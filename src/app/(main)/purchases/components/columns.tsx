@@ -2,7 +2,7 @@
 
 import { ColumnDef } from '@tanstack/react-table';
 import { PurchaseOrder, Contact } from '@/lib/types';
-import { MoreHorizontal, ArrowUpDown } from 'lucide-react';
+import { MoreHorizontal, ArrowUpDown, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
@@ -18,6 +19,7 @@ import { es } from 'date-fns/locale';
 type GetColumnsProps = {
   onEdit: (order: PurchaseOrder) => void;
   onDelete: (order: PurchaseOrder) => void;
+  onPreview: (order: PurchaseOrder) => void;
   suppliers: Contact[];
 }
 
@@ -29,7 +31,7 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 
-export const getColumns = ({ onEdit, onDelete, suppliers }: GetColumnsProps): ColumnDef<PurchaseOrder>[] => [
+export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumnsProps): ColumnDef<PurchaseOrder>[] => [
   {
     accessorKey: 'id',
     header: ({ column }) => {
@@ -48,7 +50,7 @@ export const getColumns = ({ onEdit, onDelete, suppliers }: GetColumnsProps): Co
   {
     accessorKey: 'date',
     header: 'Fecha',
-    cell: ({ row }) => format(new Date(row.getValue('date')), 'dd-MM-yyyy', { locale: es })
+    cell: ({ row }) => format(parseISO(row.getValue('date')), 'dd-MM-yyyy', { locale: es })
   },
   {
     accessorKey: 'supplierId',
@@ -65,8 +67,20 @@ export const getColumns = ({ onEdit, onDelete, suppliers }: GetColumnsProps): Co
   },
   {
     accessorKey: 'totalAmount',
-    header: 'Monto Total',
-    cell: ({ row }) => formatCurrency(row.getValue('totalAmount')),
+    header: ({ column }) => {
+        return (
+          <div className="text-right">
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            >
+              Monto Total
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    cell: ({ row }) => <div className='text-right'>{formatCurrency(row.getValue('totalAmount'))}</div>,
   },
   {
     accessorKey: 'status',
@@ -93,9 +107,14 @@ export const getColumns = ({ onEdit, onDelete, suppliers }: GetColumnsProps): Co
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => onPreview(order)}>
+              <Eye className='mr-2 h-4 w-4' />
+              Visualizar
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(order)}>
               Editar
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem 
               className="text-destructive focus:text-destructive"
               onClick={() => onDelete(order)}

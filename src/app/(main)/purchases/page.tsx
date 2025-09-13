@@ -18,12 +18,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { PurchaseOrderPreview } from './components/purchase-order-preview';
+
 
 export default function PurchasesPage() {
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<PurchaseOrder | null>(null);
+  const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   
   const suppliers = contacts.filter(c => c.type === 'supplier');
@@ -34,7 +37,7 @@ export default function PurchasesPage() {
       setPurchaseOrders(prev => prev.map(o => o.id === order.id ? order : o));
     } else {
       // Add
-      const lastId = purchaseOrders.length > 0 ? parseInt(purchaseOrders[purchaseOrders.length - 1].id.split('-')[1]) : 1000;
+      const lastId = purchaseOrders.length > 0 ? parseInt(purchaseOrders.sort((a,b) => parseInt(a.id.split('-')[1]) - parseInt(b.id.split('-')[1]))[purchaseOrders.length - 1].id.split('-')[1]) : 1000;
       const newOrder = {
         ...order,
         id: `OC-${lastId + 1}`,
@@ -53,6 +56,10 @@ export default function PurchasesPage() {
   const handleDelete = (order: PurchaseOrder) => {
     setDeletingOrder(order);
   };
+
+  const handlePreview = (order: PurchaseOrder) => {
+    setPreviewingOrder(order);
+  }
   
   const confirmDelete = () => {
     if (deletingOrder) {
@@ -68,7 +75,7 @@ export default function PurchasesPage() {
     }
   }
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, suppliers });
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreview, suppliers });
 
   return (
     <>
@@ -108,6 +115,15 @@ export default function PurchasesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {previewingOrder && (
+        <PurchaseOrderPreview
+          order={previewingOrder}
+          supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
+          isOpen={!!previewingOrder}
+          onOpenChange={(open) => !open && setPreviewingOrder(null)}
+        />
+      )}
     </>
   );
 }

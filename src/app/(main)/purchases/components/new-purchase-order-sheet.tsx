@@ -36,25 +36,25 @@ const PRODUCTS = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MANDARINAS"];
 const CALIBERS = ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES"];
 const UNITS = ["Kilos", "Cajas"];
 
-const initialFormData: Omit<PurchaseOrder, 'id' | 'totalAmount'> = {
+const getInitialFormData = (): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'> => ({
     supplierId: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     items: [{ id: `temp-${Date.now()}`, product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 }],
     status: 'pending' as 'pending' | 'completed' | 'cancelled',
-};
+});
 
 export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, suppliers }: NewPurchaseOrderSheetProps) {
-  const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount'>>(initialFormData);
+  const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData());
 
   useEffect(() => {
     if (order) {
-        const { totalAmount, ...rest } = order;
+        const { totalAmount, totalKilos, ...rest } = order;
         setFormData({
             ...rest,
             date: format(new Date(order.date), 'yyyy-MM-dd'),
         });
     } else {
-      setFormData(initialFormData);
+      setFormData(getInitialFormData());
     }
   }, [order, isOpen]);
   
@@ -94,10 +94,20 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const totalAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
+    const totalKilos = formData.items.reduce((sum, item) => {
+      // Assuming 'Kilos' is the primary unit for total weight calculation
+      if (item.unit === 'Kilos') {
+        return sum + Number(item.quantity || 0);
+      }
+      // You might need a conversion factor if 'Cajas' should be included in total kilos
+      return sum;
+    }, 0);
+
 
     const orderToSave = {
         ...formData,
         totalAmount,
+        totalKilos,
     }
 
     if(order) {

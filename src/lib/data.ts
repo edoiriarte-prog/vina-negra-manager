@@ -8,9 +8,9 @@ export const contacts: Contact[] = [
 ];
 
 export const purchaseOrders: PurchaseOrder[] = [
-  { id: 'OC-1001', supplierId: '1', date: '2023-10-01', items: [{ id: 'p1', product: 'UVAS', caliber: 'PRIMERA', quantity: 5000, unit: 'Kilos', price: 3000 }, { id: 'p2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 3000, unit: 'Kilos', price: 2500 }], totalAmount: 22500000, status: 'completed' },
-  { id: 'OC-1002', supplierId: '1', date: '2023-10-08', items: [{ id: 'p3', product: 'PALTAS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 4000 }, { id: 'p4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 3500 }], totalAmount: 38000000, status: 'completed' },
-  { id: 'OC-1003', supplierId: '1', date: '2023-10-15', items: [{ id: 'p5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 7000, unit: 'Kilos', price: 2000 }, { id: 'p6', product: 'DURAZNOS', caliber: 'PRIMERA', quantity: 2000, unit: 'Kilos', price: 1500 }], totalAmount: 17000000, status: 'completed' },
+  { id: 'OC-1001', supplierId: '1', date: '2023-10-01', items: [{ id: 'p1', product: 'UVAS', caliber: 'PRIMERA', quantity: 5000, unit: 'Kilos', price: 3000 }, { id: 'p2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 3000, unit: 'Kilos', price: 2500 }], totalAmount: 22500000, totalKilos: 8000, status: 'completed' },
+  { id: 'OC-1002', supplierId: '1', date: '2023-10-08', items: [{ id: 'p3', product: 'PALTAS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 4000 }, { id: 'p4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 3500 }], totalAmount: 38000000, totalKilos: 10000, status: 'completed' },
+  { id: 'OC-1003', supplierId: '1', date: '2023-10-15', items: [{ id: 'p5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 7000, unit: 'Kilos', price: 2000 }, { id: 'p6', product: 'DURAZNOS', caliber: 'PRIMERA', quantity: 2000, unit: 'Kilos', price: 1500 }], totalAmount: 17000000, totalKilos: 9000, status: 'completed' },
 ];
 
 export const salesOrders: SalesOrder[] = [
