@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 type GetColumnsProps = {
   onEdit: (order: PurchaseOrder) => void;
@@ -27,8 +28,6 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-const formatKilos = (value: number) =>
-  `${new Intl.NumberFormat('es-CL').format(value)} kg`;
 
 export const getColumns = ({ onEdit, onDelete, suppliers }: GetColumnsProps): ColumnDef<PurchaseOrder>[] => [
   {
@@ -49,7 +48,7 @@ export const getColumns = ({ onEdit, onDelete, suppliers }: GetColumnsProps): Co
   {
     accessorKey: 'date',
     header: 'Fecha',
-    cell: ({ row }) => format(parseISO(row.getValue('date')), 'dd-MM-yyyy')
+    cell: ({ row }) => format(new Date(row.getValue('date')), 'dd-MM-yyyy', { locale: es })
   },
   {
     accessorKey: 'supplierId',
@@ -63,11 +62,6 @@ export const getColumns = ({ onEdit, onDelete, suppliers }: GetColumnsProps): Co
       const supplier = suppliers.find(s => s.id === row.original.supplierId);
       return supplier ? supplier.name.toLowerCase().includes(value.toLowerCase()) : false;
     }
-  },
-  {
-    accessorKey: 'totalKilos',
-    header: 'Kilos Totales',
-    cell: ({ row }) => formatKilos(row.getValue('totalKilos')),
   },
   {
     accessorKey: 'totalAmount',

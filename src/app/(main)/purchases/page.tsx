@@ -34,9 +34,10 @@ export default function PurchasesPage() {
       setPurchaseOrders(prev => prev.map(o => o.id === order.id ? order : o));
     } else {
       // Add
+      const lastId = purchaseOrders.length > 0 ? parseInt(purchaseOrders[purchaseOrders.length - 1].id.split('-')[1]) : 1000;
       const newOrder = {
         ...order,
-        id: `OC-00${purchaseOrders.length + 1}`,
+        id: `OC-${lastId + 1}`,
       };
       setPurchaseOrders(prev => [...prev, newOrder]);
     }

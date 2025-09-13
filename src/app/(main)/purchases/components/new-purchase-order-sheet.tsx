@@ -32,19 +32,23 @@ type NewPurchaseOrderSheetProps = {
   suppliers: Contact[];
 };
 
-const initialFormData = {
+const PRODUCTS = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MANDARINAS"];
+const CALIBERS = ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES"];
+const UNITS = ["Kilos", "Cajas"];
+
+const initialFormData: Omit<PurchaseOrder, 'id' | 'totalAmount'> = {
     supplierId: '',
     date: format(new Date(), 'yyyy-MM-dd'),
-    items: [{ id: 'temp-1', product: 'Cereza', caliber: '', quantity: 0 }],
+    items: [{ id: `temp-${Date.now()}`, product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 }],
     status: 'pending' as 'pending' | 'completed' | 'cancelled',
 };
 
 export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, suppliers }: NewPurchaseOrderSheetProps) {
-  const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalKilos' | 'totalAmount'>>(initialFormData);
+  const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount'>>(initialFormData);
 
   useEffect(() => {
     if (order) {
-        const { totalKilos, totalAmount, ...rest } = order;
+        const { totalAmount, ...rest } = order;
         setFormData({
             ...rest,
             date: format(new Date(order.date), 'yyyy-MM-dd'),
@@ -53,11 +57,6 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
       setFormData(initialFormData);
     }
   }, [order, isOpen]);
-
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
   
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
     const newItems = [...formData.items];
@@ -67,10 +66,21 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
+  const handleSelectChange = (name: keyof typeof formData | `items.${number}.${keyof OrderItem}`, value: any) => {
+    if (name.startsWith('items.')) {
+        const [_, indexStr, field] = name.split('.');
+        const index = parseInt(indexStr);
+        handleItemChange(index, field as keyof OrderItem, value);
+    } else {
+        setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+
   const addNewItem = () => {
     setFormData(prev => ({
         ...prev,
-        items: [...prev.items, { id: `temp-${Date.now()}`, product: 'Cereza', caliber: '', quantity: 0 }]
+        items: [...prev.items, { id: `temp-${Date.now()}`, product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 }]
     }))
   }
   
@@ -83,13 +93,10 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const totalKilos = formData.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-    // Simple price calculation for demo
-    const totalAmount = totalKilos * 3000; 
+    const totalAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
 
     const orderToSave = {
         ...formData,
-        totalKilos,
         totalAmount,
     }
 
@@ -97,6 +104,17 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
         onSave({ ...orderToSave, id: order.id });
     } else {
         onSave(orderToSave);
+    }
+  };
+  
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    if (name.startsWith('items.')) {
+        const [_, indexStr, field] = name.split('.');
+        const index = parseInt(indexStr);
+        handleItemChange(index, field as keyof OrderItem, field === 'quantity' || field === 'price' ? Number(value) : value);
+    } else {
+        setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
@@ -111,7 +129,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
         <PlusCircle className="mr-2 h-4 w-4" />
         Nueva Compra
       </Button>
-      <SheetContent className="sm:max-w-xl overflow-y-auto">
+      <SheetContent className="sm:max-w-3xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -130,7 +148,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
               </Label>
               <Select
                 required
-                onValueChange={(value) => setFormData(prev => ({ ...prev, supplierId: value }))}
+                onValueChange={(value) => handleSelectChange('supplierId', value)}
                 value={formData.supplierId}
               >
                 <SelectTrigger className="col-span-3">
@@ -146,27 +164,63 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
             
             <div className="my-4">
               <h4 className="font-medium mb-2">Ítems de la Orden</h4>
-                {formData.items.map((item, index) => (
-                    <div key={item.id} className="grid grid-cols-12 gap-2 items-center mb-2 p-2 border rounded-md">
-                        <div className="col-span-4">
-                             <Label htmlFor={`item-caliber-${index}`} className="sr-only">Calibre</Label>
-                             <Input id={`item-caliber-${index}`} value={item.caliber} onChange={(e) => handleItemChange(index, 'caliber', e.target.value)} placeholder="Calibre" required />
+                {formData.items.map((item, index) => {
+                  const subtotal = (item.quantity || 0) * (item.price || 0);
+                  return (
+                    <div key={item.id} className="grid grid-cols-12 gap-2 items-center mb-2 p-3 border rounded-md">
+                        {/* Product */}
+                        <div className="col-span-12 sm:col-span-3">
+                             <Label htmlFor={`item-product-${index}`}>Producto</Label>
+                             <Select required onValueChange={(value) => handleSelectChange(`items.${index}.product`, value)} value={item.product}>
+                                 <SelectTrigger><SelectValue placeholder="Producto" /></SelectTrigger>
+                                 <SelectContent>
+                                     {PRODUCTS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                 </SelectContent>
+                             </Select>
                         </div>
-                         <div className="col-span-4">
-                             <Label htmlFor={`item-quantity-${index}`} className="sr-only">Cantidad (kg)</Label>
-                             <Input id={`item-quantity-${index}`} type="number" value={item.quantity} onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))} placeholder="Kilos" required />
+                        {/* Caliber */}
+                        <div className="col-span-12 sm:col-span-3">
+                             <Label htmlFor={`item-caliber-${index}`}>Calibre</Label>
+                             <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
+                                 <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
+                                 <SelectContent>
+                                     {CALIBERS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                 </SelectContent>
+                             </Select>
                         </div>
-                        <div className="col-span-3">
-                            <Label htmlFor={`item-product-${index}`} className="sr_only sr-only">Producto</Label>
-                            <Input id={`item-product-${index}`} value={item.product} readOnly disabled />
+                        {/* Quantity */}
+                         <div className="col-span-6 sm:col-span-2">
+                             <Label htmlFor={`item-quantity-${index}`}>Cantidad</Label>
+                             <Input id={`item-quantity-${index}`} name={`items.${index}.quantity`} type="number" value={item.quantity} onChange={handleInputChange} placeholder="Cant." required />
                         </div>
-                        <div className='col-span-1'>
+                        {/* Unit */}
+                        <div className="col-span-6 sm:col-span-2">
+                            <Label htmlFor={`item-unit-${index}`}>Unidad</Label>
+                             <Select required onValueChange={(value) => handleSelectChange(`items.${index}.unit`, value)} value={item.unit}>
+                                 <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
+                                 <SelectContent>
+                                     {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                                 </SelectContent>
+                             </Select>
+                        </div>
+                        {/* Price */}
+                         <div className="col-span-6 sm:col-span-2">
+                             <Label htmlFor={`item-price-${index}`}>Precio</Label>
+                             <Input id={`item-price-${index}`} name={`items.${index}.price`} type="number" value={item.price} onChange={handleInputChange} placeholder="Precio" required />
+                        </div>
+                        {/* Subtotal */}
+                         <div className="col-span-6 sm:col-span-3">
+                             <Label>Subtotal</Label>
+                             <Input value={new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(subtotal)} readOnly disabled />
+                        </div>
+                        {/* Remove button */}
+                        <div className='col-span-12 sm:col-span-1 self-end'>
                              <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} disabled={formData.items.length <= 1}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                         </div>
                     </div>
-                ))}
+                )})}
                  <Button type="button" variant="outline" size="sm" onClick={addNewItem} className='mt-2'>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Agregar Ítem
@@ -180,7 +234,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
               </Label>
               <Select
                 required
-                onValueChange={(value: 'pending' | 'completed' | 'cancelled') => setFormData(prev => ({...prev, status: value}))}
+                onValueChange={(value: 'pending' | 'completed' | 'cancelled') => handleSelectChange('status', value)}
                 value={formData.status}
               >
                 <SelectTrigger className="col-span-3">
@@ -194,7 +248,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
               </Select>
             </div>
           </div>
-          <SheetFooter>
+          <SheetFooter className="mt-6">
             <SheetClose asChild>
               <Button type="button" variant="outline">
                 Cancelar

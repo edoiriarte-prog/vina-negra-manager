@@ -13,7 +13,9 @@ export type OrderItem = {
   id: string;
   product: string;
   caliber: string;
-  quantity: number; // in kgs
+  quantity: number;
+  unit: 'Kilos' | 'Cajas';
+  price: number;
 };
 
 export type PurchaseOrder = {
@@ -21,7 +23,6 @@ export type PurchaseOrder = {
   supplierId: string;
   date: string;
   items: OrderItem[];
-  totalKilos: number;
   totalAmount: number;
   status: 'pending' | 'completed' | 'cancelled';
 };
