@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function FinancialsPage() {
@@ -32,6 +34,7 @@ export default function FinancialsPage() {
   const [deletingMovement, setDeletingMovement] = useState<FinancialMovement | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
@@ -41,20 +44,16 @@ export default function FinancialsPage() {
     if ('id' in movement) {
       // Update
       setFinancialMovements(prev => prev.map(m => m.id === movement.id ? movement : m));
+      toast({ title: "Movimiento Actualizado" });
     } else {
       // Add
-      const sortedMovements = [...financialMovements].sort((a, b) => {
-        const idA = a.id ? parseInt(a.id.split('-')[1]) : 0;
-        const idB = b.id ? parseInt(b.id.split('-')[1]) : 0;
-        return idA - idB;
-      });
-      const lastId = sortedMovements.length > 0 ? parseInt(sortedMovements[sortedMovements.length - 1].id.split('-')[1]) : 0;
-
+      const lastId = financialMovements.reduce((max, m) => Math.max(max, parseInt(m.id.split('-')[1])), 0);
       const newMovement = {
         ...movement,
         id: `M-${lastId + 1}`,
       };
       setFinancialMovements(prev => [...prev, newMovement]);
+      toast({ title: "Movimiento Creado" });
     }
     setIsSheetOpen(false);
     setEditingMovement(null);
@@ -72,6 +71,7 @@ export default function FinancialsPage() {
   const confirmDelete = () => {
     if (deletingMovement) {
       setFinancialMovements((prev) => prev.filter((m) => m.id !== deletingMovement.id));
+      toast({ variant: "destructive", title: "Movimiento Eliminado" });
       setDeletingMovement(null);
     }
   }
@@ -90,6 +90,18 @@ export default function FinancialsPage() {
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete });
 
+  const renderContent = () => {
+    if (!isClient) {
+      return (
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      )
+    }
+    return <DataTable columns={columns} data={financialMovements} />;
+  }
+
   return (
     <>
       <Card>
@@ -106,11 +118,7 @@ export default function FinancialsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isClient ? (
-            <DataTable columns={columns} data={financialMovements} />
-          ) : (
-            <p>Cargando movimientos...</p>
-          )}
+          {renderContent()}
         </CardContent>
       </Card>
       

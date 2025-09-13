@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SalesOrderPreview } from './components/sales-order-preview';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function SalesPage() {
@@ -71,6 +72,7 @@ export default function SalesPage() {
     if ('id' in order) {
       // Update
       setSalesOrders(prev => prev.map(o => o.id === order.id ? order : o));
+      toast({ title: 'Orden Actualizada', description: `La orden ${order.id} ha sido actualizada.` });
     } else {
       // Add
       const sortedOrders = [...salesOrders].sort((a,b) => {
@@ -84,6 +86,7 @@ export default function SalesPage() {
         id: `OV-${lastId + 1}`,
       };
       setSalesOrders(prev => [...prev, newOrder]);
+      toast({ title: 'Orden Creada', description: `La orden ${newOrder.id} ha sido creada.` });
     }
     setIsSheetOpen(false);
     setEditingOrder(null);
@@ -105,6 +108,7 @@ export default function SalesPage() {
   const confirmDelete = () => {
     if (deletingOrder) {
       setSalesOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id));
+      toast({ variant: 'destructive', title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
       setDeletingOrder(null);
     }
   }
@@ -122,6 +126,18 @@ export default function SalesPage() {
   }
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreview, clients });
+  
+  const renderContent = () => {
+    if (!isClient) {
+      return (
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      )
+    }
+    return <DataTable columns={columns} data={salesOrders} />;
+  }
 
   return (
     <>
@@ -139,11 +155,7 @@ export default function SalesPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isClient ? (
-            <DataTable columns={columns} data={salesOrders} />
-          ) : (
-            <p>Cargando órdenes de venta...</p>
-          )}
+          {renderContent()}
         </CardContent>
       </Card>
       

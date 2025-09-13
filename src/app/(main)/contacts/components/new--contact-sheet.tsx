@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -25,10 +24,11 @@ import { Contact } from '@/lib/types';
 
 type NewContactSheetProps = {
   onAddContact: (contact: Omit<Contact, 'id'>) => void;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
 };
 
-export function NewContactSheet({ onAddContact }: NewContactSheetProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function NewContactSheet({ onAddContact, isOpen, onOpenChange }: NewContactSheetProps) {
   const [type, setType] = useState<'client' | 'supplier' | ''>('');
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -44,17 +44,13 @@ export function NewContactSheet({ onAddContact }: NewContactSheetProps) {
       type: type as 'client' | 'supplier',
     };
     onAddContact(newContact);
-    setIsOpen(false);
+    onOpenChange(false);
     event.currentTarget.reset();
     setType('');
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <Button onClick={() => setIsOpen(true)}>
-        <PlusCircle className="mr-2 h-4 w-4" />
-        Nuevo Contacto
-      </Button>
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>Crear Nuevo Contacto</SheetTitle>

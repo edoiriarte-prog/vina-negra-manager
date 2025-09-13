@@ -21,6 +21,8 @@ import {
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function PurchasesPage() {
@@ -31,6 +33,7 @@ export default function PurchasesPage() {
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
@@ -42,6 +45,7 @@ export default function PurchasesPage() {
     if ('id' in order) {
       // Update
       setPurchaseOrders(prev => prev.map(o => o.id === order.id ? order : o));
+      toast({ title: 'Orden Actualizada', description: `La orden ${order.id} ha sido actualizada.` });
     } else {
       // Add
       const sortedOrders = [...purchaseOrders].sort((a,b) => {
@@ -55,6 +59,7 @@ export default function PurchasesPage() {
         id: `OC-${lastId + 1}`,
       };
       setPurchaseOrders(prev => [...prev, newOrder]);
+      toast({ title: 'Orden Creada', description: `La orden ${newOrder.id} ha sido creada.` });
     }
     setIsSheetOpen(false);
     setEditingOrder(null);
@@ -76,6 +81,7 @@ export default function PurchasesPage() {
   const confirmDelete = () => {
     if (deletingOrder) {
       setPurchaseOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id));
+      toast({ variant: 'destructive', title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
       setDeletingOrder(null);
     }
   }
@@ -94,6 +100,18 @@ export default function PurchasesPage() {
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreview, suppliers });
 
+  const renderContent = () => {
+    if (!isClient) {
+      return (
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      )
+    }
+    return <DataTable columns={columns} data={purchaseOrders} />;
+  }
+
   return (
     <>
       <Card>
@@ -110,11 +128,7 @@ export default function PurchasesPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isClient ? (
-            <DataTable columns={columns} data={purchaseOrders} />
-          ) : (
-            <p>Cargando órdenes de compra...</p>
-          )}
+          {renderContent()}
         </CardContent>
       </Card>
       

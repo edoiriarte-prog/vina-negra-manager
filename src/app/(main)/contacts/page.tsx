@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 
 export default function ContactsPage() {
@@ -27,11 +28,13 @@ export default function ContactsPage() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const { toast } = useToast();
 
   const handleSaveContact = (contact: Contact | Omit<Contact, 'id'>) => {
     if ('id' in contact) {
       // Update
       setContacts(prev => prev.map(c => c.id === contact.id ? contact : c));
+       toast({ title: "Contacto Actualizado", description: `El contacto ${contact.name} ha sido actualizado.` });
     } else {
       // Add
       const newContact = {
@@ -39,6 +42,7 @@ export default function ContactsPage() {
         id: `contact-${Date.now()}`,
       };
       setContacts(prev => [...prev, newContact]);
+       toast({ title: "Contacto Creado", description: `El contacto ${contact.name} ha sido creado.` });
     }
     setIsSheetOpen(false);
     setEditingContact(null);
@@ -57,6 +61,7 @@ export default function ContactsPage() {
   const confirmDelete = () => {
     if (deletingContact) {
       setContacts((prev) => prev.filter((c) => c.id !== deletingContact.id));
+      toast({ variant: "destructive", title: "Contacto Eliminado", description: `El contacto ${deletingContact.name} ha sido eliminado.` });
       setDeletingContact(null);
     }
   }
