@@ -20,7 +20,7 @@ export default function MainLayout({
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader>
+        <SidebarHeader className="p-0">
           <Logo />
         </SidebarHeader>
         <SidebarContent>

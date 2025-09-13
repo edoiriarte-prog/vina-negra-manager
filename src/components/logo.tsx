@@ -1,17 +1,21 @@
-import { Grape } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 export function Logo({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'flex items-center gap-2 text-lg font-bold tracking-tight text-primary',
-        'font-headline',
+        'flex items-center justify-center py-2',
         className
       )}
     >
-      <Grape className="h-6 w-6" />
-      <span>Viña Negra Manager</span>
+      <Image 
+        src="/logo.png" 
+        alt="Agrocomercial Viña Negra" 
+        width={160} 
+        height={100}
+        priority
+      />
     </div>
   );
 }
