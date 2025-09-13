@@ -1,27 +1,111 @@
-import { purchaseOrders } from '@/lib/data';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+"use client";
 
-export default async function PurchasesPage() {
+import { useState } from 'react';
+import { purchaseOrders as initialPurchaseOrders } from '@/lib/data';
+import { contacts } from '@/lib/data';
+import { PurchaseOrder } from '@/lib/types';
+import { getColumns } from './components/columns';
+import { DataTable } from './components/data-table';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { NewPurchaseOrderSheet } from './components/new-purchase-order-sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
+export default function PurchasesPage() {
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(initialPurchaseOrders);
+  const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
+  const [deletingOrder, setDeletingOrder] = useState<PurchaseOrder | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  
+  const suppliers = contacts.filter(c => c.type === 'supplier');
+
+  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>) => {
+    if ('id' in order) {
+      // Update
+      setPurchaseOrders(prev => prev.map(o => o.id === order.id ? order : o));
+    } else {
+      // Add
+      const newOrder = {
+        ...order,
+        id: `OC-00${purchaseOrders.length + 1}`,
+      };
+      setPurchaseOrders(prev => [...prev, newOrder]);
+    }
+    setIsSheetOpen(false);
+    setEditingOrder(null);
+  };
+
+  const handleEdit = (order: PurchaseOrder) => {
+    setEditingOrder(order);
+    setIsSheetOpen(true);
+  };
+
+  const handleDelete = (order: PurchaseOrder) => {
+    setDeletingOrder(order);
+  };
+  
+  const confirmDelete = () => {
+    if (deletingOrder) {
+      setPurchaseOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id));
+      setDeletingOrder(null);
+    }
+  }
+
+  const handleSheetOpenChange = (open: boolean) => {
+    setIsSheetOpen(open);
+    if (!open) {
+      setEditingOrder(null);
+    }
+  }
+
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, suppliers });
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
             <div>
                 <CardTitle className="font-headline text-2xl">Gestión de Compras (O/C)</CardTitle>
                 <CardDescription>Registra todas las adquisiciones de productos.</CardDescription>
             </div>
-            <Button>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Nueva Compra
-            </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p>Listado de órdenes de compra aparecerá aquí.</p>
-        {/* DataTable for purchases will be implemented here */}
-      </CardContent>
-    </Card>
+            <NewPurchaseOrderSheet 
+              isOpen={isSheetOpen}
+              onOpenChange={handleSheetOpenChange}
+              onSave={handleSaveOrder}
+              order={editingOrder}
+              suppliers={suppliers}
+            />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <DataTable columns={columns} data={purchaseOrders} />
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro de que quieres eliminar esta orden?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente la orden
+               "{deletingOrder?.id}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingOrder(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
