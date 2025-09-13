@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -177,74 +178,82 @@ export default function ReportsPage() {
     setOpenCollapsibles(prev => ({...prev, [id]: !prev[id]}));
   }
 
-  const renderReportRows = (data: ReportData[], filter: string) => {
+  const renderReportBody = (data: ReportData[], filter: string) => {
     const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
     
     if (!isClient) {
-        return Array.from({ length: 3 }).map((_, index) => (
-            <TableRow key={`skeleton-${index}`}>
-              <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
-            </TableRow>
-        ));
+        return (
+            <TableBody>
+                {Array.from({ length: 3 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`}>
+                      <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        );
     }
     
-    return filteredData.map((item) => (
-       <Collapsible asChild key={item.contactId} onOpenChange={() => toggleCollapsible(item.contactId)} open={openCollapsibles[item.contactId]}>
-        <TableBody>
-          <TableRow className="cursor-pointer hover:bg-muted/20">
-            <CollapsibleTrigger asChild>
-              <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                      <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
-                      {item.contactName}
-                  </div>
-              </TableCell>
-            </CollapsibleTrigger>
-            <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
-            <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
-            <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
-            <TableCell className="text-center">
-                <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
-            </TableCell>
-          </TableRow>
-          <CollapsibleContent asChild>
-              <tr className="bg-muted/20 hover:bg-muted/30">
-                  <TableCell colSpan={5} className="p-0">
-                      <div className="p-4">
-                          <h4 className="font-semibold mb-2">Detalle de Órdenes</h4>
-                          <Table>
-                              <TableHeader>
-                                  <TableRow>
-                                      <TableHead>Orden ID</TableHead>
-                                      <TableHead>Fecha</TableHead>
-                                      <TableHead className="text-right">Monto</TableHead>
-                                      <TableHead className="text-right">Pagado</TableHead>
-                                      <TableHead className="text-right">Saldo</TableHead>
-                                      <TableHead className="text-center">Estado</TableHead>
-                                  </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                  {item.orders.map(order => (
-                                      <TableRow key={order.id}>
-                                          <TableCell>{order.id}</TableCell>
-                                          <TableCell>{format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                                          <TableCell className="text-right">{formatCurrency(order.amount)}</TableCell>
-                                          <TableCell className="text-right">{formatCurrency(order.paid)}</TableCell>
-                                          <TableCell className="text-right font-semibold">{formatCurrency(order.balance)}</TableCell>
-                                          <TableCell className="text-center">
-                                              <Badge variant={ order.status === 'Pagado' ? 'default' : order.status === 'Abono' ? 'secondary' : 'destructive' }>{order.status}</Badge>
-                                          </TableCell>
-                                      </TableRow>
-                                  ))}
-                              </TableBody>
-                          </Table>
+    return (
+      <TableBody>
+        {filteredData.map((item) => (
+          <Collapsible asChild key={item.contactId} onOpenChange={() => toggleCollapsible(item.contactId)} open={openCollapsibles[item.contactId]}>
+            <>
+              <TableRow className="cursor-pointer hover:bg-muted/20">
+                <CollapsibleTrigger asChild>
+                  <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                          <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
+                          {item.contactName}
                       </div>
                   </TableCell>
-              </tr>
-          </CollapsibleContent>
-        </TableBody>
-      </Collapsible>
-    ));
+                </CollapsibleTrigger>
+                <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
+                <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
+                <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
+                <TableCell className="text-center">
+                    <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
+                </TableCell>
+              </TableRow>
+              <CollapsibleContent asChild>
+                  <tr className="bg-muted/20 hover:bg-muted/30">
+                      <TableCell colSpan={5} className="p-0">
+                          <div className="p-4">
+                              <h4 className="font-semibold mb-2">Detalle de Órdenes</h4>
+                              <Table>
+                                  <TableHeader>
+                                      <TableRow>
+                                          <TableHead>Orden ID</TableHead>
+                                          <TableHead>Fecha</TableHead>
+                                          <TableHead className="text-right">Monto</TableHead>
+                                          <TableHead className="text-right">Pagado</TableHead>
+                                          <TableHead className="text-right">Saldo</TableHead>
+                                          <TableHead className="text-center">Estado</TableHead>
+                                      </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                      {item.orders.map(order => (
+                                          <TableRow key={order.id}>
+                                              <TableCell>{order.id}</TableCell>
+                                              <TableCell>{format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                                              <TableCell className="text-right">{formatCurrency(order.amount)}</TableCell>
+                                              <TableCell className="text-right">{formatCurrency(order.paid)}</TableCell>
+                                              <TableCell className="text-right font-semibold">{formatCurrency(order.balance)}</TableCell>
+                                              <TableCell className="text-center">
+                                                  <Badge variant={ order.status === 'Pagado' ? 'default' : order.status === 'Abono' ? 'secondary' : 'destructive' }>{order.status}</Badge>
+                                              </TableCell>
+                                          </TableRow>
+                                      ))}
+                                  </TableBody>
+                              </Table>
+                          </div>
+                      </TableCell>
+                  </tr>
+              </CollapsibleContent>
+            </>
+          </Collapsible>
+        ))}
+      </TableBody>
+    );
   };
   
   return (
@@ -320,7 +329,7 @@ export default function ReportsPage() {
                       <TableHead className="text-center w-[100px]">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
-                  {renderReportRows(clientReports, clientFilter)}
+                  {renderReportBody(clientReports, clientFilter)}
                 </Table>
               </div>
             </CardContent>
@@ -351,7 +360,7 @@ export default function ReportsPage() {
                       <TableHead className="text-center w-[100px]">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
-                  {renderReportRows(supplierReports, supplierFilter)}
+                  {renderReportBody(supplierReports, supplierFilter)}
                 </Table>
               </div>
             </CardContent>
