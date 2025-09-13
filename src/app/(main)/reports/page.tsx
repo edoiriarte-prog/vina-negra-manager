@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { Contact, SalesOrder, PurchaseOrder, FinancialMovement } from '@/lib/types';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -14,6 +14,9 @@ import {
   financialMovements as initialFinancialMovements,
 } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Printer } from 'lucide-react';
+import { Logo } from '@/components/logo';
 
 type ReportData = {
   contactId: string;
@@ -140,13 +143,52 @@ export default function ReportsPage() {
       </TableRow>
     ));
   };
+  
+  const handlePrint = () => {
+    window.print();
+  }
 
 
   return (
-    <div className="flex flex-col gap-6">
-      <Card>
+    <div className="flex flex-col gap-6 print:gap-0">
+       <style jsx global>{`
+        @media print {
+          body {
+            background: white !important;
+          }
+          .no-print {
+            display: none;
+          }
+          .print-container {
+            padding: 0;
+            margin: 0;
+            box-shadow: none;
+            border: none;
+          }
+          .print-header {
+             background-color: transparent !important;
+          }
+        }
+      `}</style>
+      <div className="print-header no-print flex justify-between items-center">
+        <div>
+            <h1 className="font-headline text-2xl">Informes de Cuentas</h1>
+            <p className="text-muted-foreground">Resumen de cuentas por cobrar y por pagar.</p>
+        </div>
+        <Button onClick={handlePrint}>
+            <Printer className="mr-2 h-4 w-4" />
+            Imprimir
+        </Button>
+      </div>
+      
+      <div className="hidden print:block print:mb-8">
+        <Logo />
+        <h1 className="font-headline text-2xl text-center mt-4">Informes de Cuentas</h1>
+      </div>
+
+      <Card className="print-container">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">Informe de Cuentas por Cobrar (Clientes)</CardTitle>
+          <CardTitle className="font-headline text-2xl">Cuentas por Cobrar (Clientes)</CardTitle>
           <CardDescription>Resumen de facturación, pagos y saldos pendientes de clientes.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -169,9 +211,9 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
       
-      <Card>
+      <Card className="print-container">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">Informe de Cuentas por Pagar (Proveedores)</CardTitle>
+          <CardTitle className="font-headline text-2xl">Cuentas por Pagar (Proveedores)</CardTitle>
           <CardDescription>Resumen de compras, pagos y saldos pendientes a proveedores.</CardDescription>
         </CardHeader>
         <CardContent>
