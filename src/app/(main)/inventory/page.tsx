@@ -1,9 +1,17 @@
+"use client";
+
+import { useLocalStorage } from '@/hooks/use-local-storage';
 import { getInventory } from '@/lib/data';
+import { PurchaseOrder, SalesOrder } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
 
-export default async function InventoryPage() {
-  const inventory = getInventory();
+export default function InventoryPage() {
+  const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+  const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
+  
+  const inventory = getInventory(purchaseOrders, salesOrders);
   
   const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 

@@ -34,29 +34,38 @@ export const financialMovements: FinancialMovement[] = [
   { id: 'M-006', date: '2023-10-09', type: 'expense', description: 'Pago 50% OC-1002 - Agrícola Santa Cruz', amount: 19000000, relatedOrder: { type: 'OC', id: 'OC-1002' } },
 ];
 
-export const getInventory = (): InventoryItem[] => {
+export const getInventory = (
+  currentPurchaseOrders?: PurchaseOrder[],
+  currentSalesOrders?: SalesOrder[]
+): InventoryItem[] => {
   const inventoryMap = new Map<string, { purchased: number, sold: number }>();
+  const purchases = currentPurchaseOrders || [];
+  const sales = currentSalesOrders || [];
 
-  purchaseOrders.forEach(po => {
-    po.items.forEach(item => {
-      if (item.unit === 'Kilos') {
-        const key = `${item.product} - ${item.caliber}`;
-        const existing = inventoryMap.get(key) || { purchased: 0, sold: 0 };
-        existing.purchased += item.quantity;
-        inventoryMap.set(key, existing);
-      }
-    });
+  purchases.forEach(po => {
+    if (po.status === 'completed') {
+      po.items.forEach(item => {
+        if (item.unit === 'Kilos') {
+          const key = `${item.product} - ${item.caliber}`;
+          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0 };
+          existing.purchased += item.quantity;
+          inventoryMap.set(key, existing);
+        }
+      });
+    }
   });
 
-  salesOrders.forEach(so => {
-    so.items.forEach(item => {
-       if (item.unit === 'Kilos') {
-        const key = `${item.product} - ${item.caliber}`;
-        const existing = inventoryMap.get(key) || { purchased: 0, sold: 0 };
-        existing.sold += item.quantity;
-        inventoryMap.set(key, existing);
-      }
-    });
+  sales.forEach(so => {
+     if (so.status === 'completed') {
+      so.items.forEach(item => {
+        if (item.unit === 'Kilos') {
+          const key = `${item.product} - ${item.caliber}`;
+          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0 };
+          existing.sold += item.quantity;
+          inventoryMap.set(key, existing);
+        }
+      });
+    }
   });
 
   const inventory: InventoryItem[] = [];
