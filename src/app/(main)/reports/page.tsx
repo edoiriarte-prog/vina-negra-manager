@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { Contact, SalesOrder, PurchaseOrder, FinancialMovement } from '@/lib/types';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,8 +15,22 @@ import {
 } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Printer } from 'lucide-react';
+import { Printer, ChevronDown } from 'lucide-react';
 import { Logo } from '@/components/logo';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+type OrderDetail = {
+  id: string;
+  date: string;
+  amount: number;
+  paid: number;
+  balance: number;
+  status: 'Pagado' | 'Pendiente' | 'Abono';
+};
 
 type ReportData = {
   contactId: string;
@@ -25,6 +39,7 @@ type ReportData = {
   totalPaid: number;
   pendingBalance: number;
   status: 'Pagado' | 'Pendiente' | 'Abono';
+  orders: OrderDetail[];
 };
 
 const formatCurrency = (value: number) =>
@@ -43,11 +58,20 @@ export default function ReportsPage() {
   
   const [clientReports, setClientReports] = useState<ReportData[]>([]);
   const [supplierReports, setSupplierReports] = useState<ReportData[]>([]);
+  const [clientFilter, setClientFilter] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
   const [isClient, setIsClient] = useState(false);
+  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  const getOrderStatus = (orderTotal: number, totalPaid: number) : OrderDetail['status'] => {
+      if (totalPaid <= 0 && orderTotal > 0) return 'Pendiente';
+      if (totalPaid >= orderTotal) return 'Pagado';
+      return 'Abono';
+  }
 
   useEffect(() => {
     if (isClient) {
@@ -71,13 +95,28 @@ export default function ReportsPage() {
           status = 'Abono';
         }
 
+        const orders: OrderDetail[] = clientSalesOrders.map(order => {
+          const payments = financialMovements.filter(fm => fm.relatedOrder?.id === order.id && fm.type === 'income');
+          const totalPaidForOrder = payments.reduce((sum, p) => sum + p.amount, 0);
+          const balance = order.totalAmount - totalPaidForOrder;
+          return {
+            id: order.id,
+            date: order.date,
+            amount: order.totalAmount,
+            paid: totalPaidForOrder,
+            balance: balance,
+            status: getOrderStatus(order.totalAmount, totalPaidForOrder)
+          }
+        });
+
         return {
           contactId: client.id,
           contactName: client.name,
           totalBilled,
           totalPaid,
           pendingBalance,
-          status
+          status,
+          orders
         };
       });
       setClientReports(clientReportData);
@@ -101,6 +140,20 @@ export default function ReportsPage() {
         } else if (totalPaid > 0 && pendingBalance > 0) {
           status = 'Abono';
         }
+
+        const orders: OrderDetail[] = supplierPurchaseOrders.map(order => {
+          const payments = financialMovements.filter(fm => fm.relatedOrder?.id === order.id && fm.type === 'expense');
+          const totalPaidForOrder = payments.reduce((sum, p) => sum + p.amount, 0);
+          const balance = order.totalAmount - totalPaidForOrder;
+          return {
+            id: order.id,
+            date: order.date,
+            amount: order.totalAmount,
+            paid: totalPaidForOrder,
+            balance: balance,
+            status: getOrderStatus(order.totalAmount, totalPaidForOrder)
+          }
+        });
         
         return {
           contactId: supplier.id,
@@ -109,46 +162,89 @@ export default function ReportsPage() {
           totalPaid,
           pendingBalance,
           status,
+          orders
         };
       });
       setSupplierReports(supplierReportData);
     }
   }, [contacts, salesOrders, purchaseOrders, financialMovements, isClient]);
 
+  const handlePrint = () => window.print();
 
-  const renderReportRows = (data: ReportData[]) => {
+  const toggleCollapsible = (id: string) => {
+    setOpenCollapsibles(prev => ({...prev, [id]: !prev[id]}));
+  }
+
+  const renderReportRows = (data: ReportData[], filter: string) => {
+    const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
+    
     if (!isClient) {
       return Array.from({ length: 3 }).map((_, index) => (
-        <TableRow key={`skeleton-${index}`}>
-          <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+         <TableRow key={`skeleton-${index}`}>
+          <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
         </TableRow>
       ));
     }
     
-    return data.map((item) => (
-      <TableRow key={item.contactId}>
-        <TableCell className="font-medium">{item.contactName}</TableCell>
-        <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
-        <TableCell className="text-right text-green-600">{formatCurrency(item.totalPaid)}</TableCell>
-        <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
-        <TableCell className="text-center">
-            <Badge variant={
-                item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive'
-            }>{item.status}</Badge>
-        </TableCell>
-      </TableRow>
+    return filteredData.map((item) => (
+       <Collapsible asChild key={item.contactId} onOpenChange={() => toggleCollapsible(item.contactId)} open={openCollapsibles[item.contactId]}>
+        <>
+        <TableRow className="cursor-pointer hover:bg-muted/20">
+          <CollapsibleTrigger asChild>
+             <TableCell className="font-medium">
+                <div className="flex items-center gap-2">
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
+                    {item.contactName}
+                </div>
+            </TableCell>
+          </CollapsibleTrigger>
+          <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
+          <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
+          <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
+          <TableCell className="text-center">
+              <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
+          </TableCell>
+        </TableRow>
+        <CollapsibleContent asChild>
+            <tr className="bg-muted/20 hover:bg-muted/30">
+                <TableCell colSpan={5} className="p-0">
+                    <div className="p-4">
+                        <h4 className="font-semibold mb-2">Detalle de Órdenes</h4>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Orden ID</TableHead>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead className="text-right">Monto</TableHead>
+                                    <TableHead className="text-right">Pagado</TableHead>
+                                    <TableHead className="text-right">Saldo</TableHead>
+                                    <TableHead className="text-center">Estado</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {item.orders.map(order => (
+                                    <TableRow key={order.id}>
+                                        <TableCell>{order.id}</TableCell>
+                                        <TableCell>{format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(order.amount)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(order.paid)}</TableCell>
+                                        <TableCell className="text-right font-semibold">{formatCurrency(order.balance)}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant={ order.status === 'Pagado' ? 'default' : order.status === 'Abono' ? 'secondary' : 'destructive' }>{order.status}</Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </TableCell>
+            </tr>
+        </CollapsibleContent>
+        </>
+      </Collapsible>
     ));
   };
   
-  const handlePrint = () => {
-    window.print();
-  }
-
-
   return (
     <div className="flex flex-col gap-6 print:gap-0">
        <style jsx global>{`
@@ -164,9 +260,14 @@ export default function ReportsPage() {
             margin: 0;
             box-shadow: none;
             border: none;
+            page-break-inside: avoid;
           }
-          .print-header {
+           .print-header {
              background-color: transparent !important;
+          }
+          /* Force collapsible content to be visible for printing */
+          .print-force-open > div {
+            display: table-row !important;
           }
         }
       `}</style>
@@ -192,19 +293,27 @@ export default function ReportsPage() {
           <CardDescription>Resumen de facturación, pagos y saldos pendientes de clientes.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="no-print my-4">
+             <Input 
+                placeholder="Filtrar por cliente..." 
+                value={clientFilter}
+                onChange={(e) => setClientFilter(e.target.value)}
+                className="max-w-sm"
+              />
+          </div>
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Cliente</TableHead>
+                  <TableHead className="w-[300px]">Cliente</TableHead>
                   <TableHead className="text-right">Total Facturado</TableHead>
                   <TableHead className="text-right">Total Pagado</TableHead>
                   <TableHead className="text-right">Saldo Pendiente</TableHead>
-                  <TableHead className="text-center">Estado</TableHead>
+                  <TableHead className="text-center w-[100px]">Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {renderReportRows(clientReports)}
+                {renderReportRows(clientReports, clientFilter)}
               </TableBody>
             </Table>
           </div>
@@ -217,19 +326,27 @@ export default function ReportsPage() {
           <CardDescription>Resumen de compras, pagos y saldos pendientes a proveedores.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="no-print my-4">
+             <Input 
+                placeholder="Filtrar por proveedor..." 
+                value={supplierFilter}
+                onChange={(e) => setSupplierFilter(e.target.value)}
+                className="max-w-sm"
+              />
+          </div>
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Proveedor</TableHead>
+                  <TableHead className="w-[300px]">Proveedor</TableHead>
                   <TableHead className="text-right">Total Comprado</TableHead>
                   <TableHead className="text-right">Total Pagado</TableHead>
                   <TableHead className="text-right">Saldo Pendiente</TableHead>
-                  <TableHead className="text-center">Estado</TableHead>
+                  <TableHead className="text-center w-[100px]">Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {renderReportRows(supplierReports)}
+                {renderReportRows(supplierReports, supplierFilter)}
               </TableBody>
             </Table>
           </div>
@@ -238,3 +355,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
