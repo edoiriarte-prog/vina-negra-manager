@@ -8,45 +8,82 @@ import { Upload } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { Contact, PurchaseOrder, SalesOrder, ServiceOrder } from '@/lib/types';
+import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement } from '@/lib/types';
+import { financialMovements as initialFinancialMovements } from '@/lib/data';
 
 export default function ImportPage() {
   const [contactsJson, setContactsJson] = useState('');
   const [purchasesJson, setPurchasesJson] = useState('');
   const [salesJson, setSalesJson] = useState('');
   const [servicesJson, setServicesJson] = useState('');
+  const [financialsJson, setFinancialsJson] = useState('');
   
   const [, setContacts] = useLocalStorage<Contact[]>('contacts', []);
   const [, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', []);
   const [, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', []);
   const [, setServiceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', []);
+  const [, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
+
 
   const { toast } = useToast();
 
-  const handleImport = (type: 'contacts' | 'purchases' | 'sales' | 'services') => {
+  const handleImport = (type: 'contacts' | 'purchases' | 'sales' | 'services' | 'financials') => {
+    let jsonString: string;
+    let setter: Function;
+    let count = 0;
+
+    switch (type) {
+      case 'contacts':
+        jsonString = contactsJson;
+        setter = setContacts;
+        break;
+      case 'purchases':
+        jsonString = purchasesJson;
+        setter = setPurchaseOrders;
+        break;
+      case 'sales':
+        jsonString = salesJson;
+        setter = setSalesOrders;
+        break;
+      case 'services':
+        jsonString = servicesJson;
+        setter = setServiceOrders;
+        break;
+      case 'financials':
+        jsonString = financialsJson;
+        setter = setFinancialMovements;
+        break;
+    }
+
+    if (!jsonString.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Error de Importación",
+        description: "El campo de entrada JSON no puede estar vacío.",
+      });
+      return;
+    }
+
     try {
-      let count = 0;
-      if (type === 'contacts') {
-        const data = JSON.parse(contactsJson);
-        setContacts(data);
-        count = data.length;
-      } else if (type === 'purchases') {
-        const data = JSON.parse(purchasesJson);
-        setPurchaseOrders(data);
-        count = data.length;
-      } else if (type === 'sales') {
-        const data = JSON.parse(salesJson);
-        setSalesOrders(data);
-        count = data.length;
-      } else if (type === 'services') {
-        const data = JSON.parse(servicesJson);
-        setServiceOrders(data);
-        count = data.length;
+      const data = JSON.parse(jsonString);
+
+      if (!Array.isArray(data)) {
+        toast({
+          variant: "destructive",
+          title: "Error de Importación",
+          description: "El JSON debe ser un arreglo (array) de objetos.",
+        });
+        return;
       }
+
+      setter(data);
+      count = data.length;
+
       toast({
         title: "Importación Exitosa",
         description: `Se importaron ${count} registros de ${type}.`,
       });
+
     } catch (error) {
       toast({
         variant: "destructive",
@@ -65,11 +102,12 @@ export default function ImportPage() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="contacts">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="contacts">Contactos</TabsTrigger>
             <TabsTrigger value="purchases">Compras</TabsTrigger>
             <TabsTrigger value="sales">Ventas</TabsTrigger>
             <TabsTrigger value="services">Servicios</TabsTrigger>
+            <TabsTrigger value="financials">Finanzas</TabsTrigger>
           </TabsList>
           <TabsContent value="contacts">
              <div className="flex flex-col gap-4 mt-4">
@@ -108,6 +146,16 @@ export default function ImportPage() {
                 <Button className="self-start" onClick={() => handleImport('services')}>
                     <Upload className="mr-2 h-4 w-4" />
                     Importar Servicios
+                </Button>
+            </div>
+          </TabsContent>
+           <TabsContent value="financials">
+             <div className="flex flex-col gap-4 mt-4">
+                <p className="text-sm text-muted-foreground">Pega el contenido de un arreglo JSON de movimientos financieros.</p>
+                <Textarea rows={10} placeholder='[{"id": "M-001", "date": "2023-10-07", ...}]' value={financialsJson} onChange={e => setFinancialsJson(e.target.value)} />
+                <Button className="self-start" onClick={() => handleImport('financials')}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Importar Movimientos
                 </Button>
             </div>
           </TabsContent>
