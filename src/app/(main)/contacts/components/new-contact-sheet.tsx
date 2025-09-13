@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -24,43 +24,77 @@ import {
 import { Contact } from '@/lib/types';
 
 type NewContactSheetProps = {
-  onAddContact: (contact: Omit<Contact, 'id'>) => void;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  onSave: (contact: Contact | Omit<Contact, 'id'>) => void;
+  contact: Contact | null;
 };
 
-export function NewContactSheet({ onAddContact }: NewContactSheetProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewContactSheetProps) {
   const [type, setType] = useState<'client' | 'supplier' | ''>('');
+  const [formData, setFormData] = useState<Omit<Contact, 'id' | 'type'>>({
+    name: '',
+    rut: '',
+    email: '',
+    contactPerson: '',
+    address: '',
+    commune: '',
+  });
+
+  useEffect(() => {
+    if (contact) {
+      setFormData({
+        name: contact.name,
+        rut: contact.rut,
+        email: contact.email,
+        contactPerson: contact.contactPerson,
+        address: contact.address,
+        commune: contact.commune,
+      });
+      setType(contact.type);
+    } else {
+      // Reset form when adding a new contact
+      setFormData({
+        name: '',
+        rut: '',
+        email: '',
+        contactPerson: '',
+        address: '',
+        commune: '',
+      });
+      setType('');
+    }
+  }, [contact, isOpen]);
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const newContact: Omit<Contact, 'id'> = {
-      name: formData.get('name') as string,
-      rut: formData.get('rut') as string,
-      email: formData.get('email') as string,
-      contactPerson: formData.get('contactPerson') as string,
-      address: formData.get('address') as string,
-      commune: formData.get('commune') as string,
-      type: type as 'client' | 'supplier',
-    };
-    onAddContact(newContact);
-    setIsOpen(false);
-    event.currentTarget.reset();
-    setType('');
+    if (contact) {
+        onSave({ ...formData, type: type as 'client' | 'supplier', id: contact.id });
+    } else {
+        onSave({ ...formData, type: type as 'client' | 'supplier' });
+    }
   };
 
+  const title = contact ? 'Editar Contacto' : 'Crear Nuevo Contacto';
+  const description = contact 
+    ? 'Actualice la información del contacto.'
+    : 'Complete la información para registrar un nuevo cliente o proveedor.';
+
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <Button onClick={() => setIsOpen(true)}>
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+       <Button onClick={() => onOpenChange(true)}>
         <PlusCircle className="mr-2 h-4 w-4" />
         Nuevo Contacto
       </Button>
       <SheetContent className="sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>Crear Nuevo Contacto</SheetTitle>
-          <SheetDescription>
-            Complete la información para registrar un nuevo cliente o proveedor.
-          </SheetDescription>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
@@ -68,37 +102,37 @@ export function NewContactSheet({ onAddContact }: NewContactSheetProps) {
               <Label htmlFor="name" className="text-right">
                 Nombre
               </Label>
-              <Input id="name" name="name" className="col-span-3" required />
+              <Input id="name" name="name" value={formData.name} onChange={handleInputChange} className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="rut" className="text-right">
                 RUT
               </Label>
-              <Input id="rut" name="rut" className="col-span-3" required />
+              <Input id="rut" name="rut" value={formData.rut} onChange={handleInputChange} className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="email" className="text-right">
                 Email
               </Label>
-              <Input id="email" name="email" type="email" className="col-span-3" required />
+              <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="contactPerson" className="text-right">
                 Persona
               </Label>
-              <Input id="contactPerson" name="contactPerson" className="col-span-3" />
+              <Input id="contactPerson" name="contactPerson" value={formData.contactPerson} onChange={handleInputChange} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="address" className="text-right">
                 Dirección
               </Label>
-              <Input id="address" name="address" className="col-span-3" />
+              <Input id="address" name="address" value={formData.address} onChange={handleInputChange} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="commune" className="text-right">
                 Comuna
               </Label>
-              <Input id="commune" name="commune" className="col-span-3" />
+              <Input id="commune" name="commune" value={formData.commune} onChange={handleInputChange} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="type" className="text-right">

@@ -13,7 +13,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 
-export const columns: ColumnDef<Contact>[] = [
+type GetColumnsProps = {
+  onEdit: (contact: Contact) => void;
+  onDelete: (contact: Contact) => void;
+}
+
+export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Contact>[] => [
   {
     accessorKey: 'name',
     header: ({ column }) => {
@@ -69,13 +74,20 @@ export const columns: ColumnDef<Contact>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => onEdit(contact)}>
+              Editar
+            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => navigator.clipboard.writeText(contact.email)}
             >
               Copiar Email
             </DropdownMenuItem>
-            <DropdownMenuItem>Editar</DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive focus:text-destructive">Eliminar</DropdownMenuItem>
+            <DropdownMenuItem 
+              className="text-destructive focus:text-destructive"
+              onClick={() => onDelete(contact)}
+            >
+              Eliminar
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );
