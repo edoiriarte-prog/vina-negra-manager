@@ -91,7 +91,7 @@ export function NewContactSheet({ onAddContact }: NewContactSheetProps) {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="address" className="text-right">
                 Dirección
-              Label>
+              </Label>
               <Input id="address" name="address" className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
