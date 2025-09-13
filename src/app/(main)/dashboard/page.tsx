@@ -17,7 +17,7 @@ import {
 } from '@/lib/data';
 import { PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement } from '@/lib/types';
 import KpiCard from './components/kpi-card';
-import { Boxes, DollarSign, MinusCircle, PlusCircle, Truck } from 'lucide-react';
+import { Boxes, DollarSign, MinusCircle, PlusCircle, ShoppingBag, ShoppingCart } from 'lucide-react';
 import { WeeklyRevenueChart, ExpenseBreakdownChart, KiloComparisonChart, CaliberDistributionChart } from './components/charts';
 import AiSummary from './components/ai-summary';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,14 +46,26 @@ export default function DashboardPage() {
   const totalRevenue = financialMovements
     .filter((m) => m.type === 'income')
     .reduce((sum, m) => sum + m.amount, 0);
+
   const totalPurchaseExpenses = financialMovements
     .filter((m) => m.type === 'expense' && m.relatedOrder?.type === 'OC')
     .reduce((sum, m) => sum + m.amount, 0);
+
   const totalServiceExpenses = serviceOrders.reduce(
     (sum, so) => sum + so.cost,
     0
   );
   const totalExpenses = totalPurchaseExpenses + totalServiceExpenses;
+
+  const totalSalesAmount = salesOrders.reduce(
+    (sum, order) => sum + order.totalAmount,
+    0
+  );
+  const totalPurchasesAmount = purchaseOrders.reduce(
+    (sum, order) => sum + order.totalAmount,
+    0
+  );
+
   const netResult = totalRevenue - totalExpenses;
 
   const financialDataString = `
@@ -64,31 +76,45 @@ export default function DashboardPage() {
     Resultado Final: ${netResult.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
     Kilos Comprados: ${totalKilosPurchased.toLocaleString('es-CL')} kg
     Kilos Vendidos: ${totalKilosSold.toLocaleString('es-CL')} kg
+    Total O/V: ${totalSalesAmount.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
+    Total O/C: ${totalPurchasesAmount.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
   `;
 
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {isClient ? (
           <>
             <KpiCard
-              title="Ingresos"
+              title="Ingresos (Pagos)"
               value={`$${(totalRevenue / 1000000).toFixed(1)}M`}
-              icon={<PlusCircle className="h-5 w-5 text-primary" />}
+              icon={<PlusCircle className="h-5 w-5 text-green-500" />}
               description="Total de ingresos registrados"
             />
             <KpiCard
-              title="Egresos"
+              title="Egresos (Pagos)"
               value={`$${(totalExpenses / 1000000).toFixed(1)}M`}
-              icon={<MinusCircle className="h-5 w-5 text-destructive" />}
+              icon={<MinusCircle className="h-5 w-5 text-red-500" />}
               description={`Compras: $${(totalPurchaseExpenses/1000000).toFixed(1)}M, Servicios: $${(totalServiceExpenses/1000000).toFixed(1)}M`}
             />
             <KpiCard
               title="Resultado Neto"
               value={`$${(netResult / 1000000).toFixed(1)}M`}
-              icon={<DollarSign className="h-5 w-5 text-accent-foreground" />}
-              description="Ingresos menos egresos"
+              icon={<DollarSign className="h-5 w-5 text-primary" />}
+              description="Ingresos efectivos menos egresos"
+            />
+             <KpiCard
+              title="Total Ventas (O/V)"
+              value={`$${(totalSalesAmount / 1000000).toFixed(1)}M`}
+              icon={<ShoppingCart className="h-5 w-5 text-muted-foreground" />}
+              description="Suma total de órdenes de venta"
+            />
+             <KpiCard
+              title="Total Compras (O/C)"
+              value={`$${(totalPurchasesAmount / 1000000).toFixed(1)}M`}
+              icon={<ShoppingBag className="h-5 w-5 text-muted-foreground" />}
+              description="Suma total de órdenes de compra"
             />
              <KpiCard
               title="Kilos (Comprado/Vendido)"
@@ -101,6 +127,8 @@ export default function DashboardPage() {
           </>
         ) : (
           <>
+            <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
+            <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
             <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
             <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
             <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
