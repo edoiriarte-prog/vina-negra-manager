@@ -75,7 +75,24 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
 
   const handleRelatedOrderSelect = (orderId: string) => {
     if (!relatedOrderType) return;
-    setFormData(prev => ({ ...prev, relatedOrder: { type: relatedOrderType, id: orderId }}));
+    
+    let orderAmount = 0;
+    if (relatedOrderType === 'OC') {
+        const order = purchaseOrders.find(o => o.id === orderId);
+        if (order) orderAmount = order.totalAmount;
+    } else if (relatedOrderType === 'OV') {
+        const order = salesOrders.find(o => o.id === orderId);
+        if (order) orderAmount = order.totalAmount;
+    } else if (relatedOrderType === 'OS') {
+        const order = serviceOrders.find(o => o.id === orderId);
+        if (order) orderAmount = order.cost;
+    }
+
+    setFormData(prev => ({ 
+        ...prev, 
+        relatedOrder: { type: relatedOrderType, id: orderId },
+        amount: orderAmount // Set amount to total by default
+    }));
   }
 
   const handleSuggestDescription = async () => {
@@ -91,13 +108,34 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     setIsSuggesting(true);
     try {
         let details = '';
+        let totalAmount = 0;
+
         if (formData.relatedOrder.type === 'OC') {
             const order = purchaseOrders.find(o => o.id === formData.relatedOrder?.id);
-            details = `Orden de Compra ${order?.id} por un total de ${order?.totalAmount}`;
+            if (order) {
+                details = `Orden de Compra ${order?.id}`;
+                totalAmount = order.totalAmount;
+            }
         } else if(formData.relatedOrder.type === 'OV') {
             const order = salesOrders.find(o => o.id === formData.relatedOrder?.id);
-            details = `Orden de Venta ${order?.id} por un total de ${order?.totalAmount}`;
+            if (order) {
+                details = `Orden de Venta ${order?.id}`;
+                totalAmount = order.totalAmount;
+            }
+        } else if(formData.relatedOrder.type === 'OS') {
+            const order = serviceOrders.find(o => o.id === formData.relatedOrder?.id);
+            if (order) {
+                details = `Orden de Servicio ${order?.id} (${order.description})`;
+                totalAmount = order.cost;
+            }
         }
+
+        if (formData.amount < totalAmount) {
+            details += ` por un monto de ${formData.amount} de un total de ${totalAmount} (abono).`;
+        } else {
+            details += ` por un monto de ${formData.amount} (pago total).`;
+        }
+
 
         const result = await suggestTransactionDescription({
             transactionType: formData.type,
@@ -114,7 +152,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     } finally {
         setIsSuggesting(false);
     }
-
   }
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -196,6 +233,12 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                     </Select>
                 </div>
             </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">
+                Monto
+              </Label>
+              <Input id="amount" name="amount" type="number" value={formData.amount} onChange={handleInputChange} className="col-span-3" required />
+            </div>
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="description" className="text-right pt-2">
                 Descripción
@@ -208,13 +251,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 </Button>
               </div>
             </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="amount" className="text-right">
-                Monto
-              </Label>
-              <Input id="amount" name="amount" type="number" value={formData.amount} onChange={handleInputChange} className="col-span-3" required />
-            </div>
-
           </div>
           <SheetFooter className="mt-4">
             <SheetClose asChild>

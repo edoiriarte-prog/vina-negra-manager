@@ -47,6 +47,8 @@ const prompt = ai.definePrompt({
 Transaction Type: {{{transactionType}}}
 Transaction Details: {{{transactionDetails}}}
 
+Based on the details, suggest a clear description. For example, if it's a partial payment, describe it as "Abono a [documento]". If it's a final payment, describe it as "Pago final de [documento]". If it's a single full payment, suggest "Pago [documento]".
+
 Suggested Description:`,
 });
 
