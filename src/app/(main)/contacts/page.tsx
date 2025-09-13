@@ -18,6 +18,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Button } from '@/components/ui/button';
+import { PlusCircle } from 'lucide-react';
 
 
 export default function ContactsPage() {
@@ -67,6 +69,11 @@ export default function ContactsPage() {
   }
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete });
+  
+  const openNewContactSheet = () => {
+    setEditingContact(null);
+    setIsSheetOpen(true);
+  }
 
   return (
     <>
@@ -77,18 +84,22 @@ export default function ContactsPage() {
               <CardTitle className="font-headline text-2xl">Maestro de Contactos</CardTitle>
               <CardDescription>Gestiona tus clientes y proveedores.</CardDescription>
             </div>
-            <NewContactSheet 
-              isOpen={isSheetOpen}
-              onOpenChange={handleSheetOpenChange}
-              onSave={handleSaveContact}
-              contact={editingContact}
-            />
+             <Button onClick={openNewContactSheet}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Nuevo Contacto
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
           <DataTable columns={columns} data={contacts} />
         </CardContent>
       </Card>
+      <NewContactSheet 
+        isOpen={isSheetOpen}
+        onOpenChange={handleSheetOpenChange}
+        onSave={handleSaveContact}
+        contact={editingContact}
+      />
       <AlertDialog open={!!deletingContact} onOpenChange={(open) => !open && setDeletingContact(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

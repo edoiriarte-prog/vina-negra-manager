@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts } from '@/lib/data';
 import { PurchaseOrder, Contact } from '@/lib/types';
@@ -19,6 +19,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
+import { Button } from '@/components/ui/button';
+import { PlusCircle } from 'lucide-react';
 
 
 export default function PurchasesPage() {
@@ -28,6 +30,11 @@ export default function PurchasesPage() {
   const [deletingOrder, setDeletingOrder] = useState<PurchaseOrder | null>(null);
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   const suppliers = contacts.filter(c => c.type === 'supplier');
 
@@ -37,7 +44,11 @@ export default function PurchasesPage() {
       setPurchaseOrders(prev => prev.map(o => o.id === order.id ? order : o));
     } else {
       // Add
-      const sortedOrders = [...purchaseOrders].sort((a,b) => parseInt(a.id.split('-')[1]) - parseInt(b.id.split('-')[1]));
+      const sortedOrders = [...purchaseOrders].sort((a,b) => {
+        const idA = a.id ? parseInt(a.id.split('-')[1]) : 0;
+        const idB = b.id ? parseInt(b.id.split('-')[1]) : 0;
+        return idA - idB;
+      });
       const lastId = sortedOrders.length > 0 ? parseInt(sortedOrders[sortedOrders.length - 1].id.split('-')[1]) : 1000;
       const newOrder = {
         ...order,
@@ -75,6 +86,11 @@ export default function PurchasesPage() {
       setEditingOrder(null);
     }
   }
+  
+  const openNewOrderSheet = () => {
+    setEditingOrder(null);
+    setIsSheetOpen(true);
+  }
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreview, suppliers });
 
@@ -87,19 +103,28 @@ export default function PurchasesPage() {
                 <CardTitle className="font-headline text-2xl">Gestión de Compras (O/C)</CardTitle>
                 <CardDescription>Registra todas las adquisiciones de productos.</CardDescription>
             </div>
-            <NewPurchaseOrderSheet 
-              isOpen={isSheetOpen}
-              onOpenChange={handleSheetOpenChange}
-              onSave={handleSaveOrder}
-              order={editingOrder}
-              suppliers={suppliers}
-            />
+            <Button onClick={openNewOrderSheet}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Nueva Compra
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={purchaseOrders} />
+          {isClient ? (
+            <DataTable columns={columns} data={purchaseOrders} />
+          ) : (
+            <p>Cargando órdenes de compra...</p>
+          )}
         </CardContent>
       </Card>
+      
+      <NewPurchaseOrderSheet 
+        isOpen={isSheetOpen}
+        onOpenChange={handleSheetOpenChange}
+        onSave={handleSaveOrder}
+        order={editingOrder}
+        suppliers={suppliers}
+      />
 
       <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
         <AlertDialogContent>

@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -87,10 +86,6 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-       <Button onClick={() => onOpenChange(true)}>
-        <PlusCircle className="mr-2 h-4 w-4" />
-        Nuevo Contacto
-      </Button>
       <SheetContent className="sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>

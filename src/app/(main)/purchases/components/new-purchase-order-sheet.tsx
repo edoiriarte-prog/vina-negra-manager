@@ -135,10 +135,6 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-       <Button onClick={() => onOpenChange(true)}>
-        <PlusCircle className="mr-2 h-4 w-4" />
-        Nueva Compra
-      </Button>
       <SheetContent className="sm:max-w-3xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
