@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement } from '@/lib/types';
-import { financialMovements as initialFinancialMovements } from '@/lib/data';
+import { contacts as initialContacts, purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, serviceOrders as initialServiceOrders, financialMovements as initialFinancialMovements } from '@/lib/data';
+
 
 export default function ImportPage() {
   const [contactsJson, setContactsJson] = useState('');
@@ -18,10 +19,10 @@ export default function ImportPage() {
   const [servicesJson, setServicesJson] = useState('');
   const [financialsJson, setFinancialsJson] = useState('');
   
-  const [, setContacts] = useLocalStorage<Contact[]>('contacts', []);
-  const [, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', []);
-  const [, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', []);
-  const [, setServiceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', []);
+  const [, setContacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+  const [, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+  const [, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
+  const [, setServiceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
   const [, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
 
 
@@ -30,7 +31,6 @@ export default function ImportPage() {
   const handleImport = (type: 'contacts' | 'purchases' | 'sales' | 'services' | 'financials') => {
     let jsonString: string;
     let setter: Function;
-    let count = 0;
 
     switch (type) {
       case 'contacts':
@@ -53,6 +53,13 @@ export default function ImportPage() {
         jsonString = financialsJson;
         setter = setFinancialMovements;
         break;
+      default:
+        toast({
+          variant: "destructive",
+          title: "Error de Importación",
+          description: "Tipo de dato no reconocido.",
+        });
+        return;
     }
 
     if (!jsonString.trim()) {
@@ -77,11 +84,10 @@ export default function ImportPage() {
       }
 
       setter(data);
-      count = data.length;
-
+      
       toast({
         title: "Importación Exitosa",
-        description: `Se importaron ${count} registros de ${type}.`,
+        description: `Se importaron ${data.length} registros de ${type}.`,
       });
 
     } catch (error) {
@@ -131,7 +137,7 @@ export default function ImportPage() {
           </TabsContent>
           <TabsContent value="sales">
              <div className="flex flex-col gap-4 mt-4">
-                <p className="text-sm text-muted-foreground">Pega el contenido de un arreglo JSON de órdenes de venta.</p>
+                <p className="text-sm text-muted.foreground">Pega el contenido de un arreglo JSON de órdenes de venta.</p>
                 <Textarea rows={10} placeholder='[{"id": "OV-001", "clientId": "2", ...}]' value={salesJson} onChange={e => setSalesJson(e.target.value)} />
                 <Button className="self-start" onClick={() => handleImport('sales')}>
                     <Upload className="mr-2 h-4 w-4" />
