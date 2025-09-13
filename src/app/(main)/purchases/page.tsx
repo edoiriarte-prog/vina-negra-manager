@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from 'react';
-import { purchaseOrders as initialPurchaseOrders } from '@/lib/data';
-import { contacts } from '@/lib/data';
-import { PurchaseOrder } from '@/lib/types';
+import { useLocalStorage } from '@/hooks/use-local-storage';
+import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts } from '@/lib/data';
+import { PurchaseOrder, Contact } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/alert-dialog"
 
 export default function PurchasesPage() {
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(initialPurchaseOrders);
+  const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+  const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);

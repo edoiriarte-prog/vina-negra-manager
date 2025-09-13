@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useLocalStorage } from '@/hooks/use-local-storage';
 import { contacts as initialContacts } from '@/lib/data';
 import { Contact } from '@/lib/types';
 import { getColumns } from './components/columns';
@@ -20,26 +21,27 @@ import {
 
 
 export default function ContactsPage() {
-  const [contacts, setContacts] = useState<Contact[]>(initialContacts);
+  const [contacts, setContacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-  const handleAddContact = (newContact: Omit<Contact, 'id'>) => {
-    setContacts((prevContacts) => [
-      ...prevContacts,
-      { ...newContact, id: (prevContacts.length + 1).toString() },
-    ]);
+  const handleSaveContact = (contact: Contact | Omit<Contact, 'id'>) => {
+    if ('id' in contact) {
+      // Update
+      setContacts(prev => prev.map(c => c.id === contact.id ? contact : c));
+    } else {
+      // Add
+      const newContact = {
+        ...contact,
+        id: `contact-${Date.now()}`,
+      };
+      setContacts(prev => [...prev, newContact]);
+    }
     setIsSheetOpen(false);
+    setEditingContact(null);
   };
 
-  const handleUpdateContact = (updatedContact: Contact) => {
-    setContacts((prevContacts) =>
-      prevContacts.map((c) => (c.id === updatedContact.id ? updatedContact : c))
-    );
-    setEditingContact(null);
-    setIsSheetOpen(false);
-  }
 
   const handleEdit = (contact: Contact) => {
     setEditingContact(contact);
@@ -78,7 +80,7 @@ export default function ContactsPage() {
             <NewContactSheet 
               isOpen={isSheetOpen}
               onOpenChange={handleSheetOpenChange}
-              onSave={editingContact ? handleUpdateContact : handleAddContact}
+              onSave={handleSaveContact}
               contact={editingContact}
             />
           </div>
