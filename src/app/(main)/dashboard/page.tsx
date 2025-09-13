@@ -98,11 +98,13 @@ export default function DashboardPage() {
               icon={<MinusCircle className="h-5 w-5 text-red-500" />}
               description={`Compras: $${(totalPurchaseExpenses/1000000).toFixed(1)}M, Servicios: $${(totalServiceExpenses/1000000).toFixed(1)}M`}
             />
-            <KpiCard
-              title="Resultado Neto"
-              value={`$${(netResult / 1000000).toFixed(1)}M`}
-              icon={<DollarSign className="h-5 w-5 text-primary" />}
-              description="Ingresos efectivos menos egresos"
+             <KpiCard
+              title="Kilos (Comprado/Vendido)"
+              value={`${(totalKilosPurchased / 1000).toFixed(1)}k / ${(
+                totalKilosSold / 1000
+              ).toFixed(1)}k kg`}
+              icon={<Boxes className="h-5 w-5 text-muted-foreground" />}
+              description="Volumen total de fruta"
             />
              <KpiCard
               title="Total Ventas (O/V)"
@@ -115,14 +117,6 @@ export default function DashboardPage() {
               value={`$${(totalPurchasesAmount / 1000000).toFixed(1)}M`}
               icon={<ShoppingBag className="h-5 w-5 text-muted-foreground" />}
               description="Suma total de órdenes de compra"
-            />
-             <KpiCard
-              title="Kilos (Comprado/Vendido)"
-              value={`${(totalKilosPurchased / 1000).toFixed(1)}k / ${(
-                totalKilosSold / 1000
-              ).toFixed(1)}k kg`}
-              icon={<Boxes className="h-5 w-5 text-muted-foreground" />}
-              description="Volumen total de fruta"
             />
           </>
         ) : (
