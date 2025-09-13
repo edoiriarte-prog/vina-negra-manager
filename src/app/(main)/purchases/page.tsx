@@ -37,7 +37,8 @@ export default function PurchasesPage() {
       setPurchaseOrders(prev => prev.map(o => o.id === order.id ? order : o));
     } else {
       // Add
-      const lastId = purchaseOrders.length > 0 ? parseInt(purchaseOrders.sort((a,b) => parseInt(a.id.split('-')[1]) - parseInt(b.id.split('-')[1]))[purchaseOrders.length - 1].id.split('-')[1]) : 1000;
+      const sortedOrders = [...purchaseOrders].sort((a,b) => parseInt(a.id.split('-')[1]) - parseInt(b.id.split('-')[1]));
+      const lastId = sortedOrders.length > 0 ? parseInt(sortedOrders[sortedOrders.length - 1].id.split('-')[1]) : 1000;
       const newOrder = {
         ...order,
         id: `OC-${lastId + 1}`,
