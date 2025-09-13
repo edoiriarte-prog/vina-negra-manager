@@ -66,14 +66,11 @@ export default function DashboardPage() {
     0
   );
 
-  const netResult = totalRevenue - totalExpenses;
-
   const financialDataString = `
     Ingresos Totales: ${totalRevenue.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
     Egresos Totales: ${totalExpenses.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
     - Costo Compras: ${totalPurchaseExpenses.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
     - Costo Servicios: ${totalServiceExpenses.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
-    Resultado Final: ${netResult.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
     Kilos Comprados: ${totalKilosPurchased.toLocaleString('es-CL')} kg
     Kilos Vendidos: ${totalKilosSold.toLocaleString('es-CL')} kg
     Total O/V: ${totalSalesAmount.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
@@ -99,23 +96,27 @@ export default function DashboardPage() {
               description={`Compras: $${(totalPurchaseExpenses/1000000).toFixed(1)}M, Servicios: $${(totalServiceExpenses/1000000).toFixed(1)}M`}
             />
              <KpiCard
-              title="Kilos (Comprado/Vendido)"
-              value={`${(totalKilosPurchased / 1000).toFixed(1)}k / ${(
-                totalKilosSold / 1000
-              ).toFixed(1)}k kg`}
-              icon={<Boxes className="h-5 w-5 text-muted-foreground" />}
-              description="Volumen total de fruta"
+              title="Kilos Comprados"
+              value={`${(totalKilosPurchased / 1000).toFixed(1)}k kg`}
+              icon={<ShoppingBag className="h-5 w-5 text-muted-foreground" />}
+              description="Volumen total de fruta comprada"
+            />
+             <KpiCard
+              title="Kilos Vendidos"
+              value={`${(totalKilosSold / 1000).toFixed(1)}k kg`}
+              icon={<ShoppingCart className="h-5 w-5 text-muted-foreground" />}
+              description="Volumen total de fruta vendida"
             />
              <KpiCard
               title="Total Ventas (O/V)"
               value={`$${(totalSalesAmount / 1000000).toFixed(1)}M`}
-              icon={<ShoppingCart className="h-5 w-5 text-muted-foreground" />}
+              icon={<DollarSign className="h-5 w-5 text-muted-foreground" />}
               description="Suma total de órdenes de venta"
             />
              <KpiCard
               title="Total Compras (O/C)"
               value={`$${(totalPurchasesAmount / 1000000).toFixed(1)}M`}
-              icon={<ShoppingBag className="h-5 w-5 text-muted-foreground" />}
+              icon={<DollarSign className="h-5 w-5 text-muted-foreground" />}
               description="Suma total de órdenes de compra"
             />
           </>
