@@ -1,0 +1,67 @@
+export type Contact = {
+  id: string;
+  name: string;
+  rut: string;
+  address: string;
+  commune: string;
+  email: string;
+  contactPerson: string;
+  type: 'client' | 'supplier';
+};
+
+export type OrderItem = {
+  id: string;
+  product: string;
+  caliber: string;
+  quantity: number; // in kgs
+};
+
+export type PurchaseOrder = {
+  id: string;
+  supplierId: string;
+  date: string;
+  items: OrderItem[];
+  totalKilos: number;
+  totalAmount: number;
+  status: 'pending' | 'completed' | 'cancelled';
+};
+
+export type SalesOrder = {
+  id: string;
+  clientId: string;
+  date: string;
+  items: OrderItem[];
+  totalKilos: number;
+  totalAmount: number;
+  relatedPurchaseIds: string[];
+  status: 'pending' | 'completed' | 'cancelled';
+};
+
+export type ServiceOrder = {
+  id: string;
+  provider: string;
+  date: string;
+  serviceType: string;
+  cost: number;
+  relatedPurchaseId?: string;
+  description: string;
+};
+
+export type FinancialMovement = {
+  id: string;
+  date: string;
+  type: 'income' | 'expense';
+  description: string;
+  amount: number;
+  relatedOrder?: {
+    type: 'OV' | 'OC' | 'OS';
+    id: string;
+  };
+};
+
+export type InventoryItem = {
+  caliber: string;
+  kilosPurchased: number;
+  kilosSold: number;
+  stock: number;
+};
