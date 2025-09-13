@@ -1,9 +1,8 @@
 import { contacts } from '@/lib/data';
 import { columns } from './components/columns';
 import { DataTable } from './components/data-table';
-import { PlusCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { NewContactSheet } from './components/new-contact-sheet';
 
 export default async function ContactsPage() {
   const data = contacts;
@@ -16,10 +15,7 @@ export default async function ContactsPage() {
                 <CardTitle className="font-headline text-2xl">Maestro de Contactos</CardTitle>
                 <CardDescription>Gestiona tus clientes y proveedores.</CardDescription>
             </div>
-            <Button>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Nuevo Contacto
-            </Button>
+            <NewContactSheet />
         </div>
       </CardHeader>
       <CardContent>
