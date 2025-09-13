@@ -22,6 +22,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PerformanceReports } from './components/performance-reports';
 
 type OrderDetail = {
   id: string;
@@ -179,15 +181,11 @@ export default function ReportsPage() {
     const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
     
     if (!isClient) {
-      return (
-        <TableBody>
-          {Array.from({ length: 3 }).map((_, index) => (
+        return Array.from({ length: 3 }).map((_, index) => (
             <TableRow key={`skeleton-${index}`}>
-              <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
+              <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      );
+        ));
     }
     
     return filteredData.map((item) => (
@@ -277,8 +275,8 @@ export default function ReportsPage() {
       `}</style>
       <div className="print-header no-print flex justify-between items-center">
         <div>
-            <h1 className="font-headline text-2xl">Informes de Cuentas</h1>
-            <p className="text-muted-foreground">Resumen de cuentas por cobrar y por pagar.</p>
+            <h1 className="font-headline text-2xl">Informes de Gestión</h1>
+            <p className="text-muted-foreground">Analiza el estado de cuentas y el rendimiento de tu negocio.</p>
         </div>
         <Button onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
@@ -291,67 +289,83 @@ export default function ReportsPage() {
         <h1 className="font-headline text-2xl text-center mt-4">Informes de Cuentas</h1>
       </div>
 
-      <Card className="print-container">
-        <CardHeader>
-          <CardTitle className="font-headline text-2xl">Cuentas por Cobrar (Clientes)</CardTitle>
-          <CardDescription>Resumen de facturación, pagos y saldos pendientes de clientes.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="no-print my-4">
-             <Input 
-                placeholder="Filtrar por cliente..." 
-                value={clientFilter}
-                onChange={(e) => setClientFilter(e.target.value)}
-                className="max-w-sm"
-              />
-          </div>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[300px]">Cliente</TableHead>
-                  <TableHead className="text-right">Total Facturado</TableHead>
-                  <TableHead className="text-right">Total Pagado</TableHead>
-                  <TableHead className="text-right">Saldo Pendiente</TableHead>
-                  <TableHead className="text-center w-[100px]">Estado</TableHead>
-                </TableRow>
-              </TableHeader>
-              {renderReportRows(clientReports, clientFilter)}
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card className="print-container">
-        <CardHeader>
-          <CardTitle className="font-headline text-2xl">Cuentas por Pagar (Proveedores)</CardTitle>
-          <CardDescription>Resumen de compras, pagos y saldos pendientes a proveedores.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="no-print my-4">
-             <Input 
-                placeholder="Filtrar por proveedor..." 
-                value={supplierFilter}
-                onChange={(e) => setSupplierFilter(e.target.value)}
-                className="max-w-sm"
-              />
-          </div>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[300px]">Proveedor</TableHead>
-                  <TableHead className="text-right">Total Comprado</TableHead>
-                  <TableHead className="text-right">Total Pagado</TableHead>
-                  <TableHead className="text-right">Saldo Pendiente</TableHead>
-                  <TableHead className="text-center w-[100px]">Estado</TableHead>
-                </TableRow>
-              </TableHeader>
-              {renderReportRows(supplierReports, supplierFilter)}
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="accounts" className="no-print">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="accounts">Estado de Cuentas</TabsTrigger>
+          <TabsTrigger value="performance">Rendimiento</TabsTrigger>
+        </TabsList>
+        <TabsContent value="accounts">
+          <Card className="print-container mt-6">
+            <CardHeader>
+              <CardTitle className="font-headline text-2xl">Cuentas por Cobrar (Clientes)</CardTitle>
+              <CardDescription>Resumen de facturación, pagos y saldos pendientes de clientes.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="no-print my-4">
+                <Input 
+                    placeholder="Filtrar por cliente..." 
+                    value={clientFilter}
+                    onChange={(e) => setClientFilter(e.target.value)}
+                    className="max-w-sm"
+                  />
+              </div>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[300px]">Cliente</TableHead>
+                      <TableHead className="text-right">Total Facturado</TableHead>
+                      <TableHead className="text-right">Total Pagado</TableHead>
+                      <TableHead className="text-right">Saldo Pendiente</TableHead>
+                      <TableHead className="text-center w-[100px]">Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  {renderReportRows(clientReports, clientFilter)}
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="print-container mt-6">
+            <CardHeader>
+              <CardTitle className="font-headline text-2xl">Cuentas por Pagar (Proveedores)</CardTitle>
+              <CardDescription>Resumen de compras, pagos y saldos pendientes a proveedores.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="no-print my-4">
+                <Input 
+                    placeholder="Filtrar por proveedor..." 
+                    value={supplierFilter}
+                    onChange={(e) => setSupplierFilter(e.target.value)}
+                    className="max-w-sm"
+                  />
+              </div>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[300px]">Proveedor</TableHead>
+                      <TableHead className="text-right">Total Comprado</TableHead>
+                      <TableHead className="text-right">Total Pagado</TableHead>
+                      <TableHead className="text-right">Saldo Pendiente</TableHead>
+                      <TableHead className="text-center w-[100px]">Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  {renderReportRows(supplierReports, supplierFilter)}
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="performance">
+            <PerformanceReports
+                salesOrders={salesOrders}
+                purchaseOrders={purchaseOrders}
+            />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
+
+    
