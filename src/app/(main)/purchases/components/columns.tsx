@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 type GetColumnsProps = {
   onEdit: (order: PurchaseOrder) => void;
@@ -49,7 +49,7 @@ export const getColumns = ({ onEdit, onDelete, suppliers }: GetColumnsProps): Co
   {
     accessorKey: 'date',
     header: 'Fecha',
-    cell: ({ row }) => format(new Date(row.getValue('date')), 'dd-MM-yyyy')
+    cell: ({ row }) => format(parseISO(row.getValue('date')), 'dd-MM-yyyy')
   },
   {
     accessorKey: 'supplierId',
