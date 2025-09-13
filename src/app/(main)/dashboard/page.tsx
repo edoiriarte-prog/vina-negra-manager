@@ -1,3 +1,6 @@
+"use client";
+
+import { useLocalStorage } from '@/hooks/use-local-storage';
 import {
   Card,
   CardContent,
@@ -5,18 +8,26 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {
-  purchaseOrders,
-  salesOrders,
-  serviceOrders,
+  purchaseOrders as initialPurchaseOrders,
+  salesOrders as initialSalesOrders,
+  serviceOrders as initialServiceOrders,
+  financialMovements as initialFinancialMovements,
   getInventory,
-  financialMovements,
 } from '@/lib/data';
+import { PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement } from '@/lib/types';
 import KpiCard from './components/kpi-card';
 import { Boxes, DollarSign, MinusCircle, PlusCircle, Truck } from 'lucide-react';
 import { WeeklyRevenueChart, ExpenseBreakdownChart, KiloComparisonChart, CaliberDistributionChart } from './components/charts';
 import AiSummary from './components/ai-summary';
 
 export default function DashboardPage() {
+  const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+  const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
+  const [serviceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
+  const [financialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
+  
+  const inventory = getInventory(purchaseOrders, salesOrders);
+
   const totalKilosPurchased = purchaseOrders.reduce(
     (sum, po) => sum + po.totalKilos,
     0
@@ -37,7 +48,6 @@ export default function DashboardPage() {
   );
   const totalExpenses = totalPurchaseExpenses + totalServiceExpenses;
   const netResult = totalRevenue - totalExpenses;
-  const inventory = getInventory();
 
   const financialDataString = `
     Ingresos Totales: ${totalRevenue.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}
