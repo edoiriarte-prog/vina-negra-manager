@@ -137,7 +137,7 @@ export default function ImportPage() {
           </TabsContent>
           <TabsContent value="sales">
              <div className="flex flex-col gap-4 mt-4">
-                <p className="text-sm text-muted.foreground">Pega el contenido de un arreglo JSON de órdenes de venta.</p>
+                <p className="text-sm text-muted-foreground">Pega el contenido de un arreglo JSON de órdenes de venta.</p>
                 <Textarea rows={10} placeholder='[{"id": "OV-001", "clientId": "2", ...}]' value={salesJson} onChange={e => setSalesJson(e.target.value)} />
                 <Button className="self-start" onClick={() => handleImport('sales')}>
                     <Upload className="mr-2 h-4 w-4" />
