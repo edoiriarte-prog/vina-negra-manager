@@ -10,7 +10,6 @@ import {
   ShoppingBag,
   Truck,
   Users,
-  Upload,
   BarChart,
 } from 'lucide-react';
 
@@ -30,7 +29,6 @@ const menuItems = [
   { href: '/inventory', label: 'Inventario', icon: Boxes },
   { href: '/financials', label: 'Movimientos', icon: Landmark },
   { href: '/reports', label: 'Informes', icon: BarChart },
-  { href: '/import', label: 'Importar', icon: Upload },
 ];
 
 export function MainNav({ className }: { className?: string }) {
