@@ -56,19 +56,19 @@ export default function DashboardPage() {
         <KpiCard
           title="Ingresos"
           value={`$${(totalRevenue / 1000000).toFixed(1)}M`}
-          icon={<PlusCircle className="h-5 w-5 text-green-500" />}
+          icon={<PlusCircle className="h-5 w-5 text-primary" />}
           description="Total de ingresos registrados"
         />
         <KpiCard
           title="Egresos"
           value={`$${(totalExpenses / 1000000).toFixed(1)}M`}
-          icon={<MinusCircle className="h-5 w-5 text-red-500" />}
+          icon={<MinusCircle className="h-5 w-5 text-destructive" />}
           description={`Compras: $${(totalPurchaseExpenses/1000000).toFixed(1)}M, Servicios: $${(totalServiceExpenses/1000000).toFixed(1)}M`}
         />
         <KpiCard
-          title="Resultado Final"
+          title="Resultado Neto"
           value={`$${(netResult / 1000000).toFixed(1)}M`}
-          icon={<DollarSign className="h-5 w-5 text-blue-500" />}
+          icon={<DollarSign className="h-5 w-5 text-accent-foreground" />}
           description="Ingresos menos egresos"
         />
          <KpiCard
@@ -76,13 +76,13 @@ export default function DashboardPage() {
           value={`${(totalKilosPurchased / 1000).toFixed(1)}k / ${(
             totalKilosSold / 1000
           ).toFixed(1)}k kg`}
-          icon={<Boxes className="h-5 w-5 text-orange-500" />}
+          icon={<Boxes className="h-5 w-5 text-muted-foreground" />}
           description="Volumen total de fruta"
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-         <Card>
+      <div className="grid gap-6 lg:grid-cols-3">
+         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className='font-headline text-xl'>Resumen Ejecutivo IA</CardTitle>
           </CardHeader>
@@ -90,7 +90,7 @@ export default function DashboardPage() {
             <AiSummary financialData={financialDataString} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className='font-headline text-xl'>Ingresos Semanales</CardTitle>
           </CardHeader>

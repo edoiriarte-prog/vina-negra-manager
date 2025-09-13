@@ -4,27 +4,27 @@
 
 @layer base {
   :root {
-    --background: 127 26% 94%;
+    --background: 130 30% 95%; /* light, desaturated green - #E8F2E9 */
     --foreground: 125 15% 25%;
-    --card: 127 26% 98%;
+    --card: 130 30% 99%;
     --card-foreground: 125 15% 25%;
-    --popover: 127 26% 98%;
+    --popover: 130 30% 99%;
     --popover-foreground: 125 15% 25%;
-    --primary: 125 30% 39%;
-    --primary-foreground: 120 20% 98%;
-    --secondary: 128 30% 88%;
+    --primary: 125 30% 55%; /* soft green - #A7D1AB */
+    --primary-foreground: 120 20% 15%;
+    --secondary: 130 30% 90%;
     --secondary-foreground: 125 15% 25%;
-    --muted: 128 25% 90%;
+    --muted: 130 25% 90%;
     --muted-foreground: 125 10% 45%;
-    --accent: 208 40% 70%;
-    --accent-foreground: 208 20% 25%;
+    --accent: 210 50% 69%; /* muted blue - #8FB3D1 */
+    --accent-foreground: 210 20% 15%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 128 20% 85%;
-    --input: 128 20% 90%;
-    --ring: 125 30% 39%;
-    --chart-1: 125 30% 39%;
-    --chart-2: 208 40% 70%;
+    --border: 130 20% 88%;
+    --input: 130 20% 92%;
+    --ring: 125 30% 55%;
+    --chart-1: 125 30% 55%;
+    --chart-2: 210 50% 69%;
     --chart-3: 128 30% 74%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
@@ -38,21 +38,21 @@
     --card-foreground: 130 10% 95%;
     --popover: 130 10% 12%;
     --popover-foreground: 130 10% 95%;
-    --primary: 128 30% 74%;
-    --primary-foreground: 125 25% 15%;
+    --primary: 125 30% 55%;
+    --primary-foreground: 120 20% 15%;
     --secondary: 130 10% 20%;
     --secondary-foreground: 130 10% 95%;
     --muted: 130 10% 20%;
     --muted-foreground: 130 10% 65%;
-    --accent: 208 40% 60%;
+    --accent: 210 50% 69%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 130 10% 20%;
     --input: 130 10% 20%;
-    --ring: 128 30% 74%;
-    --chart-1: 128 30% 74%;
-    --chart-2: 208 40% 60%;
+    --ring: 125 30% 55%;
+    --chart-1: 125 30% 55%;
+    --chart-2: 210 50% 69%;
     --chart-3: 125 30% 50%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
