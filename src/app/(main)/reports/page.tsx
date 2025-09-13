@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { Contact, SalesOrder, PurchaseOrder, FinancialMovement } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -171,13 +171,25 @@ export default function ReportsPage() {
     }
   }, [contacts, salesOrders, purchaseOrders, financialMovements, isClient]);
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    // Open all collapsibles before printing
+    const allIds = [...clientReports, ...supplierReports].reduce((acc, report) => {
+        acc[report.contactId] = true;
+        return acc;
+    }, {} as Record<string, boolean>);
+    setOpenCollapsibles(allIds);
+
+    // Allow state to update before printing
+    setTimeout(() => {
+        window.print();
+    }, 100);
+  }
 
   const toggleCollapsible = (id: string) => {
     setOpenCollapsibles(prev => ({...prev, [id]: !prev[id]}));
   }
   
-  const renderReportRows = (data: ReportData[], filter: string) => {
+  const renderReportBody = (data: ReportData[], filter: string) => {
     const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
     
     if (!isClient) {
@@ -194,25 +206,23 @@ export default function ReportsPage() {
     
     return filteredData.map((item) => (
       <React.Fragment key={item.contactId}>
-        <Collapsible asChild key={item.contactId} onOpenChange={() => toggleCollapsible(item.contactId)} open={openCollapsibles[item.contactId]} >
-          <TableRow className="cursor-pointer hover:bg-muted/20">
+        <TableRow className="cursor-pointer hover:bg-muted/20">
+          <TableCell className="font-medium">
             <CollapsibleTrigger asChild>
-                <TableCell className="font-medium">
-                    <div className="flex items-center gap-2 w-full">
-                        <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
-                        {item.contactName}
-                    </div>
-                </TableCell>
+                <div className="flex items-center gap-2 w-full" onClick={() => toggleCollapsible(item.contactId)}>
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
+                    {item.contactName}
+                </div>
             </CollapsibleTrigger>
-            <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
-            <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
-            <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
-            <TableCell className="text-center">
-                <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
-            </TableCell>
-          </TableRow>
-        </Collapsible>
-        <CollapsibleContent asChild>
+          </TableCell>
+          <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
+          <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
+          <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
+          <TableCell className="text-center">
+            <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
+          </TableCell>
+        </TableRow>
+        <CollapsibleContent asChild open={openCollapsibles[item.contactId]}>
             <tr className="bg-muted/20 hover:bg-muted/30">
                 <TableCell colSpan={5} className="p-0">
                     <div className="p-4">
@@ -271,12 +281,8 @@ export default function ReportsPage() {
            .print-header {
              background-color: transparent !important;
           }
-          /* Force collapsible content to be visible for printing */
-          [data-state="closed"] {
-             display: none;
-          }
-           [data-state="open"] {
-             display: table-row;
+          .collapsible-content-print {
+             display: table-row !important;
           }
         }
       `}</style>
@@ -328,7 +334,7 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {renderReportRows(clientReports, clientFilter)}
+                    {renderReportBody(clientReports, clientFilter)}
                   </TableBody>
                 </Table>
               </div>
@@ -361,7 +367,7 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                    <TableBody>
-                    {renderReportRows(supplierReports, supplierFilter)}
+                    {renderReportBody(supplierReports, supplierFilter)}
                   </TableBody>
                 </Table>
               </div>
@@ -378,5 +384,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
