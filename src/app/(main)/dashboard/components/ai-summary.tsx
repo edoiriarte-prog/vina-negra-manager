@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -63,16 +63,18 @@ export default function AiSummary({ financialData }: { financialData: string }) 
                 <Sparkles className="h-5 w-5 text-primary" />
                 Resumen Financiero Ejecutivo
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {isLoading ? (
-                <div className="flex items-center justify-center p-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : (
-                <div className="mt-4 text-foreground whitespace-pre-wrap font-body leading-relaxed">
-                    {summary}
-                </div>
-              )}
+            <AlertDialogDescription asChild>
+              <div>
+                {isLoading ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div className="mt-4 text-foreground whitespace-pre-wrap font-body leading-relaxed">
+                      {summary}
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
