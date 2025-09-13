@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   Truck,
   Users,
+  Upload
 } from 'lucide-react';
 
 import {
@@ -27,6 +28,7 @@ const menuItems = [
   { href: '/services', label: 'Servicios (O/S)', icon: Truck },
   { href: '/inventory', label: 'Inventario', icon: Boxes },
   { href: '/financials', label: 'Movimientos', icon: Landmark },
+  { href: '/import', label: 'Importar', icon: Upload },
 ];
 
 export function MainNav({ className }: { className?: string }) {
