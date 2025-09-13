@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import {
   Card,
@@ -19,12 +20,18 @@ import KpiCard from './components/kpi-card';
 import { Boxes, DollarSign, MinusCircle, PlusCircle, Truck } from 'lucide-react';
 import { WeeklyRevenueChart, ExpenseBreakdownChart, KiloComparisonChart, CaliberDistributionChart } from './components/charts';
 import AiSummary from './components/ai-summary';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [serviceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
   const [financialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   const inventory = getInventory(purchaseOrders, salesOrders);
 
@@ -63,32 +70,43 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          title="Ingresos"
-          value={`$${(totalRevenue / 1000000).toFixed(1)}M`}
-          icon={<PlusCircle className="h-5 w-5 text-primary" />}
-          description="Total de ingresos registrados"
-        />
-        <KpiCard
-          title="Egresos"
-          value={`$${(totalExpenses / 1000000).toFixed(1)}M`}
-          icon={<MinusCircle className="h-5 w-5 text-destructive" />}
-          description={`Compras: $${(totalPurchaseExpenses/1000000).toFixed(1)}M, Servicios: $${(totalServiceExpenses/1000000).toFixed(1)}M`}
-        />
-        <KpiCard
-          title="Resultado Neto"
-          value={`$${(netResult / 1000000).toFixed(1)}M`}
-          icon={<DollarSign className="h-5 w-5 text-accent-foreground" />}
-          description="Ingresos menos egresos"
-        />
-         <KpiCard
-          title="Kilos (Comprado/Vendido)"
-          value={`${(totalKilosPurchased / 1000).toFixed(1)}k / ${(
-            totalKilosSold / 1000
-          ).toFixed(1)}k kg`}
-          icon={<Boxes className="h-5 w-5 text-muted-foreground" />}
-          description="Volumen total de fruta"
-        />
+        {isClient ? (
+          <>
+            <KpiCard
+              title="Ingresos"
+              value={`$${(totalRevenue / 1000000).toFixed(1)}M`}
+              icon={<PlusCircle className="h-5 w-5 text-primary" />}
+              description="Total de ingresos registrados"
+            />
+            <KpiCard
+              title="Egresos"
+              value={`$${(totalExpenses / 1000000).toFixed(1)}M`}
+              icon={<MinusCircle className="h-5 w-5 text-destructive" />}
+              description={`Compras: $${(totalPurchaseExpenses/1000000).toFixed(1)}M, Servicios: $${(totalServiceExpenses/1000000).toFixed(1)}M`}
+            />
+            <KpiCard
+              title="Resultado Neto"
+              value={`$${(netResult / 1000000).toFixed(1)}M`}
+              icon={<DollarSign className="h-5 w-5 text-accent-foreground" />}
+              description="Ingresos menos egresos"
+            />
+             <KpiCard
+              title="Kilos (Comprado/Vendido)"
+              value={`${(totalKilosPurchased / 1000).toFixed(1)}k / ${(
+                totalKilosSold / 1000
+              ).toFixed(1)}k kg`}
+              icon={<Boxes className="h-5 w-5 text-muted-foreground" />}
+              description="Volumen total de fruta"
+            />
+          </>
+        ) : (
+          <>
+            <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
+            <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
+            <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
+            <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
+          </>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -97,7 +115,7 @@ export default function DashboardPage() {
             <CardTitle className='font-headline text-xl'>Resumen Ejecutivo IA</CardTitle>
           </CardHeader>
           <CardContent>
-            <AiSummary financialData={financialDataString} />
+            {isClient ? <AiSummary financialData={financialDataString} /> : <Skeleton className="h-24 w-full" />}
           </CardContent>
         </Card>
         <Card className="lg:col-span-2">
@@ -105,7 +123,7 @@ export default function DashboardPage() {
             <CardTitle className='font-headline text-xl'>Ingresos Semanales</CardTitle>
           </CardHeader>
           <CardContent>
-            <WeeklyRevenueChart data={financialMovements} />
+            {isClient ? <WeeklyRevenueChart data={financialMovements} /> : <Skeleton className="h-[300px] w-full" />}
           </CardContent>
         </Card>
         <Card>
@@ -113,7 +131,7 @@ export default function DashboardPage() {
             <CardTitle className='font-headline text-xl'>Desglose de Egresos</CardTitle>
           </CardHeader>
           <CardContent>
-            <ExpenseBreakdownChart purchases={totalPurchaseExpenses} services={totalServiceExpenses} />
+            {isClient ? <ExpenseBreakdownChart purchases={totalPurchaseExpenses} services={totalServiceExpenses} /> : <Skeleton className="h-[300px] w-full" />}
           </CardContent>
         </Card>
         <Card>
@@ -121,7 +139,7 @@ export default function DashboardPage() {
             <CardTitle className='font-headline text-xl'>Comparativa Semanal de Kilos</CardTitle>
           </CardHeader>
           <CardContent>
-            <KiloComparisonChart purchases={purchaseOrders} sales={salesOrders} />
+            {isClient ? <KiloComparisonChart purchases={purchaseOrders} sales={salesOrders} /> : <Skeleton className="h-[300px] w-full" />}
           </CardContent>
         </Card>
         <Card>
@@ -129,7 +147,7 @@ export default function DashboardPage() {
             <CardTitle className='font-headline text-xl'>Distribución por Calibre (Stock)</CardTitle>
           </CardHeader>
           <CardContent>
-            <CaliberDistributionChart data={inventory} />
+            {isClient ? <CaliberDistributionChart data={inventory} /> : <Skeleton className="h-[300px] w-full" />}
           </CardContent>
         </Card>
       </div>
