@@ -196,7 +196,7 @@ export default function ReportsPage() {
     return (
       <TableBody>
         {filteredData.map((item) => (
-          <Collapsible asChild key={item.contactId} onOpenChange={() => toggleCollapsible(item.contactId)} open={openCollapsibles[item.contactId]}>
+          <Collapsible key={item.contactId} asChild onOpenChange={() => toggleCollapsible(item.contactId)} open={openCollapsibles[item.contactId]}>
             <>
               <TableRow className="cursor-pointer hover:bg-muted/20">
                 <CollapsibleTrigger asChild>
@@ -376,5 +376,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
