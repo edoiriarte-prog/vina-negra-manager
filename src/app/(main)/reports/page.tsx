@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -17,7 +18,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Printer, ChevronDown } from 'lucide-react';
 import { Logo } from '@/components/logo';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -203,61 +203,57 @@ export default function ReportsPage() {
     }
     
     return filteredData.map((item) => (
-      <Collapsible asChild key={item.contactId} onOpenChange={(isOpen) => setOpenCollapsibles(prev => ({...prev, [item.contactId]: isOpen}))} open={openCollapsibles[item.contactId]}>
-        <>
-            <TableRow className="cursor-pointer hover:bg-muted/20">
-              <CollapsibleTrigger asChild>
-                <TableCell className="font-medium" onClick={() => toggleCollapsible(item.contactId)}>
-                  <div className="flex items-center gap-2 w-full">
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
-                    {item.contactName}
-                  </div>
-                </TableCell>
-              </CollapsibleTrigger>
-              <TableCell className="text-right" onClick={() => toggleCollapsible(item.contactId)}>{formatCurrency(item.totalBilled)}</TableCell>
-              <TableCell className="text-right text-green-600 dark:text-green-500" onClick={() => toggleCollapsible(item.contactId)}>{formatCurrency(item.totalPaid)}</TableCell>
-              <TableCell className="text-right font-bold" onClick={() => toggleCollapsible(item.contactId)}>{formatCurrency(item.pendingBalance)}</TableCell>
-              <TableCell className="text-center" onClick={() => toggleCollapsible(item.contactId)}>
-                <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
-              </TableCell>
-            </TableRow>
-            <CollapsibleContent asChild>
-              <tr className="bg-muted/20 hover:bg-muted/30">
-                  <TableCell colSpan={5} className="p-0">
-                      <div className="p-4">
-                          <h4 className="font-semibold mb-2">Detalle de Órdenes</h4>
-                          <Table>
-                              <TableHeader>
-                                  <TableRow>
-                                      <TableHead>Orden ID</TableHead>
-                                      <TableHead>Fecha</TableHead>
-                                      <TableHead className="text-right">Monto</TableHead>
-                                      <TableHead className="text-right">Pagado</TableHead>
-                                      <TableHead className="text-right">Saldo</TableHead>
-                                      <TableHead className="text-center">Estado</TableHead>
-                                  </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                  {item.orders.map(order => (
-                                      <TableRow key={order.id}>
-                                          <TableCell>{order.id}</TableCell>
-                                          <TableCell>{format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                                          <TableCell className="text-right">{formatCurrency(order.amount)}</TableCell>
-                                          <TableCell className="text-right">{formatCurrency(order.paid)}</TableCell>
-                                          <TableCell className="text-right font-semibold">{formatCurrency(order.balance)}</TableCell>
-                                          <TableCell className="text-center">
-                                              <Badge variant={ order.status === 'Pagado' ? 'default' : order.status === 'Abono' ? 'secondary' : 'destructive' }>{order.status}</Badge>
-                                          </TableCell>
-                                      </TableRow>
-                                  ))}
-                              </TableBody>
-                          </Table>
-                      </div>
-                  </TableCell>
-              </tr>
-            </CollapsibleContent>
-        </>
-      </Collapsible>
+      <React.Fragment key={item.contactId}>
+        <TableRow className="cursor-pointer hover:bg-muted/20" onClick={() => toggleCollapsible(item.contactId)}>
+          <TableCell className="font-medium">
+            <div className="flex items-center gap-2">
+              <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
+              {item.contactName}
+            </div>
+          </TableCell>
+          <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
+          <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
+          <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
+          <TableCell className="text-center">
+            <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
+          </TableCell>
+        </TableRow>
+        {openCollapsibles[item.contactId] && (
+          <tr className="bg-muted/20 hover:bg-muted/30">
+            <TableCell colSpan={5} className="p-0">
+                <div className="p-4">
+                    <h4 className="font-semibold mb-2">Detalle de Órdenes</h4>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Orden ID</TableHead>
+                                <TableHead>Fecha</TableHead>
+                                <TableHead className="text-right">Monto</TableHead>
+                                <TableHead className="text-right">Pagado</TableHead>
+                                <TableHead className="text-right">Saldo</TableHead>
+                                <TableHead className="text-center">Estado</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {item.orders.map(order => (
+                                <TableRow key={order.id}>
+                                    <TableCell>{order.id}</TableCell>
+                                    <TableCell>{format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(order.amount)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(order.paid)}</TableCell>
+                                    <TableCell className="text-right font-semibold">{formatCurrency(order.balance)}</TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge variant={ order.status === 'Pagado' ? 'default' : order.status === 'Abono' ? 'secondary' : 'destructive' }>{order.status}</Badge>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </TableCell>
+          </tr>
+        )}
+      </React.Fragment>
     ));
   };
   
