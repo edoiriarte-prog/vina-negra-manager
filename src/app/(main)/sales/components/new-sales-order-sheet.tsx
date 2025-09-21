@@ -116,7 +116,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     }
   };
 
-  const handleDateSelect = (field: 'advanceDueDate' | 'balanceDueDate', date: Date | undefined) => {
+  const handleDateSelect = (field: 'date' | 'advanceDueDate' | 'balanceDueDate', date: Date | undefined) => {
       if (date) {
         setFormData(prev => ({ ...prev, [field]: format(date, 'yyyy-MM-dd') }));
       }
@@ -235,7 +235,28 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                     <Label htmlFor="date" className="text-right">
                       Fecha
                     </Label>
-                    <Input id="date" name="date" type="date" value={formData.date} onChange={handleInputChange} className="col-span-3" required />
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <Button
+                            variant={"outline"}
+                            className={cn(
+                            "col-span-3 justify-start text-left font-normal",
+                            !formData.date && "text-muted-foreground"
+                            )}
+                        >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.date ? format(new Date(formData.date), "PPP") : <span>Seleccione fecha</span>}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                        <Calendar
+                            mode="single"
+                            selected={formData.date ? new Date(formData.date) : undefined}
+                            onSelect={(date) => handleDateSelect('date', date)}
+                            initialFocus
+                        />
+                        </PopoverContent>
+                    </Popover>
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="clientId" className="text-right">
