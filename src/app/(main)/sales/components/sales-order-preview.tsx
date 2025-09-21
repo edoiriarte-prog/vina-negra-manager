@@ -41,6 +41,8 @@ const formatCurrency = (value: number) =>
 
 export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: SalesOrderPreviewProps) {
   
+  const totalPackaging = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
+
   const handlePrint = () => {
     const printContents = document.getElementById('print-area-sales')?.innerHTML;
     if (printContents) {
@@ -127,7 +129,10 @@ export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: Sales
             </TableBody>
             <TableFooter>
                 <TableRow>
-                    <TableCell colSpan={6} className="text-right font-bold text-lg">Total</TableCell>
+                    <TableCell colSpan={3} className="text-right font-bold">Totales</TableCell>
+                    <TableCell className="text-right font-bold">{totalPackaging.toLocaleString('es-CL')}</TableCell>
+                    <TableCell className="text-right font-bold">{order.totalKilos.toLocaleString('es-CL')} kg</TableCell>
+                    <TableCell className="text-right font-bold text-lg" colSpan={1}>Total</TableCell>
                     <TableCell className="text-right font-bold text-lg">{formatCurrency(order.totalAmount)}</TableCell>
                 </TableRow>
             </TableFooter>
