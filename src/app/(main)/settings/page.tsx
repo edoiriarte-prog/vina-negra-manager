@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Button } from '@/components/ui/button';
@@ -13,9 +14,11 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
     const [newItem, setNewItem] = useState('');
     const { toast } = useToast();
 
+    const sortedData = useMemo(() => [...data].sort(), [data]);
+
     const handleAddItem = () => {
         if (newItem && !data.includes(newItem)) {
-            setData(prev => [...prev, newItem].sort());
+            setData(prev => [...prev, newItem]);
             setNewItem('');
             toast({ title: `${title} - Ítem Agregado`, description: `Se agregó "${newItem}".` });
         } else if (data.includes(newItem)) {
@@ -48,7 +51,7 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
                     </Button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {data.map(item => (
+                    {sortedData.map(item => (
                         <div key={item} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                             <span>{item}</span>
                             <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item)}>
