@@ -172,14 +172,12 @@ export default function ReportsPage() {
   }, [contacts, salesOrders, purchaseOrders, financialMovements, isClient]);
 
   const handlePrint = () => {
-    // Open all collapsibles before printing
     const allIds = [...clientReports, ...supplierReports].reduce((acc, report) => {
         acc[report.contactId] = true;
         return acc;
     }, {} as Record<string, boolean>);
     setOpenCollapsibles(allIds);
 
-    // Allow state to update before printing
     setTimeout(() => {
         window.print();
     }, 100);
@@ -189,7 +187,7 @@ export default function ReportsPage() {
     setOpenCollapsibles(prev => ({...prev, [id]: !prev[id]}));
   }
   
-  const renderReportBody = (data: ReportData[], filter: string) => {
+  const renderReportRows = (data: ReportData[], filter: string) => {
     const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
     
     if (!isClient) {
@@ -205,61 +203,61 @@ export default function ReportsPage() {
     }
     
     return filteredData.map((item) => (
-        <Collapsible asChild key={item.contactId} onOpenChange={() => toggleCollapsible(item.contactId)} open={openCollapsibles[item.contactId]}>
-          <>
+      <Collapsible asChild key={item.contactId} onOpenChange={(isOpen) => setOpenCollapsibles(prev => ({...prev, [item.contactId]: isOpen}))} open={openCollapsibles[item.contactId]}>
+        <>
             <TableRow className="cursor-pointer hover:bg-muted/20">
               <CollapsibleTrigger asChild>
-                <TableCell className="font-medium">
+                <TableCell className="font-medium" onClick={() => toggleCollapsible(item.contactId)}>
                   <div className="flex items-center gap-2 w-full">
                     <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
                     {item.contactName}
                   </div>
                 </TableCell>
               </CollapsibleTrigger>
-              <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
-              <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
-              <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
-              <TableCell className="text-center">
+              <TableCell className="text-right" onClick={() => toggleCollapsible(item.contactId)}>{formatCurrency(item.totalBilled)}</TableCell>
+              <TableCell className="text-right text-green-600 dark:text-green-500" onClick={() => toggleCollapsible(item.contactId)}>{formatCurrency(item.totalPaid)}</TableCell>
+              <TableCell className="text-right font-bold" onClick={() => toggleCollapsible(item.contactId)}>{formatCurrency(item.pendingBalance)}</TableCell>
+              <TableCell className="text-center" onClick={() => toggleCollapsible(item.contactId)}>
                 <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
               </TableCell>
             </TableRow>
             <CollapsibleContent asChild>
-              <TableRow className="bg-muted/20 hover:bg-muted/30">
-                <TableCell colSpan={5} className="p-0">
-                  <div className="p-4">
-                    <h4 className="font-semibold mb-2">Detalle de Órdenes</h4>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Orden ID</TableHead>
-                          <TableHead>Fecha</TableHead>
-                          <TableHead className="text-right">Monto</TableHead>
-                          <TableHead className="text-right">Pagado</TableHead>
-                          <TableHead className="text-right">Saldo</TableHead>
-                          <TableHead className="text-center">Estado</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {item.orders.map(order => (
-                          <TableRow key={order.id}>
-                            <TableCell>{order.id}</TableCell>
-                            <TableCell>{format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(order.amount)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(order.paid)}</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(order.balance)}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant={ order.status === 'Pagado' ? 'default' : order.status === 'Abono' ? 'secondary' : 'destructive' }>{order.status}</Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <tr className="bg-muted/20 hover:bg-muted/30">
+                  <TableCell colSpan={5} className="p-0">
+                      <div className="p-4">
+                          <h4 className="font-semibold mb-2">Detalle de Órdenes</h4>
+                          <Table>
+                              <TableHeader>
+                                  <TableRow>
+                                      <TableHead>Orden ID</TableHead>
+                                      <TableHead>Fecha</TableHead>
+                                      <TableHead className="text-right">Monto</TableHead>
+                                      <TableHead className="text-right">Pagado</TableHead>
+                                      <TableHead className="text-right">Saldo</TableHead>
+                                      <TableHead className="text-center">Estado</TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {item.orders.map(order => (
+                                      <TableRow key={order.id}>
+                                          <TableCell>{order.id}</TableCell>
+                                          <TableCell>{format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                                          <TableCell className="text-right">{formatCurrency(order.amount)}</TableCell>
+                                          <TableCell className="text-right">{formatCurrency(order.paid)}</TableCell>
+                                          <TableCell className="text-right font-semibold">{formatCurrency(order.balance)}</TableCell>
+                                          <TableCell className="text-center">
+                                              <Badge variant={ order.status === 'Pagado' ? 'default' : order.status === 'Abono' ? 'secondary' : 'destructive' }>{order.status}</Badge>
+                                          </TableCell>
+                                      </TableRow>
+                                  ))}
+                              </TableBody>
+                          </Table>
+                      </div>
+                  </TableCell>
+              </tr>
             </CollapsibleContent>
-          </>
-        </Collapsible>
+        </>
+      </Collapsible>
     ));
   };
   
@@ -282,9 +280,6 @@ export default function ReportsPage() {
           }
            .print-header {
              background-color: transparent !important;
-          }
-          .collapsible-content-print {
-             display: table-row !important;
           }
         }
       `}</style>
@@ -336,7 +331,7 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {renderReportBody(clientReports, clientFilter)}
+                    {renderReportRows(clientReports, clientFilter)}
                   </TableBody>
                 </Table>
               </div>
@@ -369,7 +364,7 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                    <TableBody>
-                    {renderReportBody(supplierReports, supplierFilter)}
+                    {renderReportRows(supplierReports, supplierFilter)}
                   </TableBody>
                 </Table>
               </div>
@@ -386,3 +381,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
