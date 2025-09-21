@@ -66,11 +66,17 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
         advanceDueDate: undefined,
         balanceDueDate: undefined,
         dispatchStatus: 'Pendiente',
+        carrierId: undefined,
+        driverName: undefined,
+        truckLicensePlate: undefined,
+        dispatchGuideNumber: undefined,
+        scheduledDispatchDate: undefined,
+        freightCost: undefined,
     };
 };
 
 export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId }: NewSalesOrderSheetProps) {
-  const [formData, setFormData] = useState(getInitialFormData(order));
+  const [formData, setFormData] = useState(() => getInitialFormData(order));
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, packagingTypes } = useMasterData();
