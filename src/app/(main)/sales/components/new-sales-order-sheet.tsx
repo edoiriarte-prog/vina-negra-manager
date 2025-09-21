@@ -25,7 +25,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { SalesOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useMasterData } from '@/hooks/use-master-data';
 import { SalesOrderPreview } from './sales-order-preview';
@@ -77,11 +77,17 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
 };
 
 export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId }: NewSalesOrderSheetProps) {
-  const [formData, setFormData] = useState<Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'>>(getInitialFormData(null));
+  const [formData, setFormData] = useState<Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'>>(getInitialFormData(order));
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, packagingTypes } = useMasterData();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (isOpen) {
+        setFormData(getInitialFormData(order));
+    }
+  }, [order, isOpen]);
 
   const getPreviewOrder = (): SalesOrder => {
     const totalAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
@@ -102,10 +108,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     };
   };
 
-  useEffect(() => {
-    setFormData(getInitialFormData(order));
-  }, [order, isOpen]);
-  
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
     const newItems = [...formData.items];
     const item = { ...newItems[index] };
@@ -256,13 +258,13 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             )}
                         >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {formData.date ? format(new Date(formData.date), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                            {formData.date ? format(parseISO(formData.date), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
                         </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
                         <Calendar
                             mode="single"
-                            selected={formData.date ? new Date(formData.date) : undefined}
+                            selected={formData.date ? parseISO(formData.date) : undefined}
                             onSelect={(date) => handleDateSelect('date', date)}
                             initialFocus
                         />
@@ -457,13 +459,13 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                             )}
                                         >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {formData.advanceDueDate ? format(new Date(formData.advanceDueDate), "PPP", { locale: 'es' }) : <span>Seleccione fecha</span>}
+                                            {formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), "PPP", { locale: 'es' }) : <span>Seleccione fecha</span>}
                                         </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0">
                                         <Calendar
                                             mode="single"
-                                            selected={formData.advanceDueDate ? new Date(formData.advanceDueDate) : undefined}
+                                            selected={formData.advanceDueDate ? parseISO(formData.advanceDueDate) : undefined}
                                             onSelect={(date) => handleDateSelect('advanceDueDate', date)}
                                             initialFocus
                                         />
@@ -484,13 +486,13 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                             )}
                                         >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {formData.balanceDueDate ? format(new Date(formData.balanceDueDate), "PPP", { locale: 'es' }) : <span>Seleccione fecha</span>}
+                                            {formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), "PPP", { locale: 'es' }) : <span>Seleccione fecha</span>}
                                         </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0">
                                         <Calendar
                                             mode="single"
-                                            selected={formData.balanceDueDate ? new Date(formData.balanceDueDate) : undefined}
+                                            selected={formData.balanceDueDate ? parseISO(formData.balanceDueDate) : undefined}
                                             onSelect={(date) => handleDateSelect('balanceDueDate', date)}
                                             initialFocus
                                         />
@@ -510,7 +512,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                 </div>
                                 <div className='flex justify-between'>
                                     <span className="text-muted-foreground">Vencimiento:</span>
-                                    <span className='font-medium'>{formData.advanceDueDate ? format(new Date(formData.advanceDueDate), 'dd-MM-yyyy') : '-'}</span>
+                                    <span className='font-medium'>{formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), 'dd-MM-yyyy') : '-'}</span>
                                 </div>
                                 <Separator className="my-2" />
                                  <div className='flex justify-between'>
@@ -519,7 +521,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                 </div>
                                 <div className='flex justify-between'>
                                     <span className="text-muted-foreground">Vencimiento:</span>
-                                    <span className='font-medium'>{formData.balanceDueDate ? format(new Date(formData.balanceDueDate), 'dd-MM-yyyy') : '-'}</span>
+                                    <span className='font-medium'>{formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), 'dd-MM-yyyy') : '-'}</span>
                                 </div>
                             </div>
                         </div>
@@ -562,11 +564,11 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                 <PopoverTrigger asChild>
                                     <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !formData.scheduledDispatchDate && "text-muted-foreground")}>
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {formData.scheduledDispatchDate ? format(new Date(formData.scheduledDispatchDate), "PPP", { locale: 'es' }) : <span>Seleccione fecha</span>}
+                                        {formData.scheduledDispatchDate ? format(parseISO(formData.scheduledDispatchDate), "PPP", { locale: 'es' }) : <span>Seleccione fecha</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={formData.scheduledDispatchDate ? new Date(formData.scheduledDispatchDate) : undefined} onSelect={(date) => handleDateSelect('scheduledDispatchDate', date)} initialFocus />
+                                    <Calendar mode="single" selected={formData.scheduledDispatchDate ? parseISO(formData.scheduledDispatchDate) : undefined} onSelect={(date) => handleDateSelect('scheduledDispatchDate', date)} initialFocus />
                                 </PopoverContent>
                             </Popover>
                         </div>
@@ -626,7 +628,5 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     </>
   );
 }
-
-    
 
     
