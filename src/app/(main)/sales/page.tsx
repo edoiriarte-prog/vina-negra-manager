@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory } from '@/lib/data';
 import { SalesOrder, Contact, PurchaseOrder, InventoryItem } from '@/lib/types';
@@ -44,6 +44,14 @@ export default function SalesPage() {
   const clients = contacts.filter(c => c.type === 'client');
   const inventory = getInventory(purchaseOrders, salesOrders);
 
+  const nextOrderId = useMemo(() => {
+    const lastIdNumber = salesOrders.reduce((max, order) => {
+        const idNum = parseInt(order.id.split('-')[1]);
+        return idNum > max ? idNum : max;
+    }, 2000); // Start from 2000 to ensure next is 2001 if no higher ID exists
+    return `OV-${lastIdNumber + 1}`;
+  }, [salesOrders]);
+
   const handleSaveOrder = (order: SalesOrder | Omit<SalesOrder, 'id'>) => {
      // Stock validation
     for (const item of order.items) {
@@ -75,15 +83,9 @@ export default function SalesPage() {
       toast({ title: 'Orden Actualizada', description: `La orden ${order.id} ha sido actualizada.` });
     } else {
       // Add
-      const sortedOrders = [...salesOrders].sort((a,b) => {
-        const idA = a.id ? parseInt(a.id.split('-')[1]) : 0;
-        const idB = b.id ? parseInt(b.id.split('-')[1]) : 0;
-        return idA - idB;
-      });
-      const lastId = sortedOrders.length > 0 ? parseInt(sortedOrders[sortedOrders.length - 1].id.split('-')[1]) : 0;
       const newOrder = {
         ...order,
-        id: `OV-${lastId + 1}`,
+        id: nextOrderId,
       };
       setSalesOrders(prev => [...prev, newOrder]);
       toast({ title: 'Orden Creada', description: `La orden ${newOrder.id} ha sido creada.` });
@@ -166,6 +168,7 @@ export default function SalesPage() {
         order={editingOrder}
         clients={clients}
         inventory={inventory}
+        nextOrderId={nextOrderId}
       />
 
       <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
