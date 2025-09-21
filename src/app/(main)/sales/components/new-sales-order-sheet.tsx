@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, Eye, Calendar as CalendarIcon } from 'lucide-react';
+import { PlusCircle, Trash2, Eye } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -22,8 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+
 import { SalesOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +52,8 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
         return {
             ...order,
             date: format(new Date(order.date), 'yyyy-MM-dd'),
+            advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : undefined,
+            balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
         };
     }
     return {
@@ -80,6 +81,10 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
       setFormData(getInitialFormData(order));
     }
   }, [order, isOpen]);
+
+  if (!formData) {
+    return null; // or a loading spinner
+  }
 
   const getPreviewOrder = (): SalesOrder => {
     const totalAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
@@ -119,13 +124,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         setFormData(prev => ({ ...prev, [name as keyof typeof formData]: value }));
     }
   };
-
-  const handleDateSelect = (field: 'date' | 'advanceDueDate' | 'balanceDueDate', date: Date | undefined) => {
-      if (date) {
-        setFormData(prev => ({ ...prev, [field]: format(date, 'yyyy-MM-dd') }));
-      }
-  };
-
 
   const removeItem = (index: number) => {
     setFormData(prev => ({
@@ -183,7 +181,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'advancePercentage', 'packagingQuantity'].includes(field) ? Number(value) : value);
     }
      else {
-        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage'].includes(name) ? Number(value) : value }));
+        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage', 'date', 'advanceDueDate', 'balanceDueDate'].includes(name) ? value : Number(value) }));
     }
   };
 
@@ -223,10 +221,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
      return totalAmount - advanceAmount;
   }, [totalAmount, advanceAmount, formData.paymentMethod]);
 
-  if (!formData) {
-    return null;
-  }
-
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -243,28 +237,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                     <Label htmlFor="date" className="text-right">
                       Fecha
                     </Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button
-                            variant={"outline"}
-                            className={cn(
-                            "col-span-3 justify-start text-left font-normal",
-                            !formData.date && "text-muted-foreground"
-                            )}
-                        >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {formData.date ? format(new Date(formData.date), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                        <Calendar
-                            mode="single"
-                            selected={formData.date ? new Date(formData.date) : undefined}
-                            onSelect={(date) => handleDateSelect('date', date)}
-                            initialFocus
-                        />
-                        </PopoverContent>
-                    </Popover>
+                    <Input id="date" name="date" type="date" value={formData.date} onChange={handleInputChange} className="col-span-3" required />
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="clientId" className="text-right">
@@ -444,55 +417,13 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                     <Label htmlFor="advanceDueDate" className="text-right">
                                         Venc. Anticipo
                                     </Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                            "col-span-3 justify-start text-left font-normal",
-                                            !formData.advanceDueDate && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {formData.advanceDueDate ? format(new Date(formData.advanceDueDate), "PPP", { locale: 'es' }) : <span>Seleccione fecha</span>}
-                                        </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0">
-                                        <Calendar
-                                            mode="single"
-                                            selected={formData.advanceDueDate ? new Date(formData.advanceDueDate) : undefined}
-                                            onSelect={(date) => handleDateSelect('advanceDueDate', date)}
-                                            initialFocus
-                                        />
-                                        </PopoverContent>
-                                    </Popover>
+                                    <Input id="advanceDueDate" name="advanceDueDate" type="date" value={formData.advanceDueDate || ''} onChange={handleInputChange} className="col-span-3" required />
                                 </div>
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="balanceDueDate" className="text-right">
                                         Venc. Saldo
                                     </Label>
-                                     <Popover>
-                                        <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                            "col-span-3 justify-start text-left font-normal",
-                                            !formData.balanceDueDate && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {formData.balanceDueDate ? format(new Date(formData.balanceDueDate), "PPP", { locale: 'es' }) : <span>Seleccione fecha</span>}
-                                        </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0">
-                                        <Calendar
-                                            mode="single"
-                                            selected={formData.balanceDueDate ? new Date(formData.balanceDueDate) : undefined}
-                                            onSelect={(date) => handleDateSelect('balanceDueDate', date)}
-                                            initialFocus
-                                        />
-                                        </PopoverContent>
-                                    </Popover>
+                                    <Input id="balanceDueDate" name="balanceDueDate" type="date" value={formData.balanceDueDate || ''} onChange={handleInputChange} className="col-span-3" required />
                                 </div>
                             </div>
                         )}
