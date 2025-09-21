@@ -50,9 +50,8 @@ type NewSalesOrderSheetProps = {
 
 const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
     if (order) {
-        const { totalAmount, totalKilos, totalPackages, ...rest } = order;
         return {
-            ...rest,
+            ...order,
             date: format(new Date(order.date), 'yyyy-MM-dd'),
         };
     }
@@ -223,6 +222,10 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
      if (formData.paymentMethod !== 'Pago con Anticipo y Saldo') return 0;
      return totalAmount - advanceAmount;
   }, [totalAmount, advanceAmount, formData.paymentMethod]);
+
+  if (!formData) {
+    return null;
+  }
 
   return (
     <>
