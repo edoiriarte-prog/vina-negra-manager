@@ -93,6 +93,7 @@ export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: Sales
               <div className="text-sm text-muted-foreground">
                 <p><strong>Fecha Emisión:</strong> {format(parseISO(order.date), "PPP", { locale: es })}</p>
                 <p><strong>Estado:</strong> <span className='capitalize'>{order.status}</span></p>
+                 <p><strong>Modalidad de Pago:</strong> {order.paymentMethod}</p>
               </div>
             </div>
           </div>
@@ -127,6 +128,29 @@ export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: Sales
                 </TableRow>
             </TableFooter>
           </Table>
+          
+          {order.packaging && order.packaging.length > 0 && order.packaging.every(p => p.type) && (
+            <div className='mt-6'>
+                <h4 className='font-semibold mb-2'>Detalle de Embalaje</h4>
+                 <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Tipo de Envase</TableHead>
+                            <TableHead className="text-right">Cantidad</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {order.packaging.filter(p => p.type).map(pack => (
+                             <TableRow key={pack.id}>
+                                <TableCell>{pack.type}</TableCell>
+                                <TableCell className="text-right">{pack.quantity.toLocaleString('es-CL')}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                 </Table>
+            </div>
+          )}
+
 
           <Separator className="my-4" />
           

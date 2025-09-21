@@ -80,6 +80,9 @@ function DataExport() {
                         if (row.items) {
                             newRow.items = JSON.stringify(row.items);
                         }
+                        if (row.packaging) {
+                            newRow.packaging = JSON.stringify(row.packaging);
+                        }
                         if (row.relatedOrder) {
                             newRow.relatedOrder = `${row.relatedOrder.type}-${row.relatedOrder.id}`;
                         }
@@ -123,7 +126,7 @@ function DataExport() {
 
 
 export default function SettingsPage() {
-    const { products, setProducts, calibers, setCalibers, units, setUnits } = useMasterData();
+    const { products, setProducts, calibers, setCalibers, units, setUnits, packagingTypes, setPackagingTypes } = useMasterData();
     
     return (
         <div className="flex flex-col gap-6">
@@ -132,10 +135,11 @@ export default function SettingsPage() {
                 <p className="text-muted-foreground">Administra los datos maestros y otras configuraciones de la aplicación.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <MasterDataEditor title="Productos" data={products} setData={setProducts} />
                 <MasterDataEditor title="Calibres" data={calibers} setData={setCalibers} />
                 <MasterDataEditor title="Unidades" data={units} setData={setUnits} />
+                <MasterDataEditor title="Tipos de Envase" data={packagingTypes} setData={setPackagingTypes} />
             </div>
 
             <div className='mt-6'>

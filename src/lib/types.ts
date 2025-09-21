@@ -18,6 +18,12 @@ export type OrderItem = {
   price: number;
 };
 
+export type PackagingItem = {
+  id: string;
+  type: string;
+  quantity: number;
+};
+
 export type PaymentInstallment = {
   id: string;
   salesOrderId: string;
@@ -32,6 +38,7 @@ export type SalesOrder = {
   clientId: string;
   date: string;
   items: OrderItem[];
+  packaging: PackagingItem[];
   totalKilos: number;
   totalAmount: number;
   relatedPurchaseIds: string[];

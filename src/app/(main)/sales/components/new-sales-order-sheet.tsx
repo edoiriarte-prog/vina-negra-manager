@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SalesOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
+import { SalesOrder, OrderItem, Contact, InventoryItem, PackagingItem } from '@/lib/types';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -44,6 +44,7 @@ const getInitialFormData = (): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKil
     clientId: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     items: [{ id: `temp-${Date.now()}`, product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 }],
+    packaging: [{ id: `temp-pack-${Date.now()}`, type: '', quantity: 0 }],
     relatedPurchaseIds: [],
     status: 'pending' as 'pending' | 'completed' | 'cancelled',
     paymentMethod: 'Contado',
@@ -55,7 +56,7 @@ const getInitialFormData = (): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKil
 export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, inventory, nextOrderId }: NewSalesOrderSheetProps) {
   const [formData, setFormData] = useState<Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData());
   const [isPreviewing, setIsPreviewing] = useState(false);
-  const { products, calibers, units } = useMasterData();
+  const { products, calibers, units, packagingTypes } = useMasterData();
 
   const getPreviewOrder = (): SalesOrder => {
     const totalAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
@@ -79,6 +80,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         const { totalAmount, totalKilos, ...rest } = order;
         setFormData({
             ...rest,
+            packaging: rest.packaging && rest.packaging.length > 0 ? rest.packaging : getInitialFormData().packaging,
             date: format(new Date(order.date), 'yyyy-MM-dd'),
         });
     } else {
@@ -93,13 +95,26 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     newItems[index] = item;
     setFormData(prev => ({ ...prev, items: newItems }));
   };
+  
+  const handlePackagingChange = (index: number, field: keyof PackagingItem, value: string | number) => {
+    const newPackaging = [...formData.packaging];
+    const item = { ...newPackaging[index] };
+    (item[field] as any) = value;
+    newPackaging[index] = item;
+    setFormData(prev => ({ ...prev, packaging: newPackaging }));
+  };
 
-  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalAmount' | 'totalKilos'> | `items.${number}.${keyof OrderItem}`, value: any) => {
+  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalAmount' | 'totalKilos' | 'packaging'> | `items.${number}.${keyof OrderItem}` | `packaging.${number}.${keyof PackagingItem}`, value: any) => {
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, value);
-    } else {
+    } else if (name.startsWith('packaging.')) {
+        const [_, indexStr, field] = name.split('.');
+        const index = parseInt(indexStr);
+        handlePackagingChange(index, field as keyof PackagingItem, value);
+    }
+     else {
         setFormData(prev => ({ ...prev, [name as keyof typeof formData]: value }));
     }
   };
@@ -116,6 +131,20 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     setFormData(prev => ({
         ...prev,
         items: prev.items.filter((_, i) => i !== index)
+    }))
+  }
+
+  const addNewPackaging = () => {
+    setFormData(prev => ({
+        ...prev,
+        packaging: [...prev.packaging, { id: `temp-pack-${Date.now()}`, type: '', quantity: 0 }]
+    }))
+  }
+
+  const removePackaging = (index: number) => {
+    setFormData(prev => ({
+        ...prev,
+        packaging: prev.packaging.filter((_, i) => i !== index)
     }))
   }
 
@@ -149,7 +178,12 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, field === 'quantity' || field === 'price' || field === 'advancePercentage' ? Number(value) : value);
-    } else {
+    } else if (name.startsWith('packaging.')) {
+        const [_, indexStr, field] = name.split('.');
+        const index = parseInt(indexStr);
+        handlePackagingChange(index, field as keyof PackagingItem, field === 'quantity' ? Number(value) : value);
+    }
+     else {
         setFormData((prev) => ({ ...prev, [name]: name === 'advancePercentage' ? Number(value) : value }));
     }
   };
@@ -179,7 +213,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="sm:max-w-4xl overflow-y-auto">
+        <SheetContent className="sm:max-w-5xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{title}</SheetTitle>
             <SheetDescription>{description}</SheetDescription>
@@ -314,6 +348,40 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                         Agregar Ítem
                     </Button>
                 </CardContent>
+              </Card>
+
+              <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg font-headline">Detalles de Embalaje</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {formData.packaging.map((pack, index) => (
+                        <div key={pack.id} className="grid grid-cols-12 gap-2 items-center mb-2">
+                            <div className="col-span-5">
+                                <Label>Tipo de Envase</Label>
+                                <Select required onValueChange={(value) => handleSelectChange(`packaging.${index}.type`, value)} value={pack.type}>
+                                    <SelectTrigger><SelectValue placeholder="Seleccione envase" /></SelectTrigger>
+                                    <SelectContent>
+                                        {packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="col-span-5">
+                                <Label>Cantidad</Label>
+                                <Input name={`packaging.${index}.quantity`} type="number" value={pack.quantity} onChange={handleInputChange} placeholder="Cant." required />
+                            </div>
+                            <div className="col-span-2 self-end">
+                                <Button type="button" variant="ghost" size="icon" onClick={() => removePackaging(index)} disabled={formData.packaging.length <= 1}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </div>
+                        </div>
+                    ))}
+                     <Button type="button" variant="outline" size="sm" onClick={addNewPackaging} className='mt-2'>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Agregar Envase
+                    </Button>
+                  </CardContent>
               </Card>
 
             <Card>
