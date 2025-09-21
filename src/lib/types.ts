@@ -49,6 +49,14 @@ export type SalesOrder = {
   advancePercentage?: number;
   advanceDueDate?: string;
   balanceDueDate?: string;
+  // Dispatch Info
+  carrierId?: string;
+  driverName?: string;
+  truckLicensePlate?: string;
+  dispatchGuideNumber?: string;
+  scheduledDispatchDate?: string;
+  freightCost?: number;
+  dispatchStatus?: 'Pendiente' | 'Programado' | 'En Tránsito' | 'Entregado' | 'Incidencia';
 };
 
 export type PurchaseOrder = {

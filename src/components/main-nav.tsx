@@ -38,6 +38,7 @@ const menuItems = [
 const reportItems = [
     { href: '/reports', label: 'Cuentas Corrientes', exact: true },
     { href: '/reports/upcoming-payments', label: 'Vencimientos por Cobrar' },
+    { href: '/reports/dispatch-control', label: 'Control de Despachos' },
 ];
 
 export function MainNav({ className }: { className?: string }) {

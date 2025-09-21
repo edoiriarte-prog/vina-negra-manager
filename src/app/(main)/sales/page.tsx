@@ -42,6 +42,7 @@ export default function SalesPage() {
   }, []);
   
   const clients = contacts.filter(c => c.type === 'client');
+  const carriers = contacts.filter(c => c.type === 'supplier');
   const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, editingOrder), [purchaseOrders, salesOrders, editingOrder]);
 
   const nextOrderId = useMemo(() => {
@@ -181,6 +182,7 @@ export default function SalesPage() {
         onSave={handleSaveOrder}
         order={editingOrder}
         clients={clients}
+        carriers={carriers}
         inventory={inventory}
         nextOrderId={nextOrderId}
       />
@@ -205,6 +207,7 @@ export default function SalesPage() {
         <SalesOrderPreview
           order={previewingOrder}
           client={clients.find(s => s.id === previewingOrder.clientId) || null}
+          carrier={carriers.find(s => s.id === previewingOrder.carrierId) || null}
           isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
         />

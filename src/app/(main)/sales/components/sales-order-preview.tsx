@@ -28,6 +28,7 @@ import {
 type SalesOrderPreviewProps = {
   order: SalesOrder;
   client: Contact | null;
+  carrier: Contact | null;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 };
@@ -39,7 +40,7 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: SalesOrderPreviewProps) {
+export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange }: SalesOrderPreviewProps) {
   
   const totalPackaging = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
 
@@ -82,7 +83,7 @@ export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: Sales
             </div>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-8 mb-8">
+          <div className="grid grid-cols-3 gap-8 mb-8">
             <div>
               <h3 className="font-semibold mb-2">Cliente</h3>
               <div className="text-sm text-muted-foreground">
@@ -93,8 +94,20 @@ export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: Sales
                 <p>{client?.email}</p>
               </div>
             </div>
+             <div>
+              <h3 className="font-semibold mb-2">Información de Despacho</h3>
+               <div className="text-sm text-muted-foreground">
+                <p><strong>Transportista:</strong> {carrier?.name || 'No especificado'}</p>
+                <p><strong>Chofer:</strong> {order.driverName || 'No especificado'}</p>
+                <p><strong>Patente:</strong> {order.truckLicensePlate || 'No especificado'}</p>
+                <p><strong>Guía Despacho:</strong> {order.dispatchGuideNumber || 'No especificado'}</p>
+                <p><strong>Fecha Despacho:</strong> {order.scheduledDispatchDate ? format(parseISO(order.scheduledDispatchDate), "PPP", { locale: es }) : 'No especificado'}</p>
+                <p><strong>Costo Flete:</strong> {order.freightCost ? formatCurrency(order.freightCost) : 'No especificado'}</p>
+                <p><strong>Estado:</strong> {order.dispatchStatus || 'No especificado'}</p>
+              </div>
+            </div>
             <div className='text-right'>
-              <h3 className="font-semibold mb-2">Detalles</h3>
+              <h3 className="font-semibold mb-2">Detalles de la Orden</h3>
               <div className="text-sm text-muted-foreground">
                 <p><strong>Fecha Emisión:</strong> {format(parseISO(order.date), "PPP", { locale: es })}</p>
                 <p><strong>Estado:</strong> <span className='capitalize'>{order.status}</span></p>
