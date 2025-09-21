@@ -4,9 +4,9 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { getInventory } from '@/lib/data';
 import { PurchaseOrder, SalesOrder, InventoryItem } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
 import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function InventoryPage() {
@@ -26,6 +26,18 @@ export default function InventoryPage() {
   }, [purchaseOrders, salesOrders, isClient]);
   
   const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
+
+  const totals = useMemo(() => {
+    return inventory.reduce(
+      (acc, item) => {
+        acc.kilosPurchased += item.kilosPurchased;
+        acc.kilosSold += item.kilosSold;
+        acc.stock += item.stock;
+        return acc;
+      },
+      { kilosPurchased: 0, kilosSold: 0, stock: 0 }
+    );
+  }, [inventory]);
 
   const renderInventoryRows = () => {
     if (!isClient) {
@@ -70,6 +82,16 @@ export default function InventoryPage() {
                 <TableBody>
                     {renderInventoryRows()}
                 </TableBody>
+                {isClient && (
+                  <TableFooter>
+                    <TableRow>
+                      <TableHead className="font-bold text-lg">Total</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosPurchased)}</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosSold)}</TableHead>
+                      <TableHead className="text-right font-bold text-lg text-primary">{formatKilos(totals.stock)}</TableHead>
+                    </TableRow>
+                  </TableFooter>
+                )}
             </Table>
         </div>
       </CardContent>
