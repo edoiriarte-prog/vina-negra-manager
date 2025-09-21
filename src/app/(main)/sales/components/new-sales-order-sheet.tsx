@@ -33,6 +33,7 @@ import { Separator } from '@/components/ui/separator';
 import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { es } from 'date-fns/locale';
 
 type NewSalesOrderSheetProps = {
   isOpen: boolean;
@@ -69,7 +70,7 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
 };
 
 export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId }: NewSalesOrderSheetProps) {
-  const [formData, setFormData] = useState<Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'>>(getInitialFormData(order));
+  const [formData, setFormData] = useState(getInitialFormData(order));
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, packagingTypes } = useMasterData();
@@ -248,7 +249,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             )}
                         >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {formData.date ? format(new Date(formData.date), "PPP", { locale: 'es' }) : <span>Seleccione fecha</span>}
+                            {formData.date ? format(new Date(formData.date), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
                         </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
