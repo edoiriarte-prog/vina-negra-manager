@@ -105,6 +105,8 @@ export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: Sales
               <TableRow>
                 <TableHead>Producto</TableHead>
                 <TableHead>Calibre</TableHead>
+                <TableHead>Envase</TableHead>
+                <TableHead className="text-right">Cant. Envase</TableHead>
                 <TableHead className="text-right">Cantidad</TableHead>
                 <TableHead className="text-right">Precio Unitario</TableHead>
                 <TableHead className="text-right">Subtotal</TableHead>
@@ -115,6 +117,8 @@ export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: Sales
                 <TableRow key={item.id}>
                   <TableCell>{item.product}</TableCell>
                   <TableCell>{item.caliber}</TableCell>
+                  <TableCell>{item.packagingType}</TableCell>
+                  <TableCell className="text-right">{item.packagingQuantity?.toLocaleString('es-CL')}</TableCell>
                   <TableCell className="text-right">{item.quantity.toLocaleString('es-CL')} {item.unit}</TableCell>
                   <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
@@ -123,34 +127,11 @@ export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: Sales
             </TableBody>
             <TableFooter>
                 <TableRow>
-                    <TableCell colSpan={4} className="text-right font-bold text-lg">Total</TableCell>
+                    <TableCell colSpan={6} className="text-right font-bold text-lg">Total</TableCell>
                     <TableCell className="text-right font-bold text-lg">{formatCurrency(order.totalAmount)}</TableCell>
                 </TableRow>
             </TableFooter>
           </Table>
-          
-          {order.packaging && order.packaging.length > 0 && order.packaging.every(p => p.type) && (
-            <div className='mt-6'>
-                <h4 className='font-semibold mb-2'>Detalle de Embalaje</h4>
-                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Tipo de Envase</TableHead>
-                            <TableHead className="text-right">Cantidad</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {order.packaging.filter(p => p.type).map(pack => (
-                             <TableRow key={pack.id}>
-                                <TableCell>{pack.type}</TableCell>
-                                <TableCell className="text-right">{pack.quantity.toLocaleString('es-CL')}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                 </Table>
-            </div>
-          )}
-
 
           <Separator className="my-4" />
           

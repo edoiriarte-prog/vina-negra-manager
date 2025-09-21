@@ -16,6 +16,8 @@ export type OrderItem = {
   quantity: number;
   unit: 'Kilos' | 'Cajas';
   price: number;
+  packagingType?: string;
+  packagingQuantity?: number;
 };
 
 export type PackagingItem = {
@@ -38,7 +40,6 @@ export type SalesOrder = {
   clientId: string;
   date: string;
   items: OrderItem[];
-  packaging: PackagingItem[];
   totalKilos: number;
   totalAmount: number;
   relatedPurchaseIds: string[];
