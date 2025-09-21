@@ -273,9 +273,10 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
               
               <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg font-headline">Ítems de la Orden</CardTitle>
+                    <CardTitle className="text-lg font-headline">Ítems y Embalaje</CardTitle>
                 </CardHeader>
                 <CardContent>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-2">Ítems de la Orden</h4>
                     {formData.items.map((item, index) => {
                         const subtotal = (item.quantity || 0) * (item.price || 0);
                         const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
@@ -347,15 +348,11 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Agregar Ítem
                     </Button>
-                </CardContent>
-              </Card>
+                    
+                    <Separator className="my-6" />
 
-              <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg font-headline">Detalles de Embalaje</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {formData.packaging.map((pack, index) => (
+                    <h4 className="font-medium text-sm text-muted-foreground mb-2">Detalles de Embalaje</h4>
+                     {formData.packaging.map((pack, index) => (
                         <div key={pack.id} className="grid grid-cols-12 gap-2 items-center mb-2">
                             <div className="col-span-5">
                                 <Label>Tipo de Envase</Label>
@@ -381,7 +378,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Agregar Envase
                     </Button>
-                  </CardContent>
+                </CardContent>
               </Card>
 
             <Card>
