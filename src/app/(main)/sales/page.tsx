@@ -207,7 +207,7 @@ export default function SalesPage() {
         <SalesOrderPreview
           order={previewingOrder}
           client={clients.find(s => s.id === previewingOrder.clientId) || null}
-          carrier={carriers.find(s => s.id === previewingOrder.carrierId) || null}
+          carrier={carriers.find(s => s.id === (previewingOrder as any).carrierId) || null}
           isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
         />

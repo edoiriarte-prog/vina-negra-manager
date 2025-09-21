@@ -83,7 +83,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
             </div>
           </DialogHeader>
 
-          <div className="grid grid-cols-3 gap-8 mb-8">
+          <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
               <h3 className="font-semibold mb-2">Cliente</h3>
               <div className="text-sm text-muted-foreground">
@@ -92,18 +92,6 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
                 <p>{client?.address}</p>
                 <p>{client?.commune}</p>
                 <p>{client?.email}</p>
-              </div>
-            </div>
-             <div>
-              <h3 className="font-semibold mb-2">Información de Despacho</h3>
-               <div className="text-sm text-muted-foreground">
-                <p><strong>Transportista:</strong> {carrier?.name || 'No especificado'}</p>
-                <p><strong>Chofer:</strong> {order.driverName || 'No especificado'}</p>
-                <p><strong>Patente:</strong> {order.truckLicensePlate || 'No especificado'}</p>
-                <p><strong>Guía Despacho:</strong> {order.dispatchGuideNumber || 'No especificado'}</p>
-                <p><strong>Fecha Despacho:</strong> {order.scheduledDispatchDate ? format(parseISO(order.scheduledDispatchDate), "PPP", { locale: es }) : 'No especificado'}</p>
-                <p><strong>Costo Flete:</strong> {order.freightCost ? formatCurrency(order.freightCost) : 'No especificado'}</p>
-                <p><strong>Estado:</strong> {order.dispatchStatus || 'No especificado'}</p>
               </div>
             </div>
             <div className='text-right'>

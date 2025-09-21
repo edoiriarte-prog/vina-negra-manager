@@ -66,27 +66,18 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
         advancePercentage: 0,
         advanceDueDate: undefined,
         balanceDueDate: undefined,
-        dispatchStatus: 'Pendiente',
-        carrierId: undefined,
-        driverName: undefined,
-        truckLicensePlate: undefined,
-        dispatchGuideNumber: undefined,
-        scheduledDispatchDate: undefined,
-        freightCost: undefined,
     };
 };
 
 export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId }: NewSalesOrderSheetProps) {
-  const [formData, setFormData] = useState<Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'>>(getInitialFormData(order));
+  const [formData, setFormData] = useState(getInitialFormData(order));
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, packagingTypes } = useMasterData();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isOpen) {
-        setFormData(getInitialFormData(order));
-    }
+      setFormData(getInitialFormData(order));
   }, [order, isOpen]);
 
   const getPreviewOrder = (): SalesOrder => {
@@ -128,7 +119,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     }
   };
 
-  const handleDateSelect = (field: 'date' | 'advanceDueDate' | 'balanceDueDate' | 'scheduledDispatchDate', date: Date | undefined) => {
+  const handleDateSelect = (field: 'date' | 'advanceDueDate' | 'balanceDueDate', date: Date | undefined) => {
       if (date) {
         setFormData(prev => ({ ...prev, [field]: format(date, 'yyyy-MM-dd') }));
       }
@@ -191,7 +182,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'advancePercentage', 'packagingQuantity'].includes(field) ? Number(value) : value);
     }
      else {
-        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage', 'freightCost'].includes(name) ? Number(value) : value }));
+        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage'].includes(name) ? Number(value) : value }));
     }
   };
 
@@ -216,7 +207,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   
   const previewOrderData = getPreviewOrder();
   const previewClient = clients.find(c => c.id === previewOrderData.clientId) || null;
-  const previewCarrier = carriers.find(c => c.id === previewOrderData.carrierId) || null;
 
   const totalAmount = useMemo(() => {
     return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0)
@@ -528,71 +518,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                     )}
                 </CardContent>
             </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg font-headline">Información de Despacho</CardTitle>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="carrierId" className="text-right">Transportista</Label>
-                            <Select onValueChange={(value) => handleSelectChange('carrierId', value)} value={formData.carrierId}>
-                                <SelectTrigger className="col-span-3"><SelectValue placeholder="Seleccione transportista" /></SelectTrigger>
-                                <SelectContent>
-                                    {carriers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="driverName" className="text-right">Chofer</Label>
-                            <Input id="driverName" name="driverName" value={formData.driverName || ''} onChange={handleInputChange} className="col-span-3" />
-                        </div>
-                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="truckLicensePlate" className="text-right">Patente</Label>
-                            <Input id="truckLicensePlate" name="truckLicensePlate" value={formData.truckLicensePlate || ''} onChange={handleInputChange} className="col-span-3" />
-                        </div>
-                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="dispatchGuideNumber" className="text-right">Guía Despacho</Label>
-                            <Input id="dispatchGuideNumber" name="dispatchGuideNumber" value={formData.dispatchGuideNumber || ''} onChange={handleInputChange} className="col-span-3" />
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="scheduledDispatchDate" className="text-right">Fecha Despacho</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !formData.scheduledDispatchDate && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {formData.scheduledDispatchDate ? format(parseISO(formData.scheduledDispatchDate), "PPP", { locale: 'es' }) : <span>Seleccione fecha</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={formData.scheduledDispatchDate ? parseISO(formData.scheduledDispatchDate) : undefined} onSelect={(date) => handleDateSelect('scheduledDispatchDate', date)} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="freightCost" className="text-right">Costo Flete</Label>
-                            <Input id="freightCost" name="freightCost" type="number" value={formData.freightCost || ''} onChange={handleInputChange} className="col-span-3" />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="dispatchStatus" className="text-right">Estado Despacho</Label>
-                            <Select onValueChange={(value: 'Pendiente' | 'Programado' | 'En Tránsito' | 'Entregado' | 'Incidencia') => handleSelectChange('dispatchStatus', value)} value={formData.dispatchStatus}>
-                                <SelectTrigger className="col-span-3"><SelectValue placeholder="Estado" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Pendiente">Pendiente</SelectItem>
-                                    <SelectItem value="Programado">Programado</SelectItem>
-                                    <SelectItem value="En Tránsito">En Tránsito</SelectItem>
-                                    <SelectItem value="Entregado">Entregado</SelectItem>
-                                    <SelectItem value="Incidencia">Incidencia</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
             </div>
             <SheetFooter className="mt-6">
               <SheetClose asChild>
@@ -613,7 +538,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         <SalesOrderPreview 
             order={previewOrderData}
             client={previewClient}
-            carrier={previewCarrier}
+            carrier={null}
             isOpen={isPreviewing}
             onOpenChange={setIsPreviewing}
         />
@@ -628,5 +553,3 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     </>
   );
 }
-
-    
