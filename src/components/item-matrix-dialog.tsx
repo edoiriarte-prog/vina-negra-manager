@@ -161,7 +161,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                     <TableCell>
                       <Input
                         type="number"
-                        value={row.quantity}
+                        value={row.quantity || ''}
                         onChange={(e) => handleMatrixChange(index, 'quantity', e.target.value)}
                         placeholder="0"
                         className={orderType === 'sale' && row.quantity > row.stock ? 'border-destructive' : ''}
@@ -181,7 +181,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                     <TableCell>
                       <Input
                         type="number"
-                        value={row.price}
+                        value={row.price || ''}
                         onChange={(e) => handleMatrixChange(index, 'price', e.target.value)}
                         placeholder="0"
                       />
@@ -202,7 +202,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                         <TableCell>
                             <Input
                                 type="number"
-                                value={row.packagingQuantity}
+                                value={row.packagingQuantity || ''}
                                 onChange={(e) => handleMatrixChange(index, 'packagingQuantity', e.target.value)}
                                 placeholder="0"
                             />
