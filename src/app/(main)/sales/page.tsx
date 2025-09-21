@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory } from '@/lib/data';
-import { SalesOrder, Contact, PurchaseOrder, InventoryItem } from '@/lib/types';
+import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -52,14 +52,24 @@ export default function SalesPage() {
     return `OV-${lastIdNumber + 1}`;
   }, [salesOrders]);
 
-  const handleSaveOrder = (order: SalesOrder | Omit<SalesOrder, 'id'>) => {
+  const handleSaveOrder = (order: SalesOrder | Omit<SalesOrder, 'id'>, newItems: OrderItem[] = []) => {
+    let orderToSave: SalesOrder | Omit<SalesOrder, 'id'>;
+     if ('id' in order) {
+        const updatedItems = [...order.items, ...newItems].filter((item, index, self) =>
+            index === self.findIndex((t) => t.product === item.product && t.caliber === item.caliber)
+        );
+        orderToSave = { ...order, items: updatedItems };
+    } else {
+        orderToSave = { ...order, items: newItems };
+    }
+
      // Stock validation
-    for (const item of order.items) {
+    for (const item of orderToSave.items) {
         const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
         const currentStock = inventoryItem ? inventoryItem.stock : 0;
         
         let originalQuantity = 0;
-        if ('id' in order && editingOrder) {
+        if ('id' in orderToSave && editingOrder) {
             const originalItem = editingOrder.items.find(i => i.id === item.id);
             if (originalItem && originalItem.product === item.product && originalItem.caliber === item.caliber) {
                 originalQuantity = originalItem.quantity;
@@ -75,16 +85,26 @@ export default function SalesPage() {
             return;
         }
     }
+    
+    const totalAmount = orderToSave.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
+    const totalKilos = orderToSave.items.reduce((sum, item) => {
+      if (item.unit === 'Kilos') {
+        return sum + Number(item.quantity || 0);
+      }
+      return sum;
+    }, 0);
+
+    orderToSave = { ...orderToSave, totalAmount, totalKilos };
 
 
-    if ('id' in order) {
+    if ('id' in orderToSave) {
       // Update
-      setSalesOrders(prev => prev.map(o => o.id === order.id ? order : o));
-      toast({ title: 'Orden Actualizada', description: `La orden ${order.id} ha sido actualizada.` });
+      setSalesOrders(prev => prev.map(o => o.id === (orderToSave as SalesOrder).id ? orderToSave as SalesOrder : o));
+      toast({ title: 'Orden Actualizada', description: `La orden ${orderToSave.id} ha sido actualizada.` });
     } else {
       // Add
       const newOrder = {
-        ...order,
+        ...orderToSave,
         id: nextOrderId,
       };
       setSalesOrders(prev => [...prev, newOrder]);

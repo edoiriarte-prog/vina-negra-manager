@@ -24,37 +24,40 @@ import {
 import { PurchaseOrder, OrderItem, Contact } from '@/lib/types';
 import { format } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
+import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 
 type NewPurchaseOrderSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>) => void;
+  onSave: (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems?: OrderItem[]) => void;
   order: PurchaseOrder | null;
   suppliers: Contact[];
 };
 
 
-const getInitialFormData = (): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'> => ({
-    supplierId: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    items: [{ id: `temp-${Date.now()}`, product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 }],
-    status: 'pending' as 'pending' | 'completed' | 'cancelled',
-});
+const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'> => {
+    if (order) {
+        const { totalAmount, totalKilos, ...rest } = order;
+        return {
+            ...rest,
+            date: format(new Date(order.date), 'yyyy-MM-dd'),
+        };
+    }
+    return {
+        supplierId: '',
+        date: format(new Date(), 'yyyy-MM-dd'),
+        items: [],
+        status: 'pending' as 'pending' | 'completed' | 'cancelled',
+    };
+};
 
 export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, suppliers }: NewPurchaseOrderSheetProps) {
-  const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData());
+  const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData(order));
+  const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units } = useMasterData();
 
   useEffect(() => {
-    if (order) {
-        const { totalAmount, totalKilos, ...rest } = order;
-        setFormData({
-            ...rest,
-            date: format(new Date(order.date), 'yyyy-MM-dd'),
-        });
-    } else {
-      setFormData(getInitialFormData());
-    }
+    setFormData(getInitialFormData(order));
   }, [order, isOpen]);
   
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
@@ -75,14 +78,6 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     }
   };
 
-
-  const addNewItem = () => {
-    setFormData(prev => ({
-        ...prev,
-        items: [...prev.items, { id: `temp-${Date.now()}`, product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 }]
-    }))
-  }
-  
   const removeItem = (index: number) => {
     setFormData(prev => ({
         ...prev,
@@ -92,28 +87,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const totalAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    const totalKilos = formData.items.reduce((sum, item) => {
-      // Assuming 'Kilos' is the primary unit for total weight calculation
-      if (item.unit === 'Kilos') {
-        return sum + Number(item.quantity || 0);
-      }
-      // You might need a conversion factor if 'Cajas' should be included in total kilos
-      return sum;
-    }, 0);
-
-
-    const orderToSave = {
-        ...formData,
-        totalAmount,
-        totalKilos,
-    }
-
-    if(order) {
-        onSave({ ...orderToSave, id: order.id });
-    } else {
-        onSave(orderToSave);
-    }
+    onSave(formData);
   };
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,14 +101,31 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     }
   };
 
+  const handleMatrixSave = (matrixItems: Omit<OrderItem, 'id'>[]) => {
+    const newItems: OrderItem[] = matrixItems.map(item => ({
+        ...item,
+        id: `temp-${Date.now()}-${Math.random()}`
+    }));
+
+    if (order) {
+        // If editing, we just call onSave with the new items to be added
+        onSave(formData, newItems);
+    } else {
+        // If creating, we add the items to the current form state
+        setFormData(prev => ({...prev, items: [...prev.items, ...newItems]}));
+    }
+    setIsMatrixOpen(false);
+  }
+
   const title = order ? 'Editar Orden de Compra' : 'Crear Orden de Compra';
   const description = order 
     ? 'Actualice la información de la orden.'
     : 'Complete la información para registrar una nueva orden de compra.';
 
   return (
+    <>
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-3xl overflow-y-auto">
+      <SheetContent className="sm:max-w-4xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -168,7 +159,16 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
             </div>
             
             <div className="my-4">
-              <h4 className="font-medium mb-2">Ítems de la Orden</h4>
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="font-medium">Ítems de la Orden</h4>
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsMatrixOpen(true)}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Agregar Matriz de Items
+                </Button>
+              </div>
+
+                {formData.items.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay ítems en la orden.</p>}
+                
                 {formData.items.map((item, index) => {
                   const subtotal = (item.quantity || 0) * (item.price || 0);
                   return (
@@ -184,7 +184,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              </Select>
                         </div>
                         {/* Caliber */}
-                        <div className="col-span-12 sm:col-span-3">
+                        <div className="col-span-12 sm:col-span-2">
                              <Label htmlFor={`item-caliber-${index}`}>Calibre</Label>
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
@@ -194,7 +194,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              </Select>
                         </div>
                         {/* Quantity */}
-                         <div className="col-span-6 sm:col-span-2">
+                         <div className="col-span-6 sm:col-span-1">
                              <Label htmlFor={`item-quantity-${index}`}>Cantidad</Label>
                              <Input id={`item-quantity-${index}`} name={`items.${index}.quantity`} type="number" value={item.quantity} onChange={handleInputChange} placeholder="Cant." required />
                         </div>
@@ -214,22 +214,18 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              <Input id={`item-price-${index}`} name={`items.${index}.price`} type="number" value={item.price} onChange={handleInputChange} placeholder="Precio" required />
                         </div>
                         {/* Subtotal */}
-                         <div className="col-span-6 sm:col-span-3">
+                         <div className="col-span-6 sm:col-span-1">
                              <Label>Subtotal</Label>
                              <Input value={new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(subtotal)} readOnly disabled />
                         </div>
                         {/* Remove button */}
                         <div className='col-span-12 sm:col-span-1 self-end'>
-                             <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} disabled={formData.items.length <= 1}>
+                             <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                         </div>
                     </div>
                 )})}
-                 <Button type="button" variant="outline" size="sm" onClick={addNewItem} className='mt-2'>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Agregar Ítem
-                </Button>
             </div>
 
 
@@ -259,10 +255,17 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                 Cancelar
               </Button>
             </SheetClose>
-            <Button type="submit">Guardar</Button>
+            <Button type="submit" disabled={formData.items.length === 0}>Guardar</Button>
           </SheetFooter>
         </form>
       </SheetContent>
     </Sheet>
+    <ItemMatrixDialog 
+        isOpen={isMatrixOpen}
+        onOpenChange={setIsMatrixOpen}
+        onSave={handleMatrixSave}
+        orderType="purchase"
+    />
+    </>
   );
 }

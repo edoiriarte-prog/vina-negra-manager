@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts } from '@/lib/data';
-import { PurchaseOrder, Contact } from '@/lib/types';
+import { PurchaseOrder, Contact, OrderItem } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -41,11 +41,33 @@ export default function PurchasesPage() {
   
   const suppliers = contacts.filter(c => c.type === 'supplier');
 
-  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>) => {
+  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
+    let orderToSave: PurchaseOrder | Omit<PurchaseOrder, 'id'>;
+
     if ('id' in order) {
+        const updatedItems = [...order.items, ...newItems].filter((item, index, self) =>
+            index === self.findIndex((t) => t.product === item.product && t.caliber === item.caliber)
+        );
+        orderToSave = { ...order, items: updatedItems };
+    } else {
+        orderToSave = { ...order, items: newItems };
+    }
+    
+    const totalAmount = orderToSave.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
+    const totalKilos = orderToSave.items.reduce((sum, item) => {
+        if (item.unit === 'Kilos') {
+            return sum + Number(item.quantity || 0);
+        }
+        return sum;
+    }, 0);
+
+    orderToSave = { ...orderToSave, totalAmount, totalKilos };
+
+
+    if ('id' in orderToSave) {
       // Update
-      setPurchaseOrders(prev => prev.map(o => o.id === order.id ? order : o));
-      toast({ title: 'Orden Actualizada', description: `La orden ${order.id} ha sido actualizada.` });
+      setPurchaseOrders(prev => prev.map(o => o.id === orderToSave.id ? orderToSave as PurchaseOrder : o));
+      toast({ title: 'Orden Actualizada', description: `La orden ${orderToSave.id} ha sido actualizada.` });
     } else {
       // Add
       const sortedOrders = [...purchaseOrders].sort((a,b) => {
@@ -55,7 +77,7 @@ export default function PurchasesPage() {
       });
       const lastId = sortedOrders.length > 0 ? parseInt(sortedOrders[sortedOrders.length - 1].id.split('-')[1]) : 1000;
       const newOrder = {
-        ...order,
+        ...orderToSave,
         id: `OC-${lastId + 1}`,
       };
       setPurchaseOrders(prev => [...prev, newOrder]);

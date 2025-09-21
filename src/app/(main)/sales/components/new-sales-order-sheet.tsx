@@ -28,11 +28,12 @@ import { useMasterData } from '@/hooks/use-master-data';
 import { SalesOrderPreview } from './sales-order-preview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 
 type NewSalesOrderSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (order: SalesOrder | Omit<SalesOrder, 'id'>) => void;
+  onSave: (order: SalesOrder | Omit<SalesOrder, 'id'>, newItems?: OrderItem[]) => void;
   order: SalesOrder | null;
   clients: Contact[];
   inventory: InventoryItem[];
@@ -40,21 +41,31 @@ type NewSalesOrderSheetProps = {
 };
 
 
-const getInitialFormData = (): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos'> => ({
-    clientId: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    items: [{ id: `temp-${Date.now()}`, product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 }],
-    relatedPurchaseIds: [],
-    status: 'pending' as 'pending' | 'completed' | 'cancelled',
-    paymentMethod: 'Contado',
-    advancePercentage: 0,
-    advanceDueDate: undefined,
-    balanceDueDate: undefined,
-});
+const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos'> => {
+    if (order) {
+        const { totalAmount, totalKilos, ...rest } = order;
+        return {
+            ...rest,
+            date: format(new Date(order.date), 'yyyy-MM-dd'),
+        };
+    }
+    return {
+        clientId: '',
+        date: format(new Date(), 'yyyy-MM-dd'),
+        items: [],
+        relatedPurchaseIds: [],
+        status: 'pending' as 'pending' | 'completed' | 'cancelled',
+        paymentMethod: 'Contado',
+        advancePercentage: 0,
+        advanceDueDate: undefined,
+        balanceDueDate: undefined,
+    };
+};
 
 export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, inventory, nextOrderId }: NewSalesOrderSheetProps) {
-  const [formData, setFormData] = useState<Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData());
+  const [formData, setFormData] = useState<Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData(order));
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, packagingTypes } = useMasterData();
 
   const getPreviewOrder = (): SalesOrder => {
@@ -75,15 +86,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   };
 
   useEffect(() => {
-    if (order) {
-        const { totalAmount, totalKilos, ...rest } = order;
-        setFormData({
-            ...rest,
-            date: format(new Date(order.date), 'yyyy-MM-dd'),
-        });
-    } else {
-      setFormData(getInitialFormData());
-    }
+    setFormData(getInitialFormData(order));
   }, [order, isOpen]);
   
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
@@ -107,13 +110,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   };
 
 
-  const addNewItem = () => {
-    setFormData(prev => ({
-        ...prev,
-        items: [...prev.items, { id: `temp-${Date.now()}`, product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 }]
-    }))
-  }
-  
   const removeItem = (index: number) => {
     setFormData(prev => ({
         ...prev,
@@ -135,14 +131,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         }
     }
 
-    const orderToSave = getPreviewOrder();
-
-    if(order) {
-        onSave({ ...orderToSave, id: order.id });
-    } else {
-        const { id, ...rest } = orderToSave;
-        onSave(rest);
-    }
+    onSave(formData);
   };
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,6 +145,20 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         setFormData((prev) => ({ ...prev, [name]: name === 'advancePercentage' ? Number(value) : value }));
     }
   };
+
+  const handleMatrixSave = (matrixItems: Omit<OrderItem, 'id'>[]) => {
+    const newItems: OrderItem[] = matrixItems.map(item => ({
+        ...item,
+        id: `temp-${Date.now()}-${Math.random()}`
+    }));
+
+    if (order) {
+        onSave(formData, newItems);
+    } else {
+        setFormData(prev => ({...prev, items: [...prev.items, ...newItems]}));
+    }
+    setIsMatrixOpen(false);
+  }
 
   const title = order ? 'Editar Orden de Venta' : 'Crear Orden de Venta';
   const description = order 
@@ -242,9 +245,17 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
               
               <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg font-headline">Ítems de la Orden</CardTitle>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-lg font-headline">Ítems de la Orden</CardTitle>
+                         <Button type="button" variant="outline" size="sm" onClick={() => setIsMatrixOpen(true)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Agregar Matriz de Items
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
+                    {formData.items.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay ítems en la orden.</p>}
+
                     {formData.items.map((item, index) => {
                         const subtotal = (item.quantity || 0) * (item.price || 0);
                         const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
@@ -321,16 +332,12 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
 
                             {/* Remove button */}
                             <div className='col-span-12 md:col-span-1 self-center'>
-                                <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} disabled={formData.items.length <= 1}>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                             </div>
                         </div>
                     )})}
-                    <Button type="button" variant="outline" size="sm" onClick={addNewItem} className='mt-2'>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Agregar Ítem
-                    </Button>
                 </CardContent>
               </Card>
 
@@ -420,7 +427,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                   <Eye className="mr-2 h-4 w-4" />
                   Previsualizar
               </Button>
-              <Button type="submit">Guardar</Button>
+              <Button type="submit" disabled={formData.items.length === 0}>Guardar</Button>
             </SheetFooter>
           </form>
         </SheetContent>
@@ -433,6 +440,12 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
             onOpenChange={setIsPreviewing}
         />
       )}
+      <ItemMatrixDialog 
+        isOpen={isMatrixOpen}
+        onOpenChange={setIsMatrixOpen}
+        onSave={handleMatrixSave}
+        orderType="sale"
+      />
     </>
   );
 }
