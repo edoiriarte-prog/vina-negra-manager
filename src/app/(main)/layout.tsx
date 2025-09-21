@@ -11,23 +11,7 @@ import {
 import { Logo } from '@/components/logo';
 import { MainNav } from '@/components/main-nav';
 import { UserNav } from '@/components/user-nav';
-import { Settings } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { useSidebar } from '@/hooks/use-sidebar';
-
-function SettingsLink() {
-  const { state } = useSidebar();
-  return (
-    <Link href="/settings" className="mt-auto">
-       <Button variant="ghost" className="w-full justify-start gap-3 p-2 text-sm h-10 group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:p-2">
-        <Settings className="h-5 w-5" />
-        <span className="truncate group-data-[collapsible=icon]:hidden">Configuración</span>
-       </Button>
-    </Link>
-  )
-}
-
+import { SettingsLink } from './components/settings-link';
 
 export default function MainLayout({
   children,
