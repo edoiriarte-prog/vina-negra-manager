@@ -18,14 +18,13 @@ export type OrderItem = {
   price: number;
 };
 
-export type PurchaseOrder = {
+export type PaymentInstallment = {
   id: string;
-  supplierId: string;
-  date: string;
-  items: OrderItem[];
-  totalAmount: number;
-  totalKilos: number;
-  status: 'pending' | 'completed' | 'cancelled';
+  salesOrderId: string;
+  type: 'advance' | 'balance';
+  amount: number;
+  dueDate: string;
+  status: 'pending' | 'paid' | 'overdue';
 };
 
 export type SalesOrder = {
@@ -36,6 +35,20 @@ export type SalesOrder = {
   totalKilos: number;
   totalAmount: number;
   relatedPurchaseIds: string[];
+  status: 'pending' | 'completed' | 'cancelled';
+  paymentMethod: 'Contado' | 'Crédito' | 'Pago con Anticipo y Saldo';
+  advancePercentage?: number;
+  advanceDueDate?: string;
+  balanceDueDate?: string;
+};
+
+export type PurchaseOrder = {
+  id: string;
+  supplierId: string;
+  date: string;
+  items: OrderItem[];
+  totalAmount: number;
+  totalKilos: number;
   status: 'pending' | 'completed' | 'cancelled';
 };
 

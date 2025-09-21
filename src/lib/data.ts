@@ -14,9 +14,9 @@ export const purchaseOrders: PurchaseOrder[] = [
 ];
 
 export const salesOrders: SalesOrder[] = [
-  { id: 'OV-001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'Cereza', caliber: 'Large', quantity: 4000, unit: 'Kilos', price: 4500 }, { id: 's2', product: 'Cereza', caliber: 'Jumbo', quantity: 2000, unit: 'Kilos', price: 5000 }], totalKilos: 6000, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed' },
-  { id: 'OV-002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'Cereza', caliber: 'Large', quantity: 5000, unit: 'Kilos', price: 4500 }, { id: 's4', product: 'Cereza', caliber: 'Jumbo', quantity: 3000, unit: 'Kilos', price: 5000 }], totalKilos: 8000, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed' },
-  { id: 'OV-003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'Cereza', caliber: 'Jumbo', quantity: 6000, unit: 'Kilos', price: 5500 }], totalKilos: 6000, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending' },
+  { id: 'OV-001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'Cereza', caliber: 'Large', quantity: 4000, unit: 'Kilos', price: 4500 }, { id: 's2', product: 'Cereza', caliber: 'Jumbo', quantity: 2000, unit: 'Kilos', price: 5000 }], totalKilos: 6000, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed', paymentMethod: 'Contado' },
+  { id: 'OV-002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'Cereza', caliber: 'Large', quantity: 5000, unit: 'Kilos', price: 4500 }, { id: 's4', product: 'Cereza', caliber: 'Jumbo', quantity: 3000, unit: 'Kilos', price: 5000 }], totalKilos: 8000, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed', paymentMethod: 'Pago con Anticipo y Saldo', advancePercentage: 50, advanceDueDate: '2023-10-20', balanceDueDate: '2023-11-20' },
+  { id: 'OV-003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'Cereza', caliber: 'Jumbo', quantity: 6000, unit: 'Kilos', price: 5500 }], totalKilos: 6000, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending', paymentMethod: 'Crédito' },
 ];
 
 export const serviceOrders: ServiceOrder[] = [

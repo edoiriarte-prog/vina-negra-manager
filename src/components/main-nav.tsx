@@ -11,14 +11,19 @@ import {
   Truck,
   Users,
   BarChart,
+  CalendarClock,
 } from 'lucide-react';
 
 import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 
 const menuItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -28,7 +33,11 @@ const menuItems = [
   { href: '/services', label: 'Servicios (O/S)', icon: Truck },
   { href: '/inventory', label: 'Inventario', icon: Boxes },
   { href: '/financials', label: 'Movimientos', icon: Landmark },
-  { href: '/reports', label: 'Informes', icon: BarChart },
+];
+
+const reportItems = [
+    { href: '/reports', label: 'Cuentas Corrientes', exact: true },
+    { href: '/reports/upcoming-payments', label: 'Vencimientos por Cobrar' },
 ];
 
 export function MainNav({ className }: { className?: string }) {
@@ -50,6 +59,30 @@ export function MainNav({ className }: { className?: string }) {
             </Link>
           </SidebarMenuItem>
         ))}
+
+        <Collapsible asChild>
+            <SidebarMenuItem>
+                 <CollapsibleTrigger asChild>
+                     <SidebarMenuButton tooltip='Informes' isActive={pathname.startsWith('/reports')}>
+                        <BarChart className="h-5 w-5" />
+                        <span>Informes</span>
+                    </SidebarMenuButton>
+                 </CollapsibleTrigger>
+                <CollapsibleContent asChild>
+                    <SidebarMenuSub>
+                        {reportItems.map(item => (
+                             <SidebarMenuSubItem key={item.href}>
+                                <Link href={item.href}>
+                                    <SidebarMenuSubButton isActive={item.exact ? pathname === item.href : pathname.startsWith(item.href)}>
+                                        <span>{item.label}</span>
+                                    </SidebarMenuSubButton>
+                                </Link>
+                            </SidebarMenuSubItem>
+                        ))}
+                    </SidebarMenuSub>
+                </CollapsibleContent>
+            </SidebarMenuItem>
+        </Collapsible>
       </SidebarMenu>
     </nav>
   );
