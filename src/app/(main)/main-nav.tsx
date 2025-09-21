@@ -11,6 +11,7 @@ import {
   Truck,
   Users,
   BarChart,
+  Settings,
 } from 'lucide-react';
 
 import {

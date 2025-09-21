@@ -24,6 +24,7 @@ import {
 import { SalesOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { useMasterData } from '@/hooks/use-master-data';
 
 type NewSalesOrderSheetProps = {
   isOpen: boolean;
@@ -34,9 +35,6 @@ type NewSalesOrderSheetProps = {
   inventory: InventoryItem[];
 };
 
-const PRODUCTS = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MANDARINAS", "Cereza"];
-const CALIBERS = ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "Large", "Jumbo"];
-const UNITS = ["Kilos", "Cajas"];
 
 const getInitialFormData = (): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos'> => ({
     clientId: '',
@@ -48,6 +46,7 @@ const getInitialFormData = (): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKil
 
 export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, inventory }: NewSalesOrderSheetProps) {
   const [formData, setFormData] = useState<Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData());
+  const { products, calibers, units } = useMasterData();
 
   useEffect(() => {
     if (order) {
@@ -184,7 +183,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.product`, value)} value={item.product}>
                                  <SelectTrigger><SelectValue placeholder="Producto" /></SelectTrigger>
                                  <SelectContent>
-                                     {PRODUCTS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                     {products.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                                  </SelectContent>
                              </Select>
                         </div>
@@ -194,7 +193,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
-                                     {CALIBERS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                     {calibers.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                                  </SelectContent>
                              </Select>
                         </div>
@@ -209,7 +208,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.unit`, value)} value={item.unit}>
                                  <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
                                  <SelectContent>
-                                     {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                                     {units.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                                  </SelectContent>
                              </Select>
                         </div>
