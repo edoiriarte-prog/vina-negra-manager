@@ -64,6 +64,9 @@ export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: Sales
 
     }
   }
+
+  const advanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount * ((order.advancePercentage || 0) / 100) : 0;
+  const balanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount - advanceAmount : 0;
   
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -139,11 +142,31 @@ export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: Sales
           </Table>
 
           <Separator className="my-4" />
-          
-          <div className="mt-8 text-xs text-muted-foreground">
-            <p><strong>Observaciones:</strong></p>
-            <p>1. La presente orden de venta es válida por 30 días.</p>
-            <p>2. Para cualquier consulta, contactar a nuestro departamento de ventas.</p>
+
+          <div className="grid grid-cols-2 gap-8 mt-8">
+            <div className="text-xs text-muted-foreground">
+                <p><strong>Observaciones:</strong></p>
+                <p>1. La presente orden de venta es válida por 30 días.</p>
+                <p>2. Para cualquier consulta, contactar a nuestro departamento de ventas.</p>
+            </div>
+             {order.paymentMethod === 'Pago con Anticipo y Saldo' && (
+                <div>
+                    <h3 className="font-semibold mb-2">Condiciones de Pago</h3>
+                    <div className="text-sm text-muted-foreground border rounded-lg p-3">
+                        <div className="flex justify-between">
+                            <p>Anticipo ({order.advancePercentage}%)</p>
+                            <p className="font-medium text-foreground">{formatCurrency(advanceAmount)}</p>
+                        </div>
+                        <p className="text-xs">Vencimiento: {order.advanceDueDate ? format(parseISO(order.advanceDueDate), 'dd-MM-yyyy') : '-'}</p>
+                        <Separator className="my-2" />
+                         <div className="flex justify-between">
+                            <p>Saldo</p>
+                            <p className="font-medium text-foreground">{formatCurrency(balanceAmount)}</p>
+                        </div>
+                        <p className="text-xs">Vencimiento: {order.balanceDueDate ? format(parseISO(order.balanceDueDate), 'dd-MM-yyyy') : '-'}</p>
+                    </div>
+                </div>
+            )}
           </div>
         </div>
 
