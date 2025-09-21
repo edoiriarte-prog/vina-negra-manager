@@ -30,6 +30,9 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
+const formatKilos = (value: number) =>
+    `${new Intl.NumberFormat('es-CL').format(value)} kg`;
+
 
 export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumnsProps): ColumnDef<PurchaseOrder>[] => [
   {
@@ -64,6 +67,23 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
       const supplier = suppliers.find(s => s.id === row.original.supplierId);
       return supplier ? supplier.name.toLowerCase().includes(value.toLowerCase()) : false;
     }
+  },
+  {
+    accessorKey: 'totalKilos',
+    header: ({ column }) => {
+        return (
+          <div className="text-right">
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            >
+              Kilos Totales
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    cell: ({ row }) => <div className='text-right'>{formatKilos(row.getValue('totalKilos'))}</div>,
   },
   {
     accessorKey: 'totalAmount',
