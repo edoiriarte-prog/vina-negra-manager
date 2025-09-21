@@ -42,7 +42,7 @@ export default function SalesPage() {
   }, []);
   
   const clients = contacts.filter(c => c.type === 'client');
-  const inventory = getInventory(purchaseOrders, salesOrders);
+  const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, editingOrder), [purchaseOrders, salesOrders, editingOrder]);
 
   const nextOrderId = useMemo(() => {
     const lastIdNumber = salesOrders.reduce((max, order) => {
@@ -68,15 +68,8 @@ export default function SalesPage() {
         const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
         const currentStock = inventoryItem ? inventoryItem.stock : 0;
         
-        let originalQuantity = 0;
-        if ('id' in orderToSave && editingOrder) {
-            const originalItem = editingOrder.items.find(i => i.id === item.id);
-            if (originalItem && originalItem.product === item.product && originalItem.caliber === item.caliber) {
-                originalQuantity = originalItem.quantity;
-            }
-        }
-
-        if (item.quantity > (currentStock + originalQuantity)) {
+        // When editing, the item's original quantity is already excluded from inventory calculation
+        if (item.quantity > currentStock) {
             toast({
                 variant: "destructive",
                 title: "Error de Stock",

@@ -146,15 +146,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
       const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
       const currentStock = inventoryItem ? inventoryItem.stock : 0;
       
-      let originalQuantity = 0;
-      if (order) { // If we are editing
-        const originalItem = order.items.find(oi => oi.id === item.id);
-        if (originalItem && originalItem.product === item.product && originalItem.caliber === item.caliber) {
-            originalQuantity = originalItem.quantity;
-        }
-      }
-
-      if (item.quantity > (currentStock + originalQuantity)) {
+      if (item.quantity > currentStock) {
           toast({
               variant: "destructive",
               title: "Error de Stock",
@@ -293,18 +285,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                     {formData.items.map((item, index) => {
                         const subtotal = (item.quantity || 0) * (item.price || 0);
                         const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
-
-                        let stock = 0;
-                        if (inventoryItem) {
-                            stock = inventoryItem.stock;
-                        }
-
-                        if (order) { // If we are editing, add the original quantity back to stock for validation
-                            const originalItem = order.items.find(oi => oi.id === item.id);
-                            if (originalItem && originalItem.product === item.product && originalItem.caliber === item.caliber) {
-                                stock += originalItem.quantity;
-                            }
-                        }
+                        const stock = inventoryItem ? inventoryItem.stock : 0;
                         
                         return (
                         <div key={item.id} className="grid grid-cols-12 gap-2 items-end mb-2 p-3 border rounded-md relative">

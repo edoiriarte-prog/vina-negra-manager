@@ -36,7 +36,8 @@ export const financialMovements: FinancialMovement[] = [
 
 export const getInventory = (
   currentPurchaseOrders?: PurchaseOrder[],
-  currentSalesOrders?: SalesOrder[]
+  currentSalesOrders?: SalesOrder[],
+  orderBeingEdited?: SalesOrder | null
 ): InventoryItem[] => {
   const inventoryMap = new Map<string, { purchased: number, sold: number }>();
   const purchases = currentPurchaseOrders || [];
@@ -56,7 +57,12 @@ export const getInventory = (
   });
 
   sales.forEach(so => {
-     if (so.status === 'completed') {
+     // If we are editing an order, we don't want to count its items as "sold" yet
+     if (orderBeingEdited && so.id === orderBeingEdited.id) {
+        return;
+     }
+
+     if (so.status === 'completed' || so.status === 'pending') {
       so.items.forEach(item => {
         if (item.unit === 'Kilos') {
           const key = `${item.product} - ${item.caliber}`;
