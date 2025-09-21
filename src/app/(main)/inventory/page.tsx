@@ -8,6 +8,8 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFoo
 import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
 import { useEffect, useState, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PerformanceReports } from './components/performance-reports';
 
 export default function InventoryPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
@@ -63,38 +65,59 @@ export default function InventoryPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-headline text-2xl">Inventario en Tiempo Real</CardTitle>
-        <CardDescription>Stock disponible calculado a partir de las compras y ventas.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className='font-bold'>Calibre</TableHead>
-                        <TableHead className='text-right font-bold'>Kilos Comprados</TableHead>
-                        <TableHead className='text-right font-bold'>Kilos Vendidos</TableHead>
-                        <TableHead className='text-right font-bold text-primary'>Stock Actual</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {renderInventoryRows()}
-                </TableBody>
-                {isClient && (
-                  <TableFooter>
-                    <TableRow>
-                      <TableHead className="font-bold text-lg">Total</TableHead>
-                      <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosPurchased)}</TableHead>
-                      <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosSold)}</TableHead>
-                      <TableHead className="text-right font-bold text-lg text-primary">{formatKilos(totals.stock)}</TableHead>
-                    </TableRow>
-                  </TableFooter>
-                )}
-            </Table>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-6">
+       <div>
+        <h1 className="font-headline text-3xl">Inventario y Rendimiento</h1>
+        <p className="text-muted-foreground">Analiza el stock actual y el rendimiento de tus productos.</p>
+      </div>
+
+      <Tabs defaultValue="stock">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="stock">Stock Actual</TabsTrigger>
+          <TabsTrigger value="performance">Rendimiento de Productos</TabsTrigger>
+        </TabsList>
+        <TabsContent value="stock">
+            <Card className="mt-6">
+                <CardHeader>
+                    <CardTitle className="font-headline text-2xl">Inventario en Tiempo Real</CardTitle>
+                    <CardDescription>Stock disponible calculado a partir de las compras y ventas.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className='font-bold'>Calibre</TableHead>
+                                    <TableHead className='text-right font-bold'>Kilos Comprados</TableHead>
+                                    <TableHead className='text-right font-bold'>Kilos Vendidos</TableHead>
+                                    <TableHead className='text-right font-bold text-primary'>Stock Actual</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {renderInventoryRows()}
+                            </TableBody>
+                            {isClient && (
+                            <TableFooter>
+                                <TableRow>
+                                <TableHead className="font-bold text-lg">Total</TableHead>
+                                <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosPurchased)}</TableHead>
+                                <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosSold)}</TableHead>
+                                <TableHead className="text-right font-bold text-lg text-primary">{formatKilos(totals.stock)}</TableHead>
+                                </TableRow>
+                            </TableFooter>
+                            )}
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+        </TabsContent>
+        <TabsContent value="performance">
+             <PerformanceReports
+                salesOrders={salesOrders}
+                purchaseOrders={purchaseOrders}
+            />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
