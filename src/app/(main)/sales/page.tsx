@@ -53,15 +53,17 @@ export default function SalesPage() {
     return `OV-${lastIdNumber + 1}`;
   }, [salesOrders]);
 
-  const handleSaveOrder = (order: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
+  const handleSaveOrder = (orderData: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
     let orderToSave: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>;
-     if ('id' in order) {
-        const updatedItems = [...order.items, ...newItems].filter((item, index, self) =>
-            index === self.findIndex((t) => t.product === item.product && t.caliber === item.caliber)
-        );
-        orderToSave = { ...order, items: updatedItems };
+
+    // Combine existing items with new items from matrix dialog
+    const allItems = [...orderData.items, ...newItems];
+    
+    // For existing orders, just update items. For new orders, use the combined list.
+    if ('id' in orderData) {
+        orderToSave = { ...orderData, items: allItems };
     } else {
-        orderToSave = { ...order, items: newItems };
+        orderToSave = { ...orderData, items: allItems };
     }
 
      // Stock validation
@@ -176,16 +178,18 @@ export default function SalesPage() {
         </CardContent>
       </Card>
       
-      <NewSalesOrderSheet 
-        isOpen={isSheetOpen}
-        onOpenChange={handleSheetOpenChange}
-        onSave={handleSaveOrder}
-        order={editingOrder}
-        clients={clients}
-        carriers={carriers}
-        inventory={inventory}
-        nextOrderId={nextOrderId}
-      />
+      {isSheetOpen && (
+        <NewSalesOrderSheet 
+            isOpen={isSheetOpen}
+            onOpenChange={handleSheetOpenChange}
+            onSave={handleSaveOrder}
+            order={editingOrder}
+            clients={clients}
+            carriers={carriers}
+            inventory={inventory}
+            nextOrderId={nextOrderId}
+        />
+      )}
 
       <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
         <AlertDialogContent>
