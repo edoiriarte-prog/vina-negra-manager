@@ -41,6 +41,7 @@ export type SalesOrder = {
   date: string;
   items: OrderItem[];
   totalKilos: number;
+  totalPackages: number;
   totalAmount: number;
   relatedPurchaseIds: string[];
   status: 'pending' | 'completed' | 'cancelled';

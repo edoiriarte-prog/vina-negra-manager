@@ -34,7 +34,7 @@ import { useToast } from '@/hooks/use-toast';
 type NewSalesOrderSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (order: SalesOrder | Omit<SalesOrder, 'id'>, newItems?: OrderItem[]) => void;
+  onSave: (order: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems?: OrderItem[]) => void;
   order: SalesOrder | null;
   clients: Contact[];
   inventory: InventoryItem[];
@@ -42,9 +42,9 @@ type NewSalesOrderSheetProps = {
 };
 
 
-const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos'> => {
+const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
     if (order) {
-        const { totalAmount, totalKilos, ...rest } = order;
+        const { totalAmount, totalKilos, totalPackages, ...rest } = order;
         return {
             ...rest,
             date: format(new Date(order.date), 'yyyy-MM-dd'),
@@ -64,7 +64,7 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
 };
 
 export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, inventory, nextOrderId }: NewSalesOrderSheetProps) {
-  const [formData, setFormData] = useState<Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData(order));
+  const [formData, setFormData] = useState<Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'>>(getInitialFormData(order));
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, packagingTypes } = useMasterData();
@@ -78,12 +78,14 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
       }
       return sum;
     }, 0);
+    const totalPackages = formData.items.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
     return {
         id: order?.id || nextOrderId,
         ...formData,
         totalAmount,
         totalKilos,
+        totalPackages,
     };
   };
 
@@ -100,7 +102,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   };
   
 
-  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalAmount' | 'totalKilos' > | `items.${number}.${keyof OrderItem}`, value: any) => {
+  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalAmount' | 'totalKilos' | 'totalPackages' > | `items.${number}.${keyof OrderItem}`, value: any) => {
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);

@@ -52,8 +52,8 @@ export default function SalesPage() {
     return `OV-${lastIdNumber + 1}`;
   }, [salesOrders]);
 
-  const handleSaveOrder = (order: SalesOrder | Omit<SalesOrder, 'id'>, newItems: OrderItem[] = []) => {
-    let orderToSave: SalesOrder | Omit<SalesOrder, 'id'>;
+  const handleSaveOrder = (order: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
+    let orderToSave: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>;
      if ('id' in order) {
         const updatedItems = [...order.items, ...newItems].filter((item, index, self) =>
             index === self.findIndex((t) => t.product === item.product && t.caliber === item.caliber)
@@ -86,18 +86,19 @@ export default function SalesPage() {
       }
       return sum;
     }, 0);
+    const totalPackages = orderToSave.items.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
-    orderToSave = { ...orderToSave, totalAmount, totalKilos };
+    const finalOrder = { ...orderToSave, totalAmount, totalKilos, totalPackages };
 
 
-    if ('id' in orderToSave) {
+    if ('id' in finalOrder) {
       // Update
-      setSalesOrders(prev => prev.map(o => o.id === (orderToSave as SalesOrder).id ? orderToSave as SalesOrder : o));
-      toast({ title: 'Orden Actualizada', description: `La orden ${orderToSave.id} ha sido actualizada.` });
+      setSalesOrders(prev => prev.map(o => o.id === (finalOrder as SalesOrder).id ? finalOrder as SalesOrder : o));
+      toast({ title: 'Orden Actualizada', description: `La orden ${finalOrder.id} ha sido actualizada.` });
     } else {
       // Add
       const newOrder = {
-        ...orderToSave,
+        ...finalOrder,
         id: nextOrderId,
       };
       setSalesOrders(prev => [...prev, newOrder]);

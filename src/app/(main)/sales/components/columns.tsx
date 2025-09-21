@@ -30,6 +30,12 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
+const formatKilos = (value: number) =>
+    `${new Intl.NumberFormat('es-CL').format(value)} kg`;
+    
+const formatPackages = (value: number) =>
+    `${new Intl.NumberFormat('es-CL').format(value)}`;
+
 
 export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsProps): ColumnDef<SalesOrder>[] => [
   {
@@ -64,6 +70,49 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
       const client = clients.find(s => s.id === row.original.clientId);
       return client ? client.name.toLowerCase().includes(value.toLowerCase()) : false;
     }
+  },
+  {
+    accessorKey: 'items',
+    header: 'Producto',
+    cell: ({ row }) => {
+      const items = row.getValue('items') as SalesOrder['items'];
+      const productNames = [...new Set(items.map(item => item.product))].join(', ');
+      return <div className="max-w-[200px] truncate">{productNames}</div>
+    },
+  },
+    {
+    accessorKey: 'totalKilos',
+    header: ({ column }) => {
+        return (
+          <div className="text-right">
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            >
+              Kilos
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    cell: ({ row }) => <div className='text-right'>{formatKilos(row.getValue('totalKilos'))}</div>,
+  },
+  {
+    accessorKey: 'totalPackages',
+    header: ({ column }) => {
+        return (
+          <div className="text-right">
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            >
+              Envases
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    cell: ({ row }) => <div className='text-right'>{formatPackages(row.getValue('totalPackages'))}</div>,
   },
   {
     accessorKey: 'totalAmount',
