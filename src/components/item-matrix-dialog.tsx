@@ -23,14 +23,16 @@ import {
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useMasterData } from '@/hooks/use-master-data';
-import { OrderItem } from '@/lib/types';
+import { OrderItem, InventoryItem } from '@/lib/types';
 import { productCaliberMatrix } from '@/lib/master-data';
+import { Badge } from '@/components/ui/badge';
 
 type ItemMatrixDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSave: (items: Omit<OrderItem, 'id'>[]) => void;
   orderType: 'sale' | 'purchase';
+  inventory?: InventoryItem[];
 };
 
 type MatrixRow = {
@@ -41,9 +43,10 @@ type MatrixRow = {
   unit: 'Kilos' | 'Cajas';
   packagingType: string;
   packagingQuantity: number;
+  stock: number;
 };
 
-export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType }: ItemMatrixDialogProps) {
+export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inventory = [] }: ItemMatrixDialogProps) {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [matrixData, setMatrixData] = useState<MatrixRow[]>([]);
   const { products, units, packagingTypes } = useMasterData();
@@ -51,15 +54,19 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType }: It
   const handleProductSelect = (product: string) => {
     setSelectedProduct(product);
     const calibersForProduct = productCaliberMatrix[product] || [];
-    setMatrixData(calibersForProduct.map(caliber => ({
-      product: product,
-      caliber: caliber,
-      quantity: 0,
-      price: 0,
-      unit: 'Kilos',
-      packagingType: '',
-      packagingQuantity: 0,
-    })));
+    setMatrixData(calibersForProduct.map(caliber => {
+        const inventoryItem = inventory.find(i => i.caliber === `${product} - ${caliber}`);
+        return {
+            product: product,
+            caliber: caliber,
+            quantity: 0,
+            price: 0,
+            unit: 'Kilos',
+            packagingType: '',
+            packagingQuantity: 0,
+            stock: inventoryItem?.stock || 0,
+        }
+    }));
   };
 
   const handleMatrixChange = (index: number, field: keyof MatrixRow, value: string | number) => {
@@ -98,7 +105,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType }: It
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-6xl">
         <DialogHeader>
           <DialogTitle>Agregar Ítems por Matriz de Calibres</DialogTitle>
           <DialogDescription>
@@ -128,6 +135,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType }: It
               <TableHeader>
                 <TableRow>
                   <TableHead>Calibre</TableHead>
+                  {orderType === 'sale' && <TableHead className="w-[120px]">Stock Disp.</TableHead>}
                   <TableHead className='w-[100px]'>Cantidad</TableHead>
                   <TableHead className='w-[120px]'>Unidad</TableHead>
                   <TableHead className='w-[120px]'>Precio</TableHead>
@@ -143,12 +151,20 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType }: It
                 {matrixData.map((row, index) => (
                   <TableRow key={index}>
                     <TableCell className="font-medium">{row.caliber}</TableCell>
+                     {orderType === 'sale' && (
+                        <TableCell>
+                            <Badge variant={row.stock > 0 ? 'secondary' : 'destructive'}>
+                                {row.stock.toLocaleString('es-CL')} kg
+                            </Badge>
+                        </TableCell>
+                     )}
                     <TableCell>
                       <Input
                         type="number"
                         value={row.quantity}
                         onChange={(e) => handleMatrixChange(index, 'quantity', e.target.value)}
                         placeholder="0"
+                        className={orderType === 'sale' && row.quantity > row.stock ? 'border-destructive' : ''}
                       />
                     </TableCell>
                      <TableCell>

@@ -29,6 +29,7 @@ import { SalesOrderPreview } from './sales-order-preview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 type NewSalesOrderSheetProps = {
   isOpen: boolean;
@@ -67,6 +68,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, packagingTypes } = useMasterData();
+  const { toast } = useToast();
 
   const getPreviewOrder = (): SalesOrder => {
     const totalAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
@@ -122,14 +124,46 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
 
     if (formData.paymentMethod === 'Pago con Anticipo y Saldo') {
         if (!formData.advanceDueDate || !formData.balanceDueDate) {
-            alert("Por favor complete las fechas de vencimiento.");
+            toast({
+                variant: 'destructive',
+                title: 'Error de validación',
+                description: 'Por favor complete las fechas de vencimiento para la modalidad de pago seleccionada.',
+            });
             return;
         }
         if (new Date(formData.balanceDueDate) < new Date(formData.advanceDueDate)) {
-            alert("La fecha de vencimiento del saldo no puede ser anterior a la del anticipo.");
+            toast({
+                variant: 'destructive',
+                title: 'Error de validación',
+                description: 'La fecha de vencimiento del saldo no puede ser anterior a la del anticipo.',
+            });
             return;
         }
     }
+    
+    // Stock validation
+    for (const item of formData.items) {
+      const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
+      const currentStock = inventoryItem ? inventoryItem.stock : 0;
+      
+      let originalQuantity = 0;
+      if (order) { // If we are editing
+        const originalItem = order.items.find(oi => oi.id === item.id);
+        if (originalItem && originalItem.product === item.product && originalItem.caliber === item.caliber) {
+            originalQuantity = originalItem.quantity;
+        }
+      }
+
+      if (item.quantity > (currentStock + originalQuantity)) {
+          toast({
+              variant: "destructive",
+              title: "Error de Stock",
+              description: `No hay suficiente stock para ${item.product} - ${item.caliber}. Stock disponible: ${currentStock} kg.`,
+          });
+          return;
+      }
+    }
+
 
     onSave(formData);
   };
@@ -259,7 +293,18 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                     {formData.items.map((item, index) => {
                         const subtotal = (item.quantity || 0) * (item.price || 0);
                         const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
-                        const stock = inventoryItem ? inventoryItem.stock : 0;
+
+                        let stock = 0;
+                        if (inventoryItem) {
+                            stock = inventoryItem.stock;
+                        }
+
+                        if (order) { // If we are editing, add the original quantity back to stock for validation
+                            const originalItem = order.items.find(oi => oi.id === item.id);
+                            if (originalItem && originalItem.product === item.product && originalItem.caliber === item.caliber) {
+                                stock += originalItem.quantity;
+                            }
+                        }
                         
                         return (
                         <div key={item.id} className="grid grid-cols-12 gap-2 items-end mb-2 p-3 border rounded-md relative">
@@ -325,7 +370,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             </div>
                             <div className="col-span-6 md:col-span-1 flex flex-col">
                                 <Label>Stock</Label>
-                                <Badge variant={stock > (item.quantity || 0) ? 'default' : 'destructive'} className="mt-2 w-fit">
+                                <Badge variant={stock >= (item.quantity || 0) ? 'default' : 'destructive'} className="mt-2 w-fit">
                                     {stock.toLocaleString('es-CL')} kg
                                 </Badge>
                             </div>
@@ -445,6 +490,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         onOpenChange={setIsMatrixOpen}
         onSave={handleMatrixSave}
         orderType="sale"
+        inventory={inventory}
       />
     </>
   );
