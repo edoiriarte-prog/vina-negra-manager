@@ -18,7 +18,7 @@ import {
 import { PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement } from '@/lib/types';
 import KpiCard from './components/kpi-card';
 import { Boxes, DollarSign, MinusCircle, PlusCircle, ShoppingBag, ShoppingCart } from 'lucide-react';
-import { WeeklyRevenueChart, ExpenseBreakdownChart, KiloComparisonChart, CaliberDistributionChart } from './components/charts';
+import { WeeklyPurchasesChart, ExpenseBreakdownChart, KiloComparisonChart, CaliberDistributionChart } from './components/charts';
 import AiSummary from './components/ai-summary';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -143,10 +143,10 @@ export default function DashboardPage() {
         </Card>
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className='font-headline text-xl'>Ingresos Semanales</CardTitle>
+            <CardTitle className='font-headline text-xl'>Compras Semanales</CardTitle>
           </CardHeader>
           <CardContent>
-            {isClient ? <WeeklyRevenueChart data={financialMovements} /> : <Skeleton className="h-[300px] w-full" />}
+            {isClient ? <WeeklyPurchasesChart data={purchaseOrders} /> : <Skeleton className="h-[300px] w-full" />}
           </CardContent>
         </Card>
         <Card>

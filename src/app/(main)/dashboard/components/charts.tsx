@@ -27,21 +27,20 @@ const formatCurrency = (value: number) =>
 const formatKilos = (value: number) =>
   `${new Intl.NumberFormat('es-CL').format(value)} kg`;
 
-// Weekly Revenue Chart
-export function WeeklyRevenueChart({ data }: { data: FinancialMovement[] }) {
+// Weekly Purchases Chart
+export function WeeklyPurchasesChart({ data }: { data: PurchaseOrder[] }) {
   const weeklyData = data
-    .filter((m) => m.type === 'income')
-    .reduce((acc, m) => {
-      const week = getWeek(parseISO(m.date));
-      acc[week] = (acc[week] || 0) + m.amount;
+    .filter((order) => order.status === 'completed')
+    .reduce((acc, order) => {
+      const week = getWeek(parseISO(order.date));
+      acc[week] = (acc[week] || 0) + order.totalAmount;
       return acc;
     }, {} as { [week: number]: number });
 
-  const chartData = Object.entries(weeklyData).map(([week, revenue]) => ({
+  const chartData = Object.entries(weeklyData).map(([week, total]) => ({
     name: `Semana ${week}`,
-    Ingresos: revenue,
+    Compras: total,
   })).sort((a, b) => parseInt(a.name.split(' ')[1]) - parseInt(b.name.split(' ')[1]));
-
 
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -56,11 +55,12 @@ export function WeeklyRevenueChart({ data }: { data: FinancialMovement[] }) {
           formatter={(value: number) => formatCurrency(value)}
         />
         <Legend wrapperStyle={{fontSize: "12px"}}/>
-        <Bar dataKey="Ingresos" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Compras" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
 }
+
 
 // Expense Breakdown Chart
 export function ExpenseBreakdownChart({ purchases, services }: { purchases: number; services: number }) {
