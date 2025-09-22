@@ -31,6 +31,7 @@ type NewFinancialMovementSheetProps = {
   onOpenChange: (isOpen: boolean) => void;
   onSave: (movement: FinancialMovement | Omit<FinancialMovement, 'id'>) => void;
   movement: FinancialMovement | null;
+  allMovements: FinancialMovement[];
   purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
   serviceOrders: ServiceOrder[];
@@ -45,7 +46,7 @@ const getInitialFormData = (): Omit<FinancialMovement, 'id'> => ({
 });
 
 
-export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, purchaseOrders, salesOrders, serviceOrders }: NewFinancialMovementSheetProps) {
+export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements, purchaseOrders, salesOrders, serviceOrders }: NewFinancialMovementSheetProps) {
   const [formData, setFormData] = useState<Omit<FinancialMovement, 'id'>>(getInitialFormData());
   const [relatedOrderType, setRelatedOrderType] = useState<'OV' | 'OC' | 'OS' | ''>('');
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -77,21 +78,42 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     if (!relatedOrderType) return;
     
     let orderAmount = 0;
+    let newDescription = '';
+
     if (relatedOrderType === 'OC') {
         const order = purchaseOrders.find(o => o.id === orderId);
-        if (order) orderAmount = order.totalAmount;
+        if (order) {
+            const paymentsMade = allMovements
+                .filter(m => m.relatedOrder?.id === orderId && m.type === 'expense')
+                .reduce((sum, m) => sum + m.amount, 0);
+            orderAmount = order.totalAmount - paymentsMade;
+            newDescription = `Pago O/C ${orderId}`;
+        }
     } else if (relatedOrderType === 'OV') {
         const order = salesOrders.find(o => o.id === orderId);
-        if (order) orderAmount = order.totalAmount;
+        if (order) {
+            const paymentsMade = allMovements
+                .filter(m => m.relatedOrder?.id === orderId && m.type === 'income')
+                .reduce((sum, m) => sum + m.amount, 0);
+            orderAmount = order.totalAmount - paymentsMade;
+            newDescription = `Pago O/V ${orderId}`;
+        }
     } else if (relatedOrderType === 'OS') {
         const order = serviceOrders.find(o => o.id === orderId);
-        if (order) orderAmount = order.cost;
+        if (order) {
+            const paymentsMade = allMovements
+                .filter(m => m.relatedOrder?.id === orderId && m.type === 'expense')
+                .reduce((sum, m) => sum + m.amount, 0);
+            orderAmount = order.cost - paymentsMade;
+            newDescription = `Pago O/S ${orderId} - ${order.description}`;
+        }
     }
 
     setFormData(prev => ({ 
         ...prev, 
         relatedOrder: { type: relatedOrderType, id: orderId },
-        amount: orderAmount // Set amount to total by default
+        amount: orderAmount,
+        description: newDescription,
     }));
   }
 
@@ -129,11 +151,19 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 totalAmount = order.cost;
             }
         }
+        
+        const paymentsMade = allMovements
+            .filter(m => m.relatedOrder?.id === formData.relatedOrder?.id)
+            .reduce((sum, m) => sum + m.amount, 0);
+        
+        const newTotalPaid = paymentsMade + formData.amount;
 
-        if (formData.amount < totalAmount) {
+        if (newTotalPaid < totalAmount) {
             details += ` por un monto de ${formData.amount} de un total de ${totalAmount} (abono).`;
+        } else if (newTotalPaid > totalAmount) {
+             details += ` por un monto de ${formData.amount}. El pago excede el total del documento de ${totalAmount}.`;
         } else {
-            details += ` por un monto de ${formData.amount} (pago total).`;
+            details += ` por un monto de ${formData.amount} (pago final).`;
         }
 
 

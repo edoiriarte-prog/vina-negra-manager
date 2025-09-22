@@ -127,6 +127,7 @@ export default function FinancialsPage() {
         onOpenChange={handleSheetOpenChange}
         onSave={handleSaveMovement}
         movement={editingMovement}
+        allMovements={financialMovements}
         purchaseOrders={purchaseOrders}
         salesOrders={salesOrders}
         serviceOrders={serviceOrders}
