@@ -10,11 +10,12 @@ export function Logo({ className }: { className?: string }) {
       )}
     >
       <Image 
-        src="/logo.png" 
+        src="https://picsum.photos/seed/logo/160/100" 
         alt="Agrocomercial Viña Negra" 
         width={160} 
         height={100}
         priority
+        data-ai-hint="logo"
       />
     </div>
   );
