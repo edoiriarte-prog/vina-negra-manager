@@ -77,6 +77,7 @@ export type FinancialMovement = {
   type: 'income' | 'expense';
   description: string;
   amount: number;
+  contactId?: string;
   relatedOrder?: {
     type: 'OV' | 'OC' | 'OS';
     id: string;

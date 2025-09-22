@@ -84,11 +84,11 @@ export default function ReportsPage() {
         const clientSalesOrders = salesOrders.filter(so => so.clientId === client.id);
         const totalBilled = clientSalesOrders.reduce((sum, order) => sum + order.totalAmount, 0);
 
-        const clientSaleOrderIds = clientSalesOrders.map(so => so.id);
-        const totalPaid = financialMovements
-          .filter(fm => fm.type === 'income' && fm.relatedOrder && clientSaleOrderIds.includes(fm.relatedOrder.id))
-          .reduce((sum, movement) => sum + movement.amount, 0);
-
+        const clientMovements = financialMovements.filter(
+          fm => fm.type === 'income' && fm.contactId === client.id
+        );
+        const totalPaid = clientMovements.reduce((sum, movement) => sum + movement.amount, 0);
+        
         const pendingBalance = totalBilled - totalPaid;
         
         let status: ReportData['status'] = 'Pendiente';
@@ -130,10 +130,10 @@ export default function ReportsPage() {
         const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id);
         const totalBilled = supplierPurchaseOrders.reduce((sum, order) => sum + order.totalAmount, 0);
         
-        const supplierPurchaseOrderIds = supplierPurchaseOrders.map(po => po.id);
-        const totalPaid = financialMovements
-          .filter(fm => fm.type === 'expense' && fm.relatedOrder && supplierPurchaseOrderIds.includes(fm.relatedOrder.id))
-          .reduce((sum, movement) => sum + movement.amount, 0);
+        const supplierMovements = financialMovements.filter(
+            fm => fm.type === 'expense' && fm.contactId === supplier.id
+        );
+        const totalPaid = supplierMovements.reduce((sum, movement) => sum + movement.amount, 0);
           
         const pendingBalance = totalBilled - totalPaid;
 

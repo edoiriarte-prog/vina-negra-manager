@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder } from '@/lib/types';
+import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact } from '@/lib/types';
 import { format } from 'date-fns';
 import { suggestTransactionDescription } from '@/ai/flows/suggest-transaction-descriptions';
 import { Loader2, Sparkles } from 'lucide-react';
@@ -35,6 +35,7 @@ type NewFinancialMovementSheetProps = {
   purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
   serviceOrders: ServiceOrder[];
+  contacts: Contact[];
 };
 
 const getInitialFormData = (): Omit<FinancialMovement, 'id'> => ({
@@ -43,10 +44,14 @@ const getInitialFormData = (): Omit<FinancialMovement, 'id'> => ({
     description: '',
     amount: 0,
     relatedOrder: undefined,
+    contactId: undefined,
 });
 
 
-export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements, purchaseOrders, salesOrders, serviceOrders }: NewFinancialMovementSheetProps) {
+export function NewFinancialMovementSheet({ 
+    isOpen, onOpenChange, onSave, movement, allMovements, 
+    purchaseOrders, salesOrders, serviceOrders, contacts 
+}: NewFinancialMovementSheetProps) {
   const [formData, setFormData] = useState<Omit<FinancialMovement, 'id'>>(getInitialFormData());
   const [relatedOrderType, setRelatedOrderType] = useState<'OV' | 'OC' | 'OS' | ''>('');
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -65,6 +70,23 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     }
   }, [movement, isOpen]);
 
+  useEffect(() => {
+    // Auto-select contact when a related order is chosen
+    if (formData.relatedOrder) {
+      let contactId: string | undefined = undefined;
+      if (formData.relatedOrder.type === 'OV') {
+        const order = salesOrders.find(o => o.id === formData.relatedOrder?.id);
+        contactId = order?.clientId;
+      } else if (formData.relatedOrder.type === 'OC') {
+        const order = purchaseOrders.find(o => o.id === formData.relatedOrder?.id);
+        contactId = order?.supplierId;
+      }
+      if (contactId) {
+        handleSelectChange('contactId', contactId);
+      }
+    }
+  }, [formData.relatedOrder, salesOrders, purchaseOrders]);
+
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: name === 'amount' ? Number(value) : value }));
@@ -79,6 +101,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     
     let orderAmount = 0;
     let newDescription = '';
+    let contactId: string | undefined = undefined;
 
     if (relatedOrderType === 'OC') {
         const order = purchaseOrders.find(o => o.id === orderId);
@@ -88,6 +111,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 .reduce((sum, m) => sum + m.amount, 0);
             orderAmount = order.totalAmount - paymentsMade;
             newDescription = `Pago O/C ${orderId}`;
+            contactId = order.supplierId;
         }
     } else if (relatedOrderType === 'OV') {
         const order = salesOrders.find(o => o.id === orderId);
@@ -97,6 +121,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 .reduce((sum, m) => sum + m.amount, 0);
             orderAmount = order.totalAmount - paymentsMade;
             newDescription = `Pago O/V ${orderId}`;
+            contactId = order.clientId;
         }
     } else if (relatedOrderType === 'OS') {
         const order = serviceOrders.find(o => o.id === orderId);
@@ -114,15 +139,16 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         relatedOrder: { type: relatedOrderType, id: orderId },
         amount: orderAmount,
         description: newDescription,
+        contactId: contactId,
     }));
   }
 
   const handleSuggestDescription = async () => {
-    if (!formData.relatedOrder) {
+    if (!formData.contactId && !formData.relatedOrder) {
         toast({
             variant: 'destructive',
             title: 'Error',
-            description: 'Seleccione un documento relacionado para sugerir una descripción.',
+            description: 'Seleccione un documento o un contacto para sugerir una descripción.',
         });
         return;
     }
@@ -131,41 +157,51 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     try {
         let details = '';
         let totalAmount = 0;
+        let isOrderRelated = false;
 
-        if (formData.relatedOrder.type === 'OC') {
-            const order = purchaseOrders.find(o => o.id === formData.relatedOrder?.id);
-            if (order) {
-                details = `Orden de Compra ${order?.id}`;
-                totalAmount = order.totalAmount;
+        if (formData.relatedOrder) {
+            isOrderRelated = true;
+            if (formData.relatedOrder.type === 'OC') {
+                const order = purchaseOrders.find(o => o.id === formData.relatedOrder?.id);
+                if (order) {
+                    details = `Orden de Compra ${order?.id}`;
+                    totalAmount = order.totalAmount;
+                }
+            } else if(formData.relatedOrder.type === 'OV') {
+                const order = salesOrders.find(o => o.id === formData.relatedOrder?.id);
+                if (order) {
+                    details = `Orden de Venta ${order?.id}`;
+                    totalAmount = order.totalAmount;
+                }
+            } else if(formData.relatedOrder.type === 'OS') {
+                const order = serviceOrders.find(o => o.id === formData.relatedOrder?.id);
+                if (order) {
+                    details = `Orden de Servicio ${order?.id} (${order.description})`;
+                    totalAmount = order.cost;
+                }
             }
-        } else if(formData.relatedOrder.type === 'OV') {
-            const order = salesOrders.find(o => o.id === formData.relatedOrder?.id);
-            if (order) {
-                details = `Orden de Venta ${order?.id}`;
-                totalAmount = order.totalAmount;
-            }
-        } else if(formData.relatedOrder.type === 'OS') {
-            const order = serviceOrders.find(o => o.id === formData.relatedOrder?.id);
-            if (order) {
-                details = `Orden de Servicio ${order?.id} (${order.description})`;
-                totalAmount = order.cost;
-            }
+        } else if (formData.contactId) {
+            const contact = contacts.find(c => c.id === formData.contactId);
+            details = `Movimiento para ${contact?.name}`;
         }
-        
-        const paymentsMade = allMovements
-            .filter(m => m.relatedOrder?.id === formData.relatedOrder?.id)
-            .reduce((sum, m) => sum + m.amount, 0);
-        
-        const newTotalPaid = paymentsMade + formData.amount;
 
-        if (newTotalPaid < totalAmount) {
-            details += ` por un monto de ${formData.amount} de un total de ${totalAmount} (abono).`;
-        } else if (newTotalPaid > totalAmount) {
-             details += ` por un monto de ${formData.amount}. El pago excede el total del documento de ${totalAmount}.`;
+        if (isOrderRelated) {
+            const paymentsMade = allMovements
+                .filter(m => m.relatedOrder?.id === formData.relatedOrder?.id)
+                .reduce((sum, m) => sum + m.amount, 0);
+            
+            const newTotalPaid = paymentsMade + formData.amount;
+
+            if (newTotalPaid < totalAmount) {
+                details += ` por un monto de ${formData.amount} de un total de ${totalAmount} (abono).`;
+            } else if (newTotalPaid > totalAmount) {
+                details += ` por un monto de ${formData.amount}. El pago excede el total del documento de ${totalAmount}.`;
+            } else {
+                details += ` por un monto de ${formData.amount} (pago final).`;
+            }
         } else {
-            details += ` por un monto de ${formData.amount} (pago final).`;
+            details += ` por un monto de ${formData.amount}.`;
         }
-
 
         const result = await suggestTransactionDescription({
             transactionType: formData.type,
@@ -207,6 +243,10 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     ? 'Actualice la información del movimiento.'
     : 'Complete la información para registrar un nuevo ingreso o egreso.';
 
+  const filteredContacts = formData.type === 'income' 
+    ? contacts.filter(c => c.type === 'client') 
+    : contacts.filter(c => c.type === 'supplier');
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-lg">
@@ -228,7 +268,10 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
               </Label>
               <Select
                 required
-                onValueChange={(value: 'income' | 'expense') => handleSelectChange('type', value)}
+                onValueChange={(value: 'income' | 'expense') => {
+                    handleSelectChange('type', value);
+                    handleSelectChange('contactId', undefined); // Reset contact on type change
+                }}
                 value={formData.type}
               >
                 <SelectTrigger className="col-span-3">
@@ -245,8 +288,14 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                     Doc. Relacionado
                 </Label>
                 <div className='col-span-3 grid grid-cols-2 gap-2'>
-                    <Select onValueChange={(value: 'OV' | 'OC' | 'OS' | '') => setRelatedOrderType(value)} value={relatedOrderType}>
-                        <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
+                    <Select 
+                        onValueChange={(value: 'OV' | 'OC' | 'OS' | '') => {
+                            setRelatedOrderType(value);
+                            setFormData(prev => ({...prev, relatedOrder: undefined, contactId: undefined}));
+                        }} 
+                        value={relatedOrderType}
+                    >
+                        <SelectTrigger><SelectValue placeholder="Tipo Doc." /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="OV">Venta (O/V)</SelectItem>
                             <SelectItem value="OC">Compra (O/C)</SelectItem>
@@ -263,6 +312,26 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                     </Select>
                 </div>
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+                 <Label htmlFor="contactId" className="text-right">
+                    Cliente/Prov
+                 </Label>
+                 <Select
+                    onValueChange={(value) => handleSelectChange('contactId', value)}
+                    value={formData.contactId}
+                    disabled={!!formData.relatedOrder}
+                    required
+                 >
+                     <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Seleccione un contacto" />
+                     </SelectTrigger>
+                     <SelectContent>
+                        {filteredContacts.map(c => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                     </SelectContent>
+                 </Select>
+            </div>
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right">
                 Monto
@@ -275,7 +344,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
               </Label>
               <div className='col-span-3'>
                 <Input id="description" name="description" value={formData.description} onChange={handleInputChange} className="w-full" required />
-                <Button type="button" size="sm" variant="outline" className="mt-2" onClick={handleSuggestDescription} disabled={isSuggesting || !formData.relatedOrder}>
+                <Button type="button" size="sm" variant="outline" className="mt-2" onClick={handleSuggestDescription} disabled={isSuggesting || (!formData.relatedOrder && !formData.contactId)}>
                     {isSuggesting ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Sparkles className='mr-2 h-4 w-4'/>}
                     Sugerir con IA
                 </Button>

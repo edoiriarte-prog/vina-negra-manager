@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { financialMovements as initialFinancialMovements, purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, serviceOrders as initialServiceOrders } from '@/lib/data';
-import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder } from '@/lib/types';
+import { financialMovements as initialFinancialMovements, purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, serviceOrders as initialServiceOrders, contacts as initialContacts } from '@/lib/data';
+import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -29,6 +29,7 @@ export default function FinancialsPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [serviceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
+  const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   
   const [editingMovement, setEditingMovement] = useState<FinancialMovement | null>(null);
   const [deletingMovement, setDeletingMovement] = useState<FinancialMovement | null>(null);
@@ -131,6 +132,7 @@ export default function FinancialsPage() {
         purchaseOrders={purchaseOrders}
         salesOrders={salesOrders}
         serviceOrders={serviceOrders}
+        contacts={contacts}
       />
 
       <AlertDialog open={!!deletingMovement} onOpenChange={(open) => !open && setDeletingMovement(null)}>
