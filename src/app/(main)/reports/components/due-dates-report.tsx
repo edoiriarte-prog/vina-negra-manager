@@ -64,7 +64,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                     const clientName = client ? client.name : 'Desconocido';
                     
                     const paymentsForOrder = financialMovements.filter(
-                        fm => fm.relatedOrder?.id === order.id && fm.type === 'income'
+                        fm => (fm.relatedOrder?.id === order.id || fm.contactId === order.clientId) && fm.type === 'income'
                     );
                     const totalPaid = paymentsForOrder.reduce((sum, p) => sum + p.amount, 0);
 
@@ -75,7 +75,11 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                         
                         if (totalPaid >= advanceAmount) {
                             advanceStatus = 'Pagado';
-                        } else if (isAfter(new Date(), parseISO(order.advanceDueDate))) {
+                        } else if (totalPaid > 0) {
+                            advanceStatus = 'Pendiente'; // or create a new 'Abono' status if needed
+                        }
+                        
+                        if (advanceStatus !== 'Pagado' && isAfter(new Date(), parseISO(order.advanceDueDate))) {
                             advanceStatus = 'Vencido';
                         }
 
@@ -100,7 +104,11 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
 
                         if (totalPaid >= order.totalAmount) {
                             balanceStatus = 'Pagado';
-                        } else if (isAfter(new Date(), parseISO(order.balanceDueDate))) {
+                        } else if (totalPaid > advanceAmount) {
+                            balanceStatus = 'Pendiente';
+                        }
+                        
+                        if (balanceStatus !== 'Pagado' && isAfter(new Date(), parseISO(order.balanceDueDate))) {
                             balanceStatus = 'Vencido';
                         }
 
@@ -142,8 +150,9 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
             Object.keys(itemsByDate).sort((a,b) => new Date(a).getTime() - new Date(b).getTime()).forEach(date => {
                 const items = itemsByDate[date];
                 finalReportRows.push(...items);
-                if (items.length > 1) {
-                    const subtotalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+                const pendingOrOverdueItems = items.filter(i => i.status === 'Pendiente' || i.status === 'Vencido');
+                if (pendingOrOverdueItems.length > 1) {
+                    const subtotalAmount = pendingOrOverdueItems.reduce((sum, item) => sum + item.amount, 0);
                     finalReportRows.push({
                         id: `subtotal-${date}`,
                         date: date,
@@ -178,7 +187,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
             if (item.isSubtotal) {
                 return (
                     <TableRow key={item.id} className="bg-muted/50 font-semibold">
-                        <TableCell colSpan={4} className="text-right">Subtotal {format(parseISO(item.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                        <TableCell colSpan={4} className="text-right">Subtotal Vencimientos {format(parseISO(item.date), "dd-MM-yyyy", { locale: es })}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
                         <TableCell colSpan={2}></TableCell>
                     </TableRow>
@@ -219,7 +228,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                                 <TableHead>Orden (O/V)</TableHead>
                                 <TableHead>Tipo de Pago</TableHead>
                                 <TableHead className="text-right">Monto</TableHead>
-                                <TableHead className="text-right">Acumulado</TableHead>
+                                <TableHead className="text-right">Acumulado Pendiente</TableHead>
                                 <TableHead className="text-center">Estado</TableHead>
                             </TableRow>
                         </TableHeader>

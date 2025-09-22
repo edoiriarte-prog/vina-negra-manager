@@ -99,7 +99,7 @@ export default function ReportsPage() {
         }
 
         const orders: OrderDetail[] = clientSalesOrders.map(order => {
-          const payments = financialMovements.filter(fm => fm.relatedOrder?.id === order.id && fm.type === 'income');
+          const payments = financialMovements.filter(fm => (fm.relatedOrder?.id === order.id || fm.contactId === order.clientId) && fm.type === 'income');
           const totalPaidForOrder = payments.reduce((sum, p) => sum + p.amount, 0);
           const balance = order.totalAmount - totalPaidForOrder;
           return {
@@ -145,7 +145,7 @@ export default function ReportsPage() {
         }
 
         const orders: OrderDetail[] = supplierPurchaseOrders.map(order => {
-          const payments = financialMovements.filter(fm => fm.relatedOrder?.id === order.id && fm.type === 'expense');
+          const payments = financialMovements.filter(fm => (fm.relatedOrder?.id === order.id || fm.contactId === order.supplierId) && fm.type === 'expense');
           const totalPaidForOrder = payments.reduce((sum, p) => sum + p.amount, 0);
           const balance = order.totalAmount - totalPaidForOrder;
           return {
