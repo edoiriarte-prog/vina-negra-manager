@@ -24,6 +24,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PerformanceReports } from './components/performance-reports';
+import { DueDatesReport } from './components/due-dates-report';
 
 type OrderDetail = {
   id: string;
@@ -296,8 +297,9 @@ export default function ReportsPage() {
       </div>
 
       <Tabs defaultValue="accounts" className="no-print">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="accounts">Estado de Cuentas</TabsTrigger>
+          <TabsTrigger value="due-dates">Vencimientos</TabsTrigger>
           <TabsTrigger value="performance">Rendimiento</TabsTrigger>
         </TabsList>
         <TabsContent value="accounts">
@@ -366,6 +368,13 @@ export default function ReportsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+         <TabsContent value="due-dates">
+            <DueDatesReport 
+                salesOrders={salesOrders}
+                financialMovements={financialMovements}
+                contacts={contacts}
+            />
         </TabsContent>
         <TabsContent value="performance">
             <PerformanceReports
