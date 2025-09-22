@@ -25,7 +25,19 @@ type DueDateItem = {
     dueDate: string;
     amount: number;
     status: 'Pagado' | 'Pendiente' | 'Vencido';
+    isSubtotal?: false;
+    cumulativeAmount: number;
 };
+
+type SubtotalItem = {
+    id: string;
+    date: string;
+    amount: number;
+    isSubtotal: true;
+}
+
+type ReportRow = DueDateItem | SubtotalItem;
+
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -35,7 +47,7 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 export function DueDatesReport({ salesOrders, financialMovements, contacts }: DueDatesReportProps) {
-    const [reportData, setReportData] = useState<DueDateItem[]>([]);
+    const [reportData, setReportData] = useState<ReportRow[]>([]);
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
@@ -76,6 +88,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                             dueDate: order.advanceDueDate,
                             amount: advanceAmount,
                             status: advanceStatus,
+                            cumulativeAmount: 0 // will be calculated later
                         });
                     }
 
@@ -100,45 +113,94 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                             dueDate: order.balanceDueDate,
                             amount: balanceAmount,
                             status: balanceStatus,
+                            cumulativeAmount: 0 // will be calculated later
                         });
                     }
                 }
             });
             
-            // Sort by due date
             dueItems.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
-            setReportData(dueItems);
+            const finalReportRows: ReportRow[] = [];
+            const itemsByDate: Record<string, DueDateItem[]> = {};
+            let cumulative = 0;
+
+            dueItems.forEach(item => {
+                if (item.status === 'Pendiente' || item.status === 'Vencido') {
+                   cumulative += item.amount;
+                }
+                item.cumulativeAmount = cumulative;
+            });
+            
+            dueItems.forEach(item => {
+                if (!itemsByDate[item.dueDate]) {
+                    itemsByDate[item.dueDate] = [];
+                }
+                itemsByDate[item.dueDate].push(item);
+            });
+            
+            Object.keys(itemsByDate).sort((a,b) => new Date(a).getTime() - new Date(b).getTime()).forEach(date => {
+                const items = itemsByDate[date];
+                finalReportRows.push(...items);
+                if (items.length > 1) {
+                    const subtotalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+                    finalReportRows.push({
+                        id: `subtotal-${date}`,
+                        date: date,
+                        amount: subtotalAmount,
+                        isSubtotal: true,
+                    });
+                }
+            });
+
+
+            setReportData(finalReportRows);
         }
     }, [salesOrders, financialMovements, contacts, isClient]);
 
     const totalPending = useMemo(() => {
-        return reportData.filter(item => item.status === 'Pendiente' || item.status === 'Vencido').reduce((sum, item) => sum + item.amount, 0);
+        return reportData
+            .filter((item): item is DueDateItem => !item.isSubtotal)
+            .filter(item => item.status === 'Pendiente' || item.status === 'Vencido')
+            .reduce((sum, item) => sum + item.amount, 0);
     }, [reportData]);
 
     const renderReportRows = () => {
         if (!isClient) {
             return Array.from({ length: 5 }).map((_, index) => (
                 <TableRow key={`skeleton-due-${index}`}>
-                    <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
                 </TableRow>
             ));
         }
 
-        return reportData.map(item => (
-            <TableRow key={item.id}>
-                <TableCell>{format(parseISO(item.dueDate), "dd-MM-yyyy", { locale: es })}</TableCell>
-                <TableCell className="font-medium">{item.clientName}</TableCell>
-                <TableCell>{item.orderId}</TableCell>
-                <TableCell>{item.paymentType}</TableCell>
-                <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-                <TableCell className="text-center">
-                    <Badge variant={item.status === 'Pagado' ? 'default' : item.status === 'Vencido' ? 'destructive' : 'secondary'}>
-                        {item.status}
-                    </Badge>
-                </TableCell>
-            </TableRow>
-        ));
+        return reportData.map(item => {
+            if (item.isSubtotal) {
+                return (
+                    <TableRow key={item.id} className="bg-muted/50 font-semibold">
+                        <TableCell colSpan={4} className="text-right">Subtotal {format(parseISO(item.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
+                        <TableCell colSpan={2}></TableCell>
+                    </TableRow>
+                )
+            }
+
+            return (
+                <TableRow key={item.id}>
+                    <TableCell>{format(parseISO(item.dueDate), "dd-MM-yyyy", { locale: es })}</TableCell>
+                    <TableCell className="font-medium">{item.clientName}</TableCell>
+                    <TableCell>{item.orderId}</TableCell>
+                    <TableCell>{item.paymentType}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(item.cumulativeAmount)}</TableCell>
+                    <TableCell className="text-center">
+                        <Badge variant={item.status === 'Pagado' ? 'default' : item.status === 'Vencido' ? 'destructive' : 'secondary'}>
+                            {item.status}
+                        </Badge>
+                    </TableCell>
+                </TableRow>
+            )
+        });
     }
 
     return (
@@ -157,6 +219,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                                 <TableHead>Orden (O/V)</TableHead>
                                 <TableHead>Tipo de Pago</TableHead>
                                 <TableHead className="text-right">Monto</TableHead>
+                                <TableHead className="text-right">Acumulado</TableHead>
                                 <TableHead className="text-center">Estado</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -168,7 +231,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                                 <TableRow>
                                     <TableCell colSpan={4} className="text-right font-bold text-lg">Total Pendiente</TableCell>
                                     <TableCell className="text-right font-bold text-lg">{formatCurrency(totalPending)}</TableCell>
-                                    <TableCell></TableCell>
+                                    <TableCell colSpan={2}></TableCell>
                                 </TableRow>
                             </TableFooter>
                         )}
