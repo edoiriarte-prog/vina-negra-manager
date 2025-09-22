@@ -363,12 +363,12 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             {/* Packaging Quantity */}
                             <div className="col-span-6 md:col-span-1">
                                 <Label>Cant. Envases</Label>
-                                <Input name={`items.${index}.packagingQuantity`} type="number" value={item.packagingQuantity || ''} onChange={handleInputChange} placeholder="0"/>
+                                <Input name={`items.${index}.packagingQuantity`} type="number" value={item.packagingQuantity || ''} onChange={handleInputChange} placeholder="0" className="w-24 text-base"/>
                             </div>
                             {/* Quantity */}
                             <div className="col-span-6 md:col-span-1">
                                 <Label htmlFor={`item-quantity-${index}`}>Cantidad</Label>
-                                <Input id={`item-quantity-${index}`} name={`items.${index}.quantity`} type="number" value={item.quantity || ''} onChange={handleInputChange} placeholder="0" required />
+                                <Input id={`item-quantity-${index}`} name={`items.${index}.quantity`} type="number" value={item.quantity || ''} onChange={handleInputChange} placeholder="0" required className="w-24 text-base" />
                             </div>
                             {/* Unit */}
                             <div className="col-span-6 md:col-span-1">
@@ -383,7 +383,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             {/* Price */}
                             <div className="col-span-6 md:col-span-1">
                                 <Label htmlFor={`item-price-${index}`}>Precio</Label>
-                                <Input id={`item-price-${index}`} name={`items.${index}.price`} type="number" value={item.price || ''} onChange={handleInputChange} placeholder="0" required />
+                                <Input id={`item-price-${index}`} name={`items.${index}.price`} type="number" value={item.price || ''} onChange={handleInputChange} placeholder="0" required className="w-24 text-base" />
                             </div>
                             {/* Subtotal */}
                             <div className="col-span-6 md:col-span-1">
