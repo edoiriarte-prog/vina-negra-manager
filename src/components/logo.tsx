@@ -1,22 +1,15 @@
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
+import { ViñaNegraLogo } from '@/components/viña-negra-logo';
 
 export function Logo({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-center py-2',
+        'flex items-center justify-center py-2 px-4',
         className
       )}
     >
-      <Image 
-        src="https://picsum.photos/seed/logo/160/100" 
-        alt="Agrocomercial Viña Negra" 
-        width={160} 
-        height={100}
-        priority
-        data-ai-hint="logo"
-      />
+      <ViñaNegraLogo className="w-auto h-24" />
     </div>
   );
 }
