@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, Eye } from 'lucide-react';
+import { PlusCircle, Trash2, Eye, CalendarIcon } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -22,6 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 import { SalesOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
@@ -34,6 +39,7 @@ import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
+import { Calendar } from '@/components/ui/calendar';
 
 type NewSalesOrderSheetProps = {
   isOpen: boolean;
@@ -81,10 +87,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
       setFormData(getInitialFormData(order));
     }
   }, [order, isOpen]);
-
-  if (!formData) {
-    return null; // or a loading spinner
-  }
 
   const getPreviewOrder = (): SalesOrder => {
     const totalAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
@@ -169,7 +171,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
       }
     }
 
-
     onSave(formData);
   };
   
@@ -181,7 +182,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'advancePercentage', 'packagingQuantity'].includes(field) ? Number(value) : value);
     }
      else {
-        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage', 'date', 'advanceDueDate', 'balanceDueDate'].includes(name) ? value : Number(value) }));
+        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage'].includes(name) ? Number(value) : value }));
     }
   };
 
@@ -221,6 +222,8 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
      return totalAmount - advanceAmount;
   }, [totalAmount, advanceAmount, formData.paymentMethod]);
 
+  if (!formData) return null;
+
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -237,7 +240,32 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                     <Label htmlFor="date" className="text-right">
                       Fecha
                     </Label>
-                    <Input id="date" name="date" type="date" value={formData.date} onChange={handleInputChange} className="col-span-3" required />
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <Button
+                            variant={"outline"}
+                            className={cn(
+                            "col-span-3 justify-start text-left font-normal",
+                            !formData.date && "text-muted-foreground"
+                            )}
+                        >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.date ? format(parseISO(formData.date), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                        <Calendar
+                            mode="single"
+                            selected={formData.date ? parseISO(formData.date) : undefined}
+                            onSelect={(date) => {
+                                if (date) {
+                                    handleSelectChange('date', format(date, 'yyyy-MM-dd'))
+                                }
+                            }}
+                            initialFocus
+                        />
+                        </PopoverContent>
+                    </Popover>
                   </div>
                    <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="clientId" className="text-right">
@@ -417,13 +445,63 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                     <Label htmlFor="advanceDueDate" className="text-right">
                                         Venc. Anticipo
                                     </Label>
-                                    <Input id="advanceDueDate" name="advanceDueDate" type="date" value={formData.advanceDueDate || ''} onChange={handleInputChange} className="col-span-3" required />
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                            "col-span-3 justify-start text-left font-normal",
+                                            !formData.advanceDueDate && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                                        </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={formData.advanceDueDate ? parseISO(formData.advanceDueDate) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    handleSelectChange('advanceDueDate', format(date, 'yyyy-MM-dd'))
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="balanceDueDate" className="text-right">
                                         Venc. Saldo
                                     </Label>
-                                    <Input id="balanceDueDate" name="balanceDueDate" type="date" value={formData.balanceDueDate || ''} onChange={handleInputChange} className="col-span-3" required />
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                            "col-span-3 justify-start text-left font-normal",
+                                            !formData.balanceDueDate && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                                        </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={formData.balanceDueDate ? parseISO(formData.balanceDueDate) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    handleSelectChange('balanceDueDate', format(date, 'yyyy-MM-dd'))
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
                             </div>
                         )}
@@ -438,7 +516,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                 </div>
                                 <div className='flex justify-between'>
                                     <span className="text-muted-foreground">Vencimiento:</span>
-                                    <span className='font-medium'>{formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), 'dd-MM-yyyy') : '-'}</span>
+                                    <span className='font-medium'>{formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
                                 </div>
                                 <Separator className="my-2" />
                                  <div className='flex justify-between'>
@@ -447,7 +525,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                 </div>
                                 <div className='flex justify-between'>
                                     <span className="text-muted-foreground">Vencimiento:</span>
-                                    <span className='font-medium'>{formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), 'dd-MM-yyyy') : '-'}</span>
+                                    <span className='font-medium'>{formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
                                 </div>
                             </div>
                         </div>
