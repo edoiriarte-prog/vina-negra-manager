@@ -221,14 +221,6 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
 
             {order.items.map((item) => {
               if (!item.lotNumber) return null;
-              const barcodeValue = JSON.stringify({
-                orderId: order.id,
-                lot: item.lotNumber,
-                product: item.product,
-                caliber: item.caliber,
-                quantity: item.quantity,
-                unit: item.unit
-              });
 
               return (
                 <div key={`${item.id}-dispatch`} className="border rounded-lg p-4 mb-4 flex items-center justify-between">
@@ -239,7 +231,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
                   </div>
                   <div className="text-center">
                     <Barcode 
-                      value={barcodeValue} 
+                      value={item.lotNumber} 
                       width={1.5} 
                       height={50} 
                       fontSize={12}
