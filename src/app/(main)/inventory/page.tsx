@@ -49,7 +49,8 @@ export default function InventoryPage() {
       // Render skeleton rows on the server and initial client render
       return Array.from({ length: 5 }).map((_, index) => (
         <TableRow key={index}>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
@@ -59,8 +60,10 @@ export default function InventoryPage() {
     }
     
     return inventory.map((item) => (
-        <TableRow key={item.caliber}>
-            <TableCell className="font-medium">{item.caliber}</TableCell>
+        <TableRow key={item.key}>
+            <TableCell className="font-medium">{item.product}</TableCell>
+            <TableCell>{item.caliber}</TableCell>
+            <TableCell>{item.warehouse}</TableCell>
             <TableCell className="text-right">{formatKilos(item.kilosPurchased)}</TableCell>
             <TableCell className="text-right">{formatKilos(item.kilosSold)}</TableCell>
             <TableCell className="text-right">
@@ -96,7 +99,9 @@ export default function InventoryPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className='font-bold'>Producto</TableHead>
                                     <TableHead className='font-bold'>Calibre</TableHead>
+                                    <TableHead className='font-bold'>Bodega</TableHead>
                                     <TableHead className='text-right font-bold'>Kilos Comprados</TableHead>
                                     <TableHead className='text-right font-bold'>Kilos Vendidos</TableHead>
                                     <TableHead className='text-right font-bold'>Kilos Ajustados</TableHead>
@@ -109,7 +114,7 @@ export default function InventoryPage() {
                             {isClient && (
                             <TableFooter>
                                 <TableRow>
-                                <TableHead className="font-bold text-lg">Total</TableHead>
+                                <TableHead colSpan={3} className="font-bold text-lg">Total</TableHead>
                                 <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosPurchased)}</TableHead>
                                 <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosSold)}</TableHead>
                                 <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosAdjusted)}</TableHead>

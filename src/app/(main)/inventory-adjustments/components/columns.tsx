@@ -41,6 +41,10 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Inv
     accessorKey: 'caliber',
     header: 'Calibre',
   },
+    {
+    accessorKey: 'warehouse',
+    header: 'Bodega',
+  },
   {
     accessorKey: 'type',
     header: 'Tipo',

@@ -54,7 +54,7 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
 export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, suppliers }: NewPurchaseOrderSheetProps) {
   const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData(order));
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const { products, calibers, units } = useMasterData();
+  const { products, calibers, units, warehouses } = useMasterData();
 
   useEffect(() => {
     setFormData(getInitialFormData(order));
@@ -125,7 +125,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   return (
     <>
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-4xl overflow-y-auto">
+      <SheetContent className="sm:max-w-6xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -174,8 +174,8 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                   return (
                     <div key={item.id} className="grid grid-cols-12 gap-2 items-center mb-2 p-3 border rounded-md">
                         {/* Product */}
-                        <div className="col-span-12 sm:col-span-3">
-                             <Label htmlFor={`item-product-${index}`}>Producto</Label>
+                        <div className="col-span-12 sm:col-span-2">
+                             <Label>Producto</Label>
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.product`, value)} value={item.product}>
                                  <SelectTrigger><SelectValue placeholder="Producto" /></SelectTrigger>
                                  <SelectContent>
@@ -185,7 +185,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                         </div>
                         {/* Caliber */}
                         <div className="col-span-12 sm:col-span-2">
-                             <Label htmlFor={`item-caliber-${index}`}>Calibre</Label>
+                             <Label>Calibre</Label>
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
@@ -193,14 +193,24 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                                  </SelectContent>
                              </Select>
                         </div>
+                        {/* Warehouse */}
+                        <div className="col-span-12 sm:col-span-2">
+                             <Label>Bodega</Label>
+                             <Select required onValueChange={(value) => handleSelectChange(`items.${index}.warehouse`, value)} value={item.warehouse}>
+                                 <SelectTrigger><SelectValue placeholder="Bodega" /></SelectTrigger>
+                                 <SelectContent>
+                                     {warehouses.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+                                 </SelectContent>
+                             </Select>
+                        </div>
                         {/* Quantity */}
                          <div className="col-span-6 sm:col-span-1">
-                             <Label htmlFor={`item-quantity-${index}`}>Cantidad</Label>
-                             <Input id={`item-quantity-${index}`} name={`items.${index}.quantity`} type="number" value={item.quantity} onChange={handleInputChange} placeholder="Cant." required />
+                             <Label>Cantidad</Label>
+                             <Input name={`items.${index}.quantity`} type="number" value={item.quantity} onChange={handleInputChange} placeholder="Cant." required />
                         </div>
                         {/* Unit */}
-                        <div className="col-span-6 sm:col-span-2">
-                            <Label htmlFor={`item-unit-${index}`}>Unidad</Label>
+                        <div className="col-span-6 sm:col-span-1">
+                            <Label>Unidad</Label>
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.unit`, value)} value={item.unit}>
                                  <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
                                  <SelectContent>
@@ -210,8 +220,8 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                         </div>
                         {/* Price */}
                          <div className="col-span-6 sm:col-span-2">
-                             <Label htmlFor={`item-price-${index}`}>Precio</Label>
-                             <Input id={`item-price-${index}`} name={`items.${index}.price`} type="number" value={item.price} onChange={handleInputChange} placeholder="Precio" required />
+                             <Label>Precio</Label>
+                             <Input name={`items.${index}.price`} type="number" value={item.price} onChange={handleInputChange} placeholder="Precio" required />
                         </div>
                         {/* Subtotal */}
                          <div className="col-span-6 sm:col-span-1">

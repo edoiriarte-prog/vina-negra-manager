@@ -37,6 +37,7 @@ const getInitialFormData = (): Omit<InventoryAdjustment, 'id'> => ({
     date: format(new Date(), 'yyyy-MM-dd'),
     product: '',
     caliber: '',
+    warehouse: '',
     type: 'decrease',
     quantity: 0,
     reason: '',
@@ -44,7 +45,7 @@ const getInitialFormData = (): Omit<InventoryAdjustment, 'id'> => ({
 
 export function NewAdjustmentSheet({ isOpen, onOpenChange, onSave, adjustment }: NewAdjustmentSheetProps) {
   const [formData, setFormData] = useState<Omit<InventoryAdjustment, 'id'>>(getInitialFormData());
-  const { products, calibers } = useMasterData();
+  const { products, calibers, warehouses } = useMasterData();
 
   useEffect(() => {
     if (adjustment) {
@@ -114,6 +115,17 @@ export function NewAdjustmentSheet({ isOpen, onOpenChange, onSave, adjustment }:
                   <SelectTrigger className="col-span-3"><SelectValue placeholder="Seleccione un calibre" /></SelectTrigger>
                   <SelectContent>
                       {calibers.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="warehouse" className="text-right">
+                Bodega
+              </Label>
+               <Select required onValueChange={(value) => handleSelectChange('warehouse', value)} value={formData.warehouse}>
+                  <SelectTrigger className="col-span-3"><SelectValue placeholder="Seleccione una bodega" /></SelectTrigger>
+                  <SelectContent>
+                      {warehouses.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
                   </SelectContent>
               </Select>
             </div>

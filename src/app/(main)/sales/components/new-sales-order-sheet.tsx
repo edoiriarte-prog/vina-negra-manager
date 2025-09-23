@@ -79,7 +79,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   const [formData, setFormData] = useState(() => getInitialFormData(order));
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const { products, calibers, units, packagingTypes } = useMasterData();
+  const { products, calibers, units, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -158,14 +158,14 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     
     // Stock validation
     for (const item of formData.items) {
-      const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
+      const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === item.warehouse);
       const currentStock = inventoryItem ? inventoryItem.stock : 0;
       
       if (item.quantity > currentStock) {
           toast({
               variant: "destructive",
               title: "Error de Stock",
-              description: `No hay suficiente stock para ${item.product} - ${item.caliber}. Stock disponible: ${currentStock} kg.`,
+              description: `No hay stock para ${item.product} - ${item.caliber} en la bodega ${item.warehouse}. Stock: ${currentStock} kg.`,
           });
           return;
       }
@@ -325,14 +325,14 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
 
                     {formData.items.map((item, index) => {
                         const subtotal = (item.quantity || 0) * (item.price || 0);
-                        const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
+                        const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === item.warehouse);
                         const stock = inventoryItem ? inventoryItem.stock : 0;
                         
                         return (
                         <div key={item.id} className="grid grid-cols-12 gap-2 items-end mb-2 p-3 border rounded-md relative">
                             {/* Product */}
                             <div className="col-span-6 md:col-span-2">
-                                <Label htmlFor={`item-product-${index}`}>Producto</Label>
+                                <Label>Producto</Label>
                                 <Select required onValueChange={(value) => handleSelectChange(`items.${index}.product`, value)} value={item.product}>
                                     <SelectTrigger><SelectValue placeholder="Producto" /></SelectTrigger>
                                     <SelectContent>
@@ -342,7 +342,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             </div>
                             {/* Caliber */}
                             <div className="col-span-6 md:col-span-1">
-                                <Label htmlFor={`item-caliber-${index}`}>Calibre</Label>
+                                <Label>Calibre</Label>
                                 <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                     <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                     <SelectContent>
@@ -350,9 +350,19 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                     </SelectContent>
                                 </Select>
                             </div>
+                            {/* Warehouse */}
+                            <div className="col-span-6 md:col-span-2">
+                                <Label>Bodega</Label>
+                                <Select required onValueChange={(value) => handleSelectChange(`items.${index}.warehouse`, value)} value={item.warehouse}>
+                                    <SelectTrigger><SelectValue placeholder="Bodega" /></SelectTrigger>
+                                    <SelectContent>
+                                        {warehouses.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                              {/* Packaging Type */}
-                             <div className="col-span-6 md:col-span-2">
-                                <Label>Tipo Envase</Label>
+                             <div className="col-span-6 md:col-span-1">
+                                <Label>T. Envase</Label>
                                 <Select onValueChange={(value) => handleSelectChange(`items.${index}.packagingType`, value)} value={item.packagingType}>
                                     <SelectTrigger><SelectValue placeholder="Envase" /></SelectTrigger>
                                     <SelectContent>
@@ -362,17 +372,17 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             </div>
                             {/* Packaging Quantity */}
                             <div className="col-span-6 md:col-span-1">
-                                <Label>Cant. Envases</Label>
-                                <Input name={`items.${index}.packagingQuantity`} type="number" value={item.packagingQuantity || ''} onChange={handleInputChange} placeholder="0" className="w-24 text-base"/>
+                                <Label># Envases</Label>
+                                <Input name={`items.${index}.packagingQuantity`} type="number" value={item.packagingQuantity || ''} onChange={handleInputChange} placeholder="0" className="text-base"/>
                             </div>
                             {/* Quantity */}
                             <div className="col-span-6 md:col-span-1">
-                                <Label htmlFor={`item-quantity-${index}`}>Cantidad</Label>
-                                <Input id={`item-quantity-${index}`} name={`items.${index}.quantity`} type="number" value={item.quantity || ''} onChange={handleInputChange} placeholder="0" required className="w-24 text-base" />
+                                <Label>Cantidad</Label>
+                                <Input name={`items.${index}.quantity`} type="number" value={item.quantity || ''} onChange={handleInputChange} placeholder="0" required className="text-base" />
                             </div>
                             {/* Unit */}
                             <div className="col-span-6 md:col-span-1">
-                                <Label htmlFor={`item-unit-${index}`}>Unidad</Label>
+                                <Label>Unidad</Label>
                                 <Select required onValueChange={(value) => handleSelectChange(`items.${index}.unit`, value)} value={item.unit}>
                                     <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
                                     <SelectContent>
@@ -382,8 +392,8 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             </div>
                             {/* Price */}
                             <div className="col-span-6 md:col-span-1">
-                                <Label htmlFor={`item-price-${index}`}>Precio</Label>
-                                <Input id={`item-price-${index}`} name={`items.${index}.price`} type="number" value={item.price || ''} onChange={handleInputChange} placeholder="0" required className="w-24 text-base" />
+                                <Label>Precio</Label>
+                                <Input name={`items.${index}.price`} type="number" value={item.price || ''} onChange={handleInputChange} placeholder="0" required className="text-base" />
                             </div>
                             {/* Subtotal */}
                             <div className="col-span-6 md:col-span-1">
@@ -567,5 +577,3 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     </>
   );
 }
-
-    

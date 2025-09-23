@@ -14,7 +14,7 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
     const [newItem, setNewItem] = useState('');
     const { toast } = useToast();
 
-    const sortedData = useMemo(() => [...data].sort(), [data]);
+    const sortedData = useMemo(() => [...data].sort((a,b) => a.localeCompare(b)), [data]);
 
     const handleAddItem = () => {
         if (newItem && !data.includes(newItem)) {
@@ -70,32 +70,27 @@ function DataExport() {
 
     const handleExport = () => {
         try {
-            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements', 'inventoryAdjustments'];
+            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements', 'inventoryAdjustments', 'master-products', 'master-calibers', 'master-units', 'master-packaging-types', 'master-warehouses'];
             const workbook = XLSX.utils.book_new();
 
             keys.forEach(key => {
                 const data = localStorage.getItem(key);
                 if (data) {
                     const parsedData = JSON.parse(data);
-                    // Flatten complex objects like items or relatedOrder for better CSV/Excel readability
-                    const flattenedData = parsedData.map((row: any) => {
-                        const newRow = {...row};
-                        if (row.items) {
-                            newRow.items = JSON.stringify(row.items);
-                        }
-                        if (row.packaging) {
-                            newRow.packaging = JSON.stringify(row.packaging);
-                        }
-                        if (row.relatedOrder) {
-                            newRow.relatedOrder = `${row.relatedOrder.type}-${row.relatedOrder.id}`;
-                        }
-                        if(row.relatedPurchaseIds){
-                            newRow.relatedPurchaseIds = row.relatedPurchaseIds.join(', ');
-                        }
-                        return newRow;
-                    });
-                    const worksheet = XLSX.utils.json_to_sheet(flattenedData);
-                    XLSX.utils.book_append_sheet(workbook, worksheet, key);
+                    
+                    const dataToSheet = Array.isArray(parsedData) 
+                        ? parsedData.map((row: any) => {
+                            const newRow = {...row};
+                            if (row.items) newRow.items = JSON.stringify(row.items);
+                            if (row.packaging) newRow.packaging = JSON.stringify(row.packaging);
+                            if (row.relatedOrder) newRow.relatedOrder = `${row.relatedOrder.type}-${row.relatedOrder.id}`;
+                            if (row.relatedPurchaseIds) newRow.relatedPurchaseIds = row.relatedPurchaseIds.join(', ');
+                            return newRow;
+                          })
+                        : [parsedData];
+                    
+                    const worksheet = XLSX.utils.json_to_sheet(dataToSheet);
+                    XLSX.utils.book_append_sheet(workbook, worksheet, key.replace('master-',''));
                 }
             });
 
@@ -120,7 +115,7 @@ function DataExport() {
                     Descargar Base de Datos
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2">
-                    Esto creará un archivo .xlsx con hojas para contactos, compras, ventas, servicios y movimientos financieros.
+                    Esto creará un archivo .xlsx con hojas para cada tipo de dato en la aplicación.
                 </p>
             </CardContent>
         </Card>
@@ -129,7 +124,7 @@ function DataExport() {
 
 
 export default function SettingsPage() {
-    const { products, setProducts, calibers, setCalibers, units, setUnits, packagingTypes, setPackagingTypes } = useMasterData();
+    const { products, setProducts, calibers, setCalibers, units, setUnits, packagingTypes, setPackagingTypes, warehouses, setWarehouses } = useMasterData();
     
     return (
         <div className="flex flex-col gap-6">
@@ -143,6 +138,7 @@ export default function SettingsPage() {
                 <MasterDataEditor title="Calibres" data={calibers} setData={setCalibers} />
                 <MasterDataEditor title="Unidades" data={units} setData={setUnits} />
                 <MasterDataEditor title="Tipos de Envase" data={packagingTypes} setData={setPackagingTypes} />
+                <MasterDataEditor title="Bodegas" data={warehouses} setData={setWarehouses} />
             </div>
 
             <div className='mt-6'>
