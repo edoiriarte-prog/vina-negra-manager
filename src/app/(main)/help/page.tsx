@@ -108,7 +108,7 @@ export default function HelpPage() {
                   El Dashboard es la pantalla principal y ofrece una vista panorámica del estado del negocio. Aquí encontrarás:
                   <ul className="list-disc list-inside mt-2 space-y-1">
                     <li><strong>KPIs (Indicadores Clave de Rendimiento):</strong> Tarjetas que resumen ingresos, egresos, kilos comprados/vendidos y totales de órdenes.</li>
-                    <li><strong>Resumen Ejecutivo IA:</strong> Un análisis financiero generado por inteligencia artificial.</li>
+                    <li><strong>Resumen Ejecutivo IA:</strong> Un análisis financiero generado por inteligencia artificial que provee una sinopsis del estado actual de la empresa.</li>
                     <li><strong>Gráficos Interactivos:</strong> Visualizaciones de compras semanales, desglose de egresos, comparativa de kilos, y distribución del stock por calibre.</li>
                   </ul>
                 </AccordionContent>
@@ -121,7 +121,7 @@ export default function HelpPage() {
                   <ul className="list-disc list-inside mt-2 space-y-1">
                     <li><strong>Crear Contacto:</strong> Usa el botón "Nuevo Contacto" para abrir un formulario y registrar la información. Debes especificar si es Cliente o Proveedor.</li>
                     <li><strong>Editar y Eliminar:</strong> En la tabla, cada contacto tiene un menú de acciones (tres puntos) para editar su información o eliminarlo.</li>
-                    <li><strong>Filtrar:</strong> Puedes buscar contactos por nombre usando el campo de filtro.</li>
+                    <li><strong>Filtrar:</strong> Puedes buscar contactos por nombre usando el campo de filtro en la parte superior de la tabla.</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -132,8 +132,9 @@ export default function HelpPage() {
                   Gestiona todas las Órdenes de Compra (O/C) de productos.
                   <ul className="list-disc list-inside mt-2 space-y-1">
                     <li><strong>Crear Compra:</strong> Haz clic en "Nueva Compra". Completa los datos del proveedor, la fecha y los ítems.</li>
-                    <li><strong>Agregar Ítems:</strong> Puedes agregar ítems uno por uno o usar la "Matriz de Items" para añadir rápidamente múltiples calibres de un mismo producto.</li>
+                    <li><strong>Agregar Ítems:</strong> Puedes agregar ítems uno por uno, o usar la "Matriz de Items" para añadir rápidamente múltiples calibres de un mismo producto, agilizando la entrada de datos.</li>
                     <li><strong>Visualizar:</strong> El icono del ojo en el menú de acciones te permite ver una vista previa imprimible de la orden de compra.</li>
+                    <li><strong>Estados:</strong> Las órdenes pueden ser marcadas como "Pendiente", "Completada" o "Cancelada" para reflejar su estado en el flujo de trabajo.</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -144,8 +145,10 @@ export default function HelpPage() {
                   Crea y administra las Órdenes de Venta (O/V).
                   <ul className="list-disc list-inside mt-2 space-y-1">
                     <li><strong>Crear Venta:</strong> Completa los datos del cliente, fecha, y los ítems. El stock disponible para cada ítem se muestra para evitar sobreventas.</li>
-                    <li><strong>Condiciones de Pago:</strong> Define si el pago es al contado, a crédito o con anticipo y saldo. Para esta última, puedes definir el porcentaje del anticipo y las fechas de vencimiento.</li>
-                    <li><strong>Visualizar:</strong> Al igual que en compras, puedes previsualizar la orden de venta antes de guardarla.</li>
+                    <li><strong>Condiciones de Pago:</strong> Define si el pago es al Contado, a Crédito o con "Pago con Anticipo y Saldo". Para esta última, puedes definir el porcentaje del anticipo y las fechas de vencimiento de cada pago.</li>
+                    <li><strong>Validación de Stock:</strong> El sistema no te permitirá vender más kilos de los que tienes en inventario, asegurando la integridad de los datos.</li>
+                     <li><strong>Agregar por Matriz:</strong> Al igual que en compras, puedes usar una matriz para añadir rápidamente varios ítems a la venta.</li>
+                    <li><strong>Visualizar:</strong> Puedes previsualizar la orden de venta, que incluye un desglose de los pagos si corresponde, antes de guardarla.</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -156,7 +159,7 @@ export default function HelpPage() {
                   Registra todos los costos operativos que no son compras de producto, como fletes, jornales, o arriendos.
                    <ul className="list-disc list-inside mt-2 space-y-1">
                     <li><strong>Crear Servicio:</strong> Registra la fecha, proveedor, tipo de servicio, costo y una descripción detallada.</li>
-                    <li><strong>Asociar a Compra:</strong> Opcionalmente, puedes vincular un servicio a una orden de compra específica (ej: el flete de la OC-1001).</li>
+                    <li><strong>Asociar a Compra:</strong> Opcionalmente, puedes vincular un servicio a una orden de compra específica (ej: el flete de la OC-1001), lo que ayuda a costear mejor la operación.</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -168,8 +171,8 @@ export default function HelpPage() {
                    <ul className="list-disc list-inside mt-2 space-y-1">
                     <li><strong>Crear Movimiento:</strong> Registra la fecha, el tipo (ingreso/egreso), el monto y una descripción.</li>
                     <li><strong>Vincular a Documento:</strong> Puedes asociar un movimiento a una O/C, O/V u O/S. Al hacerlo, el monto restante de ese documento se sugiere automáticamente.</li>
-                    <li><strong>Vincular a Contacto:</strong> Si un movimiento no está ligado a un documento, puedes asociarlo directamente a un cliente o proveedor.</li>
-                    <li><strong>Sugerencia con IA:</strong> Usa el botón de IA para generar una descripción estandarizada del movimiento, indicando si es un abono, pago final, etc.</li>
+                    <li><strong>Vincular a Contacto:</strong> Si un movimiento no está ligado a un documento (ej. un anticipo general), puedes asociarlo directamente a un cliente o proveedor para que se refleje en su estado de cuenta.</li>
+                    <li><strong>Sugerencia con IA:</strong> Usa el botón "Sugerir con IA" para generar una descripción estandarizada del movimiento, indicando si es un abono, pago final, o pago de un documento específico.</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -177,10 +180,10 @@ export default function HelpPage() {
               <AccordionItem value="inventory">
                 <AccordionTrigger>Inventario y Rendimiento</AccordionTrigger>
                 <AccordionContent>
-                  Analiza el stock de tus productos y su rendimiento.
+                  Analiza el stock de tus productos y su rendimiento económico.
                    <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li><strong>Stock Actual:</strong> Una tabla que muestra los kilos comprados, vendidos y el stock disponible para cada calibre de producto.</li>
-                    <li><strong>Rendimiento de Productos:</strong> Cambia a la pestaña "Rendimiento" para ver reportes detallados sobre el total de kilos y el valor monetario de las ventas y compras por producto y calibre.</li>
+                    <li><strong>Stock Actual:</strong> Una tabla que muestra en tiempo real los kilos comprados, kilos vendidos y el stock disponible para cada combinación de producto y calibre.</li>
+                    <li><strong>Rendimiento de Productos:</strong> Cambia a la pestaña "Rendimiento" para ver reportes detallados sobre el total de kilos y el valor monetario de las ventas y compras por producto y calibre. Esto te permite identificar qué productos son más rentables.</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -188,11 +191,11 @@ export default function HelpPage() {
                <AccordionItem value="reports">
                 <AccordionTrigger>Informes</AccordionTrigger>
                 <AccordionContent>
-                  Este módulo consolida la información para ofrecerte una visión clara de las finanzas.
+                  Este módulo consolida la información para ofrecerte una visión clara de las finanzas y obligaciones.
                    <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li><strong>Estado de Cuentas:</strong> Muestra un resumen de cuentas por cobrar (clientes) y por pagar (proveedores). Puedes desplegar cada fila para ver el detalle de las órdenes asociadas.</li>
-                    <li><strong>Informe de Vencimientos:</strong> Realiza un seguimiento de los pagos pendientes de las ventas a crédito, ordenados por fecha de vencimiento y con un total acumulado.</li>
-                    <li><strong>Imprimir:</strong> El botón "Imprimir" genera una versión limpia de los informes para guardar o compartir.</li>
+                    <li><strong>Estado de Cuentas:</strong> Muestra un resumen de cuentas por cobrar (clientes) y por pagar (proveedores). Puedes desplegar cada fila para ver el detalle de las órdenes y pagos asociados a cada contacto.</li>
+                    <li><strong>Informe de Vencimientos:</strong> Realiza un seguimiento de los pagos pendientes de las ventas a crédito, ordenados por fecha de vencimiento y con un total acumulado para proyectar el flujo de caja.</li>
+                    <li><strong>Imprimir:</strong> El botón "Imprimir" genera una versión limpia de los informes para guardar en PDF o compartir.</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -200,10 +203,10 @@ export default function HelpPage() {
               <AccordionItem value="settings">
                 <AccordionTrigger>Configuración</AccordionTrigger>
                 <AccordionContent>
-                  Administra los datos maestros de la aplicación.
+                  Administra los datos maestros y la información de la aplicación.
                    <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li><strong>Datos Maestros:</strong> Puedes agregar o eliminar valores para los campos de Productos, Calibres, Unidades y Tipos de Envase. Estos cambios se reflejarán en los formularios de toda la aplicación.</li>
-                    <li><strong>Exportar Datos:</strong> Permite descargar toda la información de la aplicación (contactos, órdenes, movimientos) en un único archivo de Excel (.xlsx) como respaldo.</li>
+                    <li><strong>Datos Maestros:</strong> Puedes agregar o eliminar valores para los campos de Productos, Calibres, Unidades y Tipos de Envase. Estos cambios se reflejarán en los formularios de toda la aplicación, personalizando la experiencia.</li>
+                    <li><strong>Exportar Datos:</strong> Permite descargar toda la información de la aplicación (contactos, órdenes, movimientos) en un único archivo de Excel (.xlsx) como respaldo de seguridad o para análisis externo.</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -214,4 +217,5 @@ export default function HelpPage() {
       </div>
     </div>
   );
-}
+
+    
