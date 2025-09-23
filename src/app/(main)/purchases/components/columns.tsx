@@ -34,7 +34,7 @@ const formatKilos = (value: number) =>
     `${new Intl.NumberFormat('es-CL').format(value)} kg`;
 
 
-export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumnsProps): ColumnDef<PurchaseOrder>[] => [
+export const getColumns = ({ suppliers }: GetColumnsProps): ColumnDef<PurchaseOrder>[] => [
   {
     accessorKey: 'id',
     header: ({ column }) => {
@@ -115,39 +115,5 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
         const text = status === 'completed' ? 'Completada' : status === 'pending' ? 'Pendiente' : 'Cancelada';
         return <Badge variant={variant}>{text}</Badge>
     }
-  },
-  {
-    id: 'actions',
-    cell: ({ row }) => {
-      const order = row.original;
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Abrir menú</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onPreview(order)}>
-              <Eye className='mr-2 h-4 w-4' />
-              Visualizar
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(order)}>
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="text-destructive focus:text-destructive"
-              onClick={() => onDelete(order)}
-            >
-              Eliminar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
   },
 ];
