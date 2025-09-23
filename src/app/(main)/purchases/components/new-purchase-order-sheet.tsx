@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Wand2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -26,6 +26,7 @@ import { PurchaseOrder, OrderItem, Contact } from '@/lib/types';
 import { format } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 type NewPurchaseOrderSheetProps = {
   isOpen: boolean;
@@ -58,6 +59,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 });
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, warehouses } = useMasterData();
+  const { toast } = useToast();
 
   useEffect(() => {
     setFormData(getInitialFormData(order));
@@ -142,6 +144,24 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     setIsMatrixOpen(false);
   }
 
+  const generateLotNumber = (itemIndex: number) => {
+    if (!formData.supplierId) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Por favor, seleccione un proveedor antes de generar un lote.",
+      });
+      return;
+    }
+    const datePart = formData.date.replace(/-/g, '');
+    const lot = `LOTE-${datePart}-${formData.supplierId}-${itemIndex}`;
+    handleItemChange(itemIndex, 'lotNumber', lot);
+    toast({
+        title: "Lote Generado",
+        description: `Se ha asignado el lote: ${lot}`,
+    });
+  };
+
   const title = order ? 'Editar Orden de Compra' : 'Crear Orden de Compra';
   const description = order 
     ? 'Actualice la información de la orden.'
@@ -150,7 +170,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   return (
     <>
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-4xl overflow-y-auto">
+      <SheetContent className="sm:max-w-5xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -197,7 +217,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                 {formData.items.map((item, index) => {
                   const subtotal = (item.quantity || 0) * (item.price || 0);
                   return (
-                    <div key={item.id} className="grid grid-cols-12 gap-2 items-center mb-2 p-2 border rounded-md">
+                    <div key={item.id} className="grid grid-cols-12 gap-2 items-center mb-2 p-3 border rounded-md">
                         {/* Product */}
                         <div className="col-span-3">
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.product`, value)} value={item.product}>
@@ -217,7 +237,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              </Select>
                         </div>
                         {/* Quantity */}
-                         <div className="col-span-2">
+                         <div className="col-span-1">
                              <Input name={`items.${index}.quantity`} type="number" value={item.quantity} onChange={handleInputChange} placeholder="Cant." required />
                         </div>
                         {/* Unit */}
@@ -230,15 +250,25 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              </Select>
                         </div>
                         {/* Price */}
-                         <div className="col-span-2">
+                         <div className="col-span-1">
                              <Input name={`items.${index}.price`} type="number" value={item.price} onChange={handleInputChange} placeholder="Precio" required />
                         </div>
                         {/* Subtotal */}
-                         <div className="col-span-1">
+                         <div className="col-span-2">
                              <Input value={new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(subtotal)} readOnly disabled />
                         </div>
+                        {/* Lot */}
+                         <div className="col-span-10 md:col-span-10 mt-2">
+                           <Label>Lote</Label>
+                           <div className="flex gap-2">
+                              <Input name={`items.${index}.lotNumber`} value={item.lotNumber || ''} onChange={handleInputChange} placeholder="Número de lote" />
+                              <Button type="button" variant="outline" size="icon" onClick={() => generateLotNumber(index)} title="Generar Lote">
+                                  <Wand2 className="h-4 w-4" />
+                              </Button>
+                           </div>
+                         </div>
                         {/* Remove button */}
-                        <div className='col-span-1'>
+                        <div className='col-span-2 md:col-span-2 mt-auto self-end'>
                              <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>

@@ -27,6 +27,7 @@ export type OrderItem = {
   price: number;
   packagingType?: string;
   packagingQuantity?: number;
+  lotNumber?: string;
 };
 
 export type PackagingItem = {
@@ -69,7 +70,7 @@ export type PurchaseOrder = {
   totalAmount: number;
   totalKilos: number;
   status: 'pending' | 'completed' | 'cancelled';
-  warehouse?: string;
+  warehouse: string;
 };
 
 export type ServiceOrder = {
