@@ -1,9 +1,9 @@
-
-
 export const initialProducts = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MANDARINAS"];
 export const initialCalibers = ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"];
 export const initialUnits = ["Kilos", "Cajas"];
 export const initialPackagingTypes = ["CAJAS", "BINS", "PALLETS", "SACOS"];
+export const initialWarehouses = ["Bodega Principal", "Cámara de Frío 1", "Campo A"];
+
 
 export type ProductMatrix = {
     [product: string]: string[];

@@ -72,13 +72,8 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     }
   },
   {
-    accessorKey: 'items',
-    header: 'Producto',
-    cell: ({ row }) => {
-      const items = row.getValue('items') as SalesOrder['items'];
-      const productNames = [...new Set(items.map(item => item.product))].join(', ');
-      return <div className="max-w-[200px] truncate">{productNames}</div>
-    },
+    accessorKey: 'warehouse',
+    header: 'Bodega',
   },
     {
     accessorKey: 'totalKilos',

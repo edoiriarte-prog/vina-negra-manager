@@ -10,12 +10,17 @@ import { useEffect, useState, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PerformanceReports } from './components/performance-reports';
+import { useMasterData } from '@/hooks/use-master-data';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export default function InventoryPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isClient, setIsClient] = useState(false);
+  const { warehouses } = useMasterData();
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('All');
 
   useEffect(() => {
     setIsClient(true);
@@ -29,8 +34,32 @@ export default function InventoryPage() {
   
   const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 
+  const filteredInventory = useMemo(() => {
+    if (selectedWarehouse === 'All') {
+      const combined = new Map<string, InventoryItem>();
+      inventory.forEach(item => {
+        const key = `${item.product} - ${item.caliber}`;
+        const existing = combined.get(key) || { 
+            key, 
+            product: item.product, 
+            caliber: item.caliber, 
+            warehouse: 'All', 
+            kilosPurchased: 0, 
+            kilosSold: 0, 
+            stock: 0 
+        };
+        existing.kilosPurchased += item.kilosPurchased;
+        existing.kilosSold += item.kilosSold;
+        existing.stock += item.stock;
+        combined.set(key, existing);
+      });
+      return Array.from(combined.values());
+    }
+    return inventory.filter(item => item.warehouse === selectedWarehouse);
+  }, [inventory, selectedWarehouse]);
+
   const totals = useMemo(() => {
-    return inventory.reduce(
+    return filteredInventory.reduce(
       (acc, item) => {
         acc.kilosPurchased += item.kilosPurchased;
         acc.kilosSold += item.kilosSold;
@@ -39,7 +68,7 @@ export default function InventoryPage() {
       },
       { kilosPurchased: 0, kilosSold: 0, stock: 0 }
     );
-  }, [inventory]);
+  }, [filteredInventory]);
 
   const renderInventoryRows = () => {
     if (!isClient) {
@@ -55,7 +84,7 @@ export default function InventoryPage() {
       ));
     }
     
-    return inventory.map((item) => (
+    return filteredInventory.map((item) => (
         <TableRow key={item.key}>
             <TableCell className="font-medium">{item.product}</TableCell>
             <TableCell>{item.caliber}</TableCell>
@@ -85,6 +114,23 @@ export default function InventoryPage() {
                     <CardDescription>Stock disponible calculado a partir de las compras y ventas completadas.</CardDescription>
                 </CardHeader>
                 <CardContent>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Button
+                        variant={selectedWarehouse === 'All' ? 'default' : 'outline'}
+                        onClick={() => setSelectedWarehouse('All')}
+                      >
+                        Todas las bodegas
+                      </Button>
+                      {warehouses.map(w => (
+                        <Button
+                          key={w}
+                          variant={selectedWarehouse === w ? 'default' : 'outline'}
+                          onClick={() => setSelectedWarehouse(w)}
+                        >
+                          {w}
+                        </Button>
+                      ))}
+                    </div>
                     <div className="rounded-md border">
                         <Table>
                             <TableHeader>
@@ -102,7 +148,7 @@ export default function InventoryPage() {
                             {isClient && (
                             <TableFooter>
                                 <TableRow>
-                                <TableHead colSpan={2} className="font-bold text-lg">Total</TableHead>
+                                <TableHead colSpan={2} className="font-bold text-lg">Total ({selectedWarehouse === 'All' ? 'Global' : selectedWarehouse})</TableHead>
                                 <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosPurchased)}</TableHead>
                                 <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosSold)}</TableHead>
                                 <TableHead className="text-right font-bold text-lg text-primary">{formatKilos(totals.stock)}</TableHead>

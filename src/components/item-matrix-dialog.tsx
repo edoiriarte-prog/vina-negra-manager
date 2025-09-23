@@ -55,7 +55,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
     setSelectedProduct(product);
     const calibersForProduct = productCaliberMatrix[product] || [];
     setMatrixData(calibersForProduct.map(caliber => {
-        const inventoryItem = inventory.find(i => i.caliber === `${product} - ${caliber}`);
+        const inventoryItem = inventory.find(i => i.caliber === caliber && i.product === product);
         return {
             product: product,
             caliber: caliber,

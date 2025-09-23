@@ -48,6 +48,7 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
         date: format(new Date(), 'yyyy-MM-dd'),
         items: [],
         status: 'pending' as 'pending' | 'completed' | 'cancelled',
+        warehouse: '',
     };
 };
 
@@ -55,7 +56,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData(order));
   const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 });
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const { products, calibers, units } = useMasterData();
+  const { products, calibers, units, warehouses } = useMasterData();
 
   useEffect(() => {
     setFormData(getInitialFormData(order));
@@ -246,24 +247,45 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
             </div>
 
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">
-                Estado
-              </Label>
-              <Select
-                required
-                onValueChange={(value: 'pending' | 'completed' | 'cancelled') => handleSelectChange('status', value)}
-                value={formData.status}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Seleccione un estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pendiente</SelectItem>
-                  <SelectItem value="completed">Completada</SelectItem>
-                  <SelectItem value="cancelled">Cancelada</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="status" className="text-right">
+                  Estado
+                </Label>
+                <Select
+                  required
+                  onValueChange={(value: 'pending' | 'completed' | 'cancelled') => handleSelectChange('status', value)}
+                  value={formData.status}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Seleccione un estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendiente</SelectItem>
+                    <SelectItem value="completed">Completada</SelectItem>
+                    <SelectItem value="cancelled">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="warehouse" className="text-right">
+                  Bodega
+                </Label>
+                <Select
+                  required
+                  onValueChange={(value) => handleSelectChange('warehouse', value)}
+                  value={formData.warehouse}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Seleccione bodega" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map(w => (
+                      <SelectItem key={w} value={w}>{w}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <SheetFooter className="mt-6">

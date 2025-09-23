@@ -58,6 +58,7 @@ export type SalesOrder = {
   advancePercentage?: number;
   advanceDueDate?: string;
   balanceDueDate?: string;
+  warehouse?: string;
 };
 
 export type PurchaseOrder = {
@@ -68,6 +69,7 @@ export type PurchaseOrder = {
   totalAmount: number;
   totalKilos: number;
   status: 'pending' | 'completed' | 'cancelled';
+  warehouse?: string;
 };
 
 export type ServiceOrder = {
@@ -97,6 +99,7 @@ export type InventoryItem = {
   key: string;
   product: string;
   caliber: string;
+  warehouse: string;
   kilosPurchased: number;
   kilosSold: number;
   stock: number;

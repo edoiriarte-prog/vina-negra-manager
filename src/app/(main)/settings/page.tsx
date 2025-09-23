@@ -68,7 +68,7 @@ function DataExport() {
 
     const handleExport = () => {
         try {
-            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements', 'master-products', 'master-calibers', 'master-units', 'master-packaging-types'];
+            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements', 'master-products', 'master-calibers', 'master-units', 'master-packaging-types', 'master-warehouses'];
             const workbook = XLSX.utils.book_new();
 
             keys.forEach(key => {
@@ -122,7 +122,7 @@ function DataExport() {
 
 
 export default function SettingsPage() {
-    const { products, setProducts, calibers, setCalibers, units, setUnits, packagingTypes, setPackagingTypes } = useMasterData();
+    const { products, setProducts, calibers, setCalibers, units, setUnits, packagingTypes, setPackagingTypes, warehouses, setWarehouses } = useMasterData();
     
     return (
         <div className="flex flex-col gap-6">
@@ -136,6 +136,7 @@ export default function SettingsPage() {
                 <MasterDataEditor title="Calibres" data={calibers} setData={setCalibers} />
                 <MasterDataEditor title="Unidades" data={units} setData={setUnits} />
                 <MasterDataEditor title="Tipos de Envase" data={packagingTypes} setData={setPackagingTypes} />
+                <MasterDataEditor title="Bodegas" data={warehouses} setData={setWarehouses} />
             </div>
 
             <div className='mt-6'>

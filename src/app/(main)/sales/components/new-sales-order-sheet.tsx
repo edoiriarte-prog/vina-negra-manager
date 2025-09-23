@@ -72,6 +72,7 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
         advancePercentage: 0,
         advanceDueDate: undefined,
         balanceDueDate: undefined,
+        warehouse: '',
     };
 };
 
@@ -80,7 +81,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const { products, calibers, units, packagingTypes } = useMasterData();
+  const { products, calibers, units, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -190,14 +191,14 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     
     // Stock validation
     for (const item of formData.items) {
-      const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
+      const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}` && i.warehouse === formData.warehouse);
       const currentStock = inventoryItem ? inventoryItem.stock : 0;
       
       if (item.quantity > currentStock) {
           toast({
               variant: "destructive",
               title: "Error de Stock",
-              description: `No hay stock para ${item.product} - ${item.caliber}. Stock: ${currentStock} kg.`,
+              description: `No hay stock para ${item.product} - ${item.caliber} en ${formData.warehouse}. Stock: ${currentStock} kg.`,
           });
           return;
       }
@@ -341,6 +342,25 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                         </SelectContent>
                         </Select>
                     </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="warehouse" className="text-right">
+                            Bodega
+                        </Label>
+                        <Select
+                            required
+                            onValueChange={(value) => handleSelectChange('warehouse', value)}
+                            value={formData.warehouse}
+                        >
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Seleccione bodega" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {warehouses.map(w => (
+                                <SelectItem key={w} value={w}>{w}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
               </div>
               
@@ -348,18 +368,19 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <CardTitle className="text-lg font-headline">Ítems de la Orden</CardTitle>
-                         <Button type="button" variant="outline" size="sm" onClick={() => setIsMatrixOpen(true)}>
+                         <Button type="button" variant="outline" size="sm" onClick={() => setIsMatrixOpen(true)} disabled={!formData.warehouse}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Agregar Matriz de Items
                         </Button>
                     </div>
+                     {!formData.warehouse && <p className="text-xs text-destructive">Seleccione una bodega para agregar items.</p>}
                 </CardHeader>
                 <CardContent>
                     {formData.items.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay ítems en la orden.</p>}
 
                     {formData.items.map((item, index) => {
                         const subtotal = (item.quantity || 0) * (item.price || 0);
-                        const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
+                        const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}` && i.warehouse === formData.warehouse);
                         const stock = inventoryItem ? inventoryItem.stock : 0;
                         
                         return (
@@ -596,7 +617,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         onOpenChange={setIsMatrixOpen}
         onSave={handleMatrixSave}
         orderType="sale"
-        inventory={inventory}
+        inventory={inventory.filter(i => i.warehouse === formData.warehouse)}
       />
     </>
   );
