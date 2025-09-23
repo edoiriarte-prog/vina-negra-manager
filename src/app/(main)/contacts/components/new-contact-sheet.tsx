@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, KeyboardEvent } from 'react';
@@ -34,6 +35,7 @@ type NewContactSheetProps = {
   onOpenChange: (isOpen: boolean) => void;
   onSave: (contact: Contact | Omit<Contact, 'id' | 'interactions'>, newInteraction?: Omit<Interaction, 'id'>) => void;
   contact: Contact | null;
+  defaultTab?: string;
 };
 
 const getInitialFormData = (contact: Contact | null): Omit<Contact, 'id' | 'interactions'> => {
@@ -67,7 +69,7 @@ const initialNewInteraction: Omit<Interaction, 'id'> = {
   notes: '',
 };
 
-export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewContactSheetProps) {
+export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, defaultTab = 'details' }: NewContactSheetProps) {
   const [formData, setFormData] = useState<Omit<Contact, 'id' | 'interactions'>>(getInitialFormData(contact));
   const [tagInput, setTagInput] = useState('');
   const [interactions, setInteractions] = useState<Interaction[]>([]);
@@ -142,7 +144,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
-        <Tabs defaultValue="details" className="w-full mt-4">
+        <Tabs defaultValue={defaultTab} key={contact?.id || 'new'} className="w-full mt-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="details">Detalles</TabsTrigger>
             <TabsTrigger value="history" disabled={!contact}>Historial</TabsTrigger>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -30,6 +31,7 @@ export default function ContactsPage() {
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -73,8 +75,15 @@ export default function ContactsPage() {
 
   const handleEdit = (contact: Contact) => {
     setEditingContact(contact);
+    setActiveTab('details');
     setIsSheetOpen(true);
   };
+  
+  const handleRowClick = (contact: Contact) => {
+    setEditingContact(contact);
+    setActiveTab('history');
+    setIsSheetOpen(true);
+  }
 
   const handleDelete = (contact: Contact) => {
     setDeletingContact(contact);
@@ -99,6 +108,7 @@ export default function ContactsPage() {
   
   const openNewContactSheet = () => {
     setEditingContact(null);
+    setActiveTab('details');
     setIsSheetOpen(true);
   }
 
@@ -111,7 +121,7 @@ export default function ContactsPage() {
         </div>
       );
     }
-    return <DataTable columns={columns} data={contacts} />;
+    return <DataTable columns={columns} data={contacts} onRowClick={handleRowClick} />;
   };
 
   return (
@@ -138,6 +148,7 @@ export default function ContactsPage() {
         onOpenChange={handleSheetOpenChange}
         onSave={handleSaveContact}
         contact={editingContact}
+        defaultTab={activeTab}
       />
       <AlertDialog open={!!deletingContact} onOpenChange={(open) => !open && setDeletingContact(null)}>
         <AlertDialogContent>
