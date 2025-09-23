@@ -127,7 +127,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
 
   const title = contact ? 'Editar Contacto' : 'Crear Nuevo Contacto';
   const description = contact 
-    ? 'Actualice la información del contacto y su historial.'
+    ? 'Actualice la información del contacto y su control de eventos.'
     : 'Complete la información para registrar un nuevo cliente o proveedor.';
     
   const interactionIcons: Record<Interaction['type'], React.ReactNode> = {
@@ -147,7 +147,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
         <Tabs defaultValue={defaultTab} key={contact?.id || 'new'} className="w-full mt-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="details">Detalles</TabsTrigger>
-            <TabsTrigger value="history" disabled={!contact}>Historial</TabsTrigger>
+            <TabsTrigger value="history" disabled={!contact}>Control de Eventos</TabsTrigger>
           </TabsList>
           <TabsContent value="details">
             <form onSubmit={handleSubmit}>
@@ -280,7 +280,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                 </Card>
 
                 <div className="space-y-4">
-                    <h4 className="font-medium text-center">Historial de Contacto</h4>
+                    <h4 className="font-medium text-center">Control de Eventos</h4>
                     {interactions.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay interacciones registradas.</p>}
                     <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
                         {interactions.map(int => (
