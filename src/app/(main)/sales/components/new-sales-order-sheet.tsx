@@ -170,6 +170,35 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    
+    // --- VALIDATION START ---
+    if (!formData.clientId) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Por favor, seleccione un cliente.' });
+        return;
+    }
+    if (!formData.warehouse) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Por favor, seleccione una bodega.' });
+        return;
+    }
+    if (formData.items.length === 0) {
+        toast({ variant: 'destructive', title: 'Error', description: 'La orden de venta debe tener al menos un ítem.' });
+        return;
+    }
+    
+    for (const [index, item] of formData.items.entries()) {
+        if (!item.product || !item.caliber) {
+            toast({ variant: 'destructive', title: 'Error en Ítem', description: `El ítem #${index + 1} no tiene producto o calibre seleccionado.` });
+            return;
+        }
+        if (!item.quantity || item.quantity <= 0) {
+            toast({ variant: 'destructive', title: 'Error en Ítem', description: `La cantidad del ítem #${index + 1} debe ser mayor a 0.` });
+            return;
+        }
+        if (!item.price || item.price <= 0) {
+            toast({ variant: 'destructive', title: 'Error en Ítem', description: `El precio del ítem #${index + 1} debe ser mayor a 0.` });
+            return;
+        }
+    }
 
     if (formData.paymentMethod === 'Pago con Anticipo y Saldo') {
         if (!formData.advanceDueDate || !formData.balanceDueDate) {
@@ -204,6 +233,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
           return;
       }
     }
+    // --- VALIDATION END ---
 
     onSave(formData);
   };
