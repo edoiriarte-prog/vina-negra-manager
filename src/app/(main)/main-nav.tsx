@@ -12,6 +12,7 @@ import {
   Users,
   BarChart,
   HelpCircle,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 import {
@@ -28,6 +29,7 @@ const menuItems = [
   { href: '/sales', label: 'Ventas (O/V)', icon: ShoppingCart },
   { href: '/services', label: 'Servicios (O/S)', icon: Truck },
   { href: '/inventory', label: 'Inventario', icon: Boxes },
+  { href: '/inventory-adjustments', label: 'Ajustes de Inventario', icon: SlidersHorizontal },
   { href: '/financials', label: 'Movimientos', icon: Landmark },
   { href: '/reports', label: 'Informes', icon: BarChart },
   { href: '/help', label: 'Ayuda', icon: HelpCircle },

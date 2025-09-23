@@ -1,4 +1,4 @@
-import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem } from './types';
+import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem, InventoryAdjustment } from './types';
 
 export const contacts: Contact[] = [
   { id: '1', name: 'Agrícola Santa Cruz', rut: '76.123.456-7', address: 'Fundo El Sol, Parcela 4', commune: 'Santa Cruz', email: 'contacto@agrisc.cl', contactPerson: 'Juan Pérez', type: 'supplier', interactions: [
@@ -8,6 +8,11 @@ export const contacts: Contact[] = [
   { id: '2', name: 'Exportadora Frutillar', rut: '78.987.654-3', address: 'Av. Las Condes 1234', commune: 'Las Condes', email: 'compras@frutillar.com', contactPerson: 'Maria Rodriguez', type: 'client' },
   { id: '3', name: 'Supermercados del Sur', rut: '80.456.789-1', address: 'Ruta 5 Sur, Km 180', commune: 'Curicó', email: 'adquisiciones@sds.cl', contactPerson: 'Carlos Soto', type: 'client' },
   { id: '4', name: 'Transportes Rapido', rut: '77.555.444-K', address: 'Calle Larga 567', commune: 'Rancagua', email: 'fletes@transrapido.cl', contactPerson: 'Ana Gomez', type: 'supplier' },
+];
+
+export const inventoryAdjustments: InventoryAdjustment[] = [
+  { id: 'ADJ-1', date: '2023-10-10', product: 'UVAS', caliber: 'PRIMERA', type: 'decrease', quantity: 50, reason: 'Merma por maduración' },
+  { id: 'ADJ-2', date: '2023-10-18', product: 'PALTAS', caliber: 'EXTRA', type: 'decrease', quantity: 100, reason: 'Pérdida en cámara' },
 ];
 
 export const purchaseOrders: PurchaseOrder[] = [
@@ -40,18 +45,21 @@ export const financialMovements: FinancialMovement[] = [
 export const getInventory = (
   currentPurchaseOrders?: PurchaseOrder[],
   currentSalesOrders?: SalesOrder[],
+  currentAdjustments?: InventoryAdjustment[],
   orderBeingEdited?: SalesOrder | null
 ): InventoryItem[] => {
-  const inventoryMap = new Map<string, { purchased: number, sold: number }>();
+  const inventoryMap = new Map<string, { purchased: number, sold: number, adjusted: number }>();
   const purchases = currentPurchaseOrders || [];
   const sales = currentSalesOrders || [];
+  const adjustments = currentAdjustments || [];
 
+  // Process purchases
   purchases.forEach(po => {
     if (po.status === 'completed') {
       po.items.forEach(item => {
         if (item.unit === 'Kilos') {
           const key = `${item.product} - ${item.caliber}`;
-          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0 };
+          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
           existing.purchased += item.quantity;
           inventoryMap.set(key, existing);
         }
@@ -59,17 +67,17 @@ export const getInventory = (
     }
   });
 
+  // Process sales
   sales.forEach(so => {
-     // If we are editing an order, we don't want to count its items as "sold" yet
      if (orderBeingEdited && so.id === orderBeingEdited.id) {
-        return;
+        return; // Exclude the order being edited from stock calculation
      }
 
      if (so.status === 'completed' || so.status === 'pending') {
       so.items.forEach(item => {
         if (item.unit === 'Kilos') {
           const key = `${item.product} - ${item.caliber}`;
-          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0 };
+          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
           existing.sold += item.quantity;
           inventoryMap.set(key, existing);
         }
@@ -77,13 +85,27 @@ export const getInventory = (
     }
   });
 
+  // Process adjustments
+  adjustments.forEach(adj => {
+    const key = `${adj.product} - ${adj.caliber}`;
+    const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
+    if (adj.type === 'increase') {
+      existing.adjusted += adj.quantity;
+    } else {
+      existing.adjusted -= adj.quantity;
+    }
+    inventoryMap.set(key, existing);
+  });
+
+
   const inventory: InventoryItem[] = [];
   inventoryMap.forEach((value, key) => {
     inventory.push({
       caliber: key,
       kilosPurchased: value.purchased,
       kilosSold: value.sold,
-      stock: value.purchased - value.sold,
+      kilosAdjusted: value.adjusted,
+      stock: value.purchased - value.sold + value.adjusted,
     });
   });
 

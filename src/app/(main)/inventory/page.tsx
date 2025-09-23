@@ -2,18 +2,20 @@
 
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { getInventory } from '@/lib/data';
-import { PurchaseOrder, SalesOrder, InventoryItem } from '@/lib/types';
+import { PurchaseOrder, SalesOrder, InventoryItem, InventoryAdjustment } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
-import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
+import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
 import { useEffect, useState, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PerformanceReports } from './components/performance-reports';
+import { Badge } from '@/components/ui/badge';
 
 export default function InventoryPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
+  const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isClient, setIsClient] = useState(false);
 
@@ -23,9 +25,9 @@ export default function InventoryPage() {
 
   useEffect(() => {
     if (isClient) {
-        setInventory(getInventory(purchaseOrders, salesOrders));
+        setInventory(getInventory(purchaseOrders, salesOrders, inventoryAdjustments));
     }
-  }, [purchaseOrders, salesOrders, isClient]);
+  }, [purchaseOrders, salesOrders, inventoryAdjustments, isClient]);
   
   const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 
@@ -34,10 +36,11 @@ export default function InventoryPage() {
       (acc, item) => {
         acc.kilosPurchased += item.kilosPurchased;
         acc.kilosSold += item.kilosSold;
+        acc.kilosAdjusted += item.kilosAdjusted;
         acc.stock += item.stock;
         return acc;
       },
-      { kilosPurchased: 0, kilosSold: 0, stock: 0 }
+      { kilosPurchased: 0, kilosSold: 0, stock: 0, kilosAdjusted: 0 }
     );
   }, [inventory]);
 
@@ -50,6 +53,7 @@ export default function InventoryPage() {
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
         </TableRow>
       ));
     }
@@ -59,6 +63,11 @@ export default function InventoryPage() {
             <TableCell className="font-medium">{item.caliber}</TableCell>
             <TableCell className="text-right">{formatKilos(item.kilosPurchased)}</TableCell>
             <TableCell className="text-right">{formatKilos(item.kilosSold)}</TableCell>
+            <TableCell className="text-right">
+              <Badge variant={item.kilosAdjusted === 0 ? "secondary" : item.kilosAdjusted > 0 ? "default" : "destructive"}>
+                {formatKilos(item.kilosAdjusted)}
+              </Badge>
+            </TableCell>
             <TableCell className="text-right font-bold text-primary">{formatKilos(item.stock)}</TableCell>
         </TableRow>
     ));
@@ -80,7 +89,7 @@ export default function InventoryPage() {
             <Card className="mt-6">
                 <CardHeader>
                     <CardTitle className="font-headline text-2xl">Inventario en Tiempo Real</CardTitle>
-                    <CardDescription>Stock disponible calculado a partir de las compras y ventas.</CardDescription>
+                    <CardDescription>Stock disponible calculado a partir de compras, ventas y ajustes manuales.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="rounded-md border">
@@ -90,6 +99,7 @@ export default function InventoryPage() {
                                     <TableHead className='font-bold'>Calibre</TableHead>
                                     <TableHead className='text-right font-bold'>Kilos Comprados</TableHead>
                                     <TableHead className='text-right font-bold'>Kilos Vendidos</TableHead>
+                                    <TableHead className='text-right font-bold'>Kilos Ajustados</TableHead>
                                     <TableHead className='text-right font-bold text-primary'>Stock Actual</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -102,6 +112,7 @@ export default function InventoryPage() {
                                 <TableHead className="font-bold text-lg">Total</TableHead>
                                 <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosPurchased)}</TableHead>
                                 <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosSold)}</TableHead>
+                                <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosAdjusted)}</TableHead>
                                 <TableHead className="text-right font-bold text-lg text-primary">{formatKilos(totals.stock)}</TableHead>
                                 </TableRow>
                             </TableFooter>

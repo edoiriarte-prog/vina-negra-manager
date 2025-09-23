@@ -70,7 +70,7 @@ function DataExport() {
 
     const handleExport = () => {
         try {
-            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements'];
+            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements', 'inventoryAdjustments'];
             const workbook = XLSX.utils.book_new();
 
             keys.forEach(key => {

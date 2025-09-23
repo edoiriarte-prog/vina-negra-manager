@@ -93,9 +93,20 @@ export type FinancialMovement = {
   };
 };
 
+export type InventoryAdjustment = {
+  id: string;
+  date: string;
+  product: string;
+  caliber: string;
+  type: 'increase' | 'decrease';
+  quantity: number;
+  reason: string;
+};
+
 export type InventoryItem = {
   caliber: string;
   kilosPurchased: number;
   kilosSold: number;
+  kilosAdjusted: number;
   stock: number;
 };
