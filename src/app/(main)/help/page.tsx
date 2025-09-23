@@ -101,7 +101,7 @@ export default function HelpPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Accordion type="single" collapsible className="w-full" defaultValue='dashboard'>
+            <Accordion type="multiple" collapsible className="w-full">
               <AccordionItem value="dashboard">
                 <AccordionTrigger>Dashboard</AccordionTrigger>
                 <AccordionContent>
@@ -217,5 +217,4 @@ export default function HelpPage() {
       </div>
     </div>
   );
-
-    
+}
