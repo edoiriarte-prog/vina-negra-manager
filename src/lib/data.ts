@@ -1,4 +1,4 @@
-import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem, Interaction } from './types';
+import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem, Interaction, InventoryAdjustment } from './types';
 
 export const contacts: Contact[] = [
   { id: '1', name: 'Agrícola Santa Cruz', rut: '76.123.456-7', address: 'Fundo El Sol, Parcela 4', commune: 'Santa Cruz', email: 'contacto@agrisc.cl', contactPerson: 'Juan Pérez', type: 'supplier', tags: ['Proveedor Estratégico', 'Uva'], interactions: [
@@ -14,7 +14,7 @@ export const contacts: Contact[] = [
 
 export const purchaseOrders: PurchaseOrder[] = [
   { id: 'OC-1001', supplierId: '1', date: '2023-10-01', items: [{ id: 'p1', product: 'UVAS', caliber: 'PRIMERA', quantity: 5000, unit: 'Kilos', price: 3000 }, { id: 'p2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 3000, unit: 'Kilos', price: 2500 }], totalAmount: 22500000, totalKilos: 8000, status: 'completed', warehouse: 'Bodega Principal' },
-  { id: 'OC-1002', supplierId: '5', date: '2023-10-08', items: [{ id: 'p3', product: 'PALTAS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 4000 }, { id: 'p4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 3500 }], totalAmount: 38000000, totalKilos: 10000, status: 'completed', warehouse: 'Cámara de Frío 1' },
+  { id: 'OC-1002', supplierId: '5', date: '2023-10-08', items: [{ id: 'p3', product: 'PALTAS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 4000 }, { id: 'p4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 3500 }], totalAmount: 38000000, totalKilos: 10000, status: 'completed', warehouse: 'Bodega Principal' },
   { id: 'OC-1003', supplierId: '1', date: '2023-10-15', items: [{ id: 'p5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 7000, unit: 'Kilos', price: 2000 }, { id: 'p6', product: 'DURAZNOS', caliber: 'PRIMERA', quantity: 2000, unit: 'Kilos', price: 1500 }], totalAmount: 17000000, totalKilos: 9000, status: 'completed', warehouse: 'Bodega Principal' },
 ];
 
@@ -39,12 +39,18 @@ export const financialMovements: FinancialMovement[] = [
   { id: 'M-006', date: '2023-10-09', type: 'expense', description: 'Pago 50% OC-1002 - Agrícola Santa Cruz', amount: 19000000, relatedOrder: { type: 'OC', id: 'OC-1002' } },
 ];
 
+export const inventoryAdjustments: InventoryAdjustment[] = [
+  { id: 'ADJ-1', date: '2023-10-10', product: 'PALTAS', caliber: 'EXTRA', warehouse: 'Bodega Principal', type: 'decrease', quantity: 50, reason: 'Merma por maduración' },
+  { id: 'ADJ-2', date: '2023-10-18', product: 'UVAS', caliber: 'PRIMERA', warehouse: 'Bodega Principal', type: 'decrease', quantity: 100, reason: 'Pérdida por daño en transporte' },
+];
+
 export const getInventory = (
   currentPurchaseOrders: PurchaseOrder[] = [],
   currentSalesOrders: SalesOrder[] = [],
+  currentAdjustments: InventoryAdjustment[] = [],
   orderBeingEdited?: SalesOrder | null
 ): InventoryItem[] => {
-  const inventoryMap = new Map<string, { purchased: number; sold: number }>();
+  const inventoryMap = new Map<string, { purchased: number; sold: number, adjusted: number }>();
   
   // Process purchases
   currentPurchaseOrders.forEach(po => {
@@ -52,7 +58,7 @@ export const getInventory = (
       po.items.forEach(item => {
         if (item.unit === 'Kilos') {
           const key = `${item.product} - ${item.caliber} - ${po.warehouse}`;
-          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0 };
+          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
           existing.purchased += item.quantity;
           inventoryMap.set(key, existing);
         }
@@ -69,13 +75,26 @@ export const getInventory = (
       so.items.forEach(item => {
         if (item.unit === 'Kilos') {
           const key = `${item.product} - ${item.caliber} - ${so.warehouse}`;
-          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0 };
+          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
           existing.sold += item.quantity;
           inventoryMap.set(key, existing);
         }
       });
     }
   });
+  
+    // Process adjustments
+  currentAdjustments.forEach(adj => {
+    const key = `${adj.product} - ${adj.caliber} - ${adj.warehouse}`;
+    const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
+    if (adj.type === 'increase') {
+      existing.adjusted += adj.quantity;
+    } else {
+      existing.adjusted -= adj.quantity;
+    }
+    inventoryMap.set(key, existing);
+  });
+
 
   const inventory: InventoryItem[] = [];
   inventoryMap.forEach((value, key) => {
@@ -87,7 +106,7 @@ export const getInventory = (
       warehouse,
       kilosPurchased: value.purchased,
       kilosSold: value.sold,
-      stock: value.purchased - value.sold,
+      stock: value.purchased - value.sold + value.adjusted,
     });
   });
 
