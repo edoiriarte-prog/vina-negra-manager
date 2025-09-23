@@ -648,7 +648,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                   <Eye className="mr-2 h-4 w-4" />
                   Previsualizar
               </Button>
-              <Button type="submit" disabled={formData.items.length === 0}>Guardar</Button>
+              <Button type="submit">Guardar</Button>
             </SheetFooter>
           </form>
         </SheetContent>
@@ -672,5 +672,3 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     </>
   );
 }
-
-    
