@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory } from '@/lib/data';
 import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem } from '@/lib/types';
@@ -39,9 +39,24 @@ export default function SalesPage() {
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
 
+  const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
+
   useEffect(() => {
     setIsClient(true);
-  }, []);
+    // Calculate the initial next lot correlative
+    const maxLotNumber = salesOrders.reduce((max, order) => {
+        order.items.forEach(item => {
+            if (item.lotNumber && item.lotNumber.startsWith('L')) {
+                const numberPart = parseInt(item.lotNumber.substring(1));
+                if (!isNaN(numberPart) && numberPart > max) {
+                    max = numberPart;
+                }
+            }
+        });
+        return max;
+    }, 0);
+    setNextLotCorrelative(maxLotNumber + 1);
+  }, [salesOrders]);
   
   const clients = contacts.filter(c => c.type === 'client');
   const carriers = contacts.filter(c => c.type === 'supplier');
@@ -55,26 +70,12 @@ export default function SalesPage() {
     return `OV-${lastIdNumber + 1}`;
   }, [salesOrders]);
 
-  const getNextLotNumber = (product: string, caliber: string): string => {
-    const productCode = product.substring(0, 2).toUpperCase();
-    const caliberCode = caliber.substring(0, 2).toUpperCase();
-    const prefix = `LOTE-${productCode}${caliberCode}`;
+  const getNextLotNumber = useCallback(() => {
+    const lotNumber = `L${nextLotCorrelative.toString().padStart(5, '0')}`;
+    setNextLotCorrelative(prev => prev + 1); // Increment for the next call
+    return lotNumber;
+  }, [nextLotCorrelative]);
 
-    let maxCorrelative = 0;
-    salesOrders.forEach(order => {
-        order.items.forEach(item => {
-            if (item.lotNumber && item.lotNumber.startsWith(prefix)) {
-                const numberPart = parseInt(item.lotNumber.substring(prefix.length));
-                if (!isNaN(numberPart) && numberPart > maxCorrelative) {
-                    maxCorrelative = numberPart;
-                }
-            }
-        });
-    });
-
-    const nextCorrelative = (maxCorrelative + 1).toString().padStart(5, '0');
-    return `${prefix}${nextCorrelative}`;
-  };
 
   const handleSaveOrder = (orderData: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
     let orderToSave: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>;
@@ -265,5 +266,7 @@ export default function SalesPage() {
     </>
   );
 }
+
+    
 
     

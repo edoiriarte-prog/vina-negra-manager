@@ -50,7 +50,7 @@ type NewSalesOrderSheetProps = {
   carriers: Contact[];
   inventory: InventoryItem[];
   nextOrderId: string;
-  getNextLotNumber: (product: string, caliber: string) => string;
+  getNextLotNumber: () => string;
 };
 
 
@@ -237,17 +237,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   }
 
   const generateLotNumber = (itemIndex: number) => {
-    const item = formData.items[itemIndex];
-    if (!item.product || !item.caliber) {
-      toast({
-        variant: 'destructive',
-        title: 'Datos incompletos',
-        description: 'Asegúrese de que el producto y el calibre estén definidos.',
-      });
-      return;
-    }
-
-    const lot = getNextLotNumber(item.product, item.caliber);
+    const lot = getNextLotNumber();
     handleItemChange(itemIndex, 'lotNumber', lot);
     toast({
       title: 'Lote Generado',
@@ -652,5 +642,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     </>
   );
 }
+
+    
 
     
