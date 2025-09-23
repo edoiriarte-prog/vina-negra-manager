@@ -23,28 +23,33 @@ import {
 } from '@/components/ui/select';
 import { Contact, Interaction } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { X, PlusCircle, Calendar, Users, Mail, Phone, Handshake, Trash2 } from 'lucide-react';
+import { X, PlusCircle, Calendar, Users, Mail, Phone, Handshake } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 type NewContactSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (contact: Contact | Omit<Contact, 'id'>, newInteraction?: Omit<Interaction, 'id'>) => void;
+  onSave: (contact: Contact | Omit<Contact, 'id' | 'interactions'>, newInteraction?: Omit<Interaction, 'id'>) => void;
   contact: Contact | null;
 };
 
-const initialNewInteraction: Omit<Interaction, 'id'> = {
-  date: format(new Date(), 'yyyy-MM-dd'),
-  type: 'Llamada',
-  notes: '',
-};
-
-export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewContactSheetProps) {
-  const [formData, setFormData] = useState<Omit<Contact, 'id' | 'interactions'>>({
+const getInitialFormData = (contact: Contact | null): Omit<Contact, 'id' | 'interactions'> => {
+  if (contact) {
+    return {
+      name: contact.name,
+      rut: contact.rut,
+      email: contact.email,
+      contactPerson: contact.contactPerson,
+      address: contact.address,
+      commune: contact.commune,
+      type: contact.type,
+      tags: contact.tags || []
+    }
+  }
+  return {
     name: '',
     rut: '',
     email: '',
@@ -53,38 +58,28 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
     commune: '',
     type: 'client',
     tags: []
-  });
-  const [tags, setTags] = useState<string[]>([]);
+  }
+}
+
+const initialNewInteraction: Omit<Interaction, 'id'> = {
+  date: format(new Date(), 'yyyy-MM-dd'),
+  type: 'Llamada',
+  notes: '',
+};
+
+export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewContactSheetProps) {
+  const [formData, setFormData] = useState<Omit<Contact, 'id' | 'interactions'>>(getInitialFormData(contact));
   const [tagInput, setTagInput] = useState('');
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [newInteraction, setNewInteraction] = useState<Omit<Interaction, 'id'>>(initialNewInteraction);
 
   useEffect(() => {
-    if (contact) {
-      setFormData({
-        name: contact.name,
-        rut: contact.rut,
-        email: contact.email,
-        contactPerson: contact.contactPerson,
-        address: contact.address,
-        commune: contact.commune,
-        type: contact.type,
-      });
-      setTags(contact.tags || []);
-      setInteractions(contact.interactions || []);
-    } else {
-      // Reset form when adding a new contact
-      setFormData({
-        name: '',
-        rut: '',
-        email: '',
-        contactPerson: '',
-        address: '',
-        commune: '',
-        type: 'client',
-      });
-      setTags([]);
-      setInteractions([]);
+    if (isOpen) {
+      const initialData = getInitialFormData(contact);
+      setFormData(initialData);
+      setInteractions(contact?.interactions?.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) || []);
+      setTagInput('');
+      setNewInteraction(initialNewInteraction);
     }
   }, [contact, isOpen]);
 
@@ -96,44 +91,36 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
   const handleTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && tagInput.trim() !== '') {
       event.preventDefault();
-      if (!tags.includes(tagInput.trim())) {
-        setTags([...tags, tagInput.trim()]);
+      const newTag = tagInput.trim();
+      if (!formData.tags?.includes(newTag)) {
+        setFormData(prev => ({ ...prev, tags: [...(prev.tags || []), newTag] }));
         setTagInput('');
       }
     }
   };
 
   const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+    setFormData(prev => ({ ...prev, tags: prev.tags?.filter(tag => tag !== tagToRemove) }));
   };
   
   const handleAddInteraction = () => {
-    if (newInteraction.notes.trim() === '') return;
+    if (newInteraction.notes.trim() === '' || !contact) return;
     
-    if (contact) {
-      onSave(contact, newInteraction);
-      // Optimistically add to local state
-      setInteractions(prev => [...prev, { ...newInteraction, id: `temp-${Date.now()}` }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    } else {
-      // This path is tricky without a contact ID. We'll disable this for new contacts.
-    }
+    onSave(contact, newInteraction);
+    // Optimistically add to local state
+    const newInteractionsList = [...interactions, { ...newInteraction, id: `temp-${Date.now()}` }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setInteractions(newInteractionsList);
     setNewInteraction(initialNewInteraction);
   };
-  
-  const removeInteraction = (interactionId: string) => {
-      // This would require a delete callback to page.tsx
-      console.log("Removing interaction", interactionId);
-  }
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const finalData = { ...formData, tags, interactions };
     if (contact) {
-        onSave({ ...contact, ...finalData });
+        onSave({ ...contact, ...formData });
     } else {
-        onSave(finalData);
+        onSave(formData);
     }
-    onOpenChange(false);
+    // Don't close sheet automatically, page will handle it.
   };
 
   const title = contact ? 'Editar Contacto' : 'Crear Nuevo Contacto';
@@ -141,7 +128,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
     ? 'Actualice la información del contacto y su historial.'
     : 'Complete la información para registrar un nuevo cliente o proveedor.';
     
-  const interactionIcons = {
+  const interactionIcons: Record<Interaction['type'], React.ReactNode> = {
       'Llamada': <Phone className="h-4 w-4" />,
       'Reunión': <Users className="h-4 w-4" />,
       'Email': <Mail className="h-4 w-4" />,
@@ -158,7 +145,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
         <Tabs defaultValue="details" className="w-full mt-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="details">Detalles</TabsTrigger>
-            <TabsTrigger value="history">Historial</TabsTrigger>
+            <TabsTrigger value="history" disabled={!contact}>Historial</TabsTrigger>
           </TabsList>
           <TabsContent value="details">
             <form onSubmit={handleSubmit}>
@@ -230,7 +217,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
                             onKeyDown={handleTagInputKeyDown}
                         />
                         <div className="flex flex-wrap gap-2 mt-2">
-                            {tags.map(tag => (
+                            {formData.tags?.map(tag => (
                                 <Badge key={tag} variant="secondary">
                                     {tag}
                                     <button type="button" onClick={() => removeTag(tag)} className="ml-2 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
@@ -283,11 +270,10 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
                             value={newInteraction.notes}
                             onChange={(e) => setNewInteraction(p => ({...p, notes: e.target.value}))}
                         />
-                        <Button onClick={handleAddInteraction} disabled={!contact || !newInteraction.notes}>
+                        <Button onClick={handleAddInteraction} disabled={!newInteraction.notes}>
                             <PlusCircle className="mr-2 h-4 w-4"/>
                             Agregar al Historial
                         </Button>
-                        {!contact && <p className="text-xs text-muted-foreground">Guarde el contacto antes de agregar interacciones.</p>}
                     </CardContent>
                 </Card>
 

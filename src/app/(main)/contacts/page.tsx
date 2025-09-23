@@ -36,7 +36,7 @@ export default function ContactsPage() {
       const contactToUpdate = { ...contact };
       if (newInteraction) {
         const interaction: Interaction = { ...newInteraction, id: `int-${Date.now()}` };
-        contactToUpdate.interactions = [...(contactToUpdate.interactions || []), interaction];
+        contactToUpdate.interactions = [...(contactToUpdate.interactions || []), interaction].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       }
       setContacts(prev => prev.map(c => c.id === contact.id ? contactToUpdate : c));
        toast({ title: "Contacto Actualizado", description: `El contacto ${contact.name} ha sido actualizado.` });
@@ -46,6 +46,7 @@ export default function ContactsPage() {
         ...contact,
         id: `contact-${Date.now()}`,
         interactions: [],
+        tags: contact.tags || [],
       };
       if (newInteraction) {
          const interaction: Interaction = { ...newInteraction, id: `int-${Date.now()}` };
@@ -55,8 +56,11 @@ export default function ContactsPage() {
        toast({ title: "Contacto Creado", description: `El contacto ${contact.name} ha sido creado.` });
     }
     // We don't close the sheet here to allow adding multiple interactions
-    // setIsSheetOpen(false); 
-    // setEditingContact(null);
+    // but if it's a new contact, we should probably close it to avoid confusion
+    if (!('id' in contact)) {
+      setIsSheetOpen(false); 
+      setEditingContact(null);
+    }
   };
 
 
