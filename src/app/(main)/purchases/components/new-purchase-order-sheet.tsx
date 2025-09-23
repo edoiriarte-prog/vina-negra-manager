@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -48,7 +49,7 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
         date: format(new Date(), 'yyyy-MM-dd'),
         items: [],
         status: 'pending' as 'pending' | 'completed' | 'cancelled',
-        warehouse: '',
+        warehouse: 'Bodega Principal',
     };
 };
 
