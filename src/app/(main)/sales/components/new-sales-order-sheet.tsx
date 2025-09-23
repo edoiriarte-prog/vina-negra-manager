@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, Eye, CalendarIcon } from 'lucide-react';
+import { PlusCircle, Trash2, Eye, CalendarIcon, Wand2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -212,7 +212,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
-        handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'advancePercentage', 'packagingQuantity'].includes(field) ? Number(value) : value);
+        handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'advancePercentage', 'packagingQuantity', 'lotNumber'].includes(field) ? (field === 'lotNumber' ? value : Number(value)) : value);
     } else if (name.startsWith('newItem.')) {
         const field = name.split('.')[1] as keyof typeof newItem;
         setNewItem(prev => ({ ...prev, [field]: ['quantity', 'price', 'packagingQuantity'].includes(field) ? Number(value) : value }));
@@ -234,6 +234,29 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     }
     setIsMatrixOpen(false);
   }
+
+  const generateLotNumber = (itemIndex: number) => {
+    const item = formData.items[itemIndex];
+    if (!item.product || !item.caliber || !item.quantity) {
+      toast({
+        variant: 'destructive',
+        title: 'Datos incompletos',
+        description: 'Asegúrese de que el producto, calibre y cantidad estén definidos.',
+      });
+      return;
+    }
+    const orderId = order?.id || nextOrderId;
+    const productCode = item.product.substring(0, 2).toUpperCase();
+    const caliberCode = item.caliber.toUpperCase();
+    const quantity = item.quantity;
+
+    const lot = `${orderId}-${productCode}-${caliberCode}-${quantity}`;
+    handleItemChange(itemIndex, 'lotNumber', lot);
+    toast({
+      title: 'Lote Generado',
+      description: `Se ha asignado el lote: ${lot}`,
+    });
+  };
 
   const title = order ? 'Editar Orden de Venta' : 'Crear Orden de Venta';
   const description = order 
@@ -451,9 +474,19 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                     {stock.toLocaleString('es-CL')} kg
                                 </Badge>
                             </div>
+                             {/* Lot Number */}
+                             <div className="col-span-10 mt-2">
+                               <Label>Lote</Label>
+                               <div className="flex gap-2">
+                                <Input name={`items.${index}.lotNumber`} value={item.lotNumber || ''} onChange={handleInputChange} placeholder="Número de lote" />
+                                <Button type="button" variant="outline" size="icon" onClick={() => generateLotNumber(index)} title="Generar Lote">
+                                    <Wand2 className="h-4 w-4" />
+                                </Button>
+                               </div>
+                             </div>
 
                             {/* Remove button */}
-                            <div className='col-span-12 md:col-span-1 self-center'>
+                            <div className='col-span-2 mt-auto self-end'>
                                 <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
