@@ -11,7 +11,8 @@ import {
 import { Logo } from '@/components/logo';
 import { MainNav } from '@/components/main-nav';
 import { UserNav } from '@/components/user-nav';
-import { SettingsLink } from './components/settings-link';
+import { QuickInteraction } from './components/quick-interaction';
+import { Separator } from '@/components/ui/separator';
 
 export default function MainLayout({
   children,
@@ -27,10 +28,12 @@ export default function MainLayout({
         <SidebarContent className='p-0'>
           <div className="flex flex-col h-full p-3">
             <MainNav />
-            <SettingsLink />
           </div>
         </SidebarContent>
         <SidebarFooter>
+          <Separator className="my-2" />
+          <QuickInteraction />
+          <Separator className="my-2" />
           <UserNav />
         </SidebarFooter>
       </Sidebar>

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +43,11 @@ export function UserNav() {
         <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem>Perfil</DropdownMenuItem>
-        <DropdownMenuItem>Configuración</DropdownMenuItem>
+        <Link href="/settings">
+          <DropdownMenuItem>
+            Configuración
+          </DropdownMenuItem>
+        </Link>
         <DropdownMenuSeparator />
         <DropdownMenuItem>Cerrar Sesión</DropdownMenuItem>
       </DropdownMenuContent>
