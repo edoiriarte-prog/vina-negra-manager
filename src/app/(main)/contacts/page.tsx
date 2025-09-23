@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { contacts as initialContacts } from '@/lib/data';
 import { Contact, Interaction } from '@/lib/types';
@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function ContactsPage() {
@@ -28,7 +29,13 @@ export default function ContactsPage() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
 
   const handleSaveContact = (contact: Contact | Omit<Contact, 'id'>, newInteraction?: Omit<Interaction, 'id'>) => {
     if ('id' in contact) {
@@ -95,6 +102,18 @@ export default function ContactsPage() {
     setIsSheetOpen(true);
   }
 
+  const renderContent = () => {
+    if (!isClient) {
+      return (
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      );
+    }
+    return <DataTable columns={columns} data={contacts} />;
+  };
+
   return (
     <>
       <Card>
@@ -111,7 +130,7 @@ export default function ContactsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={contacts} />
+          {renderContent()}
         </CardContent>
       </Card>
       <NewContactSheet 
