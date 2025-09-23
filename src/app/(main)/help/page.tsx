@@ -1,4 +1,7 @@
 
+"use client";
+
+import { useRef } from 'react';
 import {
   Accordion,
   AccordionContent,
@@ -6,14 +9,57 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, Printer } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function HelpPage() {
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = () => {
+    const printContents = printRef.current?.innerHTML;
+    if (printContents) {
+      const printWindow = window.open('', '', 'height=800,width=800');
+      printWindow?.document.write('<html><head><title>Manual de Usuario</title>');
+      
+      const styles = Array.from(document.styleSheets)
+        .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
+        .join('');
+      printWindow?.document.write(styles);
+      
+      printWindow?.document.write('<style>body { padding: 2rem; } .no-print { display: none; }</style>');
+      printWindow?.document.write('</head><body>');
+      printWindow?.document.write(printContents);
+      printWindow?.document.write('</body></html>');
+      printWindow?.document.close();
+      printWindow?.focus();
+      setTimeout(() => { 
+        printWindow?.print();
+        printWindow?.close();
+      }, 500);
+    }
+  }
+
   return (
     <div className="container mx-auto p-4 md:p-6">
-      <div className="flex flex-col gap-8">
-        <div>
+      <div className="flex justify-between items-center mb-8 no-print">
+        <div className="flex-1">
           <h1 className="font-headline text-3xl flex items-center gap-2">
+            <HelpCircle className="h-8 w-8" />
+            Centro de Ayuda
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Guía completa sobre el funcionamiento y uso de la aplicación Viña Negra Manager.
+          </p>
+        </div>
+        <Button onClick={handlePrint}>
+            <Printer className="mr-2 h-4 w-4" />
+            Descargar / Imprimir
+        </Button>
+      </div>
+
+      <div ref={printRef} className="flex flex-col gap-8">
+        <div className="print:hidden">
+           <h1 className="font-headline text-3xl flex items-center gap-2">
             <HelpCircle className="h-8 w-8" />
             Centro de Ayuda
           </h1>
@@ -55,7 +101,7 @@ export default function HelpPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion type="single" collapsible className="w-full" defaultValue='dashboard'>
               <AccordionItem value="dashboard">
                 <AccordionTrigger>Dashboard</AccordionTrigger>
                 <AccordionContent>
