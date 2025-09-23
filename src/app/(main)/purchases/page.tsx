@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -29,6 +30,7 @@ export default function PurchasesPage() {
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
+  const [confirmingEditOrder, setConfirmingEditOrder] = useState<PurchaseOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<PurchaseOrder | null>(null);
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -88,9 +90,16 @@ export default function PurchasesPage() {
   };
 
   const handleEdit = (order: PurchaseOrder) => {
-    setEditingOrder(order);
-    setIsSheetOpen(true);
+    setConfirmingEditOrder(order);
   };
+
+  const confirmEdit = () => {
+    if (confirmingEditOrder) {
+      setEditingOrder(confirmingEditOrder);
+      setIsSheetOpen(true);
+      setConfirmingEditOrder(null);
+    }
+  }
 
   const handleDelete = (order: PurchaseOrder) => {
     setDeletingOrder(order);
@@ -131,7 +140,7 @@ export default function PurchasesPage() {
         </div>
       )
     }
-    return <DataTable columns={columns} data={purchaseOrders} />;
+    return <DataTable columns={columns} data={purchaseOrders} onRowClick={handleEdit} />;
   }
 
   return (
@@ -161,6 +170,21 @@ export default function PurchasesPage() {
         order={editingOrder}
         suppliers={suppliers}
       />
+
+       <AlertDialog open={!!confirmingEditOrder} onOpenChange={(open) => !open && setConfirmingEditOrder(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro de que quieres editar esta orden?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se abrirá el formulario para editar la orden "{confirmingEditOrder?.id}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmingEditOrder(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmEdit}>Editar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
         <AlertDialogContent>
