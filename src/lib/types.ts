@@ -105,3 +105,14 @@ export type InventoryItem = {
   kilosSold: number;
   stock: number;
 };
+
+export type InventoryAdjustment = {
+  id: string;
+  date: string;
+  product: string;
+  caliber: string;
+  warehouse: string;
+  type: 'increase' | 'decrease';
+  quantity: number;
+  reason: string;
+};
