@@ -214,6 +214,44 @@ export default function SalesPage() {
     XLSX.writeFile(workbook, `PackingList-${orderToExport.id}.xlsx`);
     toast({ title: 'Exportación Exitosa', description: `Se ha generado el packing list para la O/V ${orderToExport.id}.` });
   };
+  
+  const handleExportAllCompleted = () => {
+    const completedOrders = salesOrders.filter(o => o.status === 'completed');
+    if (completedOrders.length === 0) {
+        toast({
+            variant: "destructive",
+            title: "Sin Órdenes",
+            description: "No hay órdenes completadas para exportar."
+        });
+        return;
+    }
+    
+    const allItems: any[] = [];
+    completedOrders.forEach(order => {
+        const client = clients.find(c => c.id === order.clientId);
+        order.items.forEach(item => {
+            allItems.push({
+                'O/V': order.id,
+                'Fecha': format(new Date(order.date), "dd-MM-yyyy"),
+                'Cliente': client?.name,
+                'Producto': item.product,
+                'Calibre': item.caliber,
+                'Tipo Envase': item.packagingType,
+                'Cant. Envase': item.packagingQuantity,
+                'Cantidad (kg)': item.quantity,
+                'Precio Unitario': item.price,
+                'Subtotal': item.quantity * item.price,
+                'Lote': item.lotNumber,
+            });
+        });
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(allItems);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Packing List Completado');
+    XLSX.writeFile(workbook, `PackingList_Completadas.xlsx`);
+    toast({ title: 'Exportación Exitosa', description: 'Se ha generado el packing list con todas las órdenes completadas.' });
+  }
 
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreview, clients });
@@ -234,15 +272,21 @@ export default function SalesPage() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div>
                 <CardTitle className="font-headline text-2xl">Gestión de Ventas (O/V)</CardTitle>
                 <CardDescription>Crea y administra tus órdenes de venta.</CardDescription>
             </div>
-            <Button onClick={openNewOrderSheet}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Nueva Venta
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleExportAllCompleted}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar Packing List
+              </Button>
+              <Button onClick={openNewOrderSheet}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Nueva Venta
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -350,7 +394,3 @@ export default function SalesPage() {
     </>
   );
 }
-
-    
-
-    
