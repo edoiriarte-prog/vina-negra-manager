@@ -78,7 +78,7 @@ export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPrev
   const balanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount - advanceAmount : 0;
   
   const content = (
-    <div ref={printRef}>
+    <div ref={isPrintMode ? ref : printRef}>
       {/* Page 1: Commercial Invoice */}
       <div>
         <DialogHeader className="space-y-0">
@@ -180,7 +180,7 @@ export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPrev
       </div>
       
       {/* Page 2: Dispatch Guide / Picking Ticket */}
-      <div className="page-break">
+      <div className="page-break" style={{breakBefore: 'page'}}>
         <DialogHeader className="space-y-0">
             <div className="flex items-center justify-between mb-8">
             <Logo />
@@ -241,7 +241,7 @@ export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPrev
   );
 
   if (isPrintMode) {
-      return <div ref={ref}>{content}</div>
+      return content;
   }
   
   return (
@@ -269,3 +269,4 @@ export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPrev
 });
 
 SalesOrderPreview.displayName = "SalesOrderPreview";
+
