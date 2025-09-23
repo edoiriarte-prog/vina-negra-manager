@@ -36,23 +36,22 @@ type SalesOrderPreviewProps = {
   carrier: Contact | null;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  isPrintMode?: boolean;
 };
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value);
 
 const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; client: Contact | null; carrier: Contact | null }>(({ order, client, carrier }, ref) => {
     const totalPackaging = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const advanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount * ((order.advancePercentage || 0) / 100) : 0;
     const balanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount - advanceAmount : 0;
 
+    const formatCurrency = (value: number) =>
+      new Intl.NumberFormat('es-CL', {
+        style: 'currency',
+        currency: 'CLP',
+        maximumFractionDigits: 0,
+      }).format(value);
+
     return (
-        <div ref={ref}>
+        <div ref={ref} className="p-6">
         {/* Page 1: Commercial Invoice */}
         <div>
             <div className="flex items-center justify-between mb-8">
@@ -212,7 +211,7 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
 });
 PreviewContent.displayName = "PreviewContent";
 
-export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPreviewProps>(({ order, client, carrier, isOpen, onOpenChange, isPrintMode = false }, ref) => {
+export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange }: SalesOrderPreviewProps) {
   
   const printRef = React.useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -237,19 +236,14 @@ export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPrev
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Packing List');
     XLSX.writeFile(workbook, `PackingList-${order.id}.xlsx`);
   };
-
-  if (isPrintMode) {
-      return <PreviewContent ref={ref} order={order} client={client} carrier={carrier} />;
-  }
   
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-            <DialogTitle className="sr-only">Sales Order Preview</DialogTitle>
-        </DialogHeader>
-        <PreviewContent ref={printRef} order={order} client={client} carrier={carrier} />
-        <DialogFooter className="mt-8">
+      <DialogContent className="max-w-4xl p-0">
+        <div className="max-h-[80vh] overflow-y-auto">
+          <PreviewContent ref={printRef} order={order} client={client} carrier={carrier} />
+        </div>
+        <DialogFooter className="mt-0 p-6 pt-0 border-t">
            <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Exportar a Excel
@@ -265,6 +259,11 @@ export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPrev
       </DialogContent>
     </Dialog>
   );
-});
-
+};
 SalesOrderPreview.displayName = "SalesOrderPreview";
+
+
+export const PrintSalesOrder = React.forwardRef<HTMLDivElement, { order: SalesOrder, client: Contact | null, carrier: Contact | null }>(({ order, client, carrier }, ref) => {
+    return <PreviewContent ref={ref} order={order} client={client} carrier={carrier} />;
+});
+PrintSalesOrder.displayName = "PrintSalesOrder";

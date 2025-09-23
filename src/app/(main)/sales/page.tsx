@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { SalesOrderPreview } from './components/sales-order-preview';
+import { SalesOrderPreview, PrintSalesOrder } from './components/sales-order-preview';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Printer, Download, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,6 +47,11 @@ export default function SalesPage() {
   const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
 
   const printRef = useRef<HTMLDivElement>(null);
+  
+  const orderToPrint = postSaveOrderOptions || previewingOrder;
+  const clientForPrint = orderToPrint ? clients.find(c => c.id === orderToPrint.clientId) : null;
+  const carrierForPrint = orderToPrint ? carriers.find(s => s.id === (orderToPrint as any).carrierId) : null;
+
   const handlePrint = useReactToPrint({
       content: () => printRef.current,
   });
@@ -363,7 +368,7 @@ export default function SalesPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Exportar a Excel
               </Button>
-              <Button variant="outline" onClick={() => { setPreviewingOrder(postSaveOrderOptions); setPostSaveOrderOptions(null); }}>
+              <Button variant="outline" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir O/V
               </Button>
@@ -378,17 +383,13 @@ export default function SalesPage() {
 
       {/* Hidden component for printing */}
       <div className="hidden">
-          {previewingOrder && (
-            <div ref={printRef}>
-              <SalesOrderPreview
-                order={previewingOrder}
-                client={clients.find(c => c.id === previewingOrder.clientId) || null}
-                carrier={carriers.find(c => c.id === (previewingOrder as any).carrierId) || null}
-                isOpen={true}
-                onOpenChange={() => {}}
-                isPrintMode={true}
-              />
-            </div>
+          {orderToPrint && clientForPrint && (
+            <PrintSalesOrder
+              ref={printRef}
+              order={orderToPrint}
+              client={clientForPrint}
+              carrier={carrierForPrint}
+            />
           )}
       </div>
     </>
