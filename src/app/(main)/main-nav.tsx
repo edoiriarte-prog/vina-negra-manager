@@ -11,7 +11,7 @@ import {
   Truck,
   Users,
   BarChart,
-  Settings,
+  HelpCircle,
 } from 'lucide-react';
 
 import {
@@ -30,6 +30,7 @@ const menuItems = [
   { href: '/inventory', label: 'Inventario', icon: Boxes },
   { href: '/financials', label: 'Movimientos', icon: Landmark },
   { href: '/reports', label: 'Informes', icon: BarChart },
+  { href: '/help', label: 'Ayuda', icon: HelpCircle },
 ];
 
 export function MainNav({ className }: { className?: string }) {
