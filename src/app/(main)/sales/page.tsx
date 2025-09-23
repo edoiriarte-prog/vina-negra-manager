@@ -31,6 +31,7 @@ export default function SalesPage() {
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
+  const [confirmingEditOrder, setConfirmingEditOrder] = useState<SalesOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
   const [previewingOrder, setPreviewingOrder] = useState<SalesOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -68,7 +69,7 @@ export default function SalesPage() {
 
      // Stock validation
     for (const item of orderToSave.items) {
-        const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
+        const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === orderData.warehouse);
         const currentStock = inventoryItem ? inventoryItem.stock : 0;
         
         // When editing, the item's original quantity is already excluded from inventory calculation
@@ -112,9 +113,16 @@ export default function SalesPage() {
   };
 
   const handleEdit = (order: SalesOrder) => {
-    setEditingOrder(order);
-    setIsSheetOpen(true);
+    setConfirmingEditOrder(order);
   };
+  
+  const confirmEdit = () => {
+    if (confirmingEditOrder) {
+      setEditingOrder(confirmingEditOrder);
+      setIsSheetOpen(true);
+      setConfirmingEditOrder(null);
+    }
+  }
 
   const handleDelete = (order: SalesOrder) => {
     setDeletingOrder(order);
@@ -155,7 +163,7 @@ export default function SalesPage() {
         </div>
       )
     }
-    return <DataTable columns={columns} data={salesOrders} />;
+    return <DataTable columns={columns} data={salesOrders} onRowClick={handleEdit} />;
   }
 
   return (
@@ -190,6 +198,21 @@ export default function SalesPage() {
             nextOrderId={nextOrderId}
         />
       )}
+
+      <AlertDialog open={!!confirmingEditOrder} onOpenChange={(open) => !open && setConfirmingEditOrder(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro de que quieres editar esta orden?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se abrirá el formulario para editar la orden "{confirmingEditOrder?.id}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmingEditOrder(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmEdit}>Editar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
         <AlertDialogContent>
