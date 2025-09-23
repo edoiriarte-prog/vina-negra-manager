@@ -55,6 +55,27 @@ export default function SalesPage() {
     return `OV-${lastIdNumber + 1}`;
   }, [salesOrders]);
 
+  const getNextLotNumber = (product: string, caliber: string): string => {
+    const productCode = product.substring(0, 2).toUpperCase();
+    const caliberCode = caliber.substring(0, 2).toUpperCase();
+    const prefix = `LOTE-${productCode}${caliberCode}`;
+
+    let maxCorrelative = 0;
+    salesOrders.forEach(order => {
+        order.items.forEach(item => {
+            if (item.lotNumber && item.lotNumber.startsWith(prefix)) {
+                const numberPart = parseInt(item.lotNumber.substring(prefix.length));
+                if (!isNaN(numberPart) && numberPart > maxCorrelative) {
+                    maxCorrelative = numberPart;
+                }
+            }
+        });
+    });
+
+    const nextCorrelative = (maxCorrelative + 1).toString().padStart(5, '0');
+    return `${prefix}${nextCorrelative}`;
+  };
+
   const handleSaveOrder = (orderData: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
     let orderToSave: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>;
 
@@ -197,6 +218,7 @@ export default function SalesPage() {
             carriers={carriers}
             inventory={inventory}
             nextOrderId={nextOrderId}
+            getNextLotNumber={getNextLotNumber}
         />
       )}
 
@@ -243,3 +265,5 @@ export default function SalesPage() {
     </>
   );
 }
+
+    

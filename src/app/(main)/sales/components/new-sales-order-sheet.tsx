@@ -50,6 +50,7 @@ type NewSalesOrderSheetProps = {
   carriers: Contact[];
   inventory: InventoryItem[];
   nextOrderId: string;
+  getNextLotNumber: (product: string, caliber: string) => string;
 };
 
 
@@ -76,7 +77,7 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
     };
 };
 
-export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId }: NewSalesOrderSheetProps) {
+export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId, getNextLotNumber }: NewSalesOrderSheetProps) {
   const [formData, setFormData] = useState(() => getInitialFormData(order));
   const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -237,20 +238,16 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
 
   const generateLotNumber = (itemIndex: number) => {
     const item = formData.items[itemIndex];
-    if (!item.product || !item.caliber || !item.quantity) {
+    if (!item.product || !item.caliber) {
       toast({
         variant: 'destructive',
         title: 'Datos incompletos',
-        description: 'Asegúrese de que el producto, calibre y cantidad estén definidos.',
+        description: 'Asegúrese de que el producto y el calibre estén definidos.',
       });
       return;
     }
-    const orderId = order?.id || nextOrderId;
-    const productCode = item.product.substring(0, 2).toUpperCase();
-    const caliberCode = item.caliber.toUpperCase();
-    const quantity = item.quantity;
 
-    const lot = `${orderId}-${productCode}-${caliberCode}-${quantity}`;
+    const lot = getNextLotNumber(item.product, item.caliber);
     handleItemChange(itemIndex, 'lotNumber', lot);
     toast({
       title: 'Lote Generado',
@@ -655,3 +652,5 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     </>
   );
 }
+
+    
