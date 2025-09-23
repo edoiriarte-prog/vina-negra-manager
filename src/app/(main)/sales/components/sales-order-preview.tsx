@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -14,8 +15,9 @@ import { SalesOrder, Contact } from '@/lib/types';
 import { Logo } from '@/components/logo';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Printer } from 'lucide-react';
+import { Printer, Download } from 'lucide-react';
 import Barcode from 'react-barcode';
+import * as XLSX from 'xlsx';
 import {
     Table,
     TableBody,
@@ -75,6 +77,25 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
 
     }
   }
+
+  const handleExport = () => {
+    const dataForSheet = order.items.map(item => ({
+      'O/V': order.id,
+      'Fecha': format(parseISO(order.date), "dd-MM-yyyy"),
+      'Cliente': client?.name,
+      'Producto': item.product,
+      'Calibre': item.caliber,
+      'Tipo Envase': item.packagingType,
+      'Cant. Envase': item.packagingQuantity,
+      'Cantidad (kg)': item.quantity,
+      'Lote': item.lotNumber,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Packing List');
+    XLSX.writeFile(workbook, `PackingList-${order.id}.xlsx`);
+  };
 
   const advanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount * ((order.advancePercentage || 0) / 100) : 0;
   const balanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount - advanceAmount : 0;
@@ -244,6 +265,10 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
         </div>
 
         <DialogFooter className="mt-8">
+           <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar a Excel
+          </Button>
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
             Imprimir
