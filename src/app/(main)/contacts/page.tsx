@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { contacts as initialContacts } from '@/lib/data';
-import { Contact } from '@/lib/types';
+import { Contact, Interaction } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -30,22 +30,33 @@ export default function ContactsPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { toast } = useToast();
 
-  const handleSaveContact = (contact: Contact | Omit<Contact, 'id'>) => {
+  const handleSaveContact = (contact: Contact | Omit<Contact, 'id'>, newInteraction?: Omit<Interaction, 'id'>) => {
     if ('id' in contact) {
       // Update
-      setContacts(prev => prev.map(c => c.id === contact.id ? contact : c));
+      const contactToUpdate = { ...contact };
+      if (newInteraction) {
+        const interaction: Interaction = { ...newInteraction, id: `int-${Date.now()}` };
+        contactToUpdate.interactions = [...(contactToUpdate.interactions || []), interaction];
+      }
+      setContacts(prev => prev.map(c => c.id === contact.id ? contactToUpdate : c));
        toast({ title: "Contacto Actualizado", description: `El contacto ${contact.name} ha sido actualizado.` });
     } else {
       // Add
-      const newContact = {
+      const newContact: Contact = {
         ...contact,
         id: `contact-${Date.now()}`,
+        interactions: [],
       };
+      if (newInteraction) {
+         const interaction: Interaction = { ...newInteraction, id: `int-${Date.now()}` };
+         newContact.interactions = [interaction];
+      }
       setContacts(prev => [...prev, newContact]);
        toast({ title: "Contacto Creado", description: `El contacto ${contact.name} ha sido creado.` });
     }
-    setIsSheetOpen(false);
-    setEditingContact(null);
+    // We don't close the sheet here to allow adding multiple interactions
+    // setIsSheetOpen(false); 
+    // setEditingContact(null);
   };
 
 

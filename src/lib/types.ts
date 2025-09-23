@@ -1,3 +1,10 @@
+export type Interaction = {
+  id: string;
+  date: string;
+  type: 'Llamada' | 'Reunión' | 'Email' | 'Acuerdo';
+  notes: string;
+};
+
 export type Contact = {
   id: string;
   name: string;
@@ -8,6 +15,7 @@ export type Contact = {
   contactPerson: string;
   type: 'client' | 'supplier';
   tags?: string[];
+  interactions?: Interaction[];
 };
 
 export type OrderItem = {

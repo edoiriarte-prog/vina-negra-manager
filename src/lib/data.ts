@@ -1,7 +1,10 @@
 import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem } from './types';
 
 export const contacts: Contact[] = [
-  { id: '1', name: 'Agrícola Santa Cruz', rut: '76.123.456-7', address: 'Fundo El Sol, Parcela 4', commune: 'Santa Cruz', email: 'contacto@agrisc.cl', contactPerson: 'Juan Pérez', type: 'supplier' },
+  { id: '1', name: 'Agrícola Santa Cruz', rut: '76.123.456-7', address: 'Fundo El Sol, Parcela 4', commune: 'Santa Cruz', email: 'contacto@agrisc.cl', contactPerson: 'Juan Pérez', type: 'supplier', interactions: [
+    { id: 'int-1', date: '2023-09-15', type: 'Llamada', notes: 'Conversación inicial sobre precios de la temporada.' },
+    { id: 'int-2', date: '2023-09-20', type: 'Acuerdo', notes: 'Acuerdo de compra de 10,000 kg de Cerezas a $5000/kg.' },
+  ]},
   { id: '2', name: 'Exportadora Frutillar', rut: '78.987.654-3', address: 'Av. Las Condes 1234', commune: 'Las Condes', email: 'compras@frutillar.com', contactPerson: 'Maria Rodriguez', type: 'client' },
   { id: '3', name: 'Supermercados del Sur', rut: '80.456.789-1', address: 'Ruta 5 Sur, Km 180', commune: 'Curicó', email: 'adquisiciones@sds.cl', contactPerson: 'Carlos Soto', type: 'client' },
   { id: '4', name: 'Transportes Rapido', rut: '77.555.444-K', address: 'Calle Larga 567', commune: 'Rancagua', email: 'fletes@transrapido.cl', contactPerson: 'Ana Gomez', type: 'supplier' },

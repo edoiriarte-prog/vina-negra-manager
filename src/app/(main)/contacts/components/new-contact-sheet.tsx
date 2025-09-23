@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -20,29 +21,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Contact } from '@/lib/types';
+import { Contact, Interaction } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
+import { X, PlusCircle, Calendar, Users, Mail, Phone, Handshake, Trash2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 type NewContactSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (contact: Contact | Omit<Contact, 'id'>) => void;
+  onSave: (contact: Contact | Omit<Contact, 'id'>, newInteraction?: Omit<Interaction, 'id'>) => void;
   contact: Contact | null;
 };
 
+const initialNewInteraction: Omit<Interaction, 'id'> = {
+  date: format(new Date(), 'yyyy-MM-dd'),
+  type: 'Llamada',
+  notes: '',
+};
+
 export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewContactSheetProps) {
-  const [type, setType] = useState<'client' | 'supplier' | ''>('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
-  const [formData, setFormData] = useState<Omit<Contact, 'id' | 'type' | 'tags'>>({
+  const [formData, setFormData] = useState<Omit<Contact, 'id' | 'interactions'>>({
     name: '',
     rut: '',
     email: '',
     contactPerson: '',
     address: '',
     commune: '',
+    type: 'client',
+    tags: []
   });
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [newInteraction, setNewInteraction] = useState<Omit<Interaction, 'id'>>(initialNewInteraction);
 
   useEffect(() => {
     if (contact) {
@@ -53,9 +68,10 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
         contactPerson: contact.contactPerson,
         address: contact.address,
         commune: contact.commune,
+        type: contact.type,
       });
-      setType(contact.type);
       setTags(contact.tags || []);
+      setInteractions(contact.interactions || []);
     } else {
       // Reset form when adding a new contact
       setFormData({
@@ -65,9 +81,10 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
         contactPerson: '',
         address: '',
         commune: '',
+        type: 'client',
       });
-      setType('');
       setTags([]);
+      setInteractions([]);
     }
   }, [contact, isOpen]);
 
@@ -89,119 +106,217 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
   const removeTag = (tagToRemove: string) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
-
+  
+  const handleAddInteraction = () => {
+    if (newInteraction.notes.trim() === '') return;
+    
+    if (contact) {
+      onSave(contact, newInteraction);
+      // Optimistically add to local state
+      setInteractions(prev => [...prev, { ...newInteraction, id: `temp-${Date.now()}` }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    } else {
+      // This path is tricky without a contact ID. We'll disable this for new contacts.
+    }
+    setNewInteraction(initialNewInteraction);
+  };
+  
+  const removeInteraction = (interactionId: string) => {
+      // This would require a delete callback to page.tsx
+      console.log("Removing interaction", interactionId);
+  }
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const finalData = { ...formData, tags, interactions };
     if (contact) {
-        onSave({ ...formData, type: type as 'client' | 'supplier', tags, id: contact.id });
+        onSave({ ...contact, ...finalData });
     } else {
-        onSave({ ...formData, type: type as 'client' | 'supplier', tags });
+        onSave(finalData);
     }
+    onOpenChange(false);
   };
 
   const title = contact ? 'Editar Contacto' : 'Crear Nuevo Contacto';
   const description = contact 
-    ? 'Actualice la información del contacto.'
+    ? 'Actualice la información del contacto y su historial.'
     : 'Complete la información para registrar un nuevo cliente o proveedor.';
+    
+  const interactionIcons = {
+      'Llamada': <Phone className="h-4 w-4" />,
+      'Reunión': <Users className="h-4 w-4" />,
+      'Email': <Mail className="h-4 w-4" />,
+      'Acuerdo': <Handshake className="h-4 w-4" />,
+  }
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-lg">
+      <SheetContent className="sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Nombre
-              </Label>
-              <Input id="name" name="name" value={formData.name} onChange={handleInputChange} className="col-span-3" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="rut" className="text-right">
-                RUT
-              </Label>
-              <Input id="rut" name="rut" value={formData.rut} onChange={handleInputChange} className="col-span-3" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">
-                Email
-              </Label>
-              <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} className="col-span-3" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="contactPerson" className="text-right">
-                Persona
-              </Label>
-              <Input id="contactPerson" name="contactPerson" value={formData.contactPerson} onChange={handleInputChange} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="address" className="text-right">
-                Dirección
-              </Label>
-              <Input id="address" name="address" value={formData.address} onChange={handleInputChange} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="commune" className="text-right">
-                Comuna
-              </Label>
-              <Input id="commune" name="commune" value={formData.commune} onChange={handleInputChange} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="type" className="text-right">
-                Tipo
-              </Label>
-              <Select
-                required
-                onValueChange={(value: 'client' | 'supplier') => setType(value)}
-                value={type}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Seleccione un tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="client">Cliente</SelectItem>
-                  <SelectItem value="supplier">Proveedor</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="tags" className="text-right pt-2">
-                    Etiquetas
-                </Label>
-                <div className="col-span-3">
-                    <Input 
-                        id="tags"
-                        placeholder="Escriba y presione Enter"
-                        value={tagInput}
-                        onChange={(e) => setTagInput(e.target.value)}
-                        onKeyDown={handleTagInputKeyDown}
-                    />
-                    <div className="flex flex-wrap gap-2 mt-2">
-                        {tags.map(tag => (
-                            <Badge key={tag} variant="secondary">
-                                {tag}
-                                <button type="button" onClick={() => removeTag(tag)} className="ml-2 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                                    <X className="h-3 w-3" />
-                                </button>
-                            </Badge>
+        <Tabs defaultValue="details" className="w-full mt-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="details">Detalles</TabsTrigger>
+            <TabsTrigger value="history">Historial</TabsTrigger>
+          </TabsList>
+          <TabsContent value="details">
+            <form onSubmit={handleSubmit}>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right">
+                    Nombre
+                  </Label>
+                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} className="col-span-3" required />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="rut" className="text-right">
+                    RUT
+                  </Label>
+                  <Input id="rut" name="rut" value={formData.rut} onChange={handleInputChange} className="col-span-3" required />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="email" className="text-right">
+                    Email
+                  </Label>
+                  <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} className="col-span-3" required />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="contactPerson" className="text-right">
+                    Persona
+                  </Label>
+                  <Input id="contactPerson" name="contactPerson" value={formData.contactPerson} onChange={handleInputChange} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="address" className="text-right">
+                    Dirección
+                  </Label>
+                  <Input id="address" name="address" value={formData.address} onChange={handleInputChange} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="commune" className="text-right">
+                    Comuna
+                  </Label>
+                  <Input id="commune" name="commune" value={formData.commune} onChange={handleInputChange} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="type" className="text-right">
+                    Tipo
+                  </Label>
+                  <Select
+                    required
+                    onValueChange={(value: 'client' | 'supplier') => setFormData(p => ({...p, type: value}))}
+                    value={formData.type}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Seleccione un tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="client">Cliente</SelectItem>
+                      <SelectItem value="supplier">Proveedor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-start gap-4">
+                    <Label htmlFor="tags" className="text-right pt-2">
+                        Etiquetas
+                    </Label>
+                    <div className="col-span-3">
+                        <Input 
+                            id="tags"
+                            placeholder="Escriba y presione Enter"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            onKeyDown={handleTagInputKeyDown}
+                        />
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {tags.map(tag => (
+                                <Badge key={tag} variant="secondary">
+                                    {tag}
+                                    <button type="button" onClick={() => removeTag(tag)} className="ml-2 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+              </div>
+              <SheetFooter>
+                <SheetClose asChild>
+                  <Button type="button" variant="outline">
+                    Cerrar
+                  </Button>
+                </SheetClose>
+                <Button type="submit">Guardar Contacto</Button>
+              </SheetFooter>
+            </form>
+          </TabsContent>
+          <TabsContent value="history">
+            <div className="py-4 space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base font-medium">Nueva Interacción</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <Input
+                                type="date"
+                                value={newInteraction.date}
+                                onChange={(e) => setNewInteraction(p => ({ ...p, date: e.target.value }))}
+                            />
+                            <Select
+                                value={newInteraction.type}
+                                onValueChange={(value: Interaction['type']) => setNewInteraction(p => ({...p, type: value}))}
+                            >
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Llamada">Llamada</SelectItem>
+                                    <SelectItem value="Reunión">Reunión</SelectItem>
+                                    <SelectItem value="Email">Email</SelectItem>
+                                    <SelectItem value="Acuerdo">Acuerdo</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Textarea
+                            placeholder="Añada notas sobre la interacción..."
+                            value={newInteraction.notes}
+                            onChange={(e) => setNewInteraction(p => ({...p, notes: e.target.value}))}
+                        />
+                        <Button onClick={handleAddInteraction} disabled={!contact || !newInteraction.notes}>
+                            <PlusCircle className="mr-2 h-4 w-4"/>
+                            Agregar al Historial
+                        </Button>
+                        {!contact && <p className="text-xs text-muted-foreground">Guarde el contacto antes de agregar interacciones.</p>}
+                    </CardContent>
+                </Card>
+
+                <div className="space-y-4">
+                    <h4 className="font-medium text-center">Historial de Contacto</h4>
+                    {interactions.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay interacciones registradas.</p>}
+                    <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+                        {interactions.map(int => (
+                            <div key={int.id} className="flex items-start gap-4">
+                                <div className="flex flex-col items-center">
+                                    <span className="p-2 bg-muted rounded-full">
+                                        {interactionIcons[int.type]}
+                                    </span>
+                                    <div className="h-full border-l-2 border-dashed my-1"></div>
+                                </div>
+                                <div className="flex-1 pb-4 border-b">
+                                    <div className="flex justify-between items-center">
+                                        <p className="font-semibold">{int.type}</p>
+                                        <p className="text-xs text-muted-foreground">{format(parseISO(int.date), 'dd-MM-yyyy', { locale: es })}</p>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">{int.notes}</p>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </div>
             </div>
-          </div>
-          <SheetFooter>
-            <SheetClose asChild>
-              <Button type="button" variant="outline">
-                Cancelar
-              </Button>
-            </SheetClose>
-            <Button type="submit">Guardar</Button>
-          </SheetFooter>
-        </form>
+          </TabsContent>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );
