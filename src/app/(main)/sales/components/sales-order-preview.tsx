@@ -281,5 +281,3 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
     </Dialog>
   );
 }
-
-    
