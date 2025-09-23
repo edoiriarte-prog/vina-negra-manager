@@ -26,7 +26,7 @@ import { PlusCircle, Printer, Download, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useReactToPrint } from 'react-to-print';
 import * as XLSX from 'xlsx';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 
 export default function SalesPage() {
@@ -199,19 +199,31 @@ export default function SalesPage() {
 
   const handleExport = (orderToExport: SalesOrder) => {
     const client = clients.find(c => c.id === orderToExport.clientId);
-    const dataForSheet = orderToExport.items.map(item => ({
-      'O/V': orderToExport.id,
-      'Fecha': format(new Date(orderToExport.date), "dd-MM-yyyy"),
-      'Cliente': client?.name,
-      'Producto': item.product,
-      'Calibre': item.caliber,
-      'Tipo Envase': item.packagingType,
-      'Cant. Envase': item.packagingQuantity,
-      'Cantidad (kg)': item.quantity,
-      'Precio Unitario': item.price,
-      'Subtotal': item.quantity * item.price,
-      'Lote': item.lotNumber,
-    }));
+    const dataForSheet = orderToExport.items.map(item => {
+      
+      const advanceAmount = orderToExport.paymentMethod === 'Pago con Anticipo y Saldo' ? orderToExport.totalAmount * ((orderToExport.advancePercentage || 0) / 100) : 0;
+      const balanceAmount = orderToExport.paymentMethod === 'Pago con Anticipo y Saldo' ? orderToExport.totalAmount - advanceAmount : 0;
+
+      return {
+        'Proveedor': 'Viña Negra',
+        'O/V': orderToExport.id,
+        'Fecha': format(new Date(orderToExport.date), "dd-MM-yyyy"),
+        'Cliente': client?.name,
+        'Producto': item.product,
+        'Calibre': item.caliber,
+        'Tipo Envase': item.packagingType,
+        'Cant. Envase': item.packagingQuantity,
+        'Cantidad (kg)': item.quantity,
+        'Precio Unitario': item.price,
+        'Subtotal': item.quantity * item.price,
+        'Lote': item.lotNumber,
+        'Modalidad de Pago': orderToExport.paymentMethod,
+        'Monto Anticipo': advanceAmount > 0 ? advanceAmount : '',
+        'Venc. Anticipo': orderToExport.advanceDueDate ? format(parseISO(orderToExport.advanceDueDate), 'dd-MM-yyyy') : '',
+        'Monto Saldo': balanceAmount > 0 ? balanceAmount : '',
+        'Venc. Saldo': orderToExport.balanceDueDate ? format(parseISO(orderToExport.balanceDueDate), 'dd-MM-yyyy') : '',
+      }
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
     const workbook = XLSX.utils.book_new();
@@ -234,8 +246,12 @@ export default function SalesPage() {
     const allItems: any[] = [];
     completedOrders.forEach(order => {
         const client = clients.find(c => c.id === order.clientId);
+        const advanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount * ((order.advancePercentage || 0) / 100) : 0;
+        const balanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount - advanceAmount : 0;
+
         order.items.forEach(item => {
             allItems.push({
+                'Proveedor': 'Viña Negra',
                 'O/V': order.id,
                 'Fecha': format(new Date(order.date), "dd-MM-yyyy"),
                 'Cliente': client?.name,
@@ -247,6 +263,11 @@ export default function SalesPage() {
                 'Precio Unitario': item.price,
                 'Subtotal': item.quantity * item.price,
                 'Lote': item.lotNumber,
+                'Modalidad de Pago': order.paymentMethod,
+                'Monto Anticipo': advanceAmount > 0 ? advanceAmount : '',
+                'Venc. Anticipo': order.advanceDueDate ? format(parseISO(order.advanceDueDate), 'dd-MM-yyyy') : '',
+                'Monto Saldo': balanceAmount > 0 ? balanceAmount : '',
+                'Venc. Saldo': order.balanceDueDate ? format(parseISO(order.balanceDueDate), 'dd-MM-yyyy') : '',
             });
         });
     });
