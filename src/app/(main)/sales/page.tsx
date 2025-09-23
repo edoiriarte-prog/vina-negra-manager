@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory } from '@/lib/data';
 import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem } from '@/lib/types';
@@ -22,8 +22,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { SalesOrderPreview } from './components/sales-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Printer, Download, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useReactToPrint } from 'react-to-print';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 
 
 export default function SalesPage() {
@@ -37,9 +40,16 @@ export default function SalesPage() {
   const [previewingOrder, setPreviewingOrder] = useState<SalesOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
+
   const { toast } = useToast();
 
   const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
+
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+      content: () => printRef.current,
+  });
 
   useEffect(() => {
     setIsClient(true);
@@ -47,10 +57,12 @@ export default function SalesPage() {
     const maxLotNumber = salesOrders.reduce((max, order) => {
         order.items.forEach(item => {
             if (item.lotNumber && item.lotNumber.startsWith('L')) {
-                const numberPart = parseInt(item.lotNumber.substring(1));
-                if (!isNaN(numberPart) && numberPart > max) {
-                    max = numberPart;
-                }
+                try {
+                    const numberPart = parseInt(item.lotNumber.substring(1));
+                    if (!isNaN(numberPart) && numberPart > max) {
+                        max = numberPart;
+                    }
+                } catch(e) { /* ignore parse errors */ }
             }
         });
         return max;
@@ -115,24 +127,29 @@ export default function SalesPage() {
     }, 0);
     const totalPackages = orderToSave.items.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
-    const finalOrder = { ...orderToSave, totalAmount, totalKilos, totalPackages };
+    let finalOrder: SalesOrder;
 
-
-    if ('id' in finalOrder) {
+    if ('id' in orderToSave) {
       // Update
-      setSalesOrders(prev => prev.map(o => o.id === (finalOrder as SalesOrder).id ? finalOrder as SalesOrder : o));
+      finalOrder = { ...orderToSave, totalAmount, totalKilos, totalPackages } as SalesOrder;
+      setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
       toast({ title: 'Orden Actualizada', description: `La orden ${finalOrder.id} ha sido actualizada.` });
     } else {
       // Add
-      const newOrder = {
-        ...finalOrder,
+      finalOrder = {
+        ...orderToSave,
         id: nextOrderId,
-      };
-      setSalesOrders(prev => [...prev, newOrder]);
-      toast({ title: 'Orden Creada', description: `La orden ${newOrder.id} ha sido creada.` });
+        totalAmount, 
+        totalKilos, 
+        totalPackages
+      } as SalesOrder;
+      setSalesOrders(prev => [...prev, finalOrder]);
+      toast({ title: 'Orden Creada', description: `La orden ${finalOrder.id} ha sido creada.` });
     }
+
     setIsSheetOpen(false);
     setEditingOrder(null);
+    setPostSaveOrderOptions(finalOrder); // Open post-save dialog
   };
 
   const handleEdit = (order: SalesOrder) => {
@@ -174,6 +191,28 @@ export default function SalesPage() {
     setEditingOrder(null);
     setIsSheetOpen(true);
   }
+
+  const handleExport = (orderToExport: SalesOrder) => {
+    const client = clients.find(c => c.id === orderToExport.clientId);
+    const dataForSheet = orderToExport.items.map(item => ({
+      'O/V': orderToExport.id,
+      'Fecha': format(new Date(orderToExport.date), "dd-MM-yyyy"),
+      'Cliente': client?.name,
+      'Producto': item.product,
+      'Calibre': item.caliber,
+      'Tipo Envase': item.packagingType,
+      'Cant. Envase': item.packagingQuantity,
+      'Cantidad (kg)': item.quantity,
+      'Lote': item.lotNumber,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Packing List');
+    XLSX.writeFile(workbook, `PackingList-${orderToExport.id}.xlsx`);
+    toast({ title: 'Exportación Exitosa', description: `Se ha generado el packing list para la O/V ${orderToExport.id}.` });
+  };
+
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreview, clients });
   
@@ -263,6 +302,49 @@ export default function SalesPage() {
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
         />
       )}
+      
+      {postSaveOrderOptions && (
+        <AlertDialog open={!!postSaveOrderOptions} onOpenChange={() => setPostSaveOrderOptions(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Orden "{postSaveOrderOptions.id}" Guardada</AlertDialogTitle>
+              <AlertDialogDescription>
+                La orden de venta ha sido guardada exitosamente. ¿Qué deseas hacer a continuación?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="sm:justify-center gap-2">
+              <Button variant="outline" onClick={() => handleExport(postSaveOrderOptions)}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar a Excel
+              </Button>
+              <Button variant="outline" onClick={() => { setPreviewingOrder(postSaveOrderOptions); setPostSaveOrderOptions(null); }}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir O/V
+              </Button>
+               <Button onClick={() => setPostSaveOrderOptions(null)}>
+                <X className="mr-2 h-4 w-4" />
+                Salir
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Hidden component for printing */}
+      <div className="hidden">
+          {previewingOrder && (
+            <div ref={printRef}>
+              <SalesOrderPreview
+                order={previewingOrder}
+                client={clients.find(c => c.id === previewingOrder.clientId) || null}
+                carrier={carriers.find(c => c.id === (previewingOrder as any).carrierId) || null}
+                isOpen={true}
+                onOpenChange={() => {}}
+                isPrintMode={true}
+              />
+            </div>
+          )}
+      </div>
     </>
   );
 }
