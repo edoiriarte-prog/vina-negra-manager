@@ -203,6 +203,8 @@ export default function SalesPage() {
       'Tipo Envase': item.packagingType,
       'Cant. Envase': item.packagingQuantity,
       'Cantidad (kg)': item.quantity,
+      'Precio Unitario': item.price,
+      'Subtotal': item.quantity * item.price,
       'Lote': item.lotNumber,
     }));
 
