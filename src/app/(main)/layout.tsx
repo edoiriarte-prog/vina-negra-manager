@@ -11,7 +11,6 @@ import {
 import { Logo } from '@/components/logo';
 import { MainNav } from '@/components/main-nav';
 import { UserNav } from '@/components/user-nav';
-import { QuickInteraction } from './components/quick-interaction';
 import { Separator } from '@/components/ui/separator';
 
 export default function MainLayout({
@@ -31,8 +30,6 @@ export default function MainLayout({
           </div>
         </SidebarContent>
         <SidebarFooter>
-          <Separator className="my-2" />
-          <QuickInteraction />
           <Separator className="my-2" />
           <UserNav />
         </SidebarFooter>
