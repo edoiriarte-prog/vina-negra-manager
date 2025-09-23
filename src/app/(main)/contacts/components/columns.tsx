@@ -43,14 +43,6 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Con
     header: 'Email',
   },
   {
-    accessorKey: 'contactPerson',
-    header: 'Persona de Contacto',
-  },
-  {
-    accessorKey: 'commune',
-    header: 'Comuna',
-  },
-  {
     accessorKey: 'type',
     header: 'Tipo',
     cell: ({ row }) => {
@@ -58,6 +50,21 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Con
         const variant = type === 'client' ? 'default' : 'secondary';
         return <Badge variant={variant}>{type === 'client' ? 'Cliente' : 'Proveedor'}</Badge>
     }
+  },
+   {
+    accessorKey: 'tags',
+    header: 'Etiquetas',
+    cell: ({ row }) => {
+      const tags = row.getValue('tags') as string[];
+      if (!tags || tags.length === 0) return null;
+      return (
+        <div className="flex flex-wrap gap-1">
+          {tags.map(tag => (
+            <Badge key={tag} variant="outline">{tag}</Badge>
+          ))}
+        </div>
+      );
+    },
   },
   {
     id: 'actions',

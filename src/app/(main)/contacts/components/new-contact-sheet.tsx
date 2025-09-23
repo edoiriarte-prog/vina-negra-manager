@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -21,6 +21,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Contact } from '@/lib/types';
+import { Badge } from '@/components/ui/badge';
+import { X } from 'lucide-react';
 
 type NewContactSheetProps = {
   isOpen: boolean;
@@ -31,7 +33,9 @@ type NewContactSheetProps = {
 
 export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewContactSheetProps) {
   const [type, setType] = useState<'client' | 'supplier' | ''>('');
-  const [formData, setFormData] = useState<Omit<Contact, 'id' | 'type'>>({
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [formData, setFormData] = useState<Omit<Contact, 'id' | 'type' | 'tags'>>({
     name: '',
     rut: '',
     email: '',
@@ -51,6 +55,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
         commune: contact.commune,
       });
       setType(contact.type);
+      setTags(contact.tags || []);
     } else {
       // Reset form when adding a new contact
       setFormData({
@@ -62,6 +67,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
         commune: '',
       });
       setType('');
+      setTags([]);
     }
   }, [contact, isOpen]);
 
@@ -69,13 +75,28 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+  
+  const handleTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && tagInput.trim() !== '') {
+      event.preventDefault();
+      if (!tags.includes(tagInput.trim())) {
+        setTags([...tags, tagInput.trim()]);
+        setTagInput('');
+      }
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (contact) {
-        onSave({ ...formData, type: type as 'client' | 'supplier', id: contact.id });
+        onSave({ ...formData, type: type as 'client' | 'supplier', tags, id: contact.id });
     } else {
-        onSave({ ...formData, type: type as 'client' | 'supplier' });
+        onSave({ ...formData, type: type as 'client' | 'supplier', tags });
     }
   };
 
@@ -146,6 +167,30 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact }: NewCo
                   <SelectItem value="supplier">Proveedor</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="tags" className="text-right pt-2">
+                    Etiquetas
+                </Label>
+                <div className="col-span-3">
+                    <Input 
+                        id="tags"
+                        placeholder="Escriba y presione Enter"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={handleTagInputKeyDown}
+                    />
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {tags.map(tag => (
+                            <Badge key={tag} variant="secondary">
+                                {tag}
+                                <button type="button" onClick={() => removeTag(tag)} className="ml-2 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </Badge>
+                        ))}
+                    </div>
+                </div>
             </div>
           </div>
           <SheetFooter>

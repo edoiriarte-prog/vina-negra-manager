@@ -7,6 +7,7 @@ export type Contact = {
   email: string;
   contactPerson: string;
   type: 'client' | 'supplier';
+  tags?: string[];
 };
 
 export type OrderItem = {
