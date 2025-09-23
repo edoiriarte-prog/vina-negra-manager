@@ -194,8 +194,16 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
             toast({ variant: 'destructive', title: 'Error en Ítem', description: `La cantidad del ítem #${index + 1} debe ser mayor a 0.` });
             return;
         }
+        if (!item.unit) {
+            toast({ variant: 'destructive', title: 'Error en Ítem', description: `La unidad del ítem #${index + 1} no ha sido seleccionada.` });
+            return;
+        }
         if (!item.price || item.price <= 0) {
             toast({ variant: 'destructive', title: 'Error en Ítem', description: `El precio del ítem #${index + 1} debe ser mayor a 0.` });
+            return;
+        }
+        if ((item.packagingType && !item.packagingQuantity) || (!item.packagingType && item.packagingQuantity)) {
+            toast({ variant: 'destructive', title: 'Error en Ítem', description: `El ítem #${index + 1} debe tener tipo y cantidad de envase.` });
             return;
         }
     }
