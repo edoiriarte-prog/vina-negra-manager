@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useRef } from 'react';
@@ -101,7 +102,7 @@ export default function HelpPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Accordion type="multiple" collapsible className="w-full">
+            <Accordion type="multiple" className="w-full">
               <AccordionItem value="dashboard">
                 <AccordionTrigger>Dashboard</AccordionTrigger>
                 <AccordionContent>
