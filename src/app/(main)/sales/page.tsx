@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, inventoryAdjustments as initialInventoryAdjustments, getInventory } from '@/lib/data';
-import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem, InventoryAdjustment } from '@/lib/types';
+import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory } from '@/lib/data';
+import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -28,7 +28,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function SalesPage() {
   const [salesOrders, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
-  const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
@@ -44,7 +43,7 @@ export default function SalesPage() {
   
   const clients = contacts.filter(c => c.type === 'client');
   const carriers = contacts.filter(c => c.type === 'supplier');
-  const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, inventoryAdjustments, editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
+  const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, editingOrder), [purchaseOrders, salesOrders, editingOrder]);
 
   const nextOrderId = useMemo(() => {
     const lastIdNumber = salesOrders.reduce((max, order) => {

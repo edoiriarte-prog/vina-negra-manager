@@ -1,10 +1,9 @@
 
 
-export const initialProducts = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MANDARINAS", "Cereza"];
-export const initialCalibers = ["CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS", "EXTRA", "G", "Jumbo", "Large", "PRIMERA", "SEGUNDA", "TERCERA", "XJ"];
+export const initialProducts = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MANDARINAS"];
+export const initialCalibers = ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"];
 export const initialUnits = ["Kilos", "Cajas"];
 export const initialPackagingTypes = ["CAJAS", "BINS", "PALLETS", "SACOS"];
-export const initialWarehouses = ["Bodega Principal", "Cámara de Frío 1", "Campo A"];
 
 export type ProductMatrix = {
     [product: string]: string[];
@@ -17,5 +16,4 @@ export const productCaliberMatrix: ProductMatrix = {
     "DURAZNOS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
     "CLEMENTINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
     "MANDARINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLadas"],
-    "Cereza": ["Large", "Jumbo", "XJ", "G"]
 };

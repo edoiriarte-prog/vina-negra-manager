@@ -1,30 +1,27 @@
-import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem, InventoryAdjustment } from './types';
+import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem, Interaction } from './types';
 
 export const contacts: Contact[] = [
-  { id: '1', name: 'Agrícola Santa Cruz', rut: '76.123.456-7', address: 'Fundo El Sol, Parcela 4', commune: 'Santa Cruz', email: 'contacto@agrisc.cl', contactPerson: 'Juan Pérez', type: 'supplier', interactions: [
+  { id: '1', name: 'Agrícola Santa Cruz', rut: '76.123.456-7', address: 'Fundo El Sol, Parcela 4', commune: 'Santa Cruz', email: 'contacto@agrisc.cl', contactPerson: 'Juan Pérez', type: 'supplier', tags: ['Proveedor Estratégico', 'Uva'], interactions: [
     { id: 'int-1', date: '2023-09-15', type: 'Llamada', notes: 'Conversación inicial sobre precios de la temporada.' },
     { id: 'int-2', date: '2023-09-20', type: 'Acuerdo', notes: 'Acuerdo de compra de 10,000 kg de Cerezas a $5000/kg.' },
   ]},
-  { id: '2', name: 'Exportadora Frutillar', rut: '78.987.654-3', address: 'Av. Las Condes 1234', commune: 'Las Condes', email: 'compras@frutillar.com', contactPerson: 'Maria Rodriguez', type: 'client' },
-  { id: '3', name: 'Supermercados del Sur', rut: '80.456.789-1', address: 'Ruta 5 Sur, Km 180', commune: 'Curicó', email: 'adquisiciones@sds.cl', contactPerson: 'Carlos Soto', type: 'client' },
-  { id: '4', name: 'Transportes Rapido', rut: '77.555.444-K', address: 'Calle Larga 567', commune: 'Rancagua', email: 'fletes@transrapido.cl', contactPerson: 'Ana Gomez', type: 'supplier' },
-];
-
-export const inventoryAdjustments: InventoryAdjustment[] = [
-  { id: 'ADJ-1', date: '2023-10-10', product: 'UVAS', caliber: 'PRIMERA', warehouse: 'Bodega Principal', type: 'decrease', quantity: 50, reason: 'Merma por maduración' },
-  { id: 'ADJ-2', date: '2023-10-18', product: 'PALTAS', caliber: 'EXTRA', warehouse: 'Cámara de Frío 1', type: 'decrease', quantity: 100, reason: 'Pérdida en cámara' },
+  { id: '2', name: 'Exportadora Frutillar', rut: '78.987.654-3', address: 'Av. Las Condes 1234', commune: 'Las Condes', email: 'compras@frutillar.com', contactPerson: 'Maria Rodriguez', type: 'client', tags: ['Cliente Premium', 'Exportación'] },
+  { id: '3', name: 'Supermercados del Sur', rut: '80.456.789-1', address: 'Ruta 5 Sur, Km 180', commune: 'Curicó', email: 'adquisiciones@sds.cl', contactPerson: 'Carlos Soto', type: 'client', tags: ['Retail'] },
+  { id: '4', name: 'Transportes Rapido', rut: '77.555.444-K', address: 'Calle Larga 567', commune: 'Rancagua', email: 'fletes@transrapido.cl', contactPerson: 'Ana Gomez', type: 'supplier', tags: ['Logística'] },
+  { id: '5', name: 'Productor de Paltas de Quillota', rut: '79.111.222-3', address: 'Hijuela Larga s/n', commune: 'Quillota', email: 'palta.quillota@email.com', contactPerson: 'Miguel Angel', type: 'supplier', tags: [] },
+  { id: '6', name: 'Fruits & Co. SpA', rut: '81.222.333-4', address: 'Av. del Mar 4500', commune: 'La Serena', email: 'hello@fruits.co', contactPerson: 'Sofia Lopez', type: 'client', tags: ['Exportación', 'Asia'] },
 ];
 
 export const purchaseOrders: PurchaseOrder[] = [
-  { id: 'OC-1001', supplierId: '1', date: '2023-10-01', items: [{ id: 'p1', product: 'UVAS', caliber: 'PRIMERA', quantity: 5000, unit: 'Kilos', price: 3000, warehouse: 'Bodega Principal' }, { id: 'p2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 3000, unit: 'Kilos', price: 2500, warehouse: 'Bodega Principal' }], totalAmount: 22500000, totalKilos: 8000, status: 'completed' },
-  { id: 'OC-1002', supplierId: '1', date: '2023-10-08', items: [{ id: 'p3', product: 'PALTAS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 4000, warehouse: 'Cámara de Frío 1' }, { id: 'p4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 3500, warehouse: 'Cámara de Frío 1' }], totalAmount: 38000000, totalKilos: 10000, status: 'completed' },
-  { id: 'OC-1003', supplierId: '1', date: '2023-10-15', items: [{ id: 'p5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 7000, unit: 'Kilos', price: 2000, warehouse: 'Bodega Principal' }, { id: 'p6', product: 'DURAZNOS', caliber: 'PRIMERA', quantity: 2000, unit: 'Kilos', price: 1500, warehouse: 'Bodega Principal' }], totalAmount: 17000000, totalKilos: 9000, status: 'completed' },
+  { id: 'OC-1001', supplierId: '1', date: '2023-10-01', items: [{ id: 'p1', product: 'UVAS', caliber: 'PRIMERA', quantity: 5000, unit: 'Kilos', price: 3000 }, { id: 'p2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 3000, unit: 'Kilos', price: 2500 }], totalAmount: 22500000, totalKilos: 8000, status: 'completed' },
+  { id: 'OC-1002', supplierId: '5', date: '2023-10-08', items: [{ id: 'p3', product: 'PALTAS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 4000 }, { id: 'p4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 3500 }], totalAmount: 38000000, totalKilos: 10000, status: 'completed' },
+  { id: 'OC-1003', supplierId: '1', date: '2023-10-15', items: [{ id: 'p5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 7000, unit: 'Kilos', price: 2000 }, { id: 'p6', product: 'DURAZNOS', caliber: 'PRIMERA', quantity: 2000, unit: 'Kilos', price: 1500 }], totalAmount: 17000000, totalKilos: 9000, status: 'completed' },
 ];
 
 export const salesOrders: SalesOrder[] = [
-  { id: 'OV-001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'UVAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 4500, packagingQuantity: 200, warehouse: 'Bodega Principal' }, { id: 's2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 2000, unit: 'Kilos', price: 5000, packagingQuantity: 100, warehouse: 'Bodega Principal' }], totalKilos: 6000, totalPackages: 300, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed', paymentMethod: 'Contado' },
-  { id: 'OV-002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'PALTAS', caliber: 'EXTRA', quantity: 5000, unit: 'Kilos', price: 4500, packagingQuantity: 250, warehouse: 'Cámara de Frío 1' }, { id: 's4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 3000, unit: 'Kilos', price: 5000, packagingQuantity: 150, warehouse: 'Cámara de Frío 1' }], totalKilos: 8000, totalPackages: 400, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed', paymentMethod: 'Pago con Anticipo y Saldo', advancePercentage: 50, advanceDueDate: '2023-10-20', balanceDueDate: '2023-11-20' },
-  { id: 'OV-003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 5500, packagingQuantity: 300, warehouse: 'Bodega Principal' }], totalKilos: 6000, totalPackages: 300, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending', paymentMethod: 'Crédito' },
+  { id: 'OV-2001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'UVAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 4500, packagingQuantity: 200 }, { id: 's2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 2000, unit: 'Kilos', price: 5000, packagingQuantity: 100 }], totalKilos: 6000, totalPackages: 300, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed', paymentMethod: 'Contado' },
+  { id: 'OV-2002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'PALTAS', caliber: 'EXTRA', quantity: 5000, unit: 'Kilos', price: 4500, packagingQuantity: 250 }, { id: 's4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 3000, unit: 'Kilos', price: 5000, packagingQuantity: 150 }], totalKilos: 8000, totalPackages: 400, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed', paymentMethod: 'Pago con Anticipo y Saldo', advancePercentage: 50, advanceDueDate: '2023-10-20', balanceDueDate: '2023-11-20' },
+  { id: 'OV-2003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 5500, packagingQuantity: 300 }], totalKilos: 6000, totalPackages: 300, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending', paymentMethod: 'Crédito' },
 ];
 
 export const serviceOrders: ServiceOrder[] = [
@@ -42,76 +39,59 @@ export const financialMovements: FinancialMovement[] = [
   { id: 'M-006', date: '2023-10-09', type: 'expense', description: 'Pago 50% OC-1002 - Agrícola Santa Cruz', amount: 19000000, relatedOrder: { type: 'OC', id: 'OC-1002' } },
 ];
 
+export const inventoryAdjustments = [
+    {id: "ADJ-1", date: "2023-10-25", product: "UVAS", caliber: "PRIMERA", warehouse: "Bodega Principal", type: "decrease", quantity: 50, reason: "Merma por maduración"},
+    {id: "ADJ-2", date: "2023-10-26", product: "PALTAS", caliber: "EXTRA", warehouse: "Cámara de Frío 1", type: "increase", quantity: 100, reason: "Corrección de conteo"},
+]
+
 export const getInventory = (
-  currentPurchaseOrders?: PurchaseOrder[],
-  currentSalesOrders?: SalesOrder[],
-  currentAdjustments?: InventoryAdjustment[],
+  currentPurchaseOrders: PurchaseOrder[] = [],
+  currentSalesOrders: SalesOrder[] = [],
   orderBeingEdited?: SalesOrder | null
 ): InventoryItem[] => {
-  const inventoryMap = new Map<string, { purchased: number, sold: number, adjusted: number }>();
-  const purchases = currentPurchaseOrders || [];
-  const sales = currentSalesOrders || [];
-  const adjustments = currentAdjustments || [];
-
-  const processItems = (items: OrderItem[], type: 'purchase' | 'sale') => {
-    items.forEach(item => {
-      if (item.unit === 'Kilos' && item.warehouse) {
-        const key = `${item.product} - ${item.caliber} - ${item.warehouse}`;
-        const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
-        if (type === 'purchase') {
-          existing.purchased += item.quantity;
-        } else {
-          existing.sold += item.quantity;
-        }
-        inventoryMap.set(key, existing);
-      }
-    });
-  };
-
+  const inventoryMap = new Map<string, { purchased: number; sold: number }>();
+  
   // Process purchases
-  purchases.forEach(po => {
+  currentPurchaseOrders.forEach(po => {
     if (po.status === 'completed') {
-      processItems(po.items, 'purchase');
+      po.items.forEach(item => {
+        if (item.unit === 'Kilos') {
+          const key = `${item.product} - ${item.caliber}`;
+          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0 };
+          existing.purchased += item.quantity;
+          inventoryMap.set(key, existing);
+        }
+      });
     }
   });
 
   // Process sales
-  sales.forEach(so => {
+  currentSalesOrders.forEach(so => {
      if (orderBeingEdited && so.id === orderBeingEdited.id) {
         return; // Exclude the order being edited from stock calculation
      }
      if (so.status === 'completed' || so.status === 'pending') {
-      processItems(so.items, 'sale');
+      so.items.forEach(item => {
+        if (item.unit === 'Kilos') {
+          const key = `${item.product} - ${item.caliber}`;
+          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0 };
+          existing.sold += item.quantity;
+          inventoryMap.set(key, existing);
+        }
+      });
     }
   });
-
-  // Process adjustments
-  adjustments.forEach(adj => {
-    if (adj.warehouse) {
-      const key = `${adj.product} - ${adj.caliber} - ${adj.warehouse}`;
-      const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
-      if (adj.type === 'increase') {
-        existing.adjusted += adj.quantity;
-      } else {
-        existing.adjusted -= adj.quantity;
-      }
-      inventoryMap.set(key, existing);
-    }
-  });
-
 
   const inventory: InventoryItem[] = [];
   inventoryMap.forEach((value, key) => {
-    const [product, caliber, warehouse] = key.split(' - ');
+    const [product, caliber] = key.split(' - ');
     inventory.push({
       key,
       product,
       caliber,
-      warehouse,
       kilosPurchased: value.purchased,
       kilosSold: value.sold,
-      kilosAdjusted: value.adjusted,
-      stock: value.purchased - value.sold + value.adjusted,
+      stock: value.purchased - value.sold,
     });
   });
 

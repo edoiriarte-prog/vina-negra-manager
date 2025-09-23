@@ -27,7 +27,6 @@ export type OrderItem = {
   price: number;
   packagingType?: string;
   packagingQuantity?: number;
-  warehouse?: string; // New field for warehouse
 };
 
 export type PackagingItem = {
@@ -94,24 +93,11 @@ export type FinancialMovement = {
   };
 };
 
-export type InventoryAdjustment = {
-  id: string;
-  date: string;
-  product: string;
-  caliber: string;
-  warehouse: string;
-  type: 'increase' | 'decrease';
-  quantity: number;
-  reason: string;
-};
-
 export type InventoryItem = {
   key: string;
   product: string;
   caliber: string;
-  warehouse: string;
   kilosPurchased: number;
   kilosSold: number;
-  kilosAdjusted: number;
   stock: number;
 };

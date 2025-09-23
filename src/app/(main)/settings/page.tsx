@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,6 @@ import * as XLSX from 'xlsx';
 function MasterDataEditor({ title, data, setData }: { title: string, data: string[], setData: React.Dispatch<React.SetStateAction<string[]>> }) {
     const [newItem, setNewItem] = useState('');
     const { toast } = useToast();
-
-    const sortedData = useMemo(() => [...data].sort((a,b) => a.localeCompare(b)), [data]);
 
     const handleAddItem = () => {
         if (newItem && !data.includes(newItem)) {
@@ -51,7 +49,7 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
                     </Button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {sortedData.map(item => (
+                    {data.map(item => (
                         <div key={item} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                             <span>{item}</span>
                             <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item)}>
@@ -70,7 +68,7 @@ function DataExport() {
 
     const handleExport = () => {
         try {
-            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements', 'inventoryAdjustments', 'master-products', 'master-calibers', 'master-units', 'master-packaging-types', 'master-warehouses'];
+            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements', 'master-products', 'master-calibers', 'master-units', 'master-packaging-types'];
             const workbook = XLSX.utils.book_new();
 
             keys.forEach(key => {
@@ -124,7 +122,7 @@ function DataExport() {
 
 
 export default function SettingsPage() {
-    const { products, setProducts, calibers, setCalibers, units, setUnits, packagingTypes, setPackagingTypes, warehouses, setWarehouses } = useMasterData();
+    const { products, setProducts, calibers, setCalibers, units, setUnits, packagingTypes, setPackagingTypes } = useMasterData();
     
     return (
         <div className="flex flex-col gap-6">
@@ -138,7 +136,6 @@ export default function SettingsPage() {
                 <MasterDataEditor title="Calibres" data={calibers} setData={setCalibers} />
                 <MasterDataEditor title="Unidades" data={units} setData={setUnits} />
                 <MasterDataEditor title="Tipos de Envase" data={packagingTypes} setData={setPackagingTypes} />
-                <MasterDataEditor title="Bodegas" data={warehouses} setData={setWarehouses} />
             </div>
 
             <div className='mt-6'>

@@ -105,7 +105,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-6xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Agregar Ítems por Matriz de Calibres</DialogTitle>
           <DialogDescription>

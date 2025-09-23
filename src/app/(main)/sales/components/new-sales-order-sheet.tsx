@@ -77,14 +77,16 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
 
 export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId }: NewSalesOrderSheetProps) {
   const [formData, setFormData] = useState(() => getInitialFormData(order));
+  const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const { products, calibers, units, packagingTypes, warehouses } = useMasterData();
+  const { products, calibers, units, packagingTypes } = useMasterData();
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen) {
       setFormData(getInitialFormData(order));
+      setNewItem({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
     }
   }, [order, isOpen]);
 
@@ -114,15 +116,45 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     newItems[index] = item;
     setFormData(prev => ({ ...prev, items: newItems }));
   };
-  
 
-  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalAmount' | 'totalKilos' | 'totalPackages' > | `items.${number}.${keyof OrderItem}`, value: any) => {
+  const addItem = () => {
+    if (newItem.product && newItem.caliber && newItem.quantity > 0 && newItem.price > 0) {
+       // Stock validation
+        const inventoryItem = inventory.find(i => i.caliber === `${newItem.product} - ${newItem.caliber}`);
+        const currentStock = inventoryItem ? inventoryItem.stock : 0;
+        
+        if (newItem.quantity > currentStock) {
+            toast({
+                variant: "destructive",
+                title: "Error de Stock",
+                description: `No hay suficiente stock para ${newItem.product} - ${newItem.caliber}. Stock actual: ${currentStock} kg.`,
+            });
+            return;
+        }
+
+      if (order) {
+        // If editing an existing order, we pass the new item up to be added
+        onSave(formData, [{...newItem, id: `temp-${Date.now()}`}]);
+      } else {
+        // If creating a new order, we add it to local state
+        setFormData(prev => ({
+          ...prev,
+          items: [...prev.items, { ...newItem, id: `temp-${Date.now()}` }],
+        }));
+      }
+      setNewItem({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
+    }
+  };
+
+  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalAmount' | 'totalKilos' | 'totalPackages' > | `items.${number}.${keyof OrderItem}` | `newItem.${keyof OrderItem}`, value: any) => {
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, value);
-    }
-     else {
+    } else if (name.startsWith('newItem.')) {
+        const field = name.split('.')[1] as keyof OrderItem;
+        setNewItem(prev => ({ ...prev, [field]: value }));
+    } else {
         setFormData(prev => ({ ...prev, [name as keyof typeof formData]: value }));
     }
   };
@@ -158,14 +190,14 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     
     // Stock validation
     for (const item of formData.items) {
-      const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === item.warehouse);
+      const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
       const currentStock = inventoryItem ? inventoryItem.stock : 0;
       
       if (item.quantity > currentStock) {
           toast({
               variant: "destructive",
               title: "Error de Stock",
-              description: `No hay stock para ${item.product} - ${item.caliber} en la bodega ${item.warehouse}. Stock: ${currentStock} kg.`,
+              description: `No hay stock para ${item.product} - ${item.caliber}. Stock: ${currentStock} kg.`,
           });
           return;
       }
@@ -180,8 +212,10 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'advancePercentage', 'packagingQuantity'].includes(field) ? Number(value) : value);
-    }
-     else {
+    } else if (name.startsWith('newItem.')) {
+        const field = name.split('.')[1] as keyof typeof newItem;
+        setNewItem(prev => ({ ...prev, [field]: ['quantity', 'price', 'packagingQuantity'].includes(field) ? Number(value) : value }));
+    } else {
         setFormData((prev) => ({ ...prev, [name]: ['advancePercentage'].includes(name) ? Number(value) : value }));
     }
   };
@@ -325,7 +359,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
 
                     {formData.items.map((item, index) => {
                         const subtotal = (item.quantity || 0) * (item.price || 0);
-                        const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === item.warehouse);
+                        const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}`);
                         const stock = inventoryItem ? inventoryItem.stock : 0;
                         
                         return (
@@ -341,22 +375,12 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                 </Select>
                             </div>
                             {/* Caliber */}
-                            <div className="col-span-6 md:col-span-1">
+                            <div className="col-span-6 md:col-span-2">
                                 <Label>Calibre</Label>
                                 <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                     <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                     <SelectContent>
                                         {calibers.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {/* Warehouse */}
-                            <div className="col-span-6 md:col-span-2">
-                                <Label>Bodega</Label>
-                                <Select required onValueChange={(value) => handleSelectChange(`items.${index}.warehouse`, value)} value={item.warehouse}>
-                                    <SelectTrigger><SelectValue placeholder="Bodega" /></SelectTrigger>
-                                    <SelectContent>
-                                        {warehouses.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>

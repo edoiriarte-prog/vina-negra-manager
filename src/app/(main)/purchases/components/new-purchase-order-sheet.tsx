@@ -53,12 +53,29 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
 
 export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, suppliers }: NewPurchaseOrderSheetProps) {
   const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData(order));
+  const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 });
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const { products, calibers, units, warehouses } = useMasterData();
+  const { products, calibers, units } = useMasterData();
 
   useEffect(() => {
     setFormData(getInitialFormData(order));
   }, [order, isOpen]);
+
+  const addItem = () => {
+    if (newItem.product && newItem.caliber && newItem.quantity > 0 && newItem.price > 0) {
+      if (order) {
+        // If editing an existing order, we pass the new item up to be added
+        onSave(formData, [{...newItem, id: `temp-${Date.now()}`}]);
+      } else {
+        // If creating a new order, we add it to local state
+        setFormData(prev => ({
+          ...prev,
+          items: [...prev.items, { ...newItem, id: `temp-${Date.now()}` }],
+        }));
+      }
+      setNewItem({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 });
+    }
+  };
   
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
     const newItems = [...formData.items];
@@ -68,11 +85,14 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const handleSelectChange = (name: keyof typeof formData | `items.${number}.${keyof OrderItem}`, value: any) => {
+  const handleSelectChange = (name: keyof typeof formData | `items.${number}.${keyof OrderItem}` | `newItem.${keyof typeof newItem}`, value: any) => {
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, value);
+    } else if (name.startsWith('newItem.')) {
+        const field = name.split('.')[1] as keyof typeof newItem;
+        setNewItem(prev => ({ ...prev, [field]: value }));
     } else {
         setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -96,6 +116,9 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, field === 'quantity' || field === 'price' ? Number(value) : value);
+    } else if (name.startsWith('newItem.')) {
+        const field = name.split('.')[1] as keyof typeof newItem;
+        setNewItem(prev => ({ ...prev, [field]: field === 'quantity' || field === 'price' ? Number(value) : value }));
     } else {
         setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -125,7 +148,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   return (
     <>
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-6xl overflow-y-auto">
+      <SheetContent className="sm:max-w-4xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -172,10 +195,9 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                 {formData.items.map((item, index) => {
                   const subtotal = (item.quantity || 0) * (item.price || 0);
                   return (
-                    <div key={item.id} className="grid grid-cols-12 gap-2 items-center mb-2 p-3 border rounded-md">
+                    <div key={item.id} className="grid grid-cols-12 gap-2 items-center mb-2 p-2 border rounded-md">
                         {/* Product */}
-                        <div className="col-span-12 sm:col-span-2">
-                             <Label>Producto</Label>
+                        <div className="col-span-3">
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.product`, value)} value={item.product}>
                                  <SelectTrigger><SelectValue placeholder="Producto" /></SelectTrigger>
                                  <SelectContent>
@@ -184,8 +206,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              </Select>
                         </div>
                         {/* Caliber */}
-                        <div className="col-span-12 sm:col-span-2">
-                             <Label>Calibre</Label>
+                        <div className="col-span-2">
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
@@ -193,24 +214,12 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                                  </SelectContent>
                              </Select>
                         </div>
-                        {/* Warehouse */}
-                        <div className="col-span-12 sm:col-span-2">
-                             <Label>Bodega</Label>
-                             <Select required onValueChange={(value) => handleSelectChange(`items.${index}.warehouse`, value)} value={item.warehouse}>
-                                 <SelectTrigger><SelectValue placeholder="Bodega" /></SelectTrigger>
-                                 <SelectContent>
-                                     {warehouses.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
-                                 </SelectContent>
-                             </Select>
-                        </div>
                         {/* Quantity */}
-                         <div className="col-span-6 sm:col-span-1">
-                             <Label>Cantidad</Label>
+                         <div className="col-span-2">
                              <Input name={`items.${index}.quantity`} type="number" value={item.quantity} onChange={handleInputChange} placeholder="Cant." required />
                         </div>
                         {/* Unit */}
-                        <div className="col-span-6 sm:col-span-1">
-                            <Label>Unidad</Label>
+                        <div className="col-span-1">
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.unit`, value)} value={item.unit}>
                                  <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
                                  <SelectContent>
@@ -219,17 +228,15 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              </Select>
                         </div>
                         {/* Price */}
-                         <div className="col-span-6 sm:col-span-2">
-                             <Label>Precio</Label>
+                         <div className="col-span-2">
                              <Input name={`items.${index}.price`} type="number" value={item.price} onChange={handleInputChange} placeholder="Precio" required />
                         </div>
                         {/* Subtotal */}
-                         <div className="col-span-6 sm:col-span-1">
-                             <Label>Subtotal</Label>
+                         <div className="col-span-1">
                              <Input value={new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(subtotal)} readOnly disabled />
                         </div>
                         {/* Remove button */}
-                        <div className='col-span-12 sm:col-span-1 self-end'>
+                        <div className='col-span-1'>
                              <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
