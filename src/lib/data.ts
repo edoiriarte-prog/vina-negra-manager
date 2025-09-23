@@ -1,3 +1,4 @@
+
 import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem, Interaction } from './types';
 
 export const contacts: Contact[] = [

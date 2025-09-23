@@ -121,7 +121,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   const addItem = () => {
     if (newItem.product && newItem.caliber && newItem.quantity > 0 && newItem.price > 0) {
        // Stock validation
-        const inventoryItem = inventory.find(i => i.caliber === `${newItem.product} - ${newItem.caliber}`);
+        const inventoryItem = inventory.find(i => i.product === newItem.product && i.caliber === newItem.caliber && i.warehouse === formData.warehouse);
         const currentStock = inventoryItem ? inventoryItem.stock : 0;
         
         if (newItem.quantity > currentStock) {
@@ -191,7 +191,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     
     // Stock validation
     for (const item of formData.items) {
-      const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}` && i.warehouse === formData.warehouse);
+      const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === formData.warehouse);
       const currentStock = inventoryItem ? inventoryItem.stock : 0;
       
       if (item.quantity > currentStock) {
@@ -380,7 +380,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
 
                     {formData.items.map((item, index) => {
                         const subtotal = (item.quantity || 0) * (item.price || 0);
-                        const inventoryItem = inventory.find(i => i.caliber === `${item.product} - ${item.caliber}` && i.warehouse === formData.warehouse);
+                        const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === formData.warehouse);
                         const stock = inventoryItem ? inventoryItem.stock : 0;
                         
                         return (
