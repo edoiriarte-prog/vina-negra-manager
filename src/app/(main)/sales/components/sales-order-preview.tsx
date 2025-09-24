@@ -255,11 +255,9 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
             <Printer className="mr-2 h-4 w-4" />
             Imprimir
           </Button>
-          <DialogClose asChild>
-            <button className={cn(buttonVariants({ variant: 'secondary' }))}>
-              Cerrar
-            </button>
-          </DialogClose>
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+            Cerrar
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
