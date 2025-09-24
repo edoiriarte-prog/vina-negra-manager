@@ -48,6 +48,9 @@ export default function SalesPage() {
 
   const printRef = useRef<HTMLDivElement>(null);
   
+  const clients = contacts.filter(c => c.type === 'client');
+  const carriers = contacts.filter(c => c.type === 'supplier');
+  
   const orderToPrint = postSaveOrderOptions || previewingOrder;
   const clientForPrint = orderToPrint ? clients.find(c => c.id === orderToPrint.clientId) : null;
   const carrierForPrint = orderToPrint ? carriers.find(s => s.id === (orderToPrint as any).carrierId) : null;
@@ -75,8 +78,6 @@ export default function SalesPage() {
     setNextLotCorrelative(maxLotNumber + 1);
   }, [salesOrders]);
   
-  const clients = contacts.filter(c => c.type === 'client');
-  const carriers = contacts.filter(c => c.type === 'supplier');
   const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, editingOrder), [purchaseOrders, salesOrders, editingOrder]);
 
   const nextOrderId = useMemo(() => {
@@ -416,3 +417,5 @@ export default function SalesPage() {
     </>
   );
 }
+
+    
