@@ -54,13 +54,13 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
         <div ref={ref} className="p-6">
         {/* Page 1: Commercial Invoice */}
         <div>
-            <div className="flex items-center justify-between mb-8">
+            <DialogHeader className="flex flex-row items-center justify-between mb-8">
               <Logo />
               <div className='text-right'>
-                <h2 className="text-2xl font-bold font-headline mb-1">ORDEN DE VENTA</h2>
+                <DialogTitle className="text-2xl font-bold font-headline mb-1">ORDEN DE VENTA</DialogTitle>
                 <p className="text-muted-foreground font-mono">{order.id}</p>
               </div>
-            </div>
+            </DialogHeader>
   
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
@@ -152,13 +152,13 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
         
         {/* Page 2: Dispatch Guide / Picking Ticket */}
         <div className="page-break" style={{breakBefore: 'page'}}>
-            <div className="flex items-center justify-between mb-8">
+            <DialogHeader className="flex flex-row items-center justify-between mb-8">
               <Logo />
               <div className='text-right'>
-                  <h2 className="text-2xl font-bold font-headline mb-1">GUÍA DE DESPACHO</h2>
+                  <DialogTitle className="text-2xl font-bold font-headline mb-1">GUÍA DE DESPACHO</DialogTitle>
                   <p className="text-muted-foreground font-mono">{order.id}</p>
               </div>
-            </div>
+            </DialogHeader>
   
           <div className="grid grid-cols-2 gap-8 mb-8">
               <div>
@@ -245,7 +245,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
         <div className="max-h-[80vh] overflow-y-auto">
           <PreviewContent ref={printRef} order={order} client={client} carrier={carrier} />
         </div>
-        <DialogFooter className="mt-0 p-6 pt-0 border-t">
+        <DialogFooter className="mt-0 p-6 pt-0 border-t sm:justify-start">
            <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Exportar a Excel
@@ -255,7 +255,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
             Imprimir
           </Button>
           <DialogClose asChild>
-            <Button type="button">Cerrar</Button>
+            <Button type="button" variant="secondary">Cerrar</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
