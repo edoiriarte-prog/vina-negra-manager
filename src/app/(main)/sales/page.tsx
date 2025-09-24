@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { SalesOrderPreview, PrintSalesOrder } from './components/sales-order-preview';
+import { SalesOrderPreview } from './components/sales-order-preview';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Printer, Download, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -390,7 +390,12 @@ export default function SalesPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Exportar a Excel
               </Button>
-              <Button variant="outline" onClick={handlePrint}>
+              <Button variant="outline" onClick={() => {
+                if (orderToPrint) {
+                  setPreviewingOrder(orderToPrint);
+                  setTimeout(handlePrint, 100);
+                }
+              }}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir O/V
               </Button>
@@ -405,17 +410,18 @@ export default function SalesPage() {
 
       {/* Hidden component for printing */}
       <div className="hidden">
-          {orderToPrint && clientForPrint && (
-            <PrintSalesOrder
-              ref={printRef}
+        {orderToPrint && (
+          <div ref={printRef}>
+            <SalesOrderPreview
               order={orderToPrint}
               client={clientForPrint}
               carrier={carrierForPrint}
+              isOpen={true} 
+              onOpenChange={() => {}} 
             />
-          )}
+          </div>
+        )}
       </div>
     </>
   );
 }
-
-    

@@ -237,6 +237,8 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
     XLSX.writeFile(workbook, `PackingList-${order.id}.xlsx`);
   };
   
+  if (!order) return null;
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl p-0">
@@ -261,9 +263,3 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
   );
 };
 SalesOrderPreview.displayName = "SalesOrderPreview";
-
-
-export const PrintSalesOrder = React.forwardRef<HTMLDivElement, { order: SalesOrder, client: Contact | null, carrier: Contact | null }>(({ order, client, carrier }, ref) => {
-    return <PreviewContent ref={ref} order={order} client={client} carrier={carrier} />;
-});
-PrintSalesOrder.displayName = "PrintSalesOrder";
