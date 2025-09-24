@@ -247,23 +247,21 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
           <PreviewContent ref={printRef} order={order} client={client} carrier={carrier} />
         </div>
         <DialogFooter className="mt-0 p-6 pt-0 border-t sm:justify-start">
-          <div>
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" />
-              Exportar a Excel
-            </Button>
-          </div>
-          <div>
-            <Button variant="outline" onClick={handlePrint}>
-              <Printer className="mr-2 h-4 w-4" />
-              Imprimir
-            </Button>
-          </div>
-          <div>
-            <Button variant="secondary" onClick={() => onOpenChange(false)}>
-              Cerrar
-            </Button>
-          </div>
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar a Excel
+          </Button>
+          <Button variant="outline" onClick={handlePrint}>
+            <Printer className="mr-2 h-4 w-4" />
+            Imprimir
+          </Button>
+          <button
+            type="button"
+            className={cn(buttonVariants({ variant: "secondary" }))}
+            onClick={() => onOpenChange(false)}
+          >
+            Cerrar
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
