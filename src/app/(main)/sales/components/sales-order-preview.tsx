@@ -246,7 +246,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
         <div className="max-h-[80vh] overflow-y-auto">
           <PreviewContent ref={printRef} order={order} client={client} carrier={carrier} />
         </div>
-        <DialogFooter className="mt-0 p-6 pt-0 border-t sm:justify-start">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-start sm:space-x-2 p-6 pt-0 border-t">
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Exportar a Excel
@@ -262,7 +262,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
           >
             Cerrar
           </button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
