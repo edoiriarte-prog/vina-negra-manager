@@ -8,8 +8,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogClose,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SalesOrder, Contact } from '@/lib/types';
 import { Logo } from '@/components/logo';
@@ -28,6 +29,7 @@ import {
     TableRow,
     TableFooter,
   } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 type SalesOrderPreviewProps = {
   order: SalesOrder;
@@ -253,12 +255,14 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
             <Printer className="mr-2 h-4 w-4" />
             Imprimir
           </Button>
-          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <DialogClose asChild>
+            <button className={cn(buttonVariants({ variant: 'secondary' }))}>
+              Cerrar
+            </button>
+          </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
 SalesOrderPreview.displayName = "SalesOrderPreview";
-
-    
