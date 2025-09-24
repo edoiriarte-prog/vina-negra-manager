@@ -8,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -254,12 +253,12 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
             <Printer className="mr-2 h-4 w-4" />
             Imprimir
           </Button>
-          <DialogClose asChild>
-            <Button type="button" variant="secondary">Cerrar</Button>
-          </DialogClose>
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cerrar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
 SalesOrderPreview.displayName = "SalesOrderPreview";
+
+    
