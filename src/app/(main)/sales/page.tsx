@@ -55,6 +55,7 @@ export default function SalesPage() {
   const clientForPrint = orderToPrint ? clients.find(c => c.id === orderToPrint.clientId) : null;
   const carrierForPrint = orderToPrint ? carriers.find(s => s.id === (orderToPrint as any).carrierId) : null;
 
+
   const handlePrint = useReactToPrint({
       content: () => printRef.current,
   });
@@ -399,10 +400,12 @@ export default function SalesPage() {
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir O/V
               </Button>
-               <Button onClick={() => setPostSaveOrderOptions(null)}>
-                <X className="mr-2 h-4 w-4" />
-                Salir
-              </Button>
+               <AlertDialogCancel asChild>
+                <Button>
+                    <X className="mr-2 h-4 w-4" />
+                    Salir
+                </Button>
+               </AlertDialogCancel>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -425,3 +428,5 @@ export default function SalesPage() {
     </>
   );
 }
+
+    
