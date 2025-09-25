@@ -76,6 +76,7 @@ export function NewFinancialMovementSheet({
   const [batchMovements, setBatchMovements] = useState<BatchMovement[]>([]);
   const { toast } = useToast();
   const { bankAccounts, products } = useMasterData();
+  const [pendingBalance, setPendingBalance] = useState<number | null>(null);
 
   useEffect(() => {
     if (movement) {
@@ -100,6 +101,7 @@ export function NewFinancialMovementSheet({
       setAssociationType('document');
       setIsBatchMode(false);
       setBatchMovements([]);
+      setPendingBalance(null);
     }
   }, [movement, isOpen]);
   
@@ -109,6 +111,7 @@ export function NewFinancialMovementSheet({
       } else {
           setAssociationType('document');
       }
+      setPendingBalance(null);
   }, [isBatchMode]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,12 +172,12 @@ export function NewFinancialMovementSheet({
         }
     }
 
+    setPendingBalance(orderAmount);
     setFormData(prev => ({ 
         ...prev, 
         relatedDocument: { type: relatedOrderType, id: orderId },
         contactId: contactId,
-        amount: orderAmount > 0 ? orderAmount : 0,
-        description: newDescription,
+        amount: 0, // No longer auto-fill amount
         internalConcept: undefined,
         productId: undefined,
     }));
@@ -310,6 +313,7 @@ export function NewFinancialMovementSheet({
           productId: undefined,
           description: '',
       }));
+      setPendingBalance(null);
   }
 
   return (
@@ -537,6 +541,7 @@ export function NewFinancialMovementSheet({
                                 onValueChange={(value: 'OV' | 'OC' | 'OS' | '') => {
                                     setRelatedOrderType(value);
                                     setFormData(prev => ({...prev, relatedDocument: undefined, contactId: undefined}));
+                                    setPendingBalance(null);
                                 }} 
                                 value={relatedOrderType}
                             >
@@ -556,6 +561,11 @@ export function NewFinancialMovementSheet({
                                 </SelectContent>
                             </Select>
                         </div>
+                    )}
+                    {pendingBalance !== null && (
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        Saldo Pendiente del Documento: <span className="font-medium text-foreground">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(pendingBalance)}</span>
+                      </div>
                     )}
                     {associationType === 'contact' && (
                         <Select
