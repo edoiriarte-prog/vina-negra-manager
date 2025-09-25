@@ -48,7 +48,7 @@ export const getColumns = ({ onEdit, onDelete, bankAccounts }: GetColumnsProps):
   },
   {
     accessorKey: 'description',
-    header: 'Descripción',
+    header: 'Centro de Costo',
     cell: ({ row }) => <div className="max-w-xs truncate">{row.getValue('description')}</div>,
     filterFn: (row, id, value) => {
         return (row.getValue(id) as string).toLowerCase().includes(value.toLowerCase());

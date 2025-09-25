@@ -59,6 +59,7 @@ const getInitialFormData = (): Omit<FinancialMovement, 'id'> => ({
     contactId: undefined,
     relatedDocument: undefined,
     internalConcept: undefined,
+    productId: undefined,
     reference: '',
 });
 
@@ -363,7 +364,7 @@ export function NewFinancialMovementSheet({
                                 <TableHead>Monto</TableHead>
                                 <TableHead>Forma Pago</TableHead>
                                 <TableHead>Cuenta</TableHead>
-                                <TableHead>Descripción</TableHead>
+                                <TableHead>Centro de Costo</TableHead>
                                 <TableHead></TableHead>
                             </TableRow>
                         </TableHeader>
@@ -611,7 +612,7 @@ export function NewFinancialMovementSheet({
 
                 <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="description" className="text-right pt-2">
-                    Descripción
+                    Centro de Costo
                 </Label>
                 <div className='col-span-3'>
                     <Input id="description" name="description" value={formData.description} onChange={handleInputChange} className="w-full" required />
