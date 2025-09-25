@@ -352,8 +352,33 @@ export function NewFinancialMovementSheet({
                         <TableBody>
                             {batchMovements.map(bm => (
                                 <TableRow key={bm.batchId}>
-                                    <TableCell className='min-w-[150px]'>
-                                        <Input type="date" value={bm.date} onChange={(e) => handleBatchChange(bm.batchId, 'date', e.target.value)} />
+                                    <TableCell className='min-w-[180px]'>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !bm.date && "text-muted-foreground"
+                                                )}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {bm.date ? format(parseISO(bm.date), "PPP", { locale: es }) : <span>Seleccione</span>}
+                                            </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0">
+                                            <Calendar
+                                                mode="single"
+                                                selected={bm.date ? parseISO(bm.date) : undefined}
+                                                onSelect={(date) => {
+                                                    if (date) {
+                                                        handleBatchChange(bm.batchId, 'date', format(date, 'yyyy-MM-dd'))
+                                                    }
+                                                }}
+                                                initialFocus
+                                            />
+                                            </PopoverContent>
+                                        </Popover>
                                     </TableCell>
                                     <TableCell className='min-w-[150px]'>
                                         <Input type="number" placeholder="$" value={bm.amount || ''} onChange={(e) => handleBatchChange(bm.batchId, 'amount', Number(e.target.value))} />
@@ -581,4 +606,5 @@ export function NewFinancialMovementSheet({
   );
 }
 
+    
     
