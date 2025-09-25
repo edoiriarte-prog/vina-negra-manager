@@ -28,11 +28,13 @@ import { Input } from '@/components/ui/input';
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  filterPlaceholder?: string;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  filterPlaceholder = "Filtrar"
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([
       { id: 'date', desc: true }
@@ -58,7 +60,7 @@ export function DataTable<TData, TValue>({
     <div>
       <div className="flex items-center py-4 gap-4">
         <Input
-          placeholder="Filtrar por centro de costo..."
+          placeholder={filterPlaceholder}
           value={(table.getColumn('description')?.getFilterValue() as string) ?? ''}
           onChange={(event) =>
             table.getColumn('description')?.setFilterValue(event.target.value)

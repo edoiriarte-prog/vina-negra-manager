@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -20,10 +21,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import KpiCard from '../dashboard/components/kpi-card';
 
 
 export default function FinancialsPage() {
@@ -110,39 +113,88 @@ export default function FinancialsPage() {
     }));
   }, [financialMovements, contacts]);
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, bankAccounts });
+  const incomeData = useMemo(() => dataWithContactNames.filter(m => m.type === 'income'), [dataWithContactNames]);
+  const expenseData = useMemo(() => dataWithContactNames.filter(m => m.type === 'expense'), [dataWithContactNames]);
 
-  const renderContent = () => {
-    if (!isClient) {
-      return (
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      )
-    }
-    return <DataTable columns={columns} data={dataWithContactNames} />;
-  }
+  const totalIncome = useMemo(() => incomeData.reduce((sum, m) => sum + m.amount, 0), [incomeData]);
+  const totalExpense = useMemo(() => expenseData.reduce((sum, m) => sum + m.amount, 0), [expenseData]);
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('es-CL', {
+      style: 'currency',
+      currency: 'CLP',
+      maximumFractionDigits: 0,
+    }).format(value);
+
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, bankAccounts });
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="font-headline text-2xl">Tesorería y Movimientos Bancarios</CardTitle>
-              <CardDescription>Registra todos los ingresos y egresos de la empresa.</CardDescription>
+              <h1 className="font-headline text-3xl">Tesorería y Movimientos Bancarios</h1>
+              <p className="text-muted-foreground">Registra todos los ingresos y egresos de la empresa.</p>
             </div>
             <Button onClick={openNewMovementSheet}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Nuevo Movimiento
             </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {renderContent()}
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+            {isClient ? (
+                <>
+                <KpiCard
+                    title="Total Ingresos"
+                    value={formatCurrency(totalIncome)}
+                    icon={<ArrowUpCircle className="h-5 w-5 text-green-500" />}
+                    description="Suma de todos los movimientos de ingreso registrados."
+                />
+                <KpiCard
+                    title="Total Egresos"
+                    value={formatCurrency(totalExpense)}
+                    icon={<ArrowDownCircle className="h-5 w-5 text-red-500" />}
+                    description="Suma de todos los movimientos de egreso registrados."
+                />
+                </>
+            ) : (
+                <>
+                 <Skeleton className="h-32 w-full" />
+                 <Skeleton className="h-32 w-full" />
+                </>
+            )}
+        </div>
+
+        <Tabs defaultValue="income">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="income">Ingresos</TabsTrigger>
+            <TabsTrigger value="expenses">Egresos</TabsTrigger>
+          </TabsList>
+          <TabsContent value="income">
+            <Card>
+              <CardHeader>
+                <CardTitle>Ingresos Registrados</CardTitle>
+                <CardDescription>Todos los movimientos de entrada de dinero.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isClient ? <DataTable columns={columns} data={incomeData} filterPlaceholder="Filtrar por centro de costo..." /> : <Skeleton className="h-64 w-full" />}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="expenses">
+            <Card>
+              <CardHeader>
+                <CardTitle>Egresos Registrados</CardTitle>
+                <CardDescription>Todos los movimientos de salida de dinero.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isClient ? <DataTable columns={columns} data={expenseData} filterPlaceholder="Filtrar por centro de costo..." /> : <Skeleton className="h-64 w-full" />}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
       
       <NewFinancialMovementSheet 
         isOpen={isSheetOpen}
@@ -174,5 +226,3 @@ export default function FinancialsPage() {
     </>
   );
 }
-
-    
