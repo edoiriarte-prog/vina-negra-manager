@@ -33,12 +33,11 @@ type SalesOrderPreviewProps = {
   carrier: Contact | null;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onPrint: () => void;
   onExport: () => void;
 };
 
 
-export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; client: Contact | null; carrier: Contact | null }>(({ order, client, carrier }, ref) => {
+const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; client: Contact | null; carrier: Contact | null }>(({ order, client, carrier }, ref) => {
     const totalPackaging = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const advanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount * ((order.advancePercentage || 0) / 100) : 0;
     const balanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount - advanceAmount : 0;
@@ -211,8 +210,32 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
 });
 PreviewContent.displayName = "PreviewContent";
 
-export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange, onPrint, onExport }: SalesOrderPreviewProps) {
-  
+export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange, onExport }: SalesOrderPreviewProps) {
+  const contentRef = React.useRef<HTMLDivElement>(null);
+
+  const handlePrint = () => {
+    const content = contentRef.current;
+    if (!content) return;
+    const printWindow = window.open('', '', 'height=800,width=800');
+    if (printWindow) {
+      printWindow.document.write('<html><head><title>Imprimir Orden de Venta</title>');
+      const styles = Array.from(document.styleSheets)
+        .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
+        .join('');
+      printWindow.document.write(styles);
+      printWindow.document.write('<style>body { -webkit-print-color-adjust: exact; } .page-break { page-break-before: always; }</style>');
+      printWindow.document.write('</head><body>');
+      printWindow.document.write(content.innerHTML);
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+      }, 250);
+    }
+  }
+
   if (!order) return null;
 
   return (
@@ -221,30 +244,30 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
         <DialogHeader className="p-6 pb-0">
            <DialogTitle>Previsualización de Orden de Venta: {order.id}</DialogTitle>
         </DialogHeader>
-        <div className="max-h-[70vh] overflow-y-auto px-6">
-            <PreviewContent order={order} client={client} carrier={carrier} />
+        <div className="max-h-[70vh] overflow-y-auto px-6" id="print-area">
+            <PreviewContent ref={contentRef} order={order} client={client} carrier={carrier} />
         </div>
-        <div className="p-6 pt-4 border-t bg-background flex flex-col-reverse sm:flex-row sm:justify-start sm:space-x-2">
-            <Button
-              variant="outline"
+        <div className="p-6 pt-4 border-t bg-background flex flex-col-reverse sm:flex-row sm:justify-start gap-2">
+            <button
               onClick={onExport}
+              className={cn(buttonVariants({ variant: "outline" }))}
             >
               <Download className="mr-2 h-4 w-4" />
               Exportar a Excel
-            </Button>
-            <Button
-              variant="outline"
-              onClick={onPrint}
+            </button>
+            <button
+              onClick={handlePrint}
+              className={cn(buttonVariants({ variant: "outline" }))}
             >
               <Printer className="mr-2 h-4 w-4" />
               Imprimir
-            </Button>
-             <Button
-              variant="secondary"
+            </button>
+            <button
               onClick={() => onOpenChange(false)}
+              className={cn(buttonVariants({ variant: "secondary" }))}
             >
               Cerrar
-            </Button>
+            </button>
           </div>
       </DialogContent>
     </Dialog>

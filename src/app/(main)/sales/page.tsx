@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory } from '@/lib/data';
 import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem } from '@/lib/types';
@@ -20,11 +20,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { SalesOrderPreview, PreviewContent } from './components/sales-order-preview';
+import { SalesOrderPreview } from './components/sales-order-preview';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Printer, Download, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useReactToPrint } from 'react-to-print';
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
 
@@ -41,37 +40,14 @@ export default function SalesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
-  const [orderToPrint, setOrderToPrint] = useState<SalesOrder | null>(null);
-
+  
   const { toast } = useToast();
 
   const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
-
-  const printRef = useRef<HTMLDivElement>(null);
   
   const clients = contacts.filter(c => c.type === 'client');
   const carriers = contacts.filter(c => c.type === 'supplier');
   
-  const clientForPrint = orderToPrint ? clients.find(c => c.id === orderToPrint.clientId) : null;
-  const carrierForPrint = orderToPrint ? carriers.find(s => s.id === (orderToPrint as any).carrierId) : null;
-
-  const handlePrint = useReactToPrint({
-    content: () => printRef.current,
-    onAfterPrint: () => setOrderToPrint(null),
-  });
-  
-  const handlePrintRequest = (order: SalesOrder) => {
-    setPreviewingOrder(null);
-    setPostSaveOrderOptions(null);
-    setOrderToPrint(order);
-  };
-  
-  useEffect(() => {
-    if (orderToPrint && printRef.current) {
-      handlePrint();
-    }
-  }, [orderToPrint, handlePrint]);
-
 
   useEffect(() => {
     setIsClient(true);
@@ -387,7 +363,6 @@ export default function SalesPage() {
           carrier={carriers.find(s => s.id === (previewingOrder as any).carrierId) || null}
           isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
-          onPrint={() => handlePrintRequest(previewingOrder)}
           onExport={() => handleExport(previewingOrder)}
         />
       )}
@@ -409,7 +384,10 @@ export default function SalesPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Exportar a Excel
               </Button>
-              <Button variant="outline" onClick={() => handlePrintRequest(postSaveOrderOptions)}>
+              <Button variant="outline" onClick={() => {
+                 setPreviewingOrder(postSaveOrderOptions);
+                 setPostSaveOrderOptions(null);
+              }}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir O/V
               </Button>
@@ -423,15 +401,6 @@ export default function SalesPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
-
-      {/* Hidden component for printing */}
-      <div className="hidden">
-        {orderToPrint && (
-          <div ref={printRef}>
-            <PreviewContent order={orderToPrint} client={clientForPrint} carrier={carrierForPrint} />
-          </div>
-        )}
-      </div>
     </>
   );
 }
