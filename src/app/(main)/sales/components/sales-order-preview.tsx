@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import { SalesOrder, Contact } from '@/lib/types';
 import { Logo } from '@/components/logo';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Printer, Download } from 'lucide-react';
+import { Printer, Download, X } from 'lucide-react';
 import Barcode from 'react-barcode';
 import {
     Table,
@@ -170,11 +170,11 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
               </div>
               </div>
                <div className='text-right'>
-                  <h3 className="font-semibold mb-2">Viña Negra SpA</h3>
+                  <h3 className="font-semibold mb-2">VIÑA NEGRA SpA</h3>
                   <div className="text-sm text-muted-foreground">
-                      <p>RUT: 76.xxx.xxx-x</p>
-                      <p>Fundo Viña Negra</p>
-                      <p>Santa Cruz, Chile</p>
+                      <p>RUT: 76.XXX.XXX-X</p>
+                      <p>TULAHUEN S/N</p>
+                      <p>MONTE PATRIA CHILE</p>
                   </div>
               </div>
           </div>
@@ -219,20 +219,26 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
     const printWindow = window.open('', '', 'height=800,width=800');
     if (printWindow) {
       printWindow.document.write('<html><head><title>Imprimir Orden de Venta</title>');
+      
+      // Get all stylesheets
       const styles = Array.from(document.styleSheets)
         .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
         .join('');
       printWindow.document.write(styles);
-      printWindow.document.write('<style>body { -webkit-print-color-adjust: exact; } .page-break { page-break-before: always; }</style>');
+
+      // Add inline styles for printing
+      printWindow.document.write('<style>body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .page-break { page-break-before: always; }</style>');
+      
       printWindow.document.write('</head><body>');
       printWindow.document.write(content.innerHTML);
       printWindow.document.write('</body></html>');
       printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-          printWindow.print();
-          printWindow.close();
-      }, 250);
+      
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      };
     }
   }
 
@@ -244,7 +250,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
         <DialogHeader className="p-6 pb-0">
            <DialogTitle>Previsualización de Orden de Venta: {order.id}</DialogTitle>
         </DialogHeader>
-        <div className="max-h-[70vh] overflow-y-auto px-6" id="print-area">
+        <div className="max-h-[70vh] overflow-y-auto" id="print-area">
             <PreviewContent ref={contentRef} order={order} client={client} carrier={carrier} />
         </div>
         <div className="p-6 pt-4 border-t bg-background flex flex-col-reverse sm:flex-row sm:justify-start gap-2">
@@ -257,7 +263,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
             </button>
             <button
               onClick={handlePrint}
-              className={cn(buttonVariants({ variant: "outline" }))}
+              className={cn(buttonVariants())}
             >
               <Printer className="mr-2 h-4 w-4" />
               Imprimir
