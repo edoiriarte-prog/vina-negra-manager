@@ -247,14 +247,14 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
           <PreviewContent ref={printRef} order={order} client={client} carrier={carrier} />
         </div>
         <div className="flex flex-col-reverse sm:flex-row sm:justify-start sm:space-x-2 p-6 pt-0 border-t">
-          <Button variant="outline" onClick={handleExport}>
+          <button type="button" className={cn(buttonVariants({ variant: "outline" }))} onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Exportar a Excel
-          </Button>
-          <Button variant="outline" onClick={handlePrint}>
+          </button>
+          <button type="button" className={cn(buttonVariants({ variant: "outline" }))} onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
             Imprimir
-          </Button>
+          </button>
           <button
             type="button"
             className={cn(buttonVariants({ variant: "secondary" }))}
