@@ -21,9 +21,11 @@ import {
 } from "@/components/ui/alert-dialog"
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 
 
 export default function PurchasesPage() {
@@ -45,19 +47,11 @@ export default function PurchasesPage() {
 
   const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>, newItems: OrderItem[] = []) => {
     let orderToSave: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>;
-
-    const allItems = [...order.items, ...newItems];
     
-    // Remove duplicates, prioritizing the last one added (which happens with matrix)
-    const uniqueItems = allItems.reduceRight((acc, item) => {
-        const key = `${item.product}-${item.caliber}`;
-        if (!acc.find(i => `${i.product}-${i.caliber}` === key)) {
-            acc.unshift(item);
-        }
-        return acc;
-    }, [] as OrderItem[]);
+    // Combine existing items with new items from matrix dialog
+    const allItems = [...order.items, ...newItems];
 
-    orderToSave = { ...order, items: uniqueItems };
+    orderToSave = { ...order, items: allItems };
     
     const totalAmount = orderToSave.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
     const totalKilos = orderToSave.items.reduce((sum, item) => {
@@ -133,6 +127,48 @@ export default function PurchasesPage() {
     setIsSheetOpen(true);
   }
 
+  const handleExportAll = () => {
+    if (purchaseOrders.length === 0) {
+        toast({
+            variant: "destructive",
+            title: "Sin Órdenes",
+            description: "No hay órdenes de compra para exportar."
+        });
+        return;
+    }
+    
+    const allItems: any[] = [];
+    purchaseOrders.forEach(order => {
+        const supplier = suppliers.find(s => s.id === order.supplierId);
+        order.items.forEach(item => {
+            allItems.push({
+                'O/C': order.id,
+                'Fecha': format(new Date(order.date), "dd-MM-yyyy"),
+                'Proveedor': supplier?.name,
+                'RUT Proveedor': supplier?.rut,
+                'Estado': order.status,
+                'Bodega': order.warehouse,
+                'Item ID': item.id,
+                'Producto': item.product,
+                'Calibre': item.caliber,
+                'Cantidad': item.quantity,
+                'Unidad': item.unit,
+                'Precio Unitario': item.price,
+                'Subtotal': item.quantity * item.price,
+                'Tipo Envase': item.packagingType,
+                'Cant. Envase': item.packagingQuantity,
+                'Lote': item.lotNumber,
+            });
+        });
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(allItems);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Ordenes de Compra');
+    XLSX.writeFile(workbook, `Ordenes_de_Compra.xlsx`);
+    toast({ title: 'Exportación Exitosa', description: 'Se han exportado todas las órdenes de compra.' });
+  }
+
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreview, suppliers });
 
   const renderContent = () => {
@@ -156,10 +192,16 @@ export default function PurchasesPage() {
                 <CardTitle className="font-headline text-2xl">Gestión de Compras (O/C)</CardTitle>
                 <CardDescription>Registra todas las adquisiciones de productos.</CardDescription>
             </div>
-            <Button onClick={openNewOrderSheet}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Nueva Compra
-            </Button>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={handleExportAll}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar a Excel
+                </Button>
+                <Button onClick={openNewOrderSheet}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Nueva Compra
+                </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
