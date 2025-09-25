@@ -44,21 +44,32 @@ export default function FinancialsPage() {
     setIsClient(true);
   }, []);
 
-  const handleSaveMovement = (movement: FinancialMovement | Omit<FinancialMovement, 'id'>) => {
-    if ('id' in movement) {
+  const handleSaveMovement = (data: FinancialMovement | Omit<FinancialMovement, 'id'> | Omit<FinancialMovement, 'id'>[]) => {
+    const lastId = financialMovements.reduce((max, m) => Math.max(max, parseInt(m.id.split('-')[1])), 0);
+    let nextId = lastId + 1;
+
+    if (Array.isArray(data)) {
+        const newMovements: FinancialMovement[] = data.map((movement, index) => ({
+            ...movement,
+            id: `M-${nextId + index}`,
+        }));
+        setFinancialMovements(prev => [...prev, ...newMovements]);
+        toast({ title: `${newMovements.length} Movimientos Creados` });
+
+    } else if ('id' in data) {
       // Update
-      setFinancialMovements(prev => prev.map(m => m.id === movement.id ? movement : m));
+      setFinancialMovements(prev => prev.map(m => m.id === data.id ? data : m));
       toast({ title: "Movimiento Actualizado" });
     } else {
-      // Add
-      const lastId = financialMovements.reduce((max, m) => Math.max(max, parseInt(m.id.split('-')[1])), 0);
+      // Add single
       const newMovement = {
-        ...movement,
-        id: `M-${lastId + 1}`,
+        ...data,
+        id: `M-${nextId}`,
       };
       setFinancialMovements(prev => [...prev, newMovement]);
       toast({ title: "Movimiento Creado" });
     }
+
     setIsSheetOpen(false);
     setEditingMovement(null);
   };
@@ -163,3 +174,5 @@ export default function FinancialsPage() {
     </>
   );
 }
+
+    
