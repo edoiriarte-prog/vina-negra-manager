@@ -22,12 +22,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact } from '@/lib/types';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { suggestTransactionDescription } from '@/ai/flows/suggest-transaction-descriptions';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useMasterData } from '@/hooks/use-master-data';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { es } from 'date-fns/locale';
 
 type NewFinancialMovementSheetProps = {
   isOpen: boolean;
@@ -252,10 +256,35 @@ export function NewFinancialMovementSheet({
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="date" className="text-right">
-                Fecha
-              </Label>
-              <Input id="date" name="date" type="date" value={formData.date} onChange={handleInputChange} className="col-span-3" required />
+                <Label htmlFor="date" className="text-right">
+                    Fecha
+                </Label>
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        variant={"outline"}
+                        className={cn(
+                        "col-span-3 justify-start text-left font-normal",
+                        !formData.date && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.date ? format(parseISO(formData.date), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                    <Calendar
+                        mode="single"
+                        selected={formData.date ? parseISO(formData.date) : undefined}
+                        onSelect={(date) => {
+                            if (date) {
+                                handleSelectChange('date', format(date, 'yyyy-MM-dd'))
+                            }
+                        }}
+                        initialFocus
+                    />
+                    </PopoverContent>
+                </Popover>
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
