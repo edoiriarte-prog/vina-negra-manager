@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SalesOrder, Contact } from '@/lib/types';
 import { Logo } from '@/components/logo';
@@ -222,32 +222,29 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
            <DialogTitle>Previsualización de Orden de Venta: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto px-6">
-          <PreviewContent order={order} client={client} carrier={carrier} ref={() => {}}/>
+            <PreviewContent order={order} client={client} carrier={carrier} />
         </div>
         <div className="p-6 pt-4 border-t bg-background flex flex-col-reverse sm:flex-row sm:justify-start sm:space-x-2">
-            <button
-              type="button"
-              className={cn(buttonVariants({ variant: "outline" }))}
+            <Button
+              variant="outline"
               onClick={onExport}
             >
               <Download className="mr-2 h-4 w-4" />
               Exportar a Excel
-            </button>
-            <button
-              type="button"
-              className={cn(buttonVariants({ variant: "outline" }))}
+            </Button>
+            <Button
+              variant="outline"
               onClick={onPrint}
             >
               <Printer className="mr-2 h-4 w-4" />
               Imprimir
-            </button>
-             <button
-              type="button"
-              className={cn(buttonVariants({ variant: "secondary" }))}
+            </Button>
+             <Button
+              variant="secondary"
               onClick={() => onOpenChange(false)}
             >
               Cerrar
-            </button>
+            </Button>
           </div>
       </DialogContent>
     </Dialog>

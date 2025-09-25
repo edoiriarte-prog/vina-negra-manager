@@ -55,14 +55,19 @@ export default function SalesPage() {
   const clientForPrint = orderToPrint ? clients.find(c => c.id === orderToPrint.clientId) : null;
   const carrierForPrint = orderToPrint ? carriers.find(s => s.id === (orderToPrint as any).carrierId) : null;
 
-
   const handlePrint = useReactToPrint({
-      content: () => printRef.current,
-      onAfterPrint: () => setOrderToPrint(null),
+    content: () => printRef.current,
+    onAfterPrint: () => setOrderToPrint(null),
   });
   
+  const handlePrintRequest = (order: SalesOrder) => {
+    setPreviewingOrder(null);
+    setPostSaveOrderOptions(null);
+    setOrderToPrint(order);
+  };
+  
   useEffect(() => {
-    if (orderToPrint) {
+    if (orderToPrint && printRef.current) {
       handlePrint();
     }
   }, [orderToPrint, handlePrint]);
@@ -382,7 +387,7 @@ export default function SalesPage() {
           carrier={carriers.find(s => s.id === (previewingOrder as any).carrierId) || null}
           isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
-          onPrint={() => setOrderToPrint(previewingOrder)}
+          onPrint={() => handlePrintRequest(previewingOrder)}
           onExport={() => handleExport(previewingOrder)}
         />
       )}
@@ -404,10 +409,7 @@ export default function SalesPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Exportar a Excel
               </Button>
-              <Button variant="outline" onClick={() => {
-                setOrderToPrint(postSaveOrderOptions);
-                setPostSaveOrderOptions(null);
-              }}>
+              <Button variant="outline" onClick={() => handlePrintRequest(postSaveOrderOptions)}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir O/V
               </Button>
@@ -423,13 +425,13 @@ export default function SalesPage() {
       )}
 
       {/* Hidden component for printing */}
-      <div className="hidden print:block">
+      <div className="hidden">
         {orderToPrint && (
-          <PreviewContent ref={printRef} order={orderToPrint} client={clientForPrint} carrier={carrierForPrint} />
+          <div ref={printRef}>
+            <PreviewContent order={orderToPrint} client={clientForPrint} carrier={carrierForPrint} />
+          </div>
         )}
       </div>
     </>
   );
 }
-
-    
