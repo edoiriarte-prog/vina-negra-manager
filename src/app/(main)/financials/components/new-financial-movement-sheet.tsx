@@ -615,7 +615,20 @@ export function NewFinancialMovementSheet({
                     Centro de Costo
                 </Label>
                 <div className='col-span-3'>
-                    <Input id="description" name="description" value={formData.description} onChange={handleInputChange} className="w-full" required />
+                    <Select
+                        onValueChange={(value) => handleSelectChange('description', value)}
+                        value={formData.description}
+                        required
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Seleccione un producto como centro de costo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {products.map(p => (
+                                <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Button type="button" size="sm" variant="outline" className="mt-2" onClick={handleSuggestDescription} disabled={isSuggesting}>
                         {isSuggesting ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Sparkles className='mr-2 h-4 w-4'/>}
                         Sugerir con IA
@@ -644,3 +657,5 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
+
+    
