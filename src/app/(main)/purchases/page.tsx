@@ -43,17 +43,21 @@ export default function PurchasesPage() {
   
   const suppliers = contacts.filter(c => c.type === 'supplier');
 
-  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
-    let orderToSave: PurchaseOrder | Omit<PurchaseOrder, 'id'>;
+  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>, newItems: OrderItem[] = []) => {
+    let orderToSave: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>;
 
-    if ('id' in order) {
-        const updatedItems = [...order.items, ...newItems].filter((item, index, self) =>
-            index === self.findIndex((t) => t.product === item.product && t.caliber === item.caliber)
-        );
-        orderToSave = { ...order, items: updatedItems };
-    } else {
-        orderToSave = { ...order, items: newItems };
-    }
+    const allItems = [...order.items, ...newItems];
+    
+    // Remove duplicates, prioritizing the last one added (which happens with matrix)
+    const uniqueItems = allItems.reduceRight((acc, item) => {
+        const key = `${item.product}-${item.caliber}`;
+        if (!acc.find(i => `${i.product}-${i.caliber}` === key)) {
+            acc.unshift(item);
+        }
+        return acc;
+    }, [] as OrderItem[]);
+
+    orderToSave = { ...order, items: uniqueItems };
     
     const totalAmount = orderToSave.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
     const totalKilos = orderToSave.items.reduce((sum, item) => {
@@ -63,13 +67,13 @@ export default function PurchasesPage() {
         return sum;
     }, 0);
 
-    orderToSave = { ...orderToSave, totalAmount, totalKilos };
+    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id'> = { ...orderToSave, totalAmount, totalKilos };
 
 
-    if ('id' in orderToSave) {
+    if ('id' in finalOrderData) {
       // Update
-      setPurchaseOrders(prev => prev.map(o => o.id === orderToSave.id ? orderToSave as PurchaseOrder : o));
-      toast({ title: 'Orden Actualizada', description: `La orden ${orderToSave.id} ha sido actualizada.` });
+      setPurchaseOrders(prev => prev.map(o => o.id === (finalOrderData as PurchaseOrder).id ? finalOrderData as PurchaseOrder : o));
+      toast({ title: 'Orden Actualizada', description: `La orden ${finalOrderData.id} ha sido actualizada.` });
     } else {
       // Add
       const sortedOrders = [...purchaseOrders].sort((a,b) => {
@@ -79,7 +83,7 @@ export default function PurchasesPage() {
       });
       const lastId = sortedOrders.length > 0 ? parseInt(sortedOrders[sortedOrders.length - 1].id.split('-')[1]) : 1000;
       const newOrder = {
-        ...orderToSave,
+        ...(finalOrderData as Omit<PurchaseOrder, 'id'>),
         id: `OC-${lastId + 1}`,
       };
       setPurchaseOrders(prev => [...prev, newOrder]);
