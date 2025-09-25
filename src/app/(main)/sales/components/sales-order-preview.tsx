@@ -7,9 +7,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SalesOrder, Contact } from '@/lib/types';
 import { Logo } from '@/components/logo';
@@ -17,8 +16,6 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Printer, Download } from 'lucide-react';
 import Barcode from 'react-barcode';
-import * as XLSX from 'xlsx';
-import { useReactToPrint } from 'react-to-print';
 import {
     Table,
     TableBody,
@@ -36,9 +33,12 @@ type SalesOrderPreviewProps = {
   carrier: Contact | null;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  onPrint: () => void;
+  onExport: () => void;
 };
 
-const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; client: Contact | null; carrier: Contact | null }>(({ order, client, carrier }, ref) => {
+
+export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; client: Contact | null; carrier: Contact | null }>(({ order, client, carrier }, ref) => {
     const totalPackaging = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const advanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount * ((order.advancePercentage || 0) / 100) : 0;
     const balanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount - advanceAmount : 0;
@@ -54,13 +54,13 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
         <div ref={ref} className="p-6">
         {/* Page 1: Commercial Invoice */}
         <div>
-            <DialogHeader className="flex flex-row items-center justify-between mb-8">
+            <div className="flex flex-row items-center justify-between mb-8">
               <Logo />
               <div className='text-right'>
-                <DialogTitle className="text-2xl font-bold font-headline mb-1">ORDEN DE VENTA</DialogTitle>
+                <h2 className="text-2xl font-bold font-headline mb-1">ORDEN DE VENTA</h2>
                 <p className="text-muted-foreground font-mono">{order.id}</p>
               </div>
-            </DialogHeader>
+            </div>
   
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
@@ -152,13 +152,13 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
         
         {/* Page 2: Dispatch Guide / Picking Ticket */}
         <div className="page-break" style={{breakBefore: 'page'}}>
-            <DialogHeader className="flex flex-row items-center justify-between mb-8">
+            <div className="flex flex-row items-center justify-between mb-8">
               <Logo />
               <div className='text-right'>
-                  <DialogTitle className="text-2xl font-bold font-headline mb-1">GUÍA DE DESPACHO</DialogTitle>
+                  <h2 className="text-2xl font-bold font-headline mb-1">GUÍA DE DESPACHO</h2>
                   <p className="text-muted-foreground font-mono">{order.id}</p>
               </div>
-            </DialogHeader>
+            </div>
   
           <div className="grid grid-cols-2 gap-8 mb-8">
               <div>
@@ -211,46 +211,24 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
 });
 PreviewContent.displayName = "PreviewContent";
 
-export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange }: SalesOrderPreviewProps) {
-  
-  const printRef = React.useRef<HTMLDivElement>(null);
-  const handlePrint = useReactToPrint({
-      content: () => printRef.current,
-  });
-
-  const handleExport = () => {
-    const dataForSheet = order.items.map(item => ({
-      'O/V': order.id,
-      'Fecha': format(parseISO(order.date), "dd-MM-yyyy"),
-      'Cliente': client?.name,
-      'Producto': item.product,
-      'Calibre': item.caliber,
-      'Tipo Envase': item.packagingType,
-      'Cant. Envase': item.packagingQuantity,
-      'Cantidad (kg)': item.quantity,
-      'Lote': item.lotNumber,
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Packing List');
-    XLSX.writeFile(workbook, `PackingList-${order.id}.xlsx`);
-  };
+export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange, onPrint, onExport }: SalesOrderPreviewProps) {
   
   if (!order) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl p-0">
-        <div className="max-h-[80vh] overflow-y-auto">
-          <PreviewContent ref={printRef} order={order} client={client} carrier={carrier} />
+        <DialogHeader className="p-6 pb-0">
+           <DialogTitle>Previsualización de Orden de Venta: {order.id}</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[70vh] overflow-y-auto px-6">
+          <PreviewContent order={order} client={client} carrier={carrier} ref={() => {}}/>
         </div>
-        <DialogFooter className="p-6 pt-0 border-t">
-          <div className="flex flex-col-reverse sm:flex-row sm:justify-start sm:space-x-2">
+        <div className="p-6 pt-4 border-t bg-background flex flex-col-reverse sm:flex-row sm:justify-start sm:space-x-2">
             <button
               type="button"
               className={cn(buttonVariants({ variant: "outline" }))}
-              onClick={handleExport}
+              onClick={onExport}
             >
               <Download className="mr-2 h-4 w-4" />
               Exportar a Excel
@@ -258,7 +236,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
             <button
               type="button"
               className={cn(buttonVariants({ variant: "outline" }))}
-              onClick={handlePrint}
+              onClick={onPrint}
             >
               <Printer className="mr-2 h-4 w-4" />
               Imprimir
@@ -271,7 +249,6 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
               Cerrar
             </button>
           </div>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
