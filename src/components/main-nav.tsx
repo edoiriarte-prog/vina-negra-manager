@@ -14,6 +14,7 @@ import {
   BarChart,
   HelpCircle,
   FileSliders,
+  Settings,
 } from "lucide-react"
 
 import {
@@ -33,6 +34,7 @@ const menuItems = [
   { href: "/inventory-adjustments", label: "Ajustes de Inventario", icon: FileSliders },
   { href: "/financials", label: "Tesorería", icon: Landmark },
   { href: "/reports", label: "Informes", icon: BarChart },
+  { href: "/settings", label: "Maestros", icon: Settings },
   { href: "/help", label: "Ayuda", icon: HelpCircle },
 ]
 
