@@ -8,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -246,23 +245,33 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
         <div className="max-h-[80vh] overflow-y-auto">
           <PreviewContent ref={printRef} order={order} client={client} carrier={carrier} />
         </div>
-        <div className="flex flex-col-reverse sm:flex-row sm:justify-start sm:space-x-2 p-6 pt-0 border-t">
-          <button type="button" className={cn(buttonVariants({ variant: "outline" }))} onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" />
-            Exportar a Excel
-          </button>
-          <button type="button" className={cn(buttonVariants({ variant: "outline" }))} onClick={handlePrint}>
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimir
-          </button>
-          <button
-            type="button"
-            className={cn(buttonVariants({ variant: "secondary" }))}
-            onClick={() => onOpenChange(false)}
-          >
-            Cerrar
-          </button>
-        </div>
+        <DialogFooter className="p-6 pt-0 border-t">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-start sm:space-x-2">
+            <button
+              type="button"
+              className={cn(buttonVariants({ variant: "outline" }))}
+              onClick={handleExport}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Exportar a Excel
+            </button>
+            <button
+              type="button"
+              className={cn(buttonVariants({ variant: "outline" }))}
+              onClick={handlePrint}
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimir
+            </button>
+             <button
+              type="button"
+              className={cn(buttonVariants({ variant: "secondary" }))}
+              onClick={() => onOpenChange(false)}
+            >
+              Cerrar
+            </button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
