@@ -69,7 +69,7 @@ export function NewFinancialMovementSheet({
     purchaseOrders, salesOrders, serviceOrders, contacts 
 }: NewFinancialMovementSheetProps) {
   const [formData, setFormData] = useState<Omit<FinancialMovement, 'id'>>(getInitialFormData());
-  const [associationType, setAssociationType] = useState<'document' | 'contact' | 'concept' | 'product'>('document');
+  const [associationType, setAssociationType] = useState<'document' | 'abono' | 'concept'>('document');
   const [relatedOrderType, setRelatedOrderType] = useState<'OV' | 'OC' | 'OS' | ''>('');
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -88,10 +88,8 @@ export function NewFinancialMovementSheet({
         if (movement.relatedDocument) {
             setAssociationType('document');
             setRelatedOrderType(movement.relatedDocument.type);
-        } else if (movement.productId) {
-            setAssociationType('product');
         } else if (movement.contactId) {
-            setAssociationType('contact');
+            setAssociationType('abono');
         } else {
             setAssociationType('concept');
         }
@@ -107,7 +105,7 @@ export function NewFinancialMovementSheet({
   
   useEffect(() => {
       if (isBatchMode) {
-          setAssociationType('contact');
+          setAssociationType('abono');
       } else {
           setAssociationType('document');
       }
@@ -122,17 +120,6 @@ export function NewFinancialMovementSheet({
   const handleSelectChange = (name: keyof typeof formData, value: any) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-
-  const handleProductSelect = (product: string) => {
-    setFormData(prev => ({
-      ...prev,
-      productId: product,
-      description: `Movimiento para producto: ${product}`,
-      relatedDocument: undefined,
-      contactId: undefined,
-      internalConcept: undefined,
-    }));
-  }
 
   const handleRelatedOrderSelect = (orderId: string) => {
     if (!relatedOrderType) return;
@@ -200,11 +187,9 @@ export function NewFinancialMovementSheet({
             const order = serviceOrders.find(o => o.id === formData.relatedDocument?.id);
             if (order) { details = `Orden de Servicio ${order?.id} (${order.description})`; totalAmount = order.cost; }
         }
-    } else if (associationType === 'contact' && formData.contactId) {
+    } else if (associationType === 'abono' && formData.contactId) {
         const contact = contacts.find(c => c.id === formData.contactId);
         details = `Movimiento para ${contact?.name}`;
-    } else if (associationType === 'product' && formData.productId) {
-        details = `Movimiento para producto: ${formData.productId}`;
     } else if (associationType === 'concept' && formData.internalConcept) {
         details = `Concepto interno: ${formData.internalConcept}`;
     } else {
@@ -303,7 +288,7 @@ export function NewFinancialMovementSheet({
     ? contacts.filter(c => c.type === 'client') 
     : contacts.filter(c => c.type === 'supplier');
 
-  const onAssociationChange = (value: 'document' | 'contact' | 'concept' | 'product') => {
+  const onAssociationChange = (value: 'document' | 'abono' | 'concept') => {
       setAssociationType(value);
       setFormData(prev => ({
           ...prev,
@@ -521,12 +506,8 @@ export function NewFinancialMovementSheet({
                             <Label htmlFor="r-doc">Documento</Label>
                         </div>
                         <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="contact" id="r-contact" />
-                            <Label htmlFor="r-contact">Contacto</Label>
-                        </div>
-                         <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="product" id="r-product" />
-                            <Label htmlFor="r-product">Producto</Label>
+                            <RadioGroupItem value="abono" id="r-abono" />
+                            <Label htmlFor="r-abono">Abono a Contacto</Label>
                         </div>
                         <div className="flex items-center space-x-2">
                             <RadioGroupItem value="concept" id="r-concept" />
@@ -567,7 +548,7 @@ export function NewFinancialMovementSheet({
                         Saldo Pendiente del Documento: <span className="font-medium text-foreground">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(pendingBalance)}</span>
                       </div>
                     )}
-                    {associationType === 'contact' && (
+                    {associationType === 'abono' && (
                         <Select
                             onValueChange={(value) => handleSelectChange('contactId', value)}
                             value={formData.contactId}
@@ -579,22 +560,6 @@ export function NewFinancialMovementSheet({
                             <SelectContent>
                                 {filteredContacts.map(c => (
                                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                    {associationType === 'product' && (
-                        <Select
-                            onValueChange={handleProductSelect}
-                            value={formData.productId}
-                            required
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Seleccione un producto" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {products.map(p => (
-                                    <SelectItem key={p} value={p}>{p}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -667,5 +632,7 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
+
+    
 
     

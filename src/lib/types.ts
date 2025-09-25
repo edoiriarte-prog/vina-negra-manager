@@ -135,3 +135,5 @@ export type BankAccount = {
     initialBalance: number;
     status: 'Activa' | 'Inactiva';
 }
+
+    
