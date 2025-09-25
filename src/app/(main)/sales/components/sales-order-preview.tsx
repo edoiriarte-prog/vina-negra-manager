@@ -26,6 +26,7 @@ import {
     TableFooter,
   } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { useReactToPrint } from 'react-to-print';
 
 type SalesOrderPreviewProps = {
   order: SalesOrder;
@@ -54,7 +55,9 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
         {/* Page 1: Commercial Invoice */}
         <div>
             <div className="flex flex-row items-center justify-between mb-8">
-              <Logo />
+              <div className="print-logo">
+                <Logo />
+              </div>
               <div className='text-right'>
                 <h2 className="text-2xl font-bold font-headline mb-1">ORDEN DE VENTA</h2>
                 <p className="text-muted-foreground font-mono">{order.id}</p>
@@ -73,12 +76,12 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
               </div>
             </div>
             <div className='text-right'>
-              <h3 className="font-semibold mb-2">Detalles de la Orden</h3>
-              <div className="text-sm text-muted-foreground">
-                <p><strong>Fecha Emisión:</strong> {format(parseISO(order.date), "PPP", { locale: es })}</p>
-                <p><strong>Estado:</strong> <span className='capitalize'>{order.status}</span></p>
-                <p><strong>Modalidad de Pago:</strong> {order.paymentMethod}</p>
-              </div>
+                <h3 className="font-semibold mb-2">VIÑA NEGRA SpA</h3>
+                <div className="text-sm text-muted-foreground">
+                    <p>RUT: 76.XXX.XXX-X</p>
+                    <p>TULAHUEN S/N</p>
+                    <p>MONTE PATRIA CHILE</p>
+                </div>
             </div>
           </div>
   
@@ -152,7 +155,9 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
         {/* Page 2: Dispatch Guide / Picking Ticket */}
         <div className="page-break" style={{breakBefore: 'page'}}>
             <div className="flex flex-row items-center justify-between mb-8">
-              <Logo />
+              <div className="print-logo">
+                <Logo />
+              </div>
               <div className='text-right'>
                   <h2 className="text-2xl font-bold font-headline mb-1">GUÍA DE DESPACHO</h2>
                   <p className="text-muted-foreground font-mono">{order.id}</p>
@@ -220,14 +225,36 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
     if (printWindow) {
       printWindow.document.write('<html><head><title>Imprimir Orden de Venta</title>');
       
-      // Get all stylesheets
       const styles = Array.from(document.styleSheets)
         .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
         .join('');
       printWindow.document.write(styles);
 
-      // Add inline styles for printing
-      printWindow.document.write('<style>body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .page-break { page-break-before: always; }</style>');
+      printWindow.document.write(`
+        <style>
+            @media print {
+                body {
+                    background-color: white !important;
+                    color: black !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                .page-break { page-break-before: always; }
+                div, h2, h3, p, span, th, td, strong {
+                    color: black !important;
+                }
+                .text-muted-foreground {
+                    color: #4a4a4a !important;
+                }
+                .font-mono {
+                    font-family: monospace !important;
+                }
+                .print-logo {
+                    display: none !important;
+                }
+            }
+        </style>
+      `);
       
       printWindow.document.write('</head><body>');
       printWindow.document.write(content.innerHTML);
@@ -280,3 +307,4 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
   );
 };
 SalesOrderPreview.displayName = "SalesOrderPreview";
+
