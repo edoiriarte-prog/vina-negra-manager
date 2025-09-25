@@ -139,12 +139,8 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                   <TableHead className='w-[100px]'>Cantidad</TableHead>
                   <TableHead className='w-[120px]'>Unidad</TableHead>
                   <TableHead className='w-[120px]'>Precio</TableHead>
-                  {orderType === 'sale' && (
-                      <>
-                        <TableHead className='w-[150px]'>Tipo Envase</TableHead>
-                        <TableHead className='w-[100px]'>Cant. Envases</TableHead>
-                      </>
-                  )}
+                  <TableHead className='w-[150px]'>Tipo Envase</TableHead>
+                  <TableHead className='w-[100px]'>Cant. Envases</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -186,29 +182,25 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                         placeholder="0"
                       />
                     </TableCell>
-                    {orderType === 'sale' && (
-                        <>
-                        <TableCell>
-                           <Select
-                                value={row.packagingType}
-                                onValueChange={(value) => handleMatrixChange(index, 'packagingType', value)}
-                            >
-                                <SelectTrigger><SelectValue placeholder="Envase"/></SelectTrigger>
-                                <SelectContent>
-                                 {packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </TableCell>
-                        <TableCell>
-                            <Input
-                                type="number"
-                                value={row.packagingQuantity || ''}
-                                onChange={(e) => handleMatrixChange(index, 'packagingQuantity', e.target.value)}
-                                placeholder="0"
-                            />
-                        </TableCell>
-                        </>
-                    )}
+                    <TableCell>
+                       <Select
+                            value={row.packagingType}
+                            onValueChange={(value) => handleMatrixChange(index, 'packagingType', value)}
+                        >
+                            <SelectTrigger><SelectValue placeholder="Envase"/></SelectTrigger>
+                            <SelectContent>
+                             {packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </TableCell>
+                    <TableCell>
+                        <Input
+                            type="number"
+                            value={row.packagingQuantity || ''}
+                            onChange={(e) => handleMatrixChange(index, 'packagingQuantity', e.target.value)}
+                            placeholder="0"
+                        />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
