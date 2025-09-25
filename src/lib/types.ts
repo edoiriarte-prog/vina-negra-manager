@@ -1,3 +1,4 @@
+
 export type Interaction = {
   id: string;
   date: string;
@@ -60,6 +61,7 @@ export type SalesOrder = {
   advanceDueDate?: string;
   balanceDueDate?: string;
   warehouse?: string;
+  paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
 };
 
 export type PurchaseOrder = {
@@ -71,6 +73,7 @@ export type PurchaseOrder = {
   totalKilos: number;
   status: 'pending' | 'completed' | 'cancelled';
   warehouse: string;
+  paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
 };
 
 export type ServiceOrder = {
@@ -81,6 +84,7 @@ export type ServiceOrder = {
   cost: number;
   relatedPurchaseId?: string;
   description: string;
+  paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
 };
 
 export type FinancialMovement = {
@@ -89,11 +93,15 @@ export type FinancialMovement = {
   type: 'income' | 'expense';
   description: string;
   amount: number;
+  paymentMethod: 'Transferencia' | 'Efectivo' | 'Depósito Bancario' | 'Cheque';
+  accountId: string;
   contactId?: string;
-  relatedOrder?: {
+  relatedDocument?: {
     type: 'OV' | 'OC' | 'OS';
     id: string;
   };
+  internalConcept?: 'Retiro de Socios' | 'Pago de Impuestos' | 'Comisión Bancaria' | 'Préstamo Interno' | 'Otro';
+  reference?: string;
 };
 
 export type InventoryItem = {
@@ -116,3 +124,13 @@ export type InventoryAdjustment = {
   quantity: number;
   reason: string;
 };
+
+export type BankAccount = {
+    id: string;
+    name: string;
+    accountType: 'Cuenta Corriente' | 'Cuenta Vista' | 'Línea de Crédito' | 'Efectivo';
+    accountNumber?: string;
+    bankName?: string;
+    initialBalance: number;
+    status: 'Activa' | 'Inactiva';
+}

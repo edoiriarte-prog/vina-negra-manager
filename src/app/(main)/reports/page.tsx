@@ -2,9 +2,9 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { Contact, SalesOrder, PurchaseOrder, FinancialMovement } from '@/lib/types';
+import { Contact, SalesOrder, PurchaseOrder, FinancialMovement, ServiceOrder } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import {
   salesOrders as initialSalesOrders,
   purchaseOrders as initialPurchaseOrders,
   financialMovements as initialFinancialMovements,
+  serviceOrders as initialServiceOrders,
 } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -26,14 +27,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PerformanceReports } from './components/performance-reports';
 import { DueDatesReport } from './components/due-dates-report';
 
-type OrderDetail = {
+type DocumentDetail = {
   id: string;
   date: string;
+  type: 'O/V' | 'O/C' | 'O/S';
   amount: number;
-  paid: number;
-  balance: number;
-  status: 'Pagado' | 'Pendiente' | 'Abono';
 };
+
+type PaymentDetail = {
+    id: string;
+    date: string;
+    description: string;
+    amount: number;
+}
 
 type ReportData = {
   contactId: string;
@@ -42,7 +48,8 @@ type ReportData = {
   totalPaid: number;
   pendingBalance: number;
   status: 'Pagado' | 'Pendiente' | 'Abono';
-  orders: OrderDetail[];
+  documents: DocumentDetail[];
+  payments: PaymentDetail[];
 };
 
 const formatCurrency = (value: number) =>
@@ -57,6 +64,7 @@ export default function ReportsPage() {
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+  const [serviceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
   const [financialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
   
   const [clientReports, setClientReports] = useState<ReportData[]>([]);
@@ -70,19 +78,14 @@ export default function ReportsPage() {
     setIsClient(true);
   }, []);
 
-  const getOrderStatus = (orderTotal: number, totalPaid: number) : OrderDetail['status'] => {
-      if (totalPaid <= 0 && orderTotal > 0) return 'Pendiente';
-      if (totalPaid >= orderTotal) return 'Pagado';
-      return 'Abono';
-  }
-
   useEffect(() => {
     if (isClient) {
       // Client Reports
       const clients = contacts.filter(c => c.type === 'client');
       const clientReportData = clients.map(client => {
         const clientSalesOrders = salesOrders.filter(so => so.clientId === client.id);
-        const totalBilled = clientSalesOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+        const clientDocuments: DocumentDetail[] = clientSalesOrders.map(so => ({ id: so.id, date: so.date, type: 'O/V', amount: so.totalAmount }));
+        const totalBilled = clientDocuments.reduce((sum, doc) => sum + doc.amount, 0);
 
         const clientMovements = financialMovements.filter(
           fm => fm.type === 'income' && fm.contactId === client.id
@@ -98,20 +101,6 @@ export default function ReportsPage() {
           status = 'Abono';
         }
 
-        const orders: OrderDetail[] = clientSalesOrders.map(order => {
-          const payments = financialMovements.filter(fm => (fm.relatedOrder?.id === order.id || fm.contactId === order.clientId) && fm.type === 'income');
-          const totalPaidForOrder = payments.reduce((sum, p) => sum + p.amount, 0);
-          const balance = order.totalAmount - totalPaidForOrder;
-          return {
-            id: order.id,
-            date: order.date,
-            amount: order.totalAmount,
-            paid: totalPaidForOrder,
-            balance: balance,
-            status: getOrderStatus(order.totalAmount, totalPaidForOrder)
-          }
-        });
-
         return {
           contactId: client.id,
           contactName: client.name,
@@ -119,16 +108,27 @@ export default function ReportsPage() {
           totalPaid,
           pendingBalance,
           status,
-          orders
+          documents: clientDocuments,
+          payments: clientMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })),
         };
-      });
+      }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
       setClientReports(clientReportData);
 
       // Supplier Reports
       const suppliers = contacts.filter(c => c.type === 'supplier');
       const supplierReportData = suppliers.map(supplier => {
         const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id);
-        const totalBilled = supplierPurchaseOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+        const supplierServiceOrders = serviceOrders.filter(so => {
+            const contact = contacts.find(c => c.id === supplier.id);
+            return contact && so.provider.toLowerCase() === contact.name.toLowerCase();
+        });
+
+        const supplierDocuments: DocumentDetail[] = [
+            ...supplierPurchaseOrders.map(po => ({ id: po.id, date: po.date, type: 'O/C' as const, amount: po.totalAmount })),
+            ...supplierServiceOrders.map(so => ({ id: so.id, date: so.date, type: 'O/S' as const, amount: so.cost })),
+        ];
+
+        const totalBilled = supplierDocuments.reduce((sum, doc) => sum + doc.amount, 0);
         
         const supplierMovements = financialMovements.filter(
             fm => fm.type === 'expense' && fm.contactId === supplier.id
@@ -144,33 +144,20 @@ export default function ReportsPage() {
           status = 'Abono';
         }
 
-        const orders: OrderDetail[] = supplierPurchaseOrders.map(order => {
-          const payments = financialMovements.filter(fm => (fm.relatedOrder?.id === order.id || fm.contactId === order.supplierId) && fm.type === 'expense');
-          const totalPaidForOrder = payments.reduce((sum, p) => sum + p.amount, 0);
-          const balance = order.totalAmount - totalPaidForOrder;
-          return {
-            id: order.id,
-            date: order.date,
-            amount: order.totalAmount,
-            paid: totalPaidForOrder,
-            balance: balance,
-            status: getOrderStatus(order.totalAmount, totalPaidForOrder)
-          }
-        });
-        
-        return {
+         return {
           contactId: supplier.id,
           contactName: supplier.name,
           totalBilled,
           totalPaid,
           pendingBalance,
           status,
-          orders
+          documents: supplierDocuments,
+          payments: supplierMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })),
         };
-      });
+      }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
       setSupplierReports(supplierReportData);
     }
-  }, [contacts, salesOrders, purchaseOrders, financialMovements, isClient]);
+  }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements, isClient]);
 
   const handlePrint = () => {
     const allIds = [...clientReports, ...supplierReports].reduce((acc, report) => {
@@ -222,34 +209,49 @@ export default function ReportsPage() {
         {openCollapsibles[item.contactId] && (
           <tr className="bg-muted/20 hover:bg-muted/30">
             <TableCell colSpan={5} className="p-0">
-                <div className="p-4">
-                    <h4 className="font-semibold mb-2">Detalle de Órdenes</h4>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Orden ID</TableHead>
-                                <TableHead>Fecha</TableHead>
-                                <TableHead className="text-right">Monto</TableHead>
-                                <TableHead className="text-right">Pagado</TableHead>
-                                <TableHead className="text-right">Saldo</TableHead>
-                                <TableHead className="text-center">Estado</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {item.orders.map(order => (
-                                <TableRow key={order.id}>
-                                    <TableCell>{order.id}</TableCell>
-                                    <TableCell>{format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(order.amount)}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(order.paid)}</TableCell>
-                                    <TableCell className="text-right font-semibold">{formatCurrency(order.balance)}</TableCell>
-                                    <TableCell className="text-center">
-                                        <Badge variant={ order.status === 'Pagado' ? 'default' : order.status === 'Abono' ? 'secondary' : 'destructive' }>{order.status}</Badge>
-                                    </TableCell>
+                <div className="p-4 grid grid-cols-2 gap-4">
+                    <div>
+                        <h4 className="font-semibold mb-2">Documentos</h4>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>ID</TableHead>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead className="text-right">Monto</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {item.documents.map(doc => (
+                                    <TableRow key={doc.id}>
+                                        <TableCell>{doc.id}</TableCell>
+                                        <TableCell>{format(parseISO(doc.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(doc.amount)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold mb-2">Pagos</h4>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead>Descripción</TableHead>
+                                    <TableHead className="text-right">Monto</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                             <TableBody>
+                                {item.payments.map(payment => (
+                                    <TableRow key={payment.id}>
+                                        <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                                        <TableCell className='max-w-[200px] truncate'>{payment.description}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </div>
             </TableCell>
           </tr>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
@@ -72,44 +73,6 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     }
   },
   {
-    accessorKey: 'warehouse',
-    header: 'Bodega',
-  },
-    {
-    accessorKey: 'totalKilos',
-    header: ({ column }) => {
-        return (
-          <div className="text-right">
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            >
-              Kilos
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        );
-      },
-    cell: ({ row }) => <div className='text-right'>{formatKilos(row.getValue('totalKilos'))}</div>,
-  },
-  {
-    accessorKey: 'totalPackages',
-    header: ({ column }) => {
-        return (
-          <div className="text-right">
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            >
-              Envases
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        );
-      },
-    cell: ({ row }) => <div className='text-right'>{formatPackages(row.getValue('totalPackages'))}</div>,
-  },
-  {
     accessorKey: 'totalAmount',
     header: ({ column }) => {
         return (
@@ -126,9 +89,18 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
       },
     cell: ({ row }) => <div className='text-right'>{formatCurrency(row.getValue('totalAmount'))}</div>,
   },
+   {
+    accessorKey: 'paymentStatus',
+    header: 'Estado Pago',
+    cell: ({ row }) => {
+        const status = row.getValue('paymentStatus') as string;
+        const variant = status === 'Pagado' ? 'default' : status === 'Abonado' ? 'secondary' : 'destructive';
+        return <Badge variant={variant}>{status || 'Pendiente'}</Badge>
+    }
+  },
   {
     accessorKey: 'status',
-    header: 'Estado',
+    header: 'Estado Orden',
     cell: ({ row }) => {
         const status = row.getValue('status') as string;
         const variant = status === 'completed' ? 'default' : status === 'pending' ? 'secondary' : 'destructive';

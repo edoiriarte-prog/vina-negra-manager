@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory } from '@/lib/data';
-import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem } from '@/lib/types';
+import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory, serviceOrders as initialServiceOrders, financialMovements as initialFinancialMovements } from '@/lib/data';
+import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem, ServiceOrder, FinancialMovement } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -26,11 +27,14 @@ import { PlusCircle, Printer, Download, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
+import { PreviewContent } from './components/sales-order-preview';
 
 
 export default function SalesPage() {
   const [salesOrders, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
-  const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+  const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+  const [serviceOrders, setServiceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
+  const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
@@ -40,6 +44,9 @@ export default function SalesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
+  const [orderToPrint, setOrderToPrint] = useState<SalesOrder | null>(null);
+  
+  const printRef = React.useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
 
@@ -67,6 +74,47 @@ export default function SalesPage() {
     }, 0);
     setNextLotCorrelative(maxLotNumber + 1);
   }, [salesOrders]);
+
+  const handlePrint = useCallback(() => {
+    if (!printRef.current) return;
+     const printWindow = window.open('', '', 'height=800,width=800');
+     if (printWindow) {
+      printWindow.document.write('<html><head><title>Imprimir Orden de Venta</title>');
+      
+      const styles = Array.from(document.styleSheets)
+        .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
+        .join('');
+      printWindow.document.write(styles);
+
+      printWindow.document.write(`
+        <style>
+          @media print {
+            body { background: white !important; color: black !important; }
+            .print-logo { display: none !important; }
+            * { color: black !important; background-color: transparent !important; }
+          }
+        </style>
+      `);
+      
+      printWindow.document.write('</head><body>');
+      printWindow.document.write(printRef.current.innerHTML);
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      };
+    }
+    setOrderToPrint(null);
+  }, []);
+
+  useEffect(() => {
+    if (orderToPrint && printRef.current) {
+      handlePrint();
+    }
+  }, [orderToPrint, handlePrint]);
   
   const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, editingOrder), [purchaseOrders, salesOrders, editingOrder]);
 
@@ -127,7 +175,7 @@ export default function SalesPage() {
 
     if ('id' in orderToSave) {
       // Update
-      finalOrder = { ...orderToSave, totalAmount, totalKilos, totalPackages } as SalesOrder;
+      finalOrder = { ...orderToSave, totalAmount, totalKilos, totalPackages, paymentStatus: orderToSave.paymentStatus || 'Pendiente' } as SalesOrder;
       setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
       toast({ title: 'Orden Actualizada', description: `La orden ${finalOrder.id} ha sido actualizada.` });
     } else {
@@ -137,11 +185,29 @@ export default function SalesPage() {
         id: nextOrderId,
         totalAmount, 
         totalKilos, 
-        totalPackages
+        totalPackages,
+        paymentStatus: 'Pendiente'
       } as SalesOrder;
       setSalesOrders(prev => [...prev, finalOrder]);
       toast({ title: 'Orden Creada', description: `La orden ${finalOrder.id} ha sido creada.` });
     }
+
+    // Update payment status of related orders
+    const movementsForOrder = financialMovements.filter(m => m.relatedDocument?.id === finalOrder.id);
+    const totalPaid = movementsForOrder.reduce((sum, m) => sum + m.amount, 0);
+    
+    let newPaymentStatus: 'Pendiente' | 'Abonado' | 'Pagado' = 'Pendiente';
+    if (totalPaid >= finalOrder.totalAmount) {
+        newPaymentStatus = 'Pagado';
+    } else if (totalPaid > 0) {
+        newPaymentStatus = 'Abonado';
+    }
+    
+    if (finalOrder.paymentStatus !== newPaymentStatus) {
+        finalOrder.paymentStatus = newPaymentStatus;
+        setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
+    }
+
 
     setIsSheetOpen(false);
     setEditingOrder(null);
@@ -167,6 +233,10 @@ export default function SalesPage() {
   const handlePreview = (order: SalesOrder) => {
     setPreviewingOrder(order);
   }
+
+  const handlePrintRequest = (order: SalesOrder) => {
+    setOrderToPrint(order);
+  };
   
   const confirmDelete = () => {
     if (deletingOrder) {
@@ -364,6 +434,7 @@ export default function SalesPage() {
           isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
           onExport={() => handleExport(previewingOrder)}
+          onPrint={() => handlePrintRequest(previewingOrder)}
         />
       )}
       
@@ -401,6 +472,11 @@ export default function SalesPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Hidden component for printing */}
+      <div className="hidden">
+        {orderToPrint && <PreviewContent ref={printRef} order={orderToPrint} client={clients.find(c => c.id === orderToPrint.clientId) || null} carrier={null} />}
+      </div>
     </>
   );
 }

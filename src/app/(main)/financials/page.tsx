@@ -1,9 +1,10 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { financialMovements as initialFinancialMovements, purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, serviceOrders as initialServiceOrders, contacts as initialContacts } from '@/lib/data';
-import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact } from '@/lib/types';
+import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact, BankAccount } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -22,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useMasterData } from '@/hooks/use-master-data';
 
 
 export default function FinancialsPage() {
@@ -30,6 +32,7 @@ export default function FinancialsPage() {
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [serviceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+  const { bankAccounts } = useMasterData();
   
   const [editingMovement, setEditingMovement] = useState<FinancialMovement | null>(null);
   const [deletingMovement, setDeletingMovement] = useState<FinancialMovement | null>(null);
@@ -89,7 +92,14 @@ export default function FinancialsPage() {
     setIsSheetOpen(true);
   }
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete });
+  const dataWithContactNames = useMemo(() => {
+    return financialMovements.map(m => ({
+      ...m,
+      contactName: contacts.find(c => c.id === m.contactId)?.name || ''
+    }));
+  }, [financialMovements, contacts]);
+
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, bankAccounts });
 
   const renderContent = () => {
     if (!isClient) {
@@ -100,7 +110,7 @@ export default function FinancialsPage() {
         </div>
       )
     }
-    return <DataTable columns={columns} data={financialMovements} />;
+    return <DataTable columns={columns} data={dataWithContactNames} />;
   }
 
   return (
@@ -109,8 +119,8 @@ export default function FinancialsPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="font-headline text-2xl">Movimientos Financieros</CardTitle>
-              <CardDescription>Registra todos los ingresos y egresos.</CardDescription>
+              <CardTitle className="font-headline text-2xl">Tesorería y Movimientos Bancarios</CardTitle>
+              <CardDescription>Registra todos los ingresos y egresos de la empresa.</CardDescription>
             </div>
             <Button onClick={openNewMovementSheet}>
               <PlusCircle className="mr-2 h-4 w-4" />

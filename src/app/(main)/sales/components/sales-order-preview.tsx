@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useRef } from 'react';
+import React from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,8 +14,6 @@ import { Separator } from '@/components/ui/separator';
 import { SalesOrder, Contact } from '@/lib/types';
 import { Logo } from '@/components/logo';
 import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { Printer, Download, X } from 'lucide-react';
 import Barcode from 'react-barcode';
 import {
     Table,
@@ -26,7 +25,7 @@ import {
     TableFooter,
   } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { useReactToPrint } from 'react-to-print';
+import { Download, Printer } from 'lucide-react';
 
 type SalesOrderPreviewProps = {
   order: SalesOrder;
@@ -35,10 +34,11 @@ type SalesOrderPreviewProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onExport: () => void;
+  onPrint: () => void;
 };
 
 
-const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; client: Contact | null; carrier: Contact | null }>(({ order, client, carrier }, ref) => {
+export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; client: Contact | null; carrier: Contact | null }>(({ order, client, carrier }, ref) => {
     const totalPackaging = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const advanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount * ((order.advancePercentage || 0) / 100) : 0;
     const balanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount - advanceAmount : 0;
@@ -215,60 +215,8 @@ const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrder; cli
 });
 PreviewContent.displayName = "PreviewContent";
 
-export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange, onExport }: SalesOrderPreviewProps) {
-  const contentRef = React.useRef<HTMLDivElement>(null);
-
-  const handlePrint = () => {
-    const content = contentRef.current;
-    if (!content) return;
-    const printWindow = window.open('', '', 'height=800,width=800');
-    if (printWindow) {
-      printWindow.document.write('<html><head><title>Imprimir Orden de Venta</title>');
-      
-      const styles = Array.from(document.styleSheets)
-        .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
-        .join('');
-      printWindow.document.write(styles);
-
-      printWindow.document.write(`
-        <style>
-            @media print {
-                body {
-                    background-color: white !important;
-                    color: black !important;
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }
-                .page-break { page-break-before: always; }
-                div, h2, h3, p, span, th, td, strong {
-                    color: black !important;
-                }
-                .text-muted-foreground {
-                    color: #4a4a4a !important;
-                }
-                .font-mono {
-                    font-family: monospace !important;
-                }
-                .print-logo {
-                    display: none !important;
-                }
-            }
-        </style>
-      `);
-      
-      printWindow.document.write('</head><body>');
-      printWindow.document.write(content.innerHTML);
-      printWindow.document.write('</body></html>');
-      printWindow.document.close();
-      
-      printWindow.onload = () => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      };
-    }
-  }
-
+export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange, onExport, onPrint }: SalesOrderPreviewProps) {
+  
   if (!order) return null;
 
   return (
@@ -278,7 +226,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
            <DialogTitle>Previsualización de Orden de Venta: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto" id="print-area">
-            <PreviewContent ref={contentRef} order={order} client={client} carrier={carrier} />
+            <PreviewContent order={order} client={client} carrier={carrier} ref={null}/>
         </div>
         <div className="p-6 pt-4 border-t bg-background flex flex-col-reverse sm:flex-row sm:justify-start gap-2">
             <button
@@ -289,7 +237,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
               Exportar a Excel
             </button>
             <button
-              onClick={handlePrint}
+              onClick={onPrint}
               className={cn(buttonVariants())}
             >
               <Printer className="mr-2 h-4 w-4" />
@@ -307,4 +255,3 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
   );
 };
 SalesOrderPreview.displayName = "SalesOrderPreview";
-

@@ -9,6 +9,16 @@ import { Input } from '@/components/ui/input';
 import { Trash2, PlusCircle, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import { BankAccount } from '@/lib/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 function MasterDataEditor({ title, data, setData }: { title: string, data: string[], setData: React.Dispatch<React.SetStateAction<string[]>> }) {
     const [newItem, setNewItem] = useState('');
@@ -63,12 +73,74 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
     );
 }
 
+function BankAccountsEditor() {
+    const { bankAccounts, setBankAccounts } = useMasterData();
+    const [newAccount, setNewAccount] = useState<Omit<BankAccount, 'id'>>({ name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa' });
+    const { toast } = useToast();
+
+    const handleAddAccount = () => {
+        if (newAccount.name && newAccount.initialBalance >= 0) {
+            setBankAccounts(prev => [...prev, { ...newAccount, id: `acc-${Date.now()}` }]);
+            setNewAccount({ name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa' });
+            toast({ title: 'Cuenta Agregada', description: `Se agregó la cuenta "${newAccount.name}".` });
+        } else {
+            toast({ variant: "destructive", title: 'Error', description: 'Nombre y Saldo Inicial son requeridos.' });
+        }
+    };
+
+    const handleRemoveAccount = (id: string) => {
+        setBankAccounts(prev => prev.filter(acc => acc.id !== id));
+        toast({ title: 'Cuenta Eliminada' });
+    };
+    
+    return (
+         <Card>
+            <CardHeader>
+                <CardTitle className="font-headline text-lg">Cuentas Bancarias</CardTitle>
+                <CardDescription>Configure las cuentas bancarias y de efectivo de la empresa.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+                    <Input placeholder="Nombre de la Cuenta" value={newAccount.name} onChange={e => setNewAccount(p => ({...p, name: e.target.value}))}/>
+                    <Select value={newAccount.accountType} onValueChange={(value: BankAccount['accountType']) => setNewAccount(p => ({...p, accountType: value}))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Cuenta Corriente">Cuenta Corriente</SelectItem>
+                            <SelectItem value="Cuenta Vista">Cuenta Vista</SelectItem>
+                            <SelectItem value="Línea de Crédito">Línea de Crédito</SelectItem>
+                            <SelectItem value="Efectivo">Efectivo</SelectItem>
+                        </SelectContent>
+                    </Select>
+                     <Input type="number" placeholder="Saldo Inicial" value={newAccount.initialBalance || ''} onChange={e => setNewAccount(p => ({...p, initialBalance: Number(e.target.value)}))}/>
+                    <Button onClick={handleAddAccount}><PlusCircle className="mr-2 h-4 w-4" /> Agregar</Button>
+                </div>
+                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                    {bankAccounts.map(acc => (
+                        <div key={acc.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                            <div>
+                                <span className='font-semibold'>{acc.name}</span>
+                                <span className="text-xs text-muted-foreground ml-2">({acc.accountType})</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className='text-sm font-mono'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(acc.initialBalance)}</span>
+                                <Button variant="ghost" size="icon" onClick={() => handleRemoveAccount(acc.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
 function DataExport() {
     const { toast } = useToast();
 
     const handleExport = () => {
         try {
-            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements', 'master-products', 'master-calibers', 'master-units', 'master-packaging-types', 'master-warehouses'];
+            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements', 'master-products', 'master-calibers', 'master-units', 'master-packaging-types', 'master-warehouses', 'master-bank-accounts'];
             const workbook = XLSX.utils.book_new();
 
             keys.forEach(key => {
@@ -82,6 +154,7 @@ function DataExport() {
                             if (row.items) newRow.items = JSON.stringify(row.items);
                             if (row.packaging) newRow.packaging = JSON.stringify(row.packaging);
                             if (row.relatedOrder) newRow.relatedOrder = `${row.relatedOrder.type}-${row.relatedOrder.id}`;
+                            if (row.relatedDocument) newRow.relatedDocument = `${row.relatedDocument.type}-${row.relatedDocument.id}`;
                             if (row.relatedPurchaseIds) newRow.relatedPurchaseIds = row.relatedPurchaseIds.join(', ');
                             return newRow;
                           })
@@ -130,14 +203,27 @@ export default function SettingsPage() {
                 <h1 className="font-headline text-3xl">Configuración</h1>
                 <p className="text-muted-foreground">Administra los datos maestros y otras configuraciones de la aplicación.</p>
             </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <MasterDataEditor title="Productos" data={products} setData={setProducts} />
-                <MasterDataEditor title="Calibres" data={calibers} setData={setCalibers} />
-                <MasterDataEditor title="Unidades" data={units} setData={setUnits} />
-                <MasterDataEditor title="Tipos de Envase" data={packagingTypes} setData={setPackagingTypes} />
-                <MasterDataEditor title="Bodegas" data={warehouses} setData={setWarehouses} />
-            </div>
+            
+            <Tabs defaultValue="masters">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="masters">Datos Maestros</TabsTrigger>
+                    <TabsTrigger value="accounts">Cuentas Bancarias</TabsTrigger>
+                </TabsList>
+                <TabsContent value="masters">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                        <MasterDataEditor title="Productos" data={products} setData={setProducts} />
+                        <MasterDataEditor title="Calibres" data={calibers} setData={setCalibers} />
+                        <MasterDataEditor title="Unidades" data={units} setData={setUnits} />
+                        <MasterDataEditor title="Tipos de Envase" data={packagingTypes} setData={setPackagingTypes} />
+                        <MasterDataEditor title="Bodegas" data={warehouses} setData={setWarehouses} />
+                    </div>
+                </TabsContent>
+                <TabsContent value="accounts">
+                    <div className='mt-6'>
+                      <BankAccountsEditor />
+                    </div>
+                </TabsContent>
+            </Tabs>
 
             <div className='mt-6'>
                 <DataExport />

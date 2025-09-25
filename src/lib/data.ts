@@ -1,5 +1,5 @@
 
-import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem, Interaction } from './types';
+import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem, Interaction, BankAccount } from './types';
 
 export const contacts: Contact[] = [
   { id: '1', name: 'Agrícola Santa Cruz', rut: '76.123.456-7', address: 'Fundo El Sol, Parcela 4', commune: 'Santa Cruz', email: 'contacto@agrisc.cl', contactPerson: 'Juan Pérez', type: 'supplier', tags: ['Proveedor Estratégico', 'Uva'], interactions: [
@@ -14,30 +14,30 @@ export const contacts: Contact[] = [
 ];
 
 export const purchaseOrders: PurchaseOrder[] = [
-  { id: 'OC-1001', supplierId: '1', date: '2023-10-01', items: [{ id: 'p1', product: 'UVAS', caliber: 'PRIMERA', quantity: 5000, unit: 'Kilos', price: 3000 }, { id: 'p2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 3000, unit: 'Kilos', price: 2500 }], totalAmount: 22500000, totalKilos: 8000, status: 'completed', warehouse: 'Bodega Principal' },
-  { id: 'OC-1002', supplierId: '5', date: '2023-10-08', items: [{ id: 'p3', product: 'PALTAS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 4000 }, { id: 'p4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 3500 }], totalAmount: 38000000, totalKilos: 10000, status: 'completed', warehouse: 'Bodega Principal' },
-  { id: 'OC-1003', supplierId: '1', date: '2023-10-15', items: [{ id: 'p5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 7000, unit: 'Kilos', price: 2000 }, { id: 'p6', product: 'DURAZNOS', caliber: 'PRIMERA', quantity: 2000, unit: 'Kilos', price: 1500 }], totalAmount: 17000000, totalKilos: 9000, status: 'completed', warehouse: 'Bodega Principal' },
+  { id: 'OC-1001', supplierId: '1', date: '2023-10-01', items: [{ id: 'p1', product: 'UVAS', caliber: 'PRIMERA', quantity: 5000, unit: 'Kilos', price: 3000 }, { id: 'p2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 3000, unit: 'Kilos', price: 2500 }], totalAmount: 22500000, totalKilos: 8000, status: 'completed', warehouse: 'Bodega Principal', paymentStatus: 'Abonado' },
+  { id: 'OC-1002', supplierId: '5', date: '2023-10-08', items: [{ id: 'p3', product: 'PALTAS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 4000 }, { id: 'p4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 3500 }], totalAmount: 38000000, totalKilos: 10000, status: 'completed', warehouse: 'Bodega Principal', paymentStatus: 'Abonado' },
+  { id: 'OC-1003', supplierId: '1', date: '2023-10-15', items: [{ id: 'p5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 7000, unit: 'Kilos', price: 2000 }, { id: 'p6', product: 'DURAZNOS', caliber: 'PRIMERA', quantity: 2000, unit: 'Kilos', price: 1500 }], totalAmount: 17000000, totalKilos: 9000, status: 'completed', warehouse: 'Bodega Principal', paymentStatus: 'Pendiente' },
 ];
 
 export const salesOrders: SalesOrder[] = [
-  { id: 'OV-2001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'UVAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 4500, packagingQuantity: 200 }, { id: 's2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 2000, unit: 'Kilos', price: 5000, packagingQuantity: 100 }], totalKilos: 6000, totalPackages: 300, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed', paymentMethod: 'Contado', warehouse: 'Bodega Principal' },
-  { id: 'OV-2002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'PALTAS', caliber: 'EXTRA', quantity: 5000, unit: 'Kilos', price: 4500, packagingQuantity: 250 }, { id: 's4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 3000, unit: 'Kilos', price: 5000, packagingQuantity: 150 }], totalKilos: 8000, totalPackages: 400, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed', paymentMethod: 'Pago con Anticipo y Saldo', advancePercentage: 50, advanceDueDate: '2023-10-20', balanceDueDate: '2023-11-20', warehouse: 'Cámara de Frío 1' },
-  { id: 'OV-2003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 5500, packagingQuantity: 300 }], totalKilos: 6000, totalPackages: 300, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending', paymentMethod: 'Crédito', warehouse: 'Bodega Principal' },
+  { id: 'OV-2001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'UVAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 4500, packagingQuantity: 200 }, { id: 's2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 2000, unit: 'Kilos', price: 5000, packagingQuantity: 100 }], totalKilos: 6000, totalPackages: 300, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed', paymentMethod: 'Contado', warehouse: 'Bodega Principal', paymentStatus: 'Pagado' },
+  { id: 'OV-2002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'PALTAS', caliber: 'EXTRA', quantity: 5000, unit: 'Kilos', price: 4500, packagingQuantity: 250 }, { id: 's4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 3000, unit: 'Kilos', price: 5000, packagingQuantity: 150 }], totalKilos: 8000, totalPackages: 400, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed', paymentMethod: 'Pago con Anticipo y Saldo', advancePercentage: 50, advanceDueDate: '2023-10-20', balanceDueDate: '2023-11-20', warehouse: 'Cámara de Frío 1', paymentStatus: 'Pagado' },
+  { id: 'OV-2003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 5500, packagingQuantity: 300 }], totalKilos: 6000, totalPackages: 300, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending', paymentMethod: 'Crédito', warehouse: 'Bodega Principal', paymentStatus: 'Pendiente' },
 ];
 
 export const serviceOrders: ServiceOrder[] = [
-  { id: 'OS-001', provider: 'Transportes Rapido', date: '2023-10-01', serviceType: 'Flete', cost: 300000, relatedPurchaseId: 'OC-1001', description: 'Flete OC-1001 desde Santa Cruz a planta' },
-  { id: 'OS-002', provider: 'Personal Externo', date: '2023-10-03', serviceType: 'Selección de fruta', cost: 800000, relatedPurchaseId: 'OC-1001', description: 'Selección y embalaje para OV-001' },
-  { id: 'OS-003', provider: 'Transportes Rapido', date: '2023-10-08', serviceType: 'Flete', cost: 350000, relatedPurchaseId: 'OC-1002', description: 'Flete OC-1002 desde Santa Cruz a planta' },
+  { id: 'OS-001', provider: 'Transportes Rapido', date: '2023-10-01', serviceType: 'Flete', cost: 300000, relatedPurchaseId: 'OC-1001', description: 'Flete OC-1001 desde Santa Cruz a planta', paymentStatus: 'Pagado' },
+  { id: 'OS-002', provider: 'Personal Externo', date: '2023-10-03', serviceType: 'Selección de fruta', cost: 800000, relatedPurchaseId: 'OC-1001', description: 'Selección y embalaje para OV-001', paymentStatus: 'Pagado' },
+  { id: 'OS-003', provider: 'Transportes Rapido', date: '2023-10-08', serviceType: 'Flete', cost: 350000, relatedPurchaseId: 'OC-1002', description: 'Flete OC-1002 desde Santa Cruz a planta', paymentStatus: 'Pendiente' },
 ];
 
 export const financialMovements: FinancialMovement[] = [
-  { id: 'M-001', date: '2023-10-07', type: 'income', description: 'Pago OV-001 - Exportadora Frutillar', amount: 28000000, relatedOrder: { type: 'OV', id: 'OV-001' } },
-  { id: 'M-002', date: '2023-10-02', type: 'expense', description: 'Pago 50% OC-1001 - Agrícola Santa Cruz', amount: 11250000, relatedOrder: { type: 'OC', id: 'OC-1001' } },
-  { id: 'M-003', date: '2023-10-02', type: 'expense', description: 'Pago OS-001 - Transportes Rapido', amount: 300000, relatedOrder: { type: 'OS', id: 'OS-001' } },
-  { id: 'M-004', date: '2023-10-04', type: 'expense', description: 'Pago OS-002 - Personal Externo', amount: 800000, relatedOrder: { type: 'OS', id: 'OS-002' } },
-  { id: 'M-005', date: '2023-10-14', type: 'income', description: 'Pago OV-002 - Supermercados del Sur', amount: 37500000, relatedOrder: { type: 'OV', id: 'OV-002' } },
-  { id: 'M-006', date: '2023-10-09', type: 'expense', description: 'Pago 50% OC-1002 - Agrícola Santa Cruz', amount: 19000000, relatedOrder: { type: 'OC', id: 'OC-1002' } },
+  { id: 'M-001', date: '2023-10-07', type: 'income', description: 'Pago OV-001 - Exportadora Frutillar', amount: 28000000, paymentMethod: 'Transferencia', accountId: 'acc-1', contactId: '2', relatedDocument: { type: 'OV', id: 'OV-2001' } },
+  { id: 'M-002', date: '2023-10-02', type: 'expense', description: 'Pago 50% OC-1001 - Agrícola Santa Cruz', amount: 11250000, paymentMethod: 'Transferencia', accountId: 'acc-1', contactId: '1', relatedDocument: { type: 'OC', id: 'OC-1001' } },
+  { id: 'M-003', date: '2023-10-02', type: 'expense', description: 'Pago OS-001 - Transportes Rapido', amount: 300000, paymentMethod: 'Efectivo', accountId: 'acc-2', relatedDocument: { type: 'OS', id: 'OS-001' } },
+  { id: 'M-004', date: '2023-10-04', type: 'expense', description: 'Pago OS-002 - Personal Externo', amount: 800000, paymentMethod: 'Transferencia', accountId: 'acc-1', relatedDocument: { type: 'OS', id: 'OS-002' } },
+  { id: 'M-005', date: '2023-10-14', type: 'income', description: 'Pago OV-002 - Supermercados del Sur', amount: 37500000, paymentMethod: 'Transferencia', accountId: 'acc-1', contactId: '3', relatedDocument: { type: 'OV', id: 'OV-2002' } },
+  { id: 'M-006', date: '2023-10-09', type: 'expense', description: 'Pago 50% OC-1002 - Agrícola Santa Cruz', amount: 19000000, paymentMethod: 'Transferencia', accountId: 'acc-1', contactId: '5', relatedDocument: { type: 'OC', id: 'OC-1002' } },
 ];
 
 export const inventoryAdjustments = [];

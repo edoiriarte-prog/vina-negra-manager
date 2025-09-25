@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts } from '@/lib/data';
-import { PurchaseOrder, Contact, OrderItem } from '@/lib/types';
+import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts, financialMovements as initialFinancialMovements, salesOrders as initialSalesOrders, serviceOrders as initialServiceOrders } from '@/lib/data';
+import { PurchaseOrder, Contact, OrderItem, FinancialMovement, SalesOrder, ServiceOrder } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -31,6 +32,10 @@ import { format } from 'date-fns';
 export default function PurchasesPage() {
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+  const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
+  const [salesOrders, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
+  const [serviceOrders, setServiceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
+
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [confirmingEditOrder, setConfirmingEditOrder] = useState<PurchaseOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<PurchaseOrder | null>(null);
@@ -46,28 +51,38 @@ export default function PurchasesPage() {
   const suppliers = contacts.filter(c => c.type === 'supplier');
 
   const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>, newItems: OrderItem[] = []) => {
-    let orderToSave: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>;
+    // Combine existing items with new items
+    const allItems = 'id' in order
+      ? [...order.items, ...newItems]
+      : [...(order.items || []), ...newItems];
     
-    // Combine existing items with new items from matrix dialog
-    const allItems = [...order.items, ...newItems];
-
-    orderToSave = { ...order, items: allItems };
-    
-    const totalAmount = orderToSave.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    const totalKilos = orderToSave.items.reduce((sum, item) => {
+    const totalAmount = allItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
+    const totalKilos = allItems.reduce((sum, item) => {
         if (item.unit === 'Kilos') {
             return sum + Number(item.quantity || 0);
         }
         return sum;
     }, 0);
 
-    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id'> = { ...orderToSave, totalAmount, totalKilos };
-
+    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id'> = { ...order, items: allItems, totalAmount, totalKilos };
 
     if ('id' in finalOrderData) {
       // Update
-      setPurchaseOrders(prev => prev.map(o => o.id === (finalOrderData as PurchaseOrder).id ? finalOrderData as PurchaseOrder : o));
-      toast({ title: 'Orden Actualizada', description: `La orden ${finalOrderData.id} ha sido actualizada.` });
+      const updatedOrder = finalOrderData as PurchaseOrder;
+      const totalPaid = financialMovements
+        .filter(m => m.relatedDocument?.id === updatedOrder.id && m.type === 'expense')
+        .reduce((sum, m) => sum + m.amount, 0);
+
+      let paymentStatus: 'Pendiente' | 'Abonado' | 'Pagado' = 'Pendiente';
+      if (totalPaid >= updatedOrder.totalAmount) {
+        paymentStatus = 'Pagado';
+      } else if (totalPaid > 0) {
+        paymentStatus = 'Abonado';
+      }
+      updatedOrder.paymentStatus = paymentStatus;
+
+      setPurchaseOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+      toast({ title: 'Orden Actualizada', description: `La orden ${updatedOrder.id} ha sido actualizada.` });
     } else {
       // Add
       const sortedOrders = [...purchaseOrders].sort((a,b) => {
@@ -76,9 +91,10 @@ export default function PurchasesPage() {
         return idA - idB;
       });
       const lastId = sortedOrders.length > 0 ? parseInt(sortedOrders[sortedOrders.length - 1].id.split('-')[1]) : 1000;
-      const newOrder = {
+      const newOrder: PurchaseOrder = {
         ...(finalOrderData as Omit<PurchaseOrder, 'id'>),
         id: `OC-${lastId + 1}`,
+        paymentStatus: 'Pendiente',
       };
       setPurchaseOrders(prev => [...prev, newOrder]);
       toast({ title: 'Orden Creada', description: `La orden ${newOrder.id} ha sido creada.` });

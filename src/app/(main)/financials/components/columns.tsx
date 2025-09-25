@@ -1,7 +1,8 @@
+
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
-import { FinancialMovement } from '@/lib/types';
+import { FinancialMovement, BankAccount } from '@/lib/types';
 import { MoreHorizontal, ArrowUpDown, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +19,7 @@ import { es } from 'date-fns/locale';
 type GetColumnsProps = {
   onEdit: (movement: FinancialMovement) => void;
   onDelete: (movement: FinancialMovement) => void;
+  bankAccounts: BankAccount[];
 }
 
 const formatCurrency = (value: number) =>
@@ -28,7 +30,7 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 
-export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<FinancialMovement>[] => [
+export const getColumns = ({ onEdit, onDelete, bankAccounts }: GetColumnsProps): ColumnDef<FinancialMovement & { contactName?: string }>[] => [
   {
     accessorKey: 'date',
     header: ({ column }) => {
@@ -52,28 +54,32 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Fin
         return (row.getValue(id) as string).toLowerCase().includes(value.toLowerCase());
     }
   },
-  {
-    accessorKey: 'type',
-    header: 'Tipo',
-    cell: ({ row }) => {
-        const type = row.getValue('type') as string;
-        const isIncome = type === 'income';
-        return (
-            <div className='flex items-center gap-2'>
-                {isIncome ? <ArrowUpCircle className="h-4 w-4 text-green-500" /> : <ArrowDownCircle className="h-4 w-4 text-red-500" />}
-                <span>{isIncome ? 'Ingreso' : 'Egreso'}</span>
-            </div>
-        )
+    {
+    accessorKey: 'contactName',
+    header: 'Contacto Asociado',
+    cell: ({ row }) => row.getValue('contactName') || '-',
+    filterFn: (row, id, value) => {
+        const contactName = row.getValue(id) as string;
+        return contactName.toLowerCase().includes(value.toLowerCase());
     }
   },
-    {
-    accessorKey: 'relatedOrder',
-    header: 'Documento Relacionado',
+  {
+    accessorKey: 'relatedDocument',
+    header: 'Doc. Ref.',
     cell: ({ row }) => {
-        const relatedOrder = row.getValue('relatedOrder') as FinancialMovement['relatedOrder'];
-        if (!relatedOrder) return '-';
-        return <Badge variant="secondary">{relatedOrder.type}-{relatedOrder.id}</Badge>
+        const relatedDocument = row.getValue('relatedDocument') as FinancialMovement['relatedDocument'];
+        if (!relatedDocument) return '-';
+        return <Badge variant="secondary">{relatedDocument.type}-{relatedDocument.id}</Badge>
     }
+  },
+  {
+    accessorKey: 'paymentMethod',
+    header: 'Forma de Pago',
+  },
+  {
+    accessorKey: 'accountId',
+    header: 'Cuenta Origen/Destino',
+    cell: ({ row }) => bankAccounts.find(acc => acc.id === row.getValue('accountId'))?.name || 'N/A',
   },
   {
     accessorKey: 'amount',
@@ -90,7 +96,12 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Fin
           </div>
         );
       },
-    cell: ({ row }) => <div className='text-right font-medium'>{formatCurrency(row.getValue('amount'))}</div>,
+    cell: ({ row }) => (
+        <div className='text-right font-medium flex items-center justify-end gap-2'>
+            {row.original.type === 'income' ? <ArrowUpCircle className="h-4 w-4 text-green-500" /> : <ArrowDownCircle className="h-4 w-4 text-red-500" />}
+            <span>{formatCurrency(row.getValue('amount'))}</span>
+        </div>
+    ),
   },
   {
     id: 'actions',

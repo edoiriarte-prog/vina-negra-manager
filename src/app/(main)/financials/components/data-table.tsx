@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -33,7 +34,9 @@ export function DataTable<TData, TValue>({
   columns,
   data,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [sorting, setSorting] = React.useState<SortingState>([
+      { id: 'date', desc: true }
+  ]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
 
   const table = useReactTable({
@@ -53,12 +56,20 @@ export function DataTable<TData, TValue>({
 
   return (
     <div>
-      <div className="flex items-center py-4">
+      <div className="flex items-center py-4 gap-4">
         <Input
           placeholder="Filtrar por descripción..."
           value={(table.getColumn('description')?.getFilterValue() as string) ?? ''}
           onChange={(event) =>
             table.getColumn('description')?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm"
+        />
+        <Input
+          placeholder="Filtrar por contacto..."
+          value={(table.getColumn('contactName')?.getFilterValue() as string) ?? ''}
+          onChange={(event) =>
+            table.getColumn('contactName')?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
