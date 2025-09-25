@@ -68,13 +68,13 @@ export function NewFinancialMovementSheet({
     purchaseOrders, salesOrders, serviceOrders, contacts 
 }: NewFinancialMovementSheetProps) {
   const [formData, setFormData] = useState<Omit<FinancialMovement, 'id'>>(getInitialFormData());
-  const [associationType, setAssociationType] = useState<'document' | 'contact' | 'concept'>('document');
+  const [associationType, setAssociationType] = useState<'document' | 'contact' | 'concept' | 'product'>('document');
   const [relatedOrderType, setRelatedOrderType] = useState<'OV' | 'OC' | 'OS' | ''>('');
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [batchMovements, setBatchMovements] = useState<BatchMovement[]>([]);
   const { toast } = useToast();
-  const { bankAccounts } = useMasterData();
+  const { bankAccounts, products } = useMasterData();
 
   useEffect(() => {
     if (movement) {
@@ -86,6 +86,8 @@ export function NewFinancialMovementSheet({
         if (movement.relatedDocument) {
             setAssociationType('document');
             setRelatedOrderType(movement.relatedDocument.type);
+        } else if (movement.productId) {
+            setAssociationType('product');
         } else if (movement.contactId) {
             setAssociationType('contact');
         } else {
@@ -116,6 +118,17 @@ export function NewFinancialMovementSheet({
   const handleSelectChange = (name: keyof typeof formData, value: any) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
+
+  const handleProductSelect = (product: string) => {
+    setFormData(prev => ({
+      ...prev,
+      productId: product,
+      description: `Movimiento para producto: ${product}`,
+      relatedDocument: undefined,
+      contactId: undefined,
+      internalConcept: undefined,
+    }));
+  }
 
   const handleRelatedOrderSelect = (orderId: string) => {
     if (!relatedOrderType) return;
@@ -162,6 +175,7 @@ export function NewFinancialMovementSheet({
         amount: orderAmount > 0 ? orderAmount : 0,
         description: newDescription,
         internalConcept: undefined,
+        productId: undefined,
     }));
   }
 
@@ -185,6 +199,8 @@ export function NewFinancialMovementSheet({
     } else if (associationType === 'contact' && formData.contactId) {
         const contact = contacts.find(c => c.id === formData.contactId);
         details = `Movimiento para ${contact?.name}`;
+    } else if (associationType === 'product' && formData.productId) {
+        details = `Movimiento para producto: ${formData.productId}`;
     } else if (associationType === 'concept' && formData.internalConcept) {
         details = `Concepto interno: ${formData.internalConcept}`;
     } else {
@@ -283,13 +299,15 @@ export function NewFinancialMovementSheet({
     ? contacts.filter(c => c.type === 'client') 
     : contacts.filter(c => c.type === 'supplier');
 
-  const onAssociationChange = (value: 'document' | 'contact' | 'concept') => {
+  const onAssociationChange = (value: 'document' | 'contact' | 'concept' | 'product') => {
       setAssociationType(value);
       setFormData(prev => ({
           ...prev,
           relatedDocument: undefined,
           contactId: undefined,
           internalConcept: undefined,
+          productId: undefined,
+          description: '',
       }));
   }
 
@@ -501,6 +519,10 @@ export function NewFinancialMovementSheet({
                             <RadioGroupItem value="contact" id="r-contact" />
                             <Label htmlFor="r-contact">Contacto</Label>
                         </div>
+                         <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="product" id="r-product" />
+                            <Label htmlFor="r-product">Producto</Label>
+                        </div>
                         <div className="flex items-center space-x-2">
                             <RadioGroupItem value="concept" id="r-concept" />
                             <Label htmlFor="r-concept">Concepto Interno</Label>
@@ -546,6 +568,22 @@ export function NewFinancialMovementSheet({
                             <SelectContent>
                                 {filteredContacts.map(c => (
                                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                    {associationType === 'product' && (
+                        <Select
+                            onValueChange={handleProductSelect}
+                            value={formData.productId}
+                            required
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleccione un producto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {products.map(p => (
+                                    <SelectItem key={p} value={p}>{p}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -605,6 +643,3 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
-
-    
-    

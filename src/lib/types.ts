@@ -101,6 +101,7 @@ export type FinancialMovement = {
     id: string;
   };
   internalConcept?: 'Retiro de Socios' | 'Pago de Impuestos' | 'Comisión Bancaria' | 'Préstamo Interno' | 'Otro';
+  productId?: string;
   reference?: string;
 };
 
