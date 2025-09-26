@@ -64,22 +64,18 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                     const clientName = client ? client.name : 'Desconocido';
                     
                     const paymentsForOrder = financialMovements.filter(
-                        fm => (fm.relatedOrder?.id === order.id || fm.contactId === order.clientId) && fm.type === 'income'
+                        fm => (fm.relatedDocument?.id === order.id) && fm.type === 'income'
                     );
-                    const totalPaid = paymentsForOrder.reduce((sum, p) => sum + p.amount, 0);
+                    const totalPaidForOrder = paymentsForOrder.reduce((sum, p) => sum + p.amount, 0);
 
                     // Handle Advance Payment
                     if (order.advanceDueDate && order.advancePercentage) {
                         const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
                         let advanceStatus: DueDateItem['status'] = 'Pendiente';
                         
-                        if (totalPaid >= advanceAmount) {
+                        if (totalPaidForOrder >= advanceAmount) {
                             advanceStatus = 'Pagado';
-                        } else if (totalPaid > 0) {
-                            advanceStatus = 'Pendiente'; // or create a new 'Abono' status if needed
-                        }
-                        
-                        if (advanceStatus !== 'Pagado' && isAfter(new Date(), parseISO(order.advanceDueDate))) {
+                        } else if (isAfter(new Date(), parseISO(order.advanceDueDate))) {
                             advanceStatus = 'Vencido';
                         }
 
@@ -102,13 +98,9 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                         const balanceAmount = order.totalAmount - advanceAmount;
                         let balanceStatus: DueDateItem['status'] = 'Pendiente';
 
-                        if (totalPaid >= order.totalAmount) {
+                        if (totalPaidForOrder >= order.totalAmount) {
                             balanceStatus = 'Pagado';
-                        } else if (totalPaid > advanceAmount) {
-                            balanceStatus = 'Pendiente';
-                        }
-                        
-                        if (balanceStatus !== 'Pagado' && isAfter(new Date(), parseISO(order.balanceDueDate))) {
+                        } else if (isAfter(new Date(), parseISO(order.balanceDueDate))) {
                             balanceStatus = 'Vencido';
                         }
 
