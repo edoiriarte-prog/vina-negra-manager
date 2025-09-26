@@ -2,13 +2,10 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts, financialMovements as initialFinancialMovements, salesOrders as initialSalesOrders, serviceOrders as initialServiceOrders } from '@/lib/data';
 import { PurchaseOrder, Contact, OrderItem, FinancialMovement, SalesOrder, ServiceOrder } from '@/lib/types';
-import { getColumns } from './components/columns';
-import { DataTable } from './components/data-table';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { NewPurchaseOrderSheet } from './components/new-purchase-order-sheet';
 import {
   AlertDialog,
@@ -22,11 +19,31 @@ import {
 } from "@/components/ui/alert-dialog"
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download } from 'lucide-react';
+import { PlusCircle, Download, Eye, MoreHorizontal, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(value);
 
 
 export default function PurchasesPage() {
@@ -42,6 +59,8 @@ export default function PurchasesPage() {
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
+  const [filter, setFilter] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -49,6 +68,39 @@ export default function PurchasesPage() {
   }, []);
   
   const suppliers = contacts.filter(c => c.type === 'supplier');
+
+  const groupedOrders = useMemo(() => {
+    const groups: Record<string, { supplierName: string; orders: PurchaseOrder[]; subtotal: number; }> = {};
+    
+    purchaseOrders.forEach(order => {
+        const supplier = suppliers.find(s => s.id === order.supplierId);
+        if (!supplier) return;
+
+        if (!groups[supplier.id]) {
+            groups[supplier.id] = {
+                supplierName: supplier.name,
+                orders: [],
+                subtotal: 0,
+            };
+        }
+        groups[supplier.id].orders.push(order);
+        groups[supplier.id].subtotal += order.totalAmount;
+    });
+
+    return Object.values(groups).sort((a,b) => a.supplierName.localeCompare(b.supplierName));
+  }, [purchaseOrders, suppliers]);
+
+  const grandTotal = useMemo(() => {
+    return groupedOrders.reduce((sum, group) => sum + group.subtotal, 0);
+  }, [groupedOrders]);
+  
+  const filteredGroupedOrders = useMemo(() => {
+      if (!filter) return groupedOrders;
+      return groupedOrders.filter(group => 
+        group.supplierName.toLowerCase().includes(filter.toLowerCase())
+      );
+  }, [groupedOrders, filter]);
+
 
   const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>, newItems: OrderItem[] = []) => {
     // Combine existing items with new items
@@ -142,6 +194,10 @@ export default function PurchasesPage() {
     setEditingOrder(null);
     setIsSheetOpen(true);
   }
+  
+  const toggleCollapsible = (supplierId: string) => {
+    setOpenCollapsibles(prev => ({...prev, [supplierId]: !prev[supplierId]}));
+  }
 
   const handleExportAll = () => {
     if (purchaseOrders.length === 0) {
@@ -185,8 +241,6 @@ export default function PurchasesPage() {
     toast({ title: 'Exportación Exitosa', description: 'Se han exportado todas las órdenes de compra.' });
   }
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreview, suppliers });
-
   const renderContent = () => {
     if (!isClient) {
       return (
@@ -196,7 +250,109 @@ export default function PurchasesPage() {
         </div>
       )
     }
-    return <DataTable columns={columns} data={purchaseOrders} onRowClick={handleEdit} />;
+    
+    return (
+        <div className="rounded-md border">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className='w-[400px]'>Proveedor</TableHead>
+                        <TableHead className='text-right'>Monto Total</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {filteredGroupedOrders.map(group => {
+                        const supplierId = suppliers.find(s => s.name === group.supplierName)?.id || '';
+                        return (
+                            <React.Fragment key={supplierId}>
+                                <TableRow className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggleCollapsible(supplierId)}>
+                                    <TableCell className='font-bold'>
+                                         <div className="flex items-center gap-2">
+                                            <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[supplierId] && "rotate-180")} />
+                                            {group.supplierName}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className='text-right font-bold'>{formatCurrency(group.subtotal)}</TableCell>
+                                </TableRow>
+                                {openCollapsibles[supplierId] && (
+                                    <TableRow>
+                                        <TableCell colSpan={2} className="p-0">
+                                            <div className='p-4 bg-background'>
+                                                <Table>
+                                                    <TableHeader>
+                                                        <TableRow>
+                                                            <TableHead>O/C</TableHead>
+                                                            <TableHead>Fecha</TableHead>
+                                                            <TableHead className="text-right">Monto</TableHead>
+                                                            <TableHead>Estado Pago</TableHead>
+                                                            <TableHead>Estado Orden</TableHead>
+                                                            <TableHead className="w-[50px]"></TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {group.orders.map(order => (
+                                                            <TableRow key={order.id}>
+                                                                <TableCell className="font-medium">{order.id}</TableCell>
+                                                                <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy')}</TableCell>
+                                                                <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
+                                                                <TableCell>
+                                                                    <Badge variant={order.paymentStatus === 'Pagado' ? 'default' : order.paymentStatus === 'Abonado' ? 'secondary' : 'destructive'}>
+                                                                        {order.paymentStatus || 'Pendiente'}
+                                                                    </Badge>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Badge variant={order.status === 'completed' ? 'default' : order.status === 'pending' ? 'secondary' : 'destructive'}>
+                                                                        {order.status === 'completed' ? 'Completada' : order.status === 'pending' ? 'Pendiente' : 'Cancelada'}
+                                                                    </Badge>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                     <DropdownMenu>
+                                                                      <DropdownMenuTrigger asChild>
+                                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                          <span className="sr-only">Abrir menú</span>
+                                                                          <MoreHorizontal className="h-4 w-4" />
+                                                                        </Button>
+                                                                      </DropdownMenuTrigger>
+                                                                      <DropdownMenuContent align="end">
+                                                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                                                        <DropdownMenuItem onClick={() => handlePreview(order)}>
+                                                                          <Eye className='mr-2 h-4 w-4' />
+                                                                          Visualizar
+                                                                        </DropdownMenuItem>
+                                                                        <DropdownMenuItem onClick={() => handleEdit(order)}>
+                                                                          Editar
+                                                                        </DropdownMenuItem>
+                                                                        <DropdownMenuSeparator />
+                                                                        <DropdownMenuItem 
+                                                                          className="text-destructive focus:text-destructive"
+                                                                          onClick={() => handleDelete(order)}
+                                                                        >
+                                                                          Eliminar
+                                                                        </DropdownMenuItem>
+                                                                      </DropdownMenuContent>
+                                                                    </DropdownMenu>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
+                </TableBody>
+                <TableFooter>
+                    <TableRow>
+                        <TableHead className='text-right font-bold text-lg'>Total General</TableHead>
+                        <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotal)}</TableHead>
+                    </TableRow>
+                </TableFooter>
+            </Table>
+        </div>
+    );
   }
 
   return (
@@ -206,7 +362,7 @@ export default function PurchasesPage() {
           <div className="flex items-center justify-between">
             <div>
                 <CardTitle className="font-headline text-2xl">Gestión de Compras (O/C)</CardTitle>
-                <CardDescription>Registra todas las adquisiciones de productos.</CardDescription>
+                <CardDescription>Registra todas las adquisiciones de productos, agrupadas por proveedor.</CardDescription>
             </div>
             <div className="flex gap-2">
                 <Button variant="outline" onClick={handleExportAll}>
@@ -219,6 +375,14 @@ export default function PurchasesPage() {
                 </Button>
             </div>
           </div>
+           <div className="py-4">
+              <Input
+                placeholder="Filtrar por proveedor..."
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                className="max-w-sm"
+              />
+            </div>
         </CardHeader>
         <CardContent>
           {renderContent()}
@@ -275,3 +439,4 @@ export default function PurchasesPage() {
     </>
   );
 }
+
