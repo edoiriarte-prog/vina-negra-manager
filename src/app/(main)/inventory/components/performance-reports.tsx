@@ -125,31 +125,6 @@ export function PerformanceReports({ salesOrders, purchaseOrders }: PerformanceR
 
     return (
         <div className="flex flex-col gap-6 mt-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="font-headline text-2xl">Rendimiento de Ventas</CardTitle>
-                    <CardDescription>Análisis de ventas por producto y calibre.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Producto</TableHead>
-                                    <TableHead>Calibre</TableHead>
-                                    <TableHead className="text-right">Kilos Vendidos</TableHead>
-                                    <TableHead className="text-right">Ingreso Total</TableHead>
-                                    <TableHead className="text-right">Precio Promedio/kg</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {renderPerformanceRows(salesPerformance)}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
-
              <Card>
                 <CardHeader>
                     <CardTitle className="font-headline text-2xl">Rendimiento de Compras</CardTitle>
