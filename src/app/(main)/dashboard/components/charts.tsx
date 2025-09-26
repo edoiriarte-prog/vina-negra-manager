@@ -61,6 +61,47 @@ export function WeeklyPurchasesChart({ data }: { data: PurchaseOrder[] }) {
   );
 }
 
+// Income vs Expense Chart
+export function IncomeVsExpenseChart({ data }: { data: FinancialMovement[] }) {
+    const weeklyData: { [week: number]: { income: number; expense: number } } = {};
+
+    data.forEach(mov => {
+        const week = getWeek(parseISO(mov.date));
+        if(!weeklyData[week]) weeklyData[week] = { income: 0, expense: 0 };
+        
+        if (mov.type === 'income') {
+            weeklyData[week].income += mov.amount;
+        } else {
+            weeklyData[week].expense += mov.amount;
+        }
+    });
+
+    const chartData = Object.entries(weeklyData).map(([week, data]) => ({
+        name: `Semana ${week}`,
+        Ingresos: data.income,
+        Egresos: data.expense,
+    })).sort((a, b) => parseInt(a.name.split(' ')[1]) - parseInt(b.name.split(' ')[1]));
+
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={chartData}>
+        <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
+        <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'hsl(var(--background))',
+            borderColor: 'hsl(var(--border))',
+          }}
+          formatter={(value: number) => formatCurrency(value)}
+        />
+        <Legend wrapperStyle={{fontSize: "12px"}}/>
+        <Bar dataKey="Ingresos" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Egresos" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 
 // Expense Breakdown Chart
 export function ExpenseBreakdownChart({ purchases, services }: { purchases: number; services: number }) {
