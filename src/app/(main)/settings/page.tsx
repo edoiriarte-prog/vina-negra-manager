@@ -23,7 +23,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 function MasterDataEditor({ title, data, setData }: { title: string, data: string[], setData: React.Dispatch<React.SetStateAction<string[]>> }) {
     const [newItem, setNewItem] = useState('');
+    const [isClient, setIsClient] = useState(false);
     const { toast } = useToast();
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     const handleAddItem = () => {
         if (newItem && !data.includes(newItem)) {
@@ -60,7 +65,7 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
                     </Button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {data.map(item => (
+                    {isClient && data.map(item => (
                         <div key={item} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                             <span>{item}</span>
                             <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item)}>
@@ -80,7 +85,12 @@ function BankAccountsEditor() {
     const { bankAccounts, setBankAccounts } = useMasterData();
     const [formData, setFormData] = useState<Omit<BankAccount, 'id'>>(emptyAccount);
     const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+    const [isClient, setIsClient] = useState(false);
     const { toast } = useToast();
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     useEffect(() => {
         if (editingAccountId) {
@@ -152,7 +162,7 @@ function BankAccountsEditor() {
                     </div>
                 </div>
                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {bankAccounts.map(acc => (
+                    {isClient && bankAccounts.map(acc => (
                         <div key={acc.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                             <div>
                                 <span className='font-semibold'>{acc.name}</span>
@@ -272,5 +282,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
-    
