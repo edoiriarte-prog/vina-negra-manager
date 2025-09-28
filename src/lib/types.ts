@@ -91,15 +91,15 @@ export type ServiceOrder = {
 export type FinancialMovement = {
   id: string;
   date: string;
-  type: 'income' | 'expense' | 'transfer';
+  type: 'income' | 'expense' | 'traspaso';
   description: string;
   amount: number;
   paymentMethod: 'Transferencia' | 'Efectivo' | 'Depósito Bancario' | 'Cheque';
   
-  // For income and transfers
+  // For income and traspasos
   destinationAccountId?: string; 
   
-  // For expenses and transfers
+  // For expenses and traspasos
   sourceAccountId?: string;
 
   contactId?: string;
@@ -143,5 +143,3 @@ export type BankAccount = {
     status: 'Activa' | 'Inactiva';
     owner?: string;
 }
-
-    

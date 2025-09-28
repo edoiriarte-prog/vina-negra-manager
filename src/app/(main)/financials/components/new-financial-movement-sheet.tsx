@@ -107,7 +107,7 @@ export function NewFinancialMovementSheet({
   useEffect(() => {
       if (isBatchMode) {
           setAssociationType('abono');
-      } else if (formData.type !== 'transfer') {
+      } else if (formData.type !== 'traspaso') {
           setAssociationType('document');
       } else {
           setAssociationType('concept');
@@ -212,7 +212,7 @@ export function NewFinancialMovementSheet({
         }
 
         const result = await suggestTransactionDescription({
-            transactionType: formData.type === 'transfer' ? 'expense' : formData.type, // Treat transfer as expense for suggestion
+            transactionType: formData.type === 'traspaso' ? 'expense' : formData.type, // Treat transfer as expense for suggestion
             transactionDetails: details,
         });
 
@@ -305,7 +305,7 @@ export function NewFinancialMovementSheet({
       setPendingBalance(null);
   }
 
-  const onTypeChange = (value: 'income' | 'expense' | 'transfer') => {
+  const onTypeChange = (value: 'income' | 'expense' | 'traspaso') => {
       setFormData(prev => ({
           ...getInitialFormData(),
           date: prev.date,
@@ -327,9 +327,9 @@ export function NewFinancialMovementSheet({
                 <div className='flex gap-2'>
                     <Button type="button" variant={formData.type === 'income' ? 'default' : 'secondary'} onClick={() => onTypeChange('income')}>Ingreso</Button>
                     <Button type="button" variant={formData.type === 'expense' ? 'default' : 'secondary'} onClick={() => onTypeChange('expense')}>Egreso</Button>
-                    <Button type="button" variant={formData.type === 'transfer' ? 'default' : 'secondary'} onClick={() => onTypeChange('transfer')}>Transferencia</Button>
+                    <Button type="button" variant={formData.type === 'traspaso' ? 'default' : 'secondary'} onClick={() => onTypeChange('traspaso')}>Traspaso</Button>
                 </div>
-                 {!movement && formData.type !== 'transfer' && (
+                 {!movement && formData.type !== 'traspaso' && (
                     <div className="flex items-center space-x-2">
                         <Switch id="batch-mode" checked={isBatchMode} onCheckedChange={setIsBatchMode} />
                         <Label htmlFor="batch-mode">Registro Múltiple</Label>
@@ -466,7 +466,7 @@ export function NewFinancialMovementSheet({
                     <Input id="amount" name="amount" type="number" value={formData.amount} onChange={handleInputChange} className="col-span-3" required placeholder="$" />
                 </div>
                 
-                {formData.type === 'transfer' ? (
+                {formData.type === 'traspaso' ? (
                     <div className="grid grid-cols-10 items-center gap-2">
                         <Label className="col-span-2 text-right">Cuentas</Label>
                         <div className="col-span-4">
@@ -634,7 +634,7 @@ export function NewFinancialMovementSheet({
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button type="button" size="sm" variant="outline" className="mt-2" onClick={handleSuggestDescription} disabled={isSuggesting || formData.type === 'transfer'}>
+                    <Button type="button" size="sm" variant="outline" className="mt-2" onClick={handleSuggestDescription} disabled={isSuggesting || formData.type === 'traspaso'}>
                         {isSuggesting ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Sparkles className='mr-2 h-4 w-4'/>}
                         Sugerir con IA
                     </Button>
@@ -662,11 +662,3 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
-
-    
-
-    
-
-
-
-    

@@ -84,7 +84,7 @@ export const getColumns = ({ onEdit, onDelete, bankAccounts }: GetColumnsProps):
         const source = bankAccounts.find(acc => acc.id === movement.sourceAccountId);
         const destination = bankAccounts.find(acc => acc.id === movement.destinationAccountId);
 
-        if (movement.type === 'transfer') {
+        if (movement.type === 'traspaso') {
             return <span className='flex items-center gap-1 text-xs'>{source?.name} <ArrowRightCircle className='h-3 w-3'/> {destination?.name}</span>
         }
         return source?.name || destination?.name || 'N/A'
@@ -150,5 +150,3 @@ export const getColumns = ({ onEdit, onDelete, bankAccounts }: GetColumnsProps):
     },
   },
 ];
-
-    

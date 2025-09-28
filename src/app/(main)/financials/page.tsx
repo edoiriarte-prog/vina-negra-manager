@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -68,7 +67,7 @@ export default function FinancialsPage() {
   const [deletingMovement, setDeletingMovement] = useState<FinancialMovement | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [filter, setFilter] = useState<{ type: 'income' | 'expense' | 'transfer', accountId: string } | null>(null);
+  const [filter, setFilter] = useState<{ type: 'income' | 'expense' | 'traspaso', accountId: string } | null>(null);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
@@ -81,11 +80,11 @@ export default function FinancialsPage() {
     
     const summaries = bankAccounts.map(account => {
         const totalIncome = financialMovements
-            .filter(m => m.destinationAccountId === account.id && (m.type === 'income' || m.type === 'transfer'))
+            .filter(m => m.destinationAccountId === account.id && (m.type === 'income' || m.type === 'traspaso'))
             .reduce((sum, m) => sum + m.amount, 0);
 
         const totalExpense = financialMovements
-            .filter(m => m.sourceAccountId === account.id && (m.type === 'expense' || m.type === 'transfer'))
+            .filter(m => m.sourceAccountId === account.id && (m.type === 'expense' || m.type === 'traspaso'))
             .reduce((sum, m) => sum + m.amount, 0);
             
         const finalBalance = account.initialBalance + totalIncome - totalExpense;
@@ -187,8 +186,8 @@ export default function FinancialsPage() {
         return dataWithContactNames.filter(m => m.destinationAccountId === filter.accountId && m.type === 'income');
     } else if (filter.type === 'expense') {
         return dataWithContactNames.filter(m => m.sourceAccountId === filter.accountId && m.type === 'expense');
-    } else { // transfer
-        return dataWithContactNames.filter(m => (m.sourceAccountId === filter.accountId || m.destinationAccountId === filter.accountId) && m.type === 'transfer')
+    } else { // traspaso
+        return dataWithContactNames.filter(m => (m.sourceAccountId === filter.accountId || m.destinationAccountId === filter.accountId) && m.type === 'traspaso')
     }
   }, [dataWithContactNames, filter]);
 
@@ -226,10 +225,10 @@ export default function FinancialsPage() {
     return { groupedExpenses: Object.values(groups).sort((a,b) => a.contactName.localeCompare(b.contactName)), totalExpenses };
   }, [filteredData]);
   
-  const { transfers, totalTransferred } = useMemo(() => {
-    const transferMovements = filteredData.filter(m => m.type === 'transfer');
-    const total = transferMovements.reduce((sum, m) => sum + m.amount, 0);
-    return { transfers: transferMovements.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()), totalTransferred: total };
+  const { traspasos, totalTraspasado } = useMemo(() => {
+    const traspasoMovements = filteredData.filter(m => m.type === 'traspaso');
+    const total = traspasoMovements.reduce((sum, m) => sum + m.amount, 0);
+    return { traspasos: traspasoMovements.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()), totalTraspasado: total };
   }, [filteredData]);
 
   const toggleCollapsible = (id: string) => {
@@ -282,7 +281,7 @@ export default function FinancialsPage() {
         <div className="flex items-center justify-between">
             <div>
               <h1 className="font-headline text-3xl">Tesorería y Movimientos Bancarios</h1>
-              <p className="text-muted-foreground">Registra todos los ingresos, egresos y transferencias de la empresa.</p>
+              <p className="text-muted-foreground">Registra todos los ingresos, egresos y traspasos de la empresa.</p>
             </div>
             <Button onClick={openNewMovementSheet}>
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -344,7 +343,7 @@ export default function FinancialsPage() {
                         <CardTitle>Movimientos Registrados</CardTitle>
                         {filter ? (
                             <CardDescription>
-                                Mostrando {filter.type === 'income' ? 'ingresos de' : filter.type === 'expense' ? 'egresos de' : 'transferencias en'} la cuenta "{bankAccounts.find(a => a.id === filter.accountId)?.name}"
+                                Mostrando {filter.type === 'income' ? 'ingresos de' : filter.type === 'expense' ? 'egresos de' : 'traspasos en'} la cuenta "{bankAccounts.find(a => a.id === filter.accountId)?.name}"
                             </CardDescription>
                         ) : (
                             <CardDescription>Todos los movimientos registrados en el período.</CardDescription>
@@ -417,9 +416,9 @@ export default function FinancialsPage() {
                         </div>
                     </div>
 
-                    {/* Transfers Table */}
+                    {/* Traspasos Table */}
                     <div>
-                        <h3 className="font-headline text-xl mb-2">Transferencias entre Cuentas</h3>
+                        <h3 className="font-headline text-xl mb-2">Traspasos entre Cuentas</h3>
                         <div className="rounded-md border">
                             <Table>
                                 <TableHeader>
@@ -432,8 +431,8 @@ export default function FinancialsPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {transfers.length > 0 ? (
-                                        transfers.map(m => (
+                                    {traspasos.length > 0 ? (
+                                        traspasos.map(m => (
                                             <TableRow key={m.id} className="cursor-pointer" onClick={() => handleEdit(m)}>
                                                 <TableCell>{format(parseISO(m.date), 'dd-MM-yyyy')}</TableCell>
                                                 <TableCell>{m.description}</TableCell>
@@ -443,13 +442,13 @@ export default function FinancialsPage() {
                                             </TableRow>
                                         ))
                                     ) : (
-                                        <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay transferencias que mostrar.</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay traspasos que mostrar.</TableCell></TableRow>
                                     )}
                                 </TableBody>
                                 <TableFooter>
                                     <TableRow>
-                                        <TableHead colSpan={4} className="text-right font-bold text-lg">Total Transferido</TableHead>
-                                        <TableHead className="text-right font-bold text-lg">{formatCurrency(totalTransferred)}</TableHead>
+                                        <TableHead colSpan={4} className="text-right font-bold text-lg">Total Traspasado</TableHead>
+                                        <TableHead className="text-right font-bold text-lg">{formatCurrency(totalTraspasado)}</TableHead>
                                     </TableRow>
                                 </TableFooter>
                             </Table>
@@ -492,5 +491,3 @@ export default function FinancialsPage() {
     </>
   );
 }
-
-    
