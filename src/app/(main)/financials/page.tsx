@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -260,7 +261,7 @@ export default function FinancialsPage() {
         </TableRow>
         {openCollapsibles[`${type}-${group.contactName}`] && (
           group.movements.map(m => (
-            <TableRow key={m.id} className="bg-background hover:bg-muted/50">
+            <TableRow key={m.id} className="bg-background hover:bg-muted/50 cursor-pointer" onClick={() => handleEdit(m)}>
               <TableCell className="pl-12">{format(parseISO(m.date), 'dd-MM-yyyy')}</TableCell>
               <TableCell>{m.description}</TableCell>
               <TableCell>{m.paymentMethod}</TableCell>
