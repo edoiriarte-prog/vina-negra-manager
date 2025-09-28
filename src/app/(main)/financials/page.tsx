@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -81,30 +80,22 @@ export default function FinancialsPage() {
     
     const summaries = bankAccounts.map(account => {
         const totalIncome = financialMovements
-            .filter(m => m.destinationAccountId === account.id && m.type !== 'transfer')
+            .filter(m => m.destinationAccountId === account.id)
             .reduce((sum, m) => sum + m.amount, 0);
 
         const totalExpense = financialMovements
-            .filter(m => m.sourceAccountId === account.id && m.type !== 'transfer')
+            .filter(m => m.sourceAccountId === account.id)
             .reduce((sum, m) => sum + m.amount, 0);
             
-        const transfersIn = financialMovements
-            .filter(m => m.destinationAccountId === account.id && m.type === 'transfer')
-            .reduce((sum, m) => sum + m.amount, 0);
-
-        const transfersOut = financialMovements
-            .filter(m => m.sourceAccountId === account.id && m.type === 'transfer')
-            .reduce((sum, m) => sum + m.amount, 0);
-            
-        const finalBalance = account.initialBalance + totalIncome + transfersIn - totalExpense - transfersOut;
+        const finalBalance = account.initialBalance + totalIncome - totalExpense;
 
         return {
             id: account.id,
             name: account.name,
             owner: account.owner,
             initialBalance: account.initialBalance,
-            totalIncome: totalIncome + transfersIn,
-            totalExpense: totalExpense + transfersOut,
+            totalIncome,
+            totalExpense,
             finalBalance,
         };
     });
@@ -127,7 +118,7 @@ export default function FinancialsPage() {
 
     if (Array.isArray(data)) {
         const newMovements: FinancialMovement[] = data.map((movement, index) => ({
-            ...movement,
+            ...(movement as Omit<FinancialMovement, 'id'>),
             id: `M-${nextId + index}`,
         }));
         setFinancialMovements(prev => [...prev, ...newMovements]);
@@ -454,3 +445,5 @@ export default function FinancialsPage() {
     </>
   );
 }
+
+    
