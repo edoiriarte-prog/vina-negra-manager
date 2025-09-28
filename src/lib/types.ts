@@ -1,4 +1,5 @@
 
+
 export type Interaction = {
   id: string;
   date: string;
@@ -90,11 +91,17 @@ export type ServiceOrder = {
 export type FinancialMovement = {
   id: string;
   date: string;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'transfer';
   description: string;
   amount: number;
   paymentMethod: 'Transferencia' | 'Efectivo' | 'Depósito Bancario' | 'Cheque';
-  accountId: string;
+  
+  // For income and transfers
+  destinationAccountId?: string; 
+  
+  // For expenses and transfers
+  sourceAccountId?: string;
+
   contactId?: string;
   relatedDocument?: {
     type: 'OV' | 'OC' | 'OS';

@@ -3,7 +3,7 @@
 
 import { ColumnDef } from '@tanstack/react-table';
 import { FinancialMovement, BankAccount } from '@/lib/types';
-import { MoreHorizontal, ArrowUpDown, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { MoreHorizontal, ArrowUpDown, ArrowDownCircle, ArrowUpCircle, ArrowRightCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -77,9 +77,18 @@ export const getColumns = ({ onEdit, onDelete, bankAccounts }: GetColumnsProps):
     header: 'Forma de Pago',
   },
   {
-    accessorKey: 'accountId',
+    accessorKey: 'sourceAccountId',
     header: 'Cuenta Origen/Destino',
-    cell: ({ row }) => bankAccounts.find(acc => acc.id === row.getValue('accountId'))?.name || 'N/A',
+    cell: ({ row }) => {
+        const movement = row.original;
+        const source = bankAccounts.find(acc => acc.id === movement.sourceAccountId);
+        const destination = bankAccounts.find(acc => acc.id === movement.destinationAccountId);
+
+        if (movement.type === 'transfer') {
+            return <span className='flex items-center gap-1 text-xs'>{source?.name} <ArrowRightCircle className='h-3 w-3'/> {destination?.name}</span>
+        }
+        return source?.name || destination?.name || 'N/A'
+    },
   },
   {
     accessorKey: 'amount',
@@ -96,12 +105,20 @@ export const getColumns = ({ onEdit, onDelete, bankAccounts }: GetColumnsProps):
           </div>
         );
       },
-    cell: ({ row }) => (
-        <div className='text-right font-medium flex items-center justify-end gap-2'>
-            {row.original.type === 'income' ? <ArrowUpCircle className="h-4 w-4 text-green-500" /> : <ArrowDownCircle className="h-4 w-4 text-red-500" />}
-            <span>{formatCurrency(row.getValue('amount'))}</span>
-        </div>
-    ),
+    cell: ({ row }) => {
+        const type = row.original.type;
+        let icon;
+        if (type === 'income') icon = <ArrowUpCircle className="h-4 w-4 text-green-500" />;
+        else if (type === 'expense') icon = <ArrowDownCircle className="h-4 w-4 text-red-500" />;
+        else icon = <ArrowRightCircle className="h-4 w-4 text-blue-500" />;
+
+        return (
+            <div className='text-right font-medium flex items-center justify-end gap-2'>
+                {icon}
+                <span>{formatCurrency(row.getValue('amount'))}</span>
+            </div>
+        )
+    },
   },
   {
     id: 'actions',

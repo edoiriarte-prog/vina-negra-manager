@@ -24,7 +24,7 @@ import {
 import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { suggestTransactionDescription } from '@/ai/flows/suggest-transaction-descriptions';
-import { Loader2, Sparkles, CalendarIcon, Trash2, PlusCircle } from 'lucide-react';
+import { Loader2, Sparkles, CalendarIcon, Trash2, PlusCircle, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useMasterData } from '@/hooks/use-master-data';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -55,7 +55,8 @@ const getInitialFormData = (): Omit<FinancialMovement, 'id'> => ({
     description: '',
     amount: 0,
     paymentMethod: 'Transferencia',
-    accountId: '',
+    destinationAccountId: undefined,
+    sourceAccountId: undefined,
     contactId: undefined,
     relatedDocument: undefined,
     internalConcept: undefined,
@@ -106,11 +107,13 @@ export function NewFinancialMovementSheet({
   useEffect(() => {
       if (isBatchMode) {
           setAssociationType('abono');
-      } else {
+      } else if (formData.type !== 'transfer') {
           setAssociationType('document');
+      } else {
+          setAssociationType('concept');
       }
       setPendingBalance(null);
-  }, [isBatchMode]);
+  }, [isBatchMode, formData.type]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -209,7 +212,7 @@ export function NewFinancialMovementSheet({
         }
 
         const result = await suggestTransactionDescription({
-            transactionType: formData.type,
+            transactionType: formData.type === 'transfer' ? 'expense' : formData.type, // Treat transfer as expense for suggestion
             transactionDetails: details,
         });
 
@@ -232,7 +235,8 @@ export function NewFinancialMovementSheet({
         description: '',
         amount: 0,
         paymentMethod: 'Transferencia',
-        accountId: '',
+        sourceAccountId: '',
+        destinationAccountId: '',
     }]);
   }
 
@@ -251,7 +255,7 @@ export function NewFinancialMovementSheet({
             toast({ variant: "destructive", title: "Error", description: "Debe seleccionar un contacto para el registro múltiple." });
             return;
         }
-        if (batchMovements.length === 0 || batchMovements.some(m => m.amount <= 0 || !m.description || !m.accountId)) {
+        if (batchMovements.length === 0 || batchMovements.some(m => m.amount <= 0 || !m.description || (!m.sourceAccountId && !m.destinationAccountId))) {
             toast({ variant: "destructive", title: "Error", description: "Todos los movimientos deben tener descripción, monto positivo y cuenta." });
             return;
         }
@@ -301,6 +305,14 @@ export function NewFinancialMovementSheet({
       setPendingBalance(null);
   }
 
+  const onTypeChange = (value: 'income' | 'expense' | 'transfer') => {
+      setFormData(prev => ({
+          ...getInitialFormData(),
+          date: prev.date,
+          type: value,
+      }));
+  }
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-6xl">
@@ -313,10 +325,11 @@ export function NewFinancialMovementSheet({
             
             <div className='flex justify-between items-center p-2 bg-muted rounded-md'>
                 <div className='flex gap-2'>
-                    <Button type="button" variant={formData.type === 'income' ? 'default' : 'secondary'} onClick={() => handleSelectChange('type', 'income')}>Ingreso</Button>
-                    <Button type="button" variant={formData.type === 'expense' ? 'default' : 'secondary'} onClick={() => handleSelectChange('type', 'expense')}>Egreso</Button>
+                    <Button type="button" variant={formData.type === 'income' ? 'default' : 'secondary'} onClick={() => onTypeChange('income')}>Ingreso</Button>
+                    <Button type="button" variant={formData.type === 'expense' ? 'default' : 'secondary'} onClick={() => onTypeChange('expense')}>Egreso</Button>
+                    <Button type="button" variant={formData.type === 'transfer' ? 'default' : 'secondary'} onClick={() => onTypeChange('transfer')}>Transferencia</Button>
                 </div>
-                 {!movement && (
+                 {!movement && formData.type !== 'transfer' && (
                     <div className="flex items-center space-x-2">
                         <Switch id="batch-mode" checked={isBatchMode} onCheckedChange={setIsBatchMode} />
                         <Label htmlFor="batch-mode">Registro Múltiple</Label>
@@ -403,7 +416,10 @@ export function NewFinancialMovementSheet({
                                         </Select>
                                     </TableCell>
                                      <TableCell className='min-w-[200px]'>
-                                         <Select onValueChange={(value) => handleBatchChange(bm.batchId, 'accountId', value)} value={bm.accountId}>
+                                         <Select onValueChange={(value) => {
+                                             const accountField = formData.type === 'income' ? 'destinationAccountId' : 'sourceAccountId';
+                                             handleBatchChange(bm.batchId, accountField, value)}
+                                         } value={formData.type === 'income' ? bm.destinationAccountId : bm.sourceAccountId}>
                                             <SelectTrigger><SelectValue placeholder="Seleccione..."/></SelectTrigger>
                                             <SelectContent>
                                             {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
@@ -468,122 +484,155 @@ export function NewFinancialMovementSheet({
                     </Label>
                     <Input id="amount" name="amount" type="number" value={formData.amount} onChange={handleInputChange} className="col-span-3" required placeholder="$" />
                 </div>
-
-                <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="paymentMethod" className="text-right">
-                    Forma Pago
-                </Label>
-                <Select required onValueChange={(value) => handleSelectChange('paymentMethod', value)} value={formData.paymentMethod}>
-                    <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                    <SelectItem value="Transferencia">Transferencia</SelectItem>
-                    <SelectItem value="Efectivo">Efectivo</SelectItem>
-                    <SelectItem value="Depósito Bancario">Depósito Bancario</SelectItem>
-                    <SelectItem value="Cheque">Cheque</SelectItem>
-                    </SelectContent>
-                </Select>
-                </div>
-
-                <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">
-                    {formData.type === 'income' ? 'Cta. Destino' : 'Cta. Origen'}
-                </Label>
-                <Select required onValueChange={(value) => handleSelectChange('accountId', value)} value={formData.accountId}>
-                    <SelectTrigger className="col-span-3"><SelectValue placeholder="Seleccione una cuenta"/></SelectTrigger>
-                    <SelectContent>
-                    {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
-                        <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-                </div>
-
-                <div className="space-y-2 p-3 border rounded-md">
-                    <Label>Asociar a:</Label>
-                    <RadioGroup value={associationType} onValueChange={onAssociationChange} className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="document" id="r-doc" />
-                            <Label htmlFor="r-doc">Documento</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="abono" id="r-abono" />
-                            <Label htmlFor="r-abono">Abono a Contacto</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="concept" id="r-concept" />
-                            <Label htmlFor="r-concept">Concepto Interno</Label>
-                        </div>
-                    </RadioGroup>
-                    
-                    <div className='pt-2'>
-                    {associationType === 'document' && (
-                        <div className='grid grid-cols-2 gap-2'>
-                            <Select 
-                                onValueChange={(value: 'OV' | 'OC' | 'OS' | '') => {
-                                    setRelatedOrderType(value);
-                                    setFormData(prev => ({...prev, relatedDocument: undefined, contactId: undefined}));
-                                    setPendingBalance(null);
-                                }} 
-                                value={relatedOrderType}
-                            >
-                                <SelectTrigger><SelectValue placeholder="Tipo Doc." /></SelectTrigger>
+                
+                {formData.type === 'transfer' ? (
+                    <div className="grid grid-cols-10 items-center gap-2">
+                        <Label className="col-span-2 text-right">Cuentas</Label>
+                        <div className="col-span-4">
+                             <Select required onValueChange={(value) => handleSelectChange('sourceAccountId', value)} value={formData.sourceAccountId}>
+                                <SelectTrigger><SelectValue placeholder="Cuenta Origen"/></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="OV">Venta (O/V)</SelectItem>
-                                    <SelectItem value="OC">Compra (O/C)</SelectItem>
-                                    <SelectItem value="OS">Servicio (O/S)</SelectItem>
+                                {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
+                                    <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                                ))}
                                 </SelectContent>
                             </Select>
-                            <Select onValueChange={handleRelatedOrderSelect} value={formData.relatedDocument?.id} disabled={!relatedOrderType}>
-                                <SelectTrigger><SelectValue placeholder="ID Documento" /></SelectTrigger>
+                        </div>
+                        <ArrowRight className="h-4 w-4 justify-self-center"/>
+                        <div className="col-span-3">
+                             <Select required onValueChange={(value) => handleSelectChange('destinationAccountId', value)} value={formData.destinationAccountId}>
+                                <SelectTrigger><SelectValue placeholder="Cuenta Destino"/></SelectTrigger>
                                 <SelectContent>
-                                    {getOrderOptions().map(opt => (
-                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                {bankAccounts.filter(a => a.status === 'Activa' && a.id !== formData.sourceAccountId).map(acc => (
+                                    <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                                ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="paymentMethod" className="text-right">
+                            Forma Pago
+                        </Label>
+                        <Select required onValueChange={(value) => handleSelectChange('paymentMethod', value)} value={formData.paymentMethod}>
+                            <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                            <SelectItem value="Transferencia">Transferencia</SelectItem>
+                            <SelectItem value="Efectivo">Efectivo</SelectItem>
+                            <SelectItem value="Depósito Bancario">Depósito Bancario</SelectItem>
+                            <SelectItem value="Cheque">Cheque</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">
+                            {formData.type === 'income' ? 'Cta. Destino' : 'Cta. Origen'}
+                        </Label>
+                        <Select 
+                            required 
+                            onValueChange={(value) => handleSelectChange(formData.type === 'income' ? 'destinationAccountId' : 'sourceAccountId', value)} 
+                            value={formData.type === 'income' ? formData.destinationAccountId : formData.sourceAccountId}>
+                            <SelectTrigger className="col-span-3"><SelectValue placeholder="Seleccione una cuenta"/></SelectTrigger>
+                            <SelectContent>
+                            {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
+                                <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-2 p-3 border rounded-md">
+                        <Label>Asociar a:</Label>
+                        <RadioGroup value={associationType} onValueChange={onAssociationChange} className="flex gap-4">
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="document" id="r-doc" />
+                                <Label htmlFor="r-doc">Documento</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="abono" id="r-abono" />
+                                <Label htmlFor="r-abono">Abono a Contacto</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="concept" id="r-concept" />
+                                <Label htmlFor="r-concept">Concepto Interno</Label>
+                            </div>
+                        </RadioGroup>
+                        
+                        <div className='pt-2'>
+                        {associationType === 'document' && (
+                            <div className='grid grid-cols-2 gap-2'>
+                                <Select 
+                                    onValueChange={(value: 'OV' | 'OC' | 'OS' | '') => {
+                                        setRelatedOrderType(value);
+                                        setFormData(prev => ({...prev, relatedDocument: undefined, contactId: undefined}));
+                                        setPendingBalance(null);
+                                    }} 
+                                    value={relatedOrderType}
+                                >
+                                    <SelectTrigger><SelectValue placeholder="Tipo Doc." /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="OV">Venta (O/V)</SelectItem>
+                                        <SelectItem value="OC">Compra (O/C)</SelectItem>
+                                        <SelectItem value="OS">Servicio (O/S)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select onValueChange={handleRelatedOrderSelect} value={formData.relatedDocument?.id} disabled={!relatedOrderType}>
+                                    <SelectTrigger><SelectValue placeholder="ID Documento" /></SelectTrigger>
+                                    <SelectContent>
+                                        {getOrderOptions().map(opt => (
+                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        {pendingBalance !== null && (
+                        <div className="mt-2 text-sm text-muted-foreground">
+                            Saldo Pendiente del Documento: <span className="font-medium text-foreground">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(pendingBalance)}</span>
+                        </div>
+                        )}
+                        {associationType === 'abono' && (
+                            <Select
+                                onValueChange={(value) => handleSelectChange('contactId', value)}
+                                value={formData.contactId}
+                                required
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione un contacto" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {filteredContacts.map(c => (
+                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
+                        )}
+                        {associationType === 'concept' && (
+                            <Select
+                                onValueChange={(value) => handleSelectChange('internalConcept', value)}
+                                value={formData.internalConcept}
+                                required
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione un concepto" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Retiro de Socios">Retiro de Socios</SelectItem>
+                                    <SelectItem value="Pago de Impuestos">Pago de Impuestos</SelectItem>
+                                    <SelectItem value="Comisión Bancaria">Comisión Bancaria</SelectItem>
+                                    <SelectItem value="Préstamo Interno">Préstamo Interno</SelectItem>
+                                    <SelectItem value="Otro">Otro</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
                         </div>
-                    )}
-                    {pendingBalance !== null && (
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        Saldo Pendiente del Documento: <span className="font-medium text-foreground">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(pendingBalance)}</span>
-                      </div>
-                    )}
-                    {associationType === 'abono' && (
-                        <Select
-                            onValueChange={(value) => handleSelectChange('contactId', value)}
-                            value={formData.contactId}
-                            required
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Seleccione un contacto" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {filteredContacts.map(c => (
-                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                    {associationType === 'concept' && (
-                        <Select
-                            onValueChange={(value) => handleSelectChange('internalConcept', value)}
-                            value={formData.internalConcept}
-                            required
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Seleccione un concepto" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Retiro de Socios">Retiro de Socios</SelectItem>
-                                <SelectItem value="Pago de Impuestos">Pago de Impuestos</SelectItem>
-                                <SelectItem value="Comisión Bancaria">Comisión Bancaria</SelectItem>
-                                <SelectItem value="Préstamo Interno">Préstamo Interno</SelectItem>
-                                <SelectItem value="Otro">Otro</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    )}
                     </div>
-                </div>
+                    </>
+                )}
+
 
                 <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="description" className="text-right pt-2">
@@ -604,7 +653,7 @@ export function NewFinancialMovementSheet({
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button type="button" size="sm" variant="outline" className="mt-2" onClick={handleSuggestDescription} disabled={isSuggesting}>
+                    <Button type="button" size="sm" variant="outline" className="mt-2" onClick={handleSuggestDescription} disabled={isSuggesting || formData.type === 'transfer'}>
                         {isSuggesting ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Sparkles className='mr-2 h-4 w-4'/>}
                         Sugerir con IA
                     </Button>
