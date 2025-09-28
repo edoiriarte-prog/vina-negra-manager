@@ -60,7 +60,7 @@ export const getColumns = ({ onEdit, onDelete, bankAccounts }: GetColumnsProps):
     cell: ({ row }) => row.getValue('contactName') || '-',
     filterFn: (row, id, value) => {
         const contactName = row.getValue(id) as string;
-        return contactName.toLowerCase().includes(value.toLowerCase());
+        return contactName ? contactName.toLowerCase().includes(value.toLowerCase()) : false;
     }
   },
   {
@@ -150,3 +150,5 @@ export const getColumns = ({ onEdit, onDelete, bankAccounts }: GetColumnsProps):
     },
   },
 ];
+
+    

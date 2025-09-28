@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ArrowUpCircle, ArrowDownCircle, Filter, FilterX } from 'lucide-react';
+import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -277,3 +277,4 @@ export default function FinancialsPage() {
   );
 }
 
+    
