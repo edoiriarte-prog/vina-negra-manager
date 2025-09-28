@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -20,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX, MoreHorizontal, ChevronDown, Eye } from 'lucide-react';
+import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX, MoreHorizontal, ChevronDown, Eye, ArrowRightCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -224,6 +225,12 @@ export default function FinancialsPage() {
     const totalExpenses = expenseMovements.reduce((sum, m) => sum + m.amount, 0);
     return { groupedExpenses: Object.values(groups).sort((a,b) => a.contactName.localeCompare(b.contactName)), totalExpenses };
   }, [filteredData]);
+  
+  const { transfers, totalTransferred } = useMemo(() => {
+    const transferMovements = filteredData.filter(m => m.type === 'transfer');
+    const total = transferMovements.reduce((sum, m) => sum + m.amount, 0);
+    return { transfers: transferMovements.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()), totalTransferred: total };
+  }, [filteredData]);
 
   const toggleCollapsible = (id: string) => {
     setOpenCollapsibles(prev => ({ ...prev, [id]: !prev[id] }));
@@ -253,7 +260,7 @@ export default function FinancialsPage() {
         {openCollapsibles[`${type}-${group.contactName}`] && (
           group.movements.map(m => (
             <TableRow key={m.id} className="bg-background hover:bg-muted/50 cursor-pointer" onClick={() => handleEdit(m)}>
-              <TableCell className="pl-12">{format(parseISO(m.date), 'dd-MM-yyyy')}</TableCell>
+              <TableCell className="pl-12">{format(parseISO(m.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
               <TableCell>{m.description}</TableCell>
               <TableCell>{m.paymentMethod}</TableCell>
               <TableCell>
@@ -409,6 +416,46 @@ export default function FinancialsPage() {
                             </Table>
                         </div>
                     </div>
+
+                    {/* Transfers Table */}
+                    <div>
+                        <h3 className="font-headline text-xl mb-2">Transferencias entre Cuentas</h3>
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                     <TableRow>
+                                        <TableHead className="w-[120px]">Fecha</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead>Cta. Origen</TableHead>
+                                        <TableHead>Cta. Destino</TableHead>
+                                        <TableHead className="text-right">Monto</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {transfers.length > 0 ? (
+                                        transfers.map(m => (
+                                            <TableRow key={m.id} className="cursor-pointer" onClick={() => handleEdit(m)}>
+                                                <TableCell>{format(parseISO(m.date), 'dd-MM-yyyy')}</TableCell>
+                                                <TableCell>{m.description}</TableCell>
+                                                <TableCell>{bankAccounts.find(a => a.id === m.sourceAccountId)?.name || 'N/A'}</TableCell>
+                                                <TableCell>{bankAccounts.find(a => a.id === m.destinationAccountId)?.name || 'N/A'}</TableCell>
+                                                <TableCell className="text-right font-medium">{formatCurrency(m.amount)}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay transferencias que mostrar.</TableCell></TableRow>
+                                    )}
+                                </TableBody>
+                                <TableFooter>
+                                    <TableRow>
+                                        <TableHead colSpan={4} className="text-right font-bold text-lg">Total Transferido</TableHead>
+                                        <TableHead className="text-right font-bold text-lg">{formatCurrency(totalTransferred)}</TableHead>
+                                    </TableRow>
+                                </TableFooter>
+                            </Table>
+                        </div>
+                    </div>
+
                  </div>
                )}
             </CardContent>
