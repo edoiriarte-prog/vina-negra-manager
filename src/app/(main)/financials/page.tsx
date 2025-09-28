@@ -81,11 +81,11 @@ export default function FinancialsPage() {
     
     const summaries = bankAccounts.map(account => {
         const totalIncome = financialMovements
-            .filter(m => m.destinationAccountId === account.id)
+            .filter(m => m.destinationAccountId === account.id && (m.type === 'income' || m.type === 'transfer'))
             .reduce((sum, m) => sum + m.amount, 0);
 
         const totalExpense = financialMovements
-            .filter(m => m.sourceAccountId === account.id)
+            .filter(m => m.sourceAccountId === account.id && (m.type === 'expense' || m.type === 'transfer'))
             .reduce((sum, m) => sum + m.amount, 0);
             
         const finalBalance = account.initialBalance + totalIncome - totalExpense;
