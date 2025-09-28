@@ -2,12 +2,12 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Trash2, PlusCircle, Download } from 'lucide-react';
+import { Trash2, PlusCircle, Download, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { BankAccount } from '@/lib/types';
@@ -74,24 +74,53 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
     );
 }
 
+const emptyAccount: Omit<BankAccount, 'id'> = { name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa', owner: '' };
+
 function BankAccountsEditor() {
     const { bankAccounts, setBankAccounts } = useMasterData();
-    const [newAccount, setNewAccount] = useState<Omit<BankAccount, 'id'>>({ name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa', owner: '' });
+    const [formData, setFormData] = useState<Omit<BankAccount, 'id'>>(emptyAccount);
+    const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
     const { toast } = useToast();
 
-    const handleAddAccount = () => {
-        if (newAccount.name && newAccount.initialBalance >= 0) {
-            setBankAccounts(prev => [...prev, { ...newAccount, id: `acc-${Date.now()}` }]);
-            setNewAccount({ name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa', owner: '' });
-            toast({ title: 'Cuenta Agregada', description: `Se agregó la cuenta "${newAccount.name}".` });
+    useEffect(() => {
+        if (editingAccountId) {
+            const accountToEdit = bankAccounts.find(acc => acc.id === editingAccountId);
+            if (accountToEdit) {
+                setFormData(accountToEdit);
+            }
         } else {
-            toast({ variant: "destructive", title: 'Error', description: 'Nombre y Saldo Inicial son requeridos.' });
+            setFormData(emptyAccount);
         }
+    }, [editingAccountId, bankAccounts]);
+
+    const handleSaveAccount = () => {
+        if (!formData.name) {
+             toast({ variant: "destructive", title: 'Error', description: 'El nombre de la cuenta es requerido.' });
+            return;
+        }
+
+        if (editingAccountId) {
+            // Update
+            setBankAccounts(prev => prev.map(acc => acc.id === editingAccountId ? { ...formData, id: editingAccountId } : acc));
+            toast({ title: 'Cuenta Actualizada', description: `Se actualizó la cuenta "${formData.name}".` });
+        } else {
+            // Add
+            setBankAccounts(prev => [...prev, { ...formData, id: `acc-${Date.now()}` }]);
+            toast({ title: 'Cuenta Agregada', description: `Se agregó la cuenta "${formData.name}".` });
+        }
+        
+        setEditingAccountId(null);
+        setFormData(emptyAccount);
     };
 
     const handleRemoveAccount = (id: string) => {
         setBankAccounts(prev => prev.filter(acc => acc.id !== id));
         toast({ title: 'Cuenta Eliminada' });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingAccountId(null);
+        setFormData(emptyAccount);
     };
     
     return (
@@ -101,10 +130,11 @@ function BankAccountsEditor() {
                 <CardDescription>Configure las cuentas bancarias y de efectivo de la empresa.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4 items-end">
-                    <Input placeholder="Nombre de la Cuenta" value={newAccount.name} onChange={e => setNewAccount(p => ({...p, name: e.target.value}))}/>
-                    <Input placeholder="Titular" value={newAccount.owner} onChange={e => setNewAccount(p => ({...p, owner: e.target.value}))}/>
-                    <Select value={newAccount.accountType} onValueChange={(value: BankAccount['accountType']) => setNewAccount(p => ({...p, accountType: value}))}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4 items-end p-4 border rounded-md">
+                    <div className='lg:col-span-5 text-sm font-medium mb-2'>{editingAccountId ? `Editando: ${formData.name}` : 'Nueva Cuenta'}</div>
+                    <Input placeholder="Nombre de la Cuenta" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))}/>
+                    <Input placeholder="Titular" value={formData.owner} onChange={e => setFormData(p => ({...p, owner: e.target.value}))}/>
+                    <Select value={formData.accountType} onValueChange={(value: BankAccount['accountType']) => setFormData(p => ({...p, accountType: value}))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="Cuenta Corriente">Cuenta Corriente</SelectItem>
@@ -113,8 +143,13 @@ function BankAccountsEditor() {
                             <SelectItem value="Efectivo">Efectivo</SelectItem>
                         </SelectContent>
                     </Select>
-                     <Input type="number" placeholder="Saldo Inicial" value={newAccount.initialBalance || ''} onChange={e => setNewAccount(p => ({...p, initialBalance: Number(e.target.value)}))}/>
-                    <Button onClick={handleAddAccount}><PlusCircle className="mr-2 h-4 w-4" /> Agregar</Button>
+                     <Input type="number" placeholder="Saldo Inicial" value={formData.initialBalance || ''} onChange={e => setFormData(p => ({...p, initialBalance: Number(e.target.value)}))}/>
+                    <div className="flex gap-2">
+                        {editingAccountId && <Button variant="outline" onClick={handleCancelEdit}>Cancelar</Button>}
+                        <Button onClick={handleSaveAccount} className="flex-1">
+                            {editingAccountId ? 'Guardar' : <><PlusCircle className="mr-2 h-4 w-4" /> Agregar</>}
+                        </Button>
+                    </div>
                 </div>
                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                     {bankAccounts.map(acc => (
@@ -124,8 +159,11 @@ function BankAccountsEditor() {
                                 <span className="text-xs text-muted-foreground ml-2">({acc.accountType})</span>
                                 {acc.owner && <span className="text-xs text-muted-foreground ml-2">Titular: {acc.owner}</span>}
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
                                 <span className='text-sm font-mono'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(acc.initialBalance)}</span>
+                                <Button variant="ghost" size="icon" onClick={() => setEditingAccountId(acc.id)}>
+                                    <Edit className="h-4 w-4" />
+                                </Button>
                                 <Button variant="ghost" size="icon" onClick={() => handleRemoveAccount(acc.id)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
@@ -234,3 +272,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
