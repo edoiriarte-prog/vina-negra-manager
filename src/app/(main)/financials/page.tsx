@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { PlusCircle, ArrowUpCircle, ArrowDownCircle, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -128,6 +128,22 @@ export default function FinancialsPage() {
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, bankAccounts });
 
+  const accountBalances = useMemo(() => {
+    if (!isClient) return [];
+    
+    const balances = bankAccounts.map(account => {
+        const balance = financialMovements.reduce((acc, mov) => {
+            if (mov.accountId === account.id) {
+                return acc + (mov.type === 'income' ? mov.amount : -mov.amount);
+            }
+            return acc;
+        }, account.initialBalance);
+        return { ...account, balance };
+    });
+
+    return balances;
+  }, [isClient, bankAccounts, financialMovements]);
+
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -141,6 +157,32 @@ export default function FinancialsPage() {
               Nuevo Movimiento
             </Button>
         </div>
+
+        <Card>
+            <CardHeader>
+                <CardTitle className="font-headline text-2xl">Resumen por Cuenta</CardTitle>
+                <CardDescription>Saldos actuales de cada cuenta bancaria y de efectivo.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {isClient ? (
+                        accountBalances.map(acc => (
+                            <KpiCard
+                                key={acc.id}
+                                title={acc.name}
+                                value={formatCurrency(acc.balance)}
+                                icon={<Wallet className="h-5 w-5 text-blue-500" />}
+                                description={`Tipo: ${acc.accountType}`}
+                            />
+                        ))
+                    ) : (
+                         Array.from({ length: 3 }).map((_, i) => (
+                            <Skeleton key={i} className="h-32 w-full" />
+                        ))
+                    )}
+                </div>
+            </CardContent>
+        </Card>
 
         <div className="grid gap-4 md:grid-cols-2">
             {isClient ? (
