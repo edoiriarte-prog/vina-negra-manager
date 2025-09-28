@@ -191,9 +191,9 @@ export default function FinancialsPage() {
         return dataWithContactNames;
     }
     if (filter.type === 'income') {
-        return dataWithContactNames.filter(m => m.destinationAccountId === filter.accountId);
+        return dataWithContactNames.filter(m => m.destinationAccountId === filter.accountId && m.type === 'income');
     } else if (filter.type === 'expense') {
-        return dataWithContactNames.filter(m => m.sourceAccountId === filter.accountId);
+        return dataWithContactNames.filter(m => m.sourceAccountId === filter.accountId && m.type === 'expense');
     } else { // transfer
         return dataWithContactNames.filter(m => (m.sourceAccountId === filter.accountId || m.destinationAccountId === filter.accountId) && m.type === 'transfer')
     }
@@ -213,7 +213,7 @@ export default function FinancialsPage() {
     });
 
     const totalIncome = incomeMovements.reduce((sum, m) => sum + m.amount, 0);
-    return { groupedIncome: Object.values(groups), totalIncome };
+    return { groupedIncome: Object.values(groups).sort((a,b) => a.contactName.localeCompare(b.contactName)), totalIncome };
   }, [filteredData]);
 
   const { groupedExpenses, totalExpenses } = useMemo(() => {
@@ -230,7 +230,7 @@ export default function FinancialsPage() {
     });
 
     const totalExpenses = expenseMovements.reduce((sum, m) => sum + m.amount, 0);
-    return { groupedExpenses: Object.values(groups), totalExpenses };
+    return { groupedExpenses: Object.values(groups).sort((a,b) => a.contactName.localeCompare(b.contactName)), totalExpenses };
   }, [filteredData]);
 
   const toggleCollapsible = (id: string) => {
