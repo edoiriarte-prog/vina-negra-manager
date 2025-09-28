@@ -143,7 +143,7 @@ function BankAccountsEditor() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4 items-end p-4 border rounded-md">
                     <div className='lg:col-span-5 text-sm font-medium mb-2'>{editingAccountId ? `Editando: ${formData.name}` : 'Nueva Cuenta'}</div>
                     <Input placeholder="Nombre de la Cuenta" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))}/>
-                    <Input placeholder="Titular" value={formData.owner} onChange={e => setFormData(p => ({...p, owner: e.target.value}))}/>
+                    <Input placeholder="Titular" value={formData.owner || ''} onChange={e => setFormData(p => ({...p, owner: e.target.value}))}/>
                     <Select value={formData.accountType} onValueChange={(value: BankAccount['accountType']) => setFormData(p => ({...p, accountType: value}))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -162,7 +162,7 @@ function BankAccountsEditor() {
                     </div>
                 </div>
                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {isClient ? bankAccounts.map(acc => (
+                    {isClient && bankAccounts.map(acc => (
                         <div key={acc.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                             <div>
                                 <span className='font-semibold'>{acc.name}</span>
@@ -179,7 +179,7 @@ function BankAccountsEditor() {
                                 </Button>
                             </div>
                         </div>
-                    )) : null}
+                    ))}
                 </div>
             </CardContent>
         </Card>
