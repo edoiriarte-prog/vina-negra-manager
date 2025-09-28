@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX, MoreHorizontal, ChevronDown, Eye, ArrowRightCircle } from 'lucide-react';
+import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX, MoreHorizontal, ChevronDown, Eye, ArrowRightCircle, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -78,8 +78,8 @@ export default function FinancialsPage() {
     setIsClient(true);
   }, []);
 
-  const accountSummariesByOwner = useMemo((): Record<string, AccountSummary[]> => {
-    if (!isClient) return {};
+  const { accountSummariesByOwner, generalSummary } = useMemo(() => {
+    if (!isClient) return { accountSummariesByOwner: {}, generalSummary: null };
     
     const summaries = bankAccounts.map(account => {
         const totalIncome = financialMovements
@@ -113,7 +113,7 @@ export default function FinancialsPage() {
         };
     });
     
-    return summaries.reduce((acc, summary) => {
+    const groupedByOwner = summaries.reduce((acc, summary) => {
         const owner = summary.owner || 'General';
         if (!acc[owner]) {
             acc[owner] = [];
@@ -121,6 +121,21 @@ export default function FinancialsPage() {
         acc[owner].push(summary);
         return acc;
     }, {} as Record<string, AccountSummary[]>);
+
+    const mainAccounts = summaries.filter(s => s.owner === 'Viña Negra SpA');
+    const generalSummaryData = mainAccounts.reduce((acc, summary) => {
+        acc.initialBalance += summary.initialBalance;
+        acc.totalIncome += summary.totalIncome;
+        acc.totalExpense += summary.totalExpense;
+        acc.transfersIn += summary.transfersIn;
+        acc.transfersOut += summary.transfersOut;
+        acc.finalBalance += summary.finalBalance;
+        return acc;
+    }, {
+        id: 'general', name: 'General', initialBalance: 0, totalIncome: 0, totalExpense: 0, transfersIn: 0, transfersOut: 0, finalBalance: 0
+    });
+
+    return { accountSummariesByOwner: groupedByOwner, generalSummary: generalSummaryData };
 
   }, [financialMovements, bankAccounts, isClient]);
 
@@ -314,56 +329,78 @@ export default function FinancialsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
                  {!isClient ? Array.from({length: 2}).map((_, i) => <Skeleton key={i} className="h-48" />) :
-                 Object.entries(accountSummariesByOwner).map(([owner, summaries]) => (
-                     <div key={owner}>
-                         <h3 className="text-lg font-semibold mb-2 font-headline">{owner}</h3>
-                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {summaries.map(acc => (
-                                <Card key={acc.id} className="flex flex-col">
-                                    <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg">{acc.name}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="flex-1 flex flex-col justify-between">
-                                        <div>
-                                            <p className="text-2xl font-bold">{formatCurrency(acc.finalBalance)}</p>
-                                            <p className="text-xs text-muted-foreground">Saldo Actual</p>
-                                        </div>
-                                        <div className="mt-4 text-sm space-y-1">
-                                            <div 
-                                                className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
-                                                onClick={() => setFilter({ type: 'income', accountId: acc.id })}
-                                            >
-                                                <span className="flex items-center gap-1 text-green-600"><ArrowUpCircle className="h-4 w-4" /> Ingresos</span>
-                                                <span>{formatCurrency(acc.totalIncome)}</span>
+                 <>
+                    {generalSummary && (
+                        <Card className="bg-primary/10 border-primary/40">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Wallet className="h-5 w-5"/>
+                                    Resumen General (Cuentas Principales)
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-3xl font-bold">{formatCurrency(generalSummary.finalBalance)}</p>
+                                <p className="text-xs text-muted-foreground mb-4">Saldo Consolidado</p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                    <div className="flex justify-between"><span>Ingresos:</span> <span className="font-medium">{formatCurrency(generalSummary.totalIncome)}</span></div>
+                                    <div className="flex justify-between"><span>Egresos:</span> <span className="font-medium">{formatCurrency(generalSummary.totalExpense)}</span></div>
+                                    <div className="flex justify-between"><span>Traspasos (Recibidos):</span> <span className="font-medium">{formatCurrency(generalSummary.transfersIn)}</span></div>
+                                    <div className="flex justify-between"><span>Traspasos (Enviados):</span> <span className="font-medium">{formatCurrency(generalSummary.transfersOut)}</span></div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                    {Object.entries(accountSummariesByOwner).map(([owner, summaries]) => (
+                        <div key={owner}>
+                            <h3 className="text-lg font-semibold mb-2 font-headline">{owner}</h3>
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {summaries.map(acc => (
+                                    <Card key={acc.id} className="flex flex-col">
+                                        <CardHeader className="pb-2">
+                                        <CardTitle className="text-lg">{acc.name}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex-1 flex flex-col justify-between">
+                                            <div>
+                                                <p className="text-2xl font-bold">{formatCurrency(acc.finalBalance)}</p>
+                                                <p className="text-xs text-muted-foreground">Saldo Actual</p>
                                             </div>
-                                            <div 
-                                                className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
-                                                onClick={() => setFilter({ type: 'expense', accountId: acc.id })}
-                                            >
-                                                <span className="flex items-center gap-1 text-red-600"><ArrowDownCircle className="h-4 w-4" /> Egresos</span>
-                                                <span>{formatCurrency(acc.totalExpense)}</span>
+                                            <div className="mt-4 text-sm space-y-1">
+                                                <div 
+                                                    className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
+                                                    onClick={() => setFilter({ type: 'income', accountId: acc.id })}
+                                                >
+                                                    <span className="flex items-center gap-1 text-green-600"><ArrowUpCircle className="h-4 w-4" /> Ingresos</span>
+                                                    <span>{formatCurrency(acc.totalIncome)}</span>
+                                                </div>
+                                                <div 
+                                                    className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
+                                                    onClick={() => setFilter({ type: 'expense', accountId: acc.id })}
+                                                >
+                                                    <span className="flex items-center gap-1 text-red-600"><ArrowDownCircle className="h-4 w-4" /> Egresos</span>
+                                                    <span>{formatCurrency(acc.totalExpense)}</span>
+                                                </div>
+                                                <div 
+                                                    className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
+                                                    onClick={() => setFilter({ type: 'traspaso_in', accountId: acc.id })}
+                                                >
+                                                    <span className="flex items-center gap-1 text-blue-500"><ArrowRightCircle className="h-4 w-4" /> Traspasos (Recibidos)</span>
+                                                    <span className='text-blue-500'>{formatCurrency(acc.transfersIn)}</span>
+                                                </div>
+                                                <div 
+                                                    className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
+                                                    onClick={() => setFilter({ type: 'traspaso_out', accountId: acc.id })}
+                                                >
+                                                    <span className="flex items-center gap-1 text-orange-500"><ArrowRightCircle className="h-4 w-4 -rotate-180" /> Traspasos (Enviados)</span>
+                                                    <span className='text-orange-500'>{formatCurrency(acc.transfersOut)}</span>
+                                                </div>
                                             </div>
-                                            <div 
-                                                className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
-                                                onClick={() => setFilter({ type: 'traspaso_in', accountId: acc.id })}
-                                            >
-                                                <span className="flex items-center gap-1 text-blue-500"><ArrowRightCircle className="h-4 w-4" /> Traspasos (Recibidos)</span>
-                                                <span className='text-blue-500'>{formatCurrency(acc.transfersIn)}</span>
-                                            </div>
-                                             <div 
-                                                className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
-                                                onClick={() => setFilter({ type: 'traspaso_out', accountId: acc.id })}
-                                            >
-                                                <span className="flex items-center gap-1 text-orange-500"><ArrowRightCircle className="h-4 w-4 -rotate-180" /> Traspasos (Enviados)</span>
-                                                <span className='text-orange-500'>{formatCurrency(acc.transfersOut)}</span>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                         </div>
-                     </div>
-                 ))
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                 </>
                 }
             </CardContent>
         </Card>
