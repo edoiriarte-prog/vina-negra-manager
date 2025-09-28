@@ -235,8 +235,8 @@ export function NewFinancialMovementSheet({
         description: '',
         amount: 0,
         paymentMethod: 'Transferencia',
-        sourceAccountId: '',
-        destinationAccountId: '',
+        sourceAccountId: formData.type === 'expense' ? formData.sourceAccountId : '',
+        destinationAccountId: formData.type === 'income' ? formData.destinationAccountId : '',
     }]);
   }
 
@@ -338,73 +338,70 @@ export function NewFinancialMovementSheet({
             </div>
 
             {isBatchMode ? (
-            <div>
-                 <div className="grid grid-cols-4 items-center gap-4 mb-4">
-                    <Label className="text-right">Contacto</Label>
-                     <Select
-                        onValueChange={(value) => handleSelectChange('contactId', value)}
-                        value={formData.contactId}
-                        required
-                        
-                     >
-                         <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Seleccione un contacto para el lote" />
-                         </SelectTrigger>
-                         <SelectContent>
-                            {filteredContacts.map(c => (
-                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            <div className="space-y-4">
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <Label>Contacto</Label>
+                        <Select
+                            onValueChange={(value) => handleSelectChange('contactId', value)}
+                            value={formData.contactId}
+                            required
+                        >
+                            <SelectTrigger><SelectValue placeholder="Seleccione un contacto" /></SelectTrigger>
+                            <SelectContent>
+                                {filteredContacts.map(c => (
+                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                         <Label>{formData.type === 'income' ? 'Cuenta Destino Lote' : 'Cuenta Origen Lote'}</Label>
+                         <Select 
+                            onValueChange={(value) => handleSelectChange(formData.type === 'income' ? 'destinationAccountId' : 'sourceAccountId', value)} 
+                            value={formData.type === 'income' ? formData.destinationAccountId : formData.sourceAccountId}>
+                            <SelectTrigger><SelectValue placeholder="Seleccione cuenta para el lote"/></SelectTrigger>
+                            <SelectContent>
+                            {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
+                                <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
                             ))}
-                         </SelectContent>
-                     </Select>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 <div className="rounded-md border">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Fecha</TableHead>
-                                <TableHead>Monto</TableHead>
-                                <TableHead>Forma Pago</TableHead>
-                                <TableHead>Cuenta</TableHead>
-                                <TableHead>Centro de Costo</TableHead>
-                                <TableHead></TableHead>
+                                <TableHead className="w-[180px]">Fecha</TableHead>
+                                <TableHead>Centro de Costo / Descripción</TableHead>
+                                <TableHead className="w-[150px]">Monto</TableHead>
+                                <TableHead className="w-[180px]">Forma Pago</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {batchMovements.map(bm => (
                                 <TableRow key={bm.batchId}>
-                                    <TableCell className='min-w-[180px]'>
+                                    <TableCell>
                                         <Popover>
                                             <PopoverTrigger asChild>
-                                            <Button
-                                                variant={"outline"}
-                                                className={cn(
-                                                "w-full justify-start text-left font-normal",
-                                                !bm.date && "text-muted-foreground"
-                                                )}
-                                            >
+                                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !bm.date && "text-muted-foreground")}>
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 {bm.date ? format(parseISO(bm.date), "PPP", { locale: es }) : <span>Seleccione</span>}
                                             </Button>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0">
-                                            <Calendar
-                                                mode="single"
-                                                selected={bm.date ? parseISO(bm.date) : undefined}
-                                                onSelect={(date) => {
-                                                    if (date) {
-                                                        handleBatchChange(bm.batchId, 'date', format(date, 'yyyy-MM-dd'))
-                                                    }
-                                                }}
-                                                initialFocus
-                                            />
-                                            </PopoverContent>
+                                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={bm.date ? parseISO(bm.date) : undefined} onSelect={(date) => date && handleBatchChange(bm.batchId, 'date', format(date, 'yyyy-MM-dd'))} initialFocus /></PopoverContent>
                                         </Popover>
                                     </TableCell>
-                                    <TableCell className='min-w-[150px]'>
+                                    <TableCell>
+                                        <Input placeholder="Descripción del movimiento" value={bm.description} onChange={(e) => handleBatchChange(bm.batchId, 'description', e.target.value)} />
+                                    </TableCell>
+                                    <TableCell>
                                         <Input type="number" placeholder="$" value={bm.amount || ''} onChange={(e) => handleBatchChange(bm.batchId, 'amount', Number(e.target.value))} />
                                     </TableCell>
-                                    <TableCell className='min-w-[180px]'>
+                                    <TableCell>
                                          <Select onValueChange={(value) => handleBatchChange(bm.batchId, 'paymentMethod', value)} value={bm.paymentMethod}>
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
@@ -414,22 +411,6 @@ export function NewFinancialMovementSheet({
                                                 <SelectItem value="Cheque">Cheque</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                    </TableCell>
-                                     <TableCell className='min-w-[200px]'>
-                                         <Select onValueChange={(value) => {
-                                             const accountField = formData.type === 'income' ? 'destinationAccountId' : 'sourceAccountId';
-                                             handleBatchChange(bm.batchId, accountField, value)}
-                                         } value={formData.type === 'income' ? bm.destinationAccountId : bm.sourceAccountId}>
-                                            <SelectTrigger><SelectValue placeholder="Seleccione..."/></SelectTrigger>
-                                            <SelectContent>
-                                            {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
-                                                <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                                            ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </TableCell>
-                                    <TableCell className='min-w-[250px]'>
-                                        <Input placeholder="Descripción del movimiento" value={bm.description} onChange={(e) => handleBatchChange(bm.batchId, 'description', e.target.value)} />
                                     </TableCell>
                                     <TableCell>
                                         <Button type="button" variant="ghost" size="icon" onClick={() => removeBatchMovement(bm.batchId)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -686,3 +667,6 @@ export function NewFinancialMovementSheet({
 
     
 
+
+
+    
