@@ -29,6 +29,7 @@ import { useMasterData } from '@/hooks/use-master-data';
 type AccountSummary = {
     id: string;
     name: string;
+    owner?: string;
     initialBalance: number;
     totalIncome: number;
     totalExpense: number;
@@ -54,10 +55,10 @@ export default function FinancialsPage() {
     setIsClient(true);
   }, []);
 
-  const accountSummaries = useMemo((): AccountSummary[] => {
-    if (!isClient) return [];
+  const accountSummariesByOwner = useMemo((): Record<string, AccountSummary[]> => {
+    if (!isClient) return {};
     
-    return bankAccounts.map(account => {
+    const summaries = bankAccounts.map(account => {
         const totalIncome = financialMovements
             .filter(m => m.destinationAccountId === account.id)
             .reduce((sum, m) => sum + m.amount, 0);
@@ -71,12 +72,23 @@ export default function FinancialsPage() {
         return {
             id: account.id,
             name: account.name,
+            owner: account.owner,
             initialBalance: account.initialBalance,
             totalIncome,
             totalExpense,
             finalBalance,
         };
     });
+
+    return summaries.reduce((acc, summary) => {
+        const owner = summary.owner || 'General';
+        if (!acc[owner]) {
+            acc[owner] = [];
+        }
+        acc[owner].push(summary);
+        return acc;
+    }, {} as Record<string, AccountSummary[]>);
+
   }, [financialMovements, bankAccounts, isClient]);
 
 
@@ -185,37 +197,45 @@ export default function FinancialsPage() {
                 <CardTitle>Resumen por Cuenta</CardTitle>
                 <CardDescription>Saldos y movimientos totales para cada cuenta.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {!isClient ? Array.from({length: 2}).map((_, i) => <Skeleton key={i} className="h-36" />) :
-                accountSummaries.map(acc => (
-                    <Card key={acc.id} className="flex flex-col">
-                        <CardHeader className="pb-2">
-                           <CardTitle className="text-lg">{acc.name}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex-1 flex flex-col justify-between">
-                            <div>
-                                <p className="text-2xl font-bold">{formatCurrency(acc.finalBalance)}</p>
-                                <p className="text-xs text-muted-foreground">Saldo Actual</p>
-                            </div>
-                            <div className="mt-4 text-sm space-y-1">
-                                <div 
-                                    className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
-                                    onClick={() => setFilter({ type: 'income', accountId: acc.id })}
-                                >
-                                    <span className="flex items-center gap-1 text-green-600"><ArrowUpCircle className="h-4 w-4" /> Ingresos</span>
-                                    <span>{formatCurrency(acc.totalIncome)}</span>
-                                </div>
-                                <div 
-                                    className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
-                                    onClick={() => setFilter({ type: 'expense', accountId: acc.id })}
-                                >
-                                    <span className="flex items-center gap-1 text-red-600"><ArrowDownCircle className="h-4 w-4" /> Egresos</span>
-                                    <span>{formatCurrency(acc.totalExpense)}</span>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
+            <CardContent className="space-y-6">
+                 {!isClient ? Array.from({length: 2}).map((_, i) => <Skeleton key={i} className="h-48" />) :
+                 Object.entries(accountSummariesByOwner).map(([owner, summaries]) => (
+                     <div key={owner}>
+                         <h3 className="text-lg font-semibold mb-2 font-headline">{owner}</h3>
+                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            {summaries.map(acc => (
+                                <Card key={acc.id} className="flex flex-col">
+                                    <CardHeader className="pb-2">
+                                    <CardTitle className="text-lg">{acc.name}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="flex-1 flex flex-col justify-between">
+                                        <div>
+                                            <p className="text-2xl font-bold">{formatCurrency(acc.finalBalance)}</p>
+                                            <p className="text-xs text-muted-foreground">Saldo Actual</p>
+                                        </div>
+                                        <div className="mt-4 text-sm space-y-1">
+                                            <div 
+                                                className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
+                                                onClick={() => setFilter({ type: 'income', accountId: acc.id })}
+                                            >
+                                                <span className="flex items-center gap-1 text-green-600"><ArrowUpCircle className="h-4 w-4" /> Ingresos</span>
+                                                <span>{formatCurrency(acc.totalIncome)}</span>
+                                            </div>
+                                            <div 
+                                                className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
+                                                onClick={() => setFilter({ type: 'expense', accountId: acc.id })}
+                                            >
+                                                <span className="flex items-center gap-1 text-red-600"><ArrowDownCircle className="h-4 w-4" /> Egresos</span>
+                                                <span>{formatCurrency(acc.totalExpense)}</span>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                         </div>
+                     </div>
+                 ))
+                }
             </CardContent>
         </Card>
         
@@ -276,5 +296,7 @@ export default function FinancialsPage() {
     </>
   );
 }
+
+    
 
     
