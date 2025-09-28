@@ -1,14 +1,13 @@
 
-
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { financialMovements as initialFinancialMovements, purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, serviceOrders as initialServiceOrders, contacts as initialContacts } from '@/lib/data';
 import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact, BankAccount } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { NewFinancialMovementSheet } from './components/new-financial-movement-sheet';
 import {
   AlertDialog,
@@ -21,10 +20,23 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX } from 'lucide-react';
+import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX, MoreHorizontal, ChevronDown, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { format, parseISO } from 'date-fns';
 
 type AccountSummary = {
     id: string;
@@ -35,6 +47,12 @@ type AccountSummary = {
     totalExpense: number;
     finalBalance: number;
 }
+
+type GroupedMovement = {
+    contactName: string;
+    movements: (FinancialMovement & { contactName?: string })[];
+    subtotal: number;
+};
 
 export default function FinancialsPage() {
   const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
@@ -48,7 +66,8 @@ export default function FinancialsPage() {
   const [deletingMovement, setDeletingMovement] = useState<FinancialMovement | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [filter, setFilter] = useState<{ type: 'income' | 'expense', accountId: string } | null>(null);
+  const [filter, setFilter] = useState<{ type: 'income' | 'expense' | 'transfer', accountId: string } | null>(null);
+  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -60,26 +79,34 @@ export default function FinancialsPage() {
     
     const summaries = bankAccounts.map(account => {
         const totalIncome = financialMovements
-            .filter(m => m.destinationAccountId === account.id)
+            .filter(m => m.destinationAccountId === account.id && m.type !== 'transfer')
             .reduce((sum, m) => sum + m.amount, 0);
 
         const totalExpense = financialMovements
-            .filter(m => m.sourceAccountId === account.id)
+            .filter(m => m.sourceAccountId === account.id && m.type !== 'transfer')
             .reduce((sum, m) => sum + m.amount, 0);
             
-        const finalBalance = account.initialBalance + totalIncome - totalExpense;
+        const transfersIn = financialMovements
+            .filter(m => m.destinationAccountId === account.id && m.type === 'transfer')
+            .reduce((sum, m) => sum + m.amount, 0);
+
+        const transfersOut = financialMovements
+            .filter(m => m.sourceAccountId === account.id && m.type === 'transfer')
+            .reduce((sum, m) => sum + m.amount, 0);
+            
+        const finalBalance = account.initialBalance + totalIncome + transfersIn - totalExpense - transfersOut;
 
         return {
             id: account.id,
             name: account.name,
             owner: account.owner,
             initialBalance: account.initialBalance,
-            totalIncome,
-            totalExpense,
+            totalIncome: totalIncome + transfersIn,
+            totalExpense: totalExpense + transfersOut,
             finalBalance,
         };
     });
-
+    
     return summaries.reduce((acc, summary) => {
         const owner = summary.owner || 'General';
         if (!acc[owner]) {
@@ -154,7 +181,7 @@ export default function FinancialsPage() {
   const dataWithContactNames = useMemo(() => {
     return financialMovements.map(m => ({
       ...m,
-      contactName: contacts.find(c => c.id === m.contactId)?.name || ''
+      contactName: contacts.find(c => c.id === m.contactId)?.name || 'Sin Contacto Asociado'
     }));
   }, [financialMovements, contacts]);
 
@@ -164,10 +191,50 @@ export default function FinancialsPage() {
     }
     if (filter.type === 'income') {
         return dataWithContactNames.filter(m => m.destinationAccountId === filter.accountId);
-    } else {
+    } else if (filter.type === 'expense') {
         return dataWithContactNames.filter(m => m.sourceAccountId === filter.accountId);
+    } else { // transfer
+        return dataWithContactNames.filter(m => (m.sourceAccountId === filter.accountId || m.destinationAccountId === filter.accountId) && m.type === 'transfer')
     }
   }, [dataWithContactNames, filter]);
+
+  const { groupedIncome, totalIncome } = useMemo(() => {
+    const incomeMovements = filteredData.filter(m => m.type === 'income');
+    const groups: Record<string, GroupedMovement> = {};
+
+    incomeMovements.forEach(m => {
+      const contactName = m.contactName || 'Ingresos sin contacto';
+      if (!groups[contactName]) {
+        groups[contactName] = { contactName, movements: [], subtotal: 0 };
+      }
+      groups[contactName].movements.push(m);
+      groups[contactName].subtotal += m.amount;
+    });
+
+    const totalIncome = incomeMovements.reduce((sum, m) => sum + m.amount, 0);
+    return { groupedIncome: Object.values(groups), totalIncome };
+  }, [filteredData]);
+
+  const { groupedExpenses, totalExpenses } = useMemo(() => {
+    const expenseMovements = filteredData.filter(m => m.type === 'expense');
+    const groups: Record<string, GroupedMovement> = {};
+
+    expenseMovements.forEach(m => {
+      const contactName = m.contactName || 'Egresos sin contacto';
+      if (!groups[contactName]) {
+        groups[contactName] = { contactName, movements: [], subtotal: 0 };
+      }
+      groups[contactName].movements.push(m);
+      groups[contactName].subtotal += m.amount;
+    });
+
+    const totalExpenses = expenseMovements.reduce((sum, m) => sum + m.amount, 0);
+    return { groupedExpenses: Object.values(groups), totalExpenses };
+  }, [filteredData]);
+
+  const toggleCollapsible = (id: string) => {
+    setOpenCollapsibles(prev => ({ ...prev, [id]: !prev[id] }));
+  }
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('es-CL', {
@@ -177,6 +244,37 @@ export default function FinancialsPage() {
     }).format(value);
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, bankAccounts });
+
+  const renderMovementGroup = (groups: GroupedMovement[], type: 'income' | 'expense') => {
+    return groups.map(group => (
+      <React.Fragment key={`${type}-${group.contactName}`}>
+        <TableRow className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggleCollapsible(`${type}-${group.contactName}`)}>
+          <TableCell className='font-bold' colSpan={5}>
+            <div className="flex items-center gap-2">
+              <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[`${type}-${group.contactName}`] && "rotate-180")} />
+              {group.contactName}
+            </div>
+          </TableCell>
+          <TableCell className='text-right font-bold'>{formatCurrency(group.subtotal)}</TableCell>
+        </TableRow>
+        {openCollapsibles[`${type}-${group.contactName}`] && (
+          group.movements.map(m => (
+            <TableRow key={m.id} className="bg-background hover:bg-muted/50">
+              <TableCell className="pl-12">{format(parseISO(m.date), 'dd-MM-yyyy')}</TableCell>
+              <TableCell>{m.description}</TableCell>
+              <TableCell>{m.paymentMethod}</TableCell>
+              <TableCell>
+                {m.relatedDocument ? `${m.relatedDocument.type}-${m.relatedDocument.id}` : m.internalConcept || '-'}
+              </TableCell>
+              <TableCell>{bankAccounts.find(a => a.id === (type === 'income' ? m.destinationAccountId : m.sourceAccountId))?.name || 'N/A'}</TableCell>
+              <TableCell className="text-right font-medium">{formatCurrency(m.amount)}</TableCell>
+            </TableRow>
+          ))
+        )}
+      </React.Fragment>
+    ));
+  };
+
 
   return (
     <>
@@ -195,7 +293,7 @@ export default function FinancialsPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Resumen por Cuenta</CardTitle>
-                <CardDescription>Saldos y movimientos totales para cada cuenta.</CardDescription>
+                <CardDescription>Saldos y movimientos totales para cada cuenta. Haga clic en un total para filtrar los movimientos.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                  {!isClient ? Array.from({length: 2}).map((_, i) => <Skeleton key={i} className="h-48" />) :
@@ -246,7 +344,7 @@ export default function FinancialsPage() {
                         <CardTitle>Movimientos Registrados</CardTitle>
                         {filter ? (
                             <CardDescription>
-                                Mostrando {filter.type === 'income' ? 'ingresos' : 'egresos'} de la cuenta "{bankAccounts.find(a => a.id === filter.accountId)?.name}"
+                                Mostrando {filter.type === 'income' ? 'ingresos de' : filter.type === 'expense' ? 'egresos de' : 'transferencias en'} la cuenta "{bankAccounts.find(a => a.id === filter.accountId)?.name}"
                             </CardDescription>
                         ) : (
                             <CardDescription>Todos los movimientos registrados en el período.</CardDescription>
@@ -261,7 +359,65 @@ export default function FinancialsPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                {isClient ? <DataTable columns={columns} data={filteredData} filterPlaceholder="Filtrar por centro de costo..." /> : <Skeleton className="h-64 w-full" />}
+               {!isClient ? <Skeleton className="h-64 w-full" /> : (
+                 <div className="space-y-8">
+                    {/* Income Table */}
+                    <div>
+                        <h3 className="font-headline text-xl mb-2">Ingresos</h3>
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[120px]">Fecha</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead>Forma Pago</TableHead>
+                                        <TableHead>Doc/Concepto</TableHead>
+                                        <TableHead>Cta. Destino</TableHead>
+                                        <TableHead className="text-right">Monto</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {groupedIncome.length > 0 ? renderMovementGroup(groupedIncome, 'income') : <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay ingresos que mostrar.</TableCell></TableRow>}
+                                </TableBody>
+                                <TableFooter>
+                                    <TableRow>
+                                        <TableHead colSpan={5} className="text-right font-bold text-lg">Total Ingresos</TableHead>
+                                        <TableHead className="text-right font-bold text-lg">{formatCurrency(totalIncome)}</TableHead>
+                                    </TableRow>
+                                </TableFooter>
+                            </Table>
+                        </div>
+                    </div>
+
+                    {/* Expenses Table */}
+                    <div>
+                        <h3 className="font-headline text-xl mb-2">Egresos</h3>
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                     <TableRow>
+                                        <TableHead className="w-[120px]">Fecha</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead>Forma Pago</TableHead>
+                                        <TableHead>Doc/Concepto</TableHead>
+                                        <TableHead>Cta. Origen</TableHead>
+                                        <TableHead className="text-right">Monto</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {groupedExpenses.length > 0 ? renderMovementGroup(groupedExpenses, 'expense') : <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay egresos que mostrar.</TableCell></TableRow>}
+                                </TableBody>
+                                <TableFooter>
+                                    <TableRow>
+                                        <TableHead colSpan={5} className="text-right font-bold text-lg">Total Egresos</TableHead>
+                                        <TableHead className="text-right font-bold text-lg">{formatCurrency(totalExpenses)}</TableHead>
+                                    </TableRow>
+                                </TableFooter>
+                            </Table>
+                        </div>
+                    </div>
+                 </div>
+               )}
             </CardContent>
         </Card>
       </div>
@@ -296,7 +452,3 @@ export default function FinancialsPage() {
     </>
   );
 }
-
-    
-
-    
