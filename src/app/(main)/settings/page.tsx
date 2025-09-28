@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -75,13 +76,13 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
 
 function BankAccountsEditor() {
     const { bankAccounts, setBankAccounts } = useMasterData();
-    const [newAccount, setNewAccount] = useState<Omit<BankAccount, 'id'>>({ name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa' });
+    const [newAccount, setNewAccount] = useState<Omit<BankAccount, 'id'>>({ name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa', owner: '' });
     const { toast } = useToast();
 
     const handleAddAccount = () => {
         if (newAccount.name && newAccount.initialBalance >= 0) {
             setBankAccounts(prev => [...prev, { ...newAccount, id: `acc-${Date.now()}` }]);
-            setNewAccount({ name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa' });
+            setNewAccount({ name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa', owner: '' });
             toast({ title: 'Cuenta Agregada', description: `Se agregó la cuenta "${newAccount.name}".` });
         } else {
             toast({ variant: "destructive", title: 'Error', description: 'Nombre y Saldo Inicial son requeridos.' });
@@ -100,8 +101,9 @@ function BankAccountsEditor() {
                 <CardDescription>Configure las cuentas bancarias y de efectivo de la empresa.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4 items-end">
                     <Input placeholder="Nombre de la Cuenta" value={newAccount.name} onChange={e => setNewAccount(p => ({...p, name: e.target.value}))}/>
+                    <Input placeholder="Titular" value={newAccount.owner} onChange={e => setNewAccount(p => ({...p, owner: e.target.value}))}/>
                     <Select value={newAccount.accountType} onValueChange={(value: BankAccount['accountType']) => setNewAccount(p => ({...p, accountType: value}))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -120,6 +122,7 @@ function BankAccountsEditor() {
                             <div>
                                 <span className='font-semibold'>{acc.name}</span>
                                 <span className="text-xs text-muted-foreground ml-2">({acc.accountType})</span>
+                                {acc.owner && <span className="text-xs text-muted-foreground ml-2">Titular: {acc.owner}</span>}
                             </div>
                             <div className="flex items-center gap-4">
                                 <span className='text-sm font-mono'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(acc.initialBalance)}</span>

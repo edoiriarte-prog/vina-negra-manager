@@ -1,4 +1,5 @@
 
+
 export const initialProducts = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MANDARINAS"];
 export const initialCalibers = ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"];
 export const initialUnits = ["Kilos", "Cajas"];
@@ -13,6 +14,7 @@ export const initialBankAccounts = [
         bankName: 'Banco Estado',
         initialBalance: 15000000,
         status: 'Activa' as const,
+        owner: 'Viña Negra SpA',
     },
     {
         id: 'acc-2',
@@ -20,6 +22,7 @@ export const initialBankAccounts = [
         accountType: 'Efectivo' as const,
         initialBalance: 500000,
         status: 'Activa' as const,
+        owner: 'Viña Negra SpA',
     }
 ];
 
@@ -36,3 +39,4 @@ export const productCaliberMatrix: ProductMatrix = {
     "CLEMENTINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
     "MANDARINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLadas"],
 };
+
