@@ -345,7 +345,7 @@ export function NewFinancialMovementSheet({
                         onValueChange={(value) => handleSelectChange('contactId', value)}
                         value={formData.contactId}
                         required
-                        className="col-span-3"
+                        
                      >
                          <SelectTrigger className="col-span-3">
                             <SelectValue placeholder="Seleccione un contacto para el lote" />
@@ -685,3 +685,4 @@ export function NewFinancialMovementSheet({
     
 
     
+
