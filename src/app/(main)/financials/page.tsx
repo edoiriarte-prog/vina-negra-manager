@@ -46,6 +46,7 @@ type AccountSummary = {
     initialBalance: number;
     totalIncome: number;
     totalExpense: number;
+    totalTransfers: number;
     finalBalance: number;
 }
 
@@ -80,14 +81,24 @@ export default function FinancialsPage() {
     
     const summaries = bankAccounts.map(account => {
         const totalIncome = financialMovements
-            .filter(m => m.destinationAccountId === account.id && (m.type === 'income' || m.type === 'traspaso'))
+            .filter(m => m.destinationAccountId === account.id && m.type === 'income')
             .reduce((sum, m) => sum + m.amount, 0);
 
         const totalExpense = financialMovements
-            .filter(m => m.sourceAccountId === account.id && (m.type === 'expense' || m.type === 'traspaso'))
+            .filter(m => m.sourceAccountId === account.id && m.type === 'expense')
+            .reduce((sum, m) => sum + m.amount, 0);
+
+        const transfersIn = financialMovements
+            .filter(m => m.destinationAccountId === account.id && m.type === 'traspaso')
+            .reduce((sum, m) => sum + m.amount, 0);
+        
+        const transfersOut = financialMovements
+            .filter(m => m.sourceAccountId === account.id && m.type === 'traspaso')
             .reduce((sum, m) => sum + m.amount, 0);
             
-        const finalBalance = account.initialBalance + totalIncome - totalExpense;
+        const totalTransfers = transfersIn - transfersOut;
+
+        const finalBalance = account.initialBalance + totalIncome - totalExpense + totalTransfers;
 
         return {
             id: account.id,
@@ -96,6 +107,7 @@ export default function FinancialsPage() {
             initialBalance: account.initialBalance,
             totalIncome,
             totalExpense,
+            totalTransfers,
             finalBalance,
         };
     });
@@ -325,6 +337,13 @@ export default function FinancialsPage() {
                                                 <span className="flex items-center gap-1 text-red-600"><ArrowDownCircle className="h-4 w-4" /> Egresos</span>
                                                 <span>{formatCurrency(acc.totalExpense)}</span>
                                             </div>
+                                             <div 
+                                                className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
+                                                onClick={() => setFilter({ type: 'traspaso', accountId: acc.id })}
+                                            >
+                                                <span className="flex items-center gap-1 text-blue-500"><ArrowRightCircle className="h-4 w-4" /> Traspasos</span>
+                                                <span className={cn(acc.totalTransfers >= 0 ? 'text-blue-500' : 'text-orange-500')}>{formatCurrency(acc.totalTransfers)}</span>
+                                            </div>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -491,3 +510,5 @@ export default function FinancialsPage() {
     </>
   );
 }
+
+    
