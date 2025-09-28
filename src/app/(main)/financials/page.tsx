@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -46,7 +47,8 @@ type AccountSummary = {
     initialBalance: number;
     totalIncome: number;
     totalExpense: number;
-    totalTransfers: number;
+    transfersIn: number;
+    transfersOut: number;
     finalBalance: number;
 }
 
@@ -68,7 +70,7 @@ export default function FinancialsPage() {
   const [deletingMovement, setDeletingMovement] = useState<FinancialMovement | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [filter, setFilter] = useState<{ type: 'income' | 'expense' | 'traspaso', accountId: string } | null>(null);
+  const [filter, setFilter] = useState<{ type: 'income' | 'expense' | 'traspaso_in' | 'traspaso_out', accountId: string } | null>(null);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
@@ -96,9 +98,7 @@ export default function FinancialsPage() {
             .filter(m => m.sourceAccountId === account.id && m.type === 'traspaso')
             .reduce((sum, m) => sum + m.amount, 0);
             
-        const totalTransfers = transfersIn - transfersOut;
-
-        const finalBalance = account.initialBalance + totalIncome - totalExpense + totalTransfers;
+        const finalBalance = account.initialBalance + totalIncome - totalExpense + transfersIn - transfersOut;
 
         return {
             id: account.id,
@@ -107,7 +107,8 @@ export default function FinancialsPage() {
             initialBalance: account.initialBalance,
             totalIncome,
             totalExpense,
-            totalTransfers,
+            transfersIn,
+            transfersOut,
             finalBalance,
         };
     });
@@ -194,12 +195,17 @@ export default function FinancialsPage() {
     if (!filter) {
         return dataWithContactNames;
     }
-    if (filter.type === 'income') {
-        return dataWithContactNames.filter(m => m.destinationAccountId === filter.accountId && m.type === 'income');
-    } else if (filter.type === 'expense') {
-        return dataWithContactNames.filter(m => m.sourceAccountId === filter.accountId && m.type === 'expense');
-    } else { // traspaso
-        return dataWithContactNames.filter(m => (m.sourceAccountId === filter.accountId || m.destinationAccountId === filter.accountId) && m.type === 'traspaso')
+    switch (filter.type) {
+        case 'income':
+            return dataWithContactNames.filter(m => m.destinationAccountId === filter.accountId && m.type === 'income');
+        case 'expense':
+            return dataWithContactNames.filter(m => m.sourceAccountId === filter.accountId && m.type === 'expense');
+        case 'traspaso_in':
+            return dataWithContactNames.filter(m => m.destinationAccountId === filter.accountId && m.type === 'traspaso');
+        case 'traspaso_out':
+            return dataWithContactNames.filter(m => m.sourceAccountId === filter.accountId && m.type === 'traspaso');
+        default:
+            return dataWithContactNames;
     }
   }, [dataWithContactNames, filter]);
 
@@ -337,12 +343,19 @@ export default function FinancialsPage() {
                                                 <span className="flex items-center gap-1 text-red-600"><ArrowDownCircle className="h-4 w-4" /> Egresos</span>
                                                 <span>{formatCurrency(acc.totalExpense)}</span>
                                             </div>
+                                            <div 
+                                                className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
+                                                onClick={() => setFilter({ type: 'traspaso_in', accountId: acc.id })}
+                                            >
+                                                <span className="flex items-center gap-1 text-blue-500"><ArrowRightCircle className="h-4 w-4" /> Traspasos (Recibidos)</span>
+                                                <span className='text-blue-500'>{formatCurrency(acc.transfersIn)}</span>
+                                            </div>
                                              <div 
                                                 className="flex justify-between items-center hover:bg-muted p-1 rounded-md cursor-pointer"
-                                                onClick={() => setFilter({ type: 'traspaso', accountId: acc.id })}
+                                                onClick={() => setFilter({ type: 'traspaso_out', accountId: acc.id })}
                                             >
-                                                <span className="flex items-center gap-1 text-blue-500"><ArrowRightCircle className="h-4 w-4" /> Traspasos</span>
-                                                <span className={cn(acc.totalTransfers >= 0 ? 'text-blue-500' : 'text-orange-500')}>{formatCurrency(acc.totalTransfers)}</span>
+                                                <span className="flex items-center gap-1 text-orange-500"><ArrowRightCircle className="h-4 w-4 -rotate-180" /> Traspasos (Enviados)</span>
+                                                <span className='text-orange-500'>{formatCurrency(acc.transfersOut)}</span>
                                             </div>
                                         </div>
                                     </CardContent>
@@ -362,7 +375,7 @@ export default function FinancialsPage() {
                         <CardTitle>Movimientos Registrados</CardTitle>
                         {filter ? (
                             <CardDescription>
-                                Mostrando {filter.type === 'income' ? 'ingresos de' : filter.type === 'expense' ? 'egresos de' : 'traspasos en'} la cuenta "{bankAccounts.find(a => a.id === filter.accountId)?.name}"
+                                Mostrando {filter.type.startsWith('traspaso') ? 'traspasos' : filter.type === 'income' ? 'ingresos' : 'egresos'} en la cuenta "{bankAccounts.find(a => a.id === filter.accountId)?.name}"
                             </CardDescription>
                         ) : (
                             <CardDescription>Todos los movimientos registrados en el período.</CardDescription>
