@@ -162,7 +162,7 @@ function BankAccountsEditor() {
                     </div>
                 </div>
                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {isClient && bankAccounts.map(acc => (
+                    {isClient ? bankAccounts.map(acc => (
                         <div key={acc.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                             <div>
                                 <span className='font-semibold'>{acc.name}</span>
@@ -179,7 +179,7 @@ function BankAccountsEditor() {
                                 </Button>
                             </div>
                         </div>
-                    ))}
+                    )) : null}
                 </div>
             </CardContent>
         </Card>
