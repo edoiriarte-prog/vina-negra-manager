@@ -254,7 +254,7 @@ export default function ReportsPage() {
         {openCollapsibles[item.contactId] && (
           <tr className="bg-muted/20 hover:bg-muted/30">
             <TableCell colSpan={5} className="p-0">
-                <div className="p-4 grid grid-cols-5 gap-4">
+                <div className="p-4">
                     <div className="col-span-3">
                         <h4 className="font-semibold mb-2">Detalle de Órdenes de Venta</h4>
                         <Table>
@@ -281,25 +281,6 @@ export default function ReportsPage() {
                                              <Badge variant={doc.status === 'Pagado' ? 'default' : doc.status === 'Abonado' ? 'secondary' : 'destructive'}>{doc.status}</Badge>
                                         </TableCell>
                                         <TableCell>{doc.paymentCompleteDate ? format(parseISO(doc.paymentCompleteDate), "dd-MM-yyyy") : '-'}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                    <div className="col-span-2">
-                        <h4 className="font-semibold mb-2">Detalle de Pagos Recibidos</h4>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead className="text-right">Monto</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                             <TableBody>
-                                {item.payments.map(payment => (
-                                    <TableRow key={payment.id}>
-                                        <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
