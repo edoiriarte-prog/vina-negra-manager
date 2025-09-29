@@ -65,9 +65,9 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                 const client = contacts.find(c => c.id === order.clientId);
                 const clientName = client ? client.name : 'Desconocido';
                 
-                if (order.paymentMethod === 'Pago con Anticipo y Saldo') {
+                if (order.paymentMethod === 'Pago con Anticipo y Saldo' && order.advancePercentage) {
                     if (order.advanceDueDate && new Date(order.advanceDueDate) <= endDate) {
-                        const advanceAmount = order.totalAmount * ((order.advancePercentage || 0) / 100);
+                        const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
                         allDueItems.push({
                             id: `${order.id}-advance`, clientId: order.clientId, clientName, orderId: order.id,
                             paymentType: 'Anticipo', dueDate: order.advanceDueDate, amount: advanceAmount,
@@ -75,7 +75,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                         });
                     }
                     if (order.balanceDueDate && new Date(order.balanceDueDate) <= endDate) {
-                        const advanceAmount = order.totalAmount * ((order.advancePercentage || 0) / 100);
+                        const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
                         const balanceAmount = order.totalAmount - advanceAmount;
                         allDueItems.push({
                             id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
@@ -89,6 +89,12 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                         paymentType: 'Saldo', dueDate: order.date, amount: order.totalAmount,
                         paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
                     });
+                } else if (order.paymentMethod === 'Contado' && new Date(order.date) <= endDate) {
+                    allDueItems.push({
+                        id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
+                        paymentType: 'Saldo', dueDate: order.date, amount: order.totalAmount,
+                        paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
+                    });
                 }
              }
         });
@@ -97,15 +103,19 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         const relevantPayments = financialMovements.filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate);
 
         const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
+        
         allDueItems.forEach(due => {
             if (!clientData[due.clientId]) clientData[due.clientId] = { dues: [], payments: [] };
             clientData[due.clientId].dues.push(due);
         });
+
         relevantPayments.forEach(fm => {
-            if (fm.contactId && clientData[fm.contactId]) {
-                clientData[fm.contactId].payments.push(fm);
+            if (fm.contactId) {
+                 if (!clientData[fm.contactId]) clientData[fm.contactId] = { dues: [], payments: [] };
+                 clientData[fm.contactId].payments.push(fm);
             }
         });
+
 
         // Settle payments for each client
         Object.values(clientData).forEach(({ dues, payments }) => {
@@ -272,4 +282,5 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
             </CardContent>
         </Card>
     )
-}
+
+    
