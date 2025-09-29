@@ -178,7 +178,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                 <TableCell>{item.orderId}</TableCell>
                 <TableCell>{item.paymentType}</TableCell>
                 <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-                <TableCell className="text-right font-bold text-destructive">{item.pendingAmount > 0 ? formatCurrency(item.pendingAmount) : '-'}</TableCell>
+                <TableCell className="text-right font-bold">{item.pendingAmount > 0 ? formatCurrency(item.pendingAmount) : '-'}</TableCell>
                 <TableCell className="text-center">
                     <Badge variant={item.status === 'Pagado' ? 'default' : item.status === 'Vencido' ? 'destructive' : 'secondary'}>
                         {item.status}
