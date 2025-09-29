@@ -59,7 +59,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         const allDueItems: DueDateItem[] = [];
         const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
 
-        // 1. Generate all due items from sales orders with due dates on or before the filter date
         salesOrders.forEach(order => {
              if (order.status !== 'cancelled') {
                 const client = contacts.find(c => c.id === order.clientId);
@@ -99,7 +98,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
              }
         });
         
-        // Filter payments made on or before the filter date
         const relevantPayments = financialMovements.filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate);
 
         const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
@@ -117,7 +115,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         });
 
 
-        // Settle payments for each client
         Object.values(clientData).forEach(({ dues, payments }) => {
             const sortedDues = dues.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
             const paymentPool = payments.map(p => ({ ...p, remaining: p.amount }));
@@ -134,12 +131,11 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
             });
         });
 
-        // Update status for all due items
         allDueItems.forEach(due => {
             if (due.pendingAmount <= 0.01) {
                 due.status = 'Pagado';
                 due.pendingAmount = 0;
-            } else if (isAfter(endDate, parseISO(due.dueDate)) && !isEqual(endDate, parseISO(due.dueDate))) {
+            } else if (isAfter(startOfDay(new Date()), parseISO(due.dueDate)) && !isEqual(startOfDay(new Date()), parseISO(due.dueDate))) {
                 due.status = 'Vencido';
             } else {
                 due.status = 'Pendiente';
@@ -282,5 +278,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
             </CardContent>
         </Card>
     )
+
+    
+}
 
     
