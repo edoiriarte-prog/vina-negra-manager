@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { Contact, SalesOrder, PurchaseOrder, FinancialMovement, ServiceOrder } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
   contacts as initialContacts,
@@ -203,6 +203,15 @@ export default function ReportsPage() {
       setSupplierReports(supplierReportData);
     }
   }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements, isClient]);
+
+  const supplierTotals = useMemo(() => {
+    return supplierReports.reduce((acc, report) => {
+        acc.totalBilled += report.totalBilled;
+        acc.totalPaid += report.totalPaid;
+        acc.pendingBalance += report.pendingBalance;
+        return acc;
+    }, { totalBilled: 0, totalPaid: 0, pendingBalance: 0 });
+  }, [supplierReports]);
 
   const handlePrint = () => {
     const allIds = [...clientReports, ...supplierReports].reduce((acc, report) => {
@@ -482,6 +491,15 @@ export default function ReportsPage() {
                    <TableBody>
                     {renderSupplierReportRows(supplierReports, supplierFilter)}
                   </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableHead className="text-right font-bold text-lg">Total General</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.totalBilled)}</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.totalPaid)}</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.pendingBalance)}</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableFooter>
                 </Table>
               </div>
             </CardContent>
@@ -504,3 +522,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+
