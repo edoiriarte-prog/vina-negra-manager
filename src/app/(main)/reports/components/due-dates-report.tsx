@@ -7,8 +7,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, parseISO, isAfter } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format, parseISO, isAfter, startOfDay, isEqual } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { CalendarIcon, DollarSign, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type DueDatesReportProps = {
     salesOrders: SalesOrder[];
@@ -30,16 +36,6 @@ type DueDateItem = {
     isSubtotal?: false;
 };
 
-type SubtotalItem = {
-    id: string;
-    date: string;
-    amount: number;
-    isSubtotal: true;
-}
-
-type ReportRow = DueDateItem | SubtotalItem;
-
-
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
     style: 'currency',
@@ -48,222 +44,230 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 export function DueDatesReport({ salesOrders, financialMovements, contacts }: DueDatesReportProps) {
-    const [reportData, setReportData] = useState<ReportRow[]>([]);
     const [isClient, setIsClient] = useState(false);
+    const [filterDate, setFilterDate] = useState<Date | undefined>(new Date());
+    const [activeTab, setActiveTab] = useState('pending');
 
     useEffect(() => {
         setIsClient(true);
     }, []);
+    
+    const { pendingItems, paidItems, totalPending, totalPaid } = useMemo(() => {
+        if (!isClient) return { pendingItems: [], paidItems: [], totalPending: 0, totalPaid: 0 };
+        
+        const allDueItems: DueDateItem[] = [];
+        const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
 
-    useEffect(() => {
-        if (isClient) {
-            const allDueItems: DueDateItem[] = [];
-
-            // 1. Generate all due items from sales orders
-            salesOrders.forEach(order => {
-                if (order.paymentMethod === 'Pago con Anticipo y Saldo' && order.status !== 'cancelled') {
-                    const client = contacts.find(c => c.id === order.clientId);
-                    const clientName = client ? client.name : 'Desconocido';
-                    
-                    if (order.advanceDueDate && order.advancePercentage) {
-                        const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
+        // 1. Generate all due items from sales orders with due dates on or before the filter date
+        salesOrders.forEach(order => {
+             if (order.status !== 'cancelled') {
+                const client = contacts.find(c => c.id === order.clientId);
+                const clientName = client ? client.name : 'Desconocido';
+                
+                if (order.paymentMethod === 'Pago con Anticipo y Saldo') {
+                    if (order.advanceDueDate && new Date(order.advanceDueDate) <= endDate) {
+                        const advanceAmount = order.totalAmount * ((order.advancePercentage || 0) / 100);
                         allDueItems.push({
-                            id: `${order.id}-advance`,
-                            clientId: order.clientId,
-                            clientName,
-                            orderId: order.id,
-                            paymentType: 'Anticipo',
-                            dueDate: order.advanceDueDate,
-                            amount: advanceAmount,
-                            paidAmount: 0,
-                            pendingAmount: advanceAmount,
-                            status: 'Pendiente', // Initial status
+                            id: `${order.id}-advance`, clientId: order.clientId, clientName, orderId: order.id,
+                            paymentType: 'Anticipo', dueDate: order.advanceDueDate, amount: advanceAmount,
+                            paidAmount: 0, pendingAmount: advanceAmount, status: 'Pendiente',
                         });
                     }
-
-                    if (order.balanceDueDate) {
+                    if (order.balanceDueDate && new Date(order.balanceDueDate) <= endDate) {
                         const advanceAmount = order.totalAmount * ((order.advancePercentage || 0) / 100);
                         const balanceAmount = order.totalAmount - advanceAmount;
-                         allDueItems.push({
-                            id: `${order.id}-balance`,
-                            clientId: order.clientId,
-                            clientName,
-                            orderId: order.id,
-                            paymentType: 'Saldo',
-                            dueDate: order.balanceDueDate,
-                            amount: balanceAmount,
-                            paidAmount: 0,
-                            pendingAmount: balanceAmount,
-                            status: 'Pendiente', // Initial status
+                        allDueItems.push({
+                            id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
+                            paymentType: 'Saldo', dueDate: order.balanceDueDate, amount: balanceAmount,
+                            paidAmount: 0, pendingAmount: balanceAmount, status: 'Pendiente',
                         });
                     }
-                }
-            });
-
-            // Group due items and payments by client
-            const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
-
-            allDueItems.forEach(due => {
-                if (!clientData[due.clientId]) {
-                    clientData[due.clientId] = { dues: [], payments: [] };
-                }
-                clientData[due.clientId].dues.push(due);
-            });
-
-            financialMovements.forEach(fm => {
-                if (fm.type === 'income' && fm.contactId && clientData[fm.contactId]) {
-                    clientData[fm.contactId].payments.push(fm);
-                }
-            });
-            
-            // 2. Settle payments for each client
-            Object.values(clientData).forEach(({ dues, payments }) => {
-                const sortedDues = dues.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-                const sortedPayments = payments.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(p => ({ ...p, remaining: p.amount }));
-                
-                sortedDues.forEach(due => {
-                    sortedPayments.forEach(payment => {
-                        if (payment.remaining > 0 && due.pendingAmount > 0) {
-                            const amountToApply = Math.min(payment.remaining, due.pendingAmount);
-                            due.paidAmount += amountToApply;
-                            due.pendingAmount -= amountToApply;
-                            payment.remaining -= amountToApply;
-                        }
+                } else if (order.paymentMethod === 'Crédito' && new Date(order.date) <= endDate) {
+                     allDueItems.push({
+                        id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
+                        paymentType: 'Saldo', dueDate: order.date, amount: order.totalAmount,
+                        paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
                     });
+                }
+             }
+        });
+        
+        // Filter payments made on or before the filter date
+        const relevantPayments = financialMovements.filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate);
+
+        const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
+        allDueItems.forEach(due => {
+            if (!clientData[due.clientId]) clientData[due.clientId] = { dues: [], payments: [] };
+            clientData[due.clientId].dues.push(due);
+        });
+        relevantPayments.forEach(fm => {
+            if (fm.contactId && clientData[fm.contactId]) {
+                clientData[fm.contactId].payments.push(fm);
+            }
+        });
+
+        // Settle payments for each client
+        Object.values(clientData).forEach(({ dues, payments }) => {
+            const sortedDues = dues.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+            const paymentPool = payments.map(p => ({ ...p, remaining: p.amount }));
+
+            sortedDues.forEach(due => {
+                paymentPool.forEach(payment => {
+                    if (payment.remaining > 0 && due.pendingAmount > 0) {
+                        const amountToApply = Math.min(payment.remaining, due.pendingAmount);
+                        due.paidAmount += amountToApply;
+                        due.pendingAmount -= amountToApply;
+                        payment.remaining -= amountToApply;
+                    }
                 });
             });
+        });
 
-            // 3. Update status for all due items
-            allDueItems.forEach(due => {
-                if (due.pendingAmount <= 0.01) { // Use a small epsilon for float comparison
-                    due.status = 'Pagado';
-                    due.pendingAmount = 0;
-                } else if (isAfter(new Date(), parseISO(due.dueDate))) {
-                    due.status = 'Vencido';
-                } else {
-                    due.status = 'Pendiente';
-                }
-            });
+        // Update status for all due items
+        allDueItems.forEach(due => {
+            if (due.pendingAmount <= 0.01) {
+                due.status = 'Pagado';
+                due.pendingAmount = 0;
+            } else if (isAfter(endDate, parseISO(due.dueDate)) && !isEqual(endDate, parseISO(due.dueDate))) {
+                due.status = 'Vencido';
+            } else {
+                due.status = 'Pendiente';
+            }
+        });
 
-
-            // 4. Group by date and add subtotals
-            const finalReportRows: ReportRow[] = [];
-            const itemsByDate: Record<string, DueDateItem[]> = {};
+        const pending = allDueItems
+            .filter(item => item.status === 'Pendiente' || item.status === 'Vencido')
+            .sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        
+        const paid = allDueItems
+            .filter(item => item.status === 'Pagado')
+            .sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
             
-            const pendingAndOverdueItems = allDueItems.filter(item => item.status === 'Pendiente' || item.status === 'Vencido');
+        const totalPending = pending.reduce((sum, item) => sum + item.pendingAmount, 0);
+        const totalPaid = paid.reduce((sum, item) => sum + item.amount, 0);
 
-            pendingAndOverdueItems.forEach(item => {
-                if (!itemsByDate[item.dueDate]) {
-                    itemsByDate[item.dueDate] = [];
-                }
-                itemsByDate[item.dueDate].push(item);
-            });
-            
-            Object.keys(itemsByDate).sort((a,b) => new Date(a).getTime() - new Date(b).getTime()).forEach(date => {
-                const items = itemsByDate[date].sort((a,b) => a.clientName.localeCompare(b.clientName));
-                finalReportRows.push(...items);
-                
-                if (items.length > 1) {
-                    const subtotalAmount = items.reduce((sum, item) => sum + item.pendingAmount, 0);
-                    finalReportRows.push({
-                        id: `subtotal-${date}`,
-                        date: date,
-                        amount: subtotalAmount,
-                        isSubtotal: true,
-                    });
-                }
-            });
+        return { pendingItems: pending, paidItems: paid, totalPending, totalPaid };
 
-            setReportData(finalReportRows);
-        }
-    }, [salesOrders, financialMovements, contacts, isClient]);
+    }, [salesOrders, financialMovements, contacts, isClient, filterDate]);
 
-    const totalPending = useMemo(() => {
-        return reportData
-            .filter((item): item is DueDateItem => !item.isSubtotal)
-            .reduce((sum, item) => sum + item.pendingAmount, 0);
-    }, [reportData]);
 
-    const renderReportRows = () => {
+    const renderReportRows = (data: DueDateItem[]) => {
         if (!isClient) {
             return Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={`skeleton-due-${index}`}>
-                    <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
-                </TableRow>
+                <TableRow key={`skeleton-due-${index}`}><TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
             ));
         }
-
-        if (reportData.length === 0) {
-            return (
-                <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">No hay vencimientos pendientes.</TableCell>
-                </TableRow>
-            )
+        if (data.length === 0) {
+            return ( <TableRow><TableCell colSpan={7} className="h-24 text-center">No hay datos que mostrar para esta selección.</TableCell></TableRow> )
         }
-
-        return reportData.map(item => {
-            if (item.isSubtotal) {
-                return (
-                    <TableRow key={item.id} className="bg-muted/50 font-semibold">
-                        <TableCell colSpan={3} className="text-right">Saldo Vencimientos {format(parseISO(item.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-                        <TableCell colSpan={2}></TableCell>
-                    </TableRow>
-                )
-            }
-
-            return (
-                <TableRow key={item.id}>
-                    <TableCell>{format(parseISO(item.dueDate), "dd-MM-yyyy", { locale: es })}</TableCell>
-                    <TableCell className="font-medium">{item.clientName}</TableCell>
-                    <TableCell>{item.orderId}</TableCell>
-                    <TableCell>{item.paymentType}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-                    <TableCell className="text-right font-bold text-destructive">{formatCurrency(item.pendingAmount)}</TableCell>
-                    <TableCell className="text-center">
-                        <Badge variant={item.status === 'Pagado' ? 'default' : item.status === 'Vencido' ? 'destructive' : 'secondary'}>
-                            {item.status}
-                        </Badge>
-                    </TableCell>
-                </TableRow>
-            )
-        });
+        return data.map(item => (
+            <TableRow key={item.id}>
+                <TableCell>{format(parseISO(item.dueDate), "dd-MM-yyyy", { locale: es })}</TableCell>
+                <TableCell className="font-medium">{item.clientName}</TableCell>
+                <TableCell>{item.orderId}</TableCell>
+                <TableCell>{item.paymentType}</TableCell>
+                <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
+                <TableCell className="text-right font-bold text-destructive">{item.pendingAmount > 0 ? formatCurrency(item.pendingAmount) : '-'}</TableCell>
+                <TableCell className="text-center">
+                    <Badge variant={item.status === 'Pagado' ? 'default' : item.status === 'Vencido' ? 'destructive' : 'secondary'}>
+                        {item.status}
+                    </Badge>
+                </TableCell>
+            </TableRow>
+        ));
     }
+    
+    const renderTable = (items: DueDateItem[], total: number, caption: string) => (
+         <div className="rounded-md border">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Fecha Venc.</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Orden (O/V)</TableHead>
+                        <TableHead>Tipo de Pago</TableHead>
+                        <TableHead className="text-right">Monto Cuota</TableHead>
+                        <TableHead className="text-right">Saldo Pendiente</TableHead>
+                        <TableHead className="text-center">Estado</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {renderReportRows(items)}
+                </TableBody>
+                {isClient && items.length > 0 && (
+                    <TableFooter>
+                        <TableRow>
+                            <TableCell colSpan={6} className="text-right font-bold text-lg">{caption}</TableCell>
+                            <TableCell className="text-right font-bold text-lg">{formatCurrency(total)}</TableCell>
+                        </TableRow>
+                    </TableFooter>
+                )}
+            </Table>
+        </div>
+    )
 
     return (
         <Card className="print-container mt-6">
             <CardHeader>
                 <CardTitle className="font-headline text-2xl">Informe de Vencimientos</CardTitle>
-                <CardDescription>Seguimiento de los próximos vencimientos de pago de las órdenes de venta.</CardDescription>
+                <CardDescription>Seguimiento de vencimientos de pago. Seleccione una fecha para ver el balance a ese día.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Fecha Venc.</TableHead>
-                                <TableHead>Cliente</TableHead>
-                                <TableHead>Orden (O/V)</TableHead>
-                                <TableHead>Tipo de Pago</TableHead>
-                                <TableHead className="text-right">Monto Cuota</TableHead>
-                                <TableHead className="text-right">Saldo Pendiente</TableHead>
-                                <TableHead className="text-center">Estado</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {renderReportRows()}
-                        </TableBody>
-                        {isClient && (
-                            <TableFooter>
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-right font-bold text-lg">Total Pendiente</TableCell>
-                                    <TableCell className="text-right font-bold text-lg">{formatCurrency(totalPending)}</TableCell>
-                                    <TableCell></TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        )}
-                    </Table>
+                <div className="grid md:grid-cols-3 gap-4 mb-6">
+                    <div className="md:col-span-1">
+                        <Label>Ver balance al:</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                            <Button
+                                variant={"outline"}
+                                className={cn("w-full justify-start text-left font-normal", !filterDate && "text-muted-foreground")}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                            </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={filterDate} onSelect={setFilterDate} initialFocus />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                     <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Total Pendiente / Vencido</CardTitle>
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalPending)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Total Pagado</CardTitle>
+                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalPaid)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                <p className="text-xs text-muted-foreground">en cuotas con vencimiento hasta la fecha</p>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
+                
+                 <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="pending">Pendientes y Vencidos</TabsTrigger>
+                        <TabsTrigger value="paid">Pagados</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="pending" className="mt-4">
+                        {renderTable(pendingItems, totalPending, 'Total Pendiente')}
+                    </TabsContent>
+                    <TabsContent value="paid" className="mt-4">
+                        {renderTable(paidItems, totalPaid, 'Total Pagado')}
+                    </TabsContent>
+                </Tabs>
+
             </CardContent>
         </Card>
     )
