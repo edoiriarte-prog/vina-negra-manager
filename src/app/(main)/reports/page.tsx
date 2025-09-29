@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { Contact, SalesOrder, PurchaseOrder, FinancialMovement, ServiceOrder } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -17,7 +17,7 @@ import {
 } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Printer, ChevronDown } from 'lucide-react';
+import { Printer, ChevronDown, MoreHorizontal } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,14 @@ import { es } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PerformanceReports } from './components/performance-reports';
 import { DueDatesReport } from './components/due-dates-report';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 
 type DocumentDetail = {
   id: string;
@@ -77,10 +85,45 @@ export default function ReportsPage() {
   const [supplierFilter, setSupplierFilter] = useState('');
   const [isClient, setIsClient] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
+  const [printingReport, setPrintingReport] = useState<ReportData | null>(null);
+
+  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    if (printingReport) {
+      setTimeout(() => {
+        if (printRef.current) {
+          const printContents = printRef.current.innerHTML;
+          const originalContents = document.body.innerHTML;
+          const printWindow = window.open('', '', 'height=800,width=800');
+          
+          if(printWindow){
+            printWindow.document.write('<html><head><title>Estado de Cuenta</title>');
+            const styles = Array.from(document.styleSheets)
+              .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
+              .join('');
+            printWindow.document.write(styles);
+            printWindow.document.write('<style>body { padding: 2rem; } .print-only { display: block !important; } .no-print { display: none !important; }</style>');
+            printWindow.document.write('</head><body class="bg-white">');
+            printWindow.document.write(printContents);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
+            
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+                setPrintingReport(null);
+            }, 500);
+          }
+        }
+      }, 100);
+    }
+  }, [printingReport]);
 
   useEffect(() => {
     if (isClient) {
@@ -222,17 +265,10 @@ export default function ReportsPage() {
     }, { totalBilled: 0, totalPaid: 0, pendingBalance: 0 });
   }, [supplierReports]);
 
-  const handlePrint = () => {
-    const allIds = [...clientReports, ...supplierReports].reduce((acc, report) => {
-        acc[report.contactId] = true;
-        return acc;
-    }, {} as Record<string, boolean>);
-    setOpenCollapsibles(allIds);
 
-    setTimeout(() => {
-        window.print();
-    }, 100);
-  }
+  const handlePrintRequest = (report: ReportData) => {
+    setPrintingReport(report);
+  };
 
   const toggleCollapsible = (id: string) => {
     setOpenCollapsibles(prev => ({...prev, [id]: !prev[id]}));
@@ -244,7 +280,7 @@ export default function ReportsPage() {
     if (!isClient) {
         return (
             <TableRow>
-              <TableCell colSpan={5} className="h-24 text-center">
+              <TableCell colSpan={6} className="h-24 text-center">
                 {Array.from({ length: 3 }).map((_, index) => (
                     <Skeleton key={`skeleton-${index}`} className="h-8 w-full my-2" />
                 ))}
@@ -255,10 +291,12 @@ export default function ReportsPage() {
     
     return filteredData.map((item) => (
       <React.Fragment key={item.contactId}>
-        <TableRow className="cursor-pointer hover:bg-muted/20" onClick={() => toggleCollapsible(item.contactId)}>
+        <TableRow>
           <TableCell className="font-medium">
             <div className="flex items-center gap-2">
-              <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
+              <Button variant="ghost" size="sm" onClick={() => toggleCollapsible(item.contactId)}>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
+              </Button>
               {item.contactName}
             </div>
           </TableCell>
@@ -268,10 +306,27 @@ export default function ReportsPage() {
           <TableCell className="text-center">
             <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
           </TableCell>
+          <TableCell className="text-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Abrir menú</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handlePrintRequest(item)}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir Estado de Cuenta
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
         </TableRow>
         {openCollapsibles[item.contactId] && (
           <tr className="bg-muted/20 hover:bg-muted/30">
-            <TableCell colSpan={5} className="p-0">
+            <TableCell colSpan={6} className="p-0">
                 <div className="p-4">
                     <div className="col-span-3">
                         <h4 className="font-semibold mb-2">Detalle de Órdenes de Venta</h4>
@@ -317,7 +372,7 @@ export default function ReportsPage() {
     if (!isClient) {
         return (
             <TableRow>
-              <TableCell colSpan={5} className="h-24 text-center">
+              <TableCell colSpan={6} className="h-24 text-center">
                 {Array.from({ length: 3 }).map((_, index) => (
                     <Skeleton key={`skeleton-supp-${index}`} className="h-8 w-full my-2" />
                 ))}
@@ -328,10 +383,12 @@ export default function ReportsPage() {
     
     return filteredData.map((item) => (
       <React.Fragment key={item.contactId}>
-        <TableRow className="cursor-pointer hover:bg-muted/20" onClick={() => toggleCollapsible(item.contactId)}>
+        <TableRow>
           <TableCell className="font-medium">
             <div className="flex items-center gap-2">
-              <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
+               <Button variant="ghost" size="sm" onClick={() => toggleCollapsible(item.contactId)}>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
+              </Button>
               {item.contactName}
             </div>
           </TableCell>
@@ -341,10 +398,27 @@ export default function ReportsPage() {
           <TableCell className="text-center">
             <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
           </TableCell>
+           <TableCell className="text-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Abrir menú</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handlePrintRequest(item)}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir Estado de Cuenta
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
         </TableRow>
         {openCollapsibles[item.contactId] && (
           <tr className="bg-muted/20 hover:bg-muted/30">
-            <TableCell colSpan={5} className="p-0">
+            <TableCell colSpan={6} className="p-0">
                 <div className="p-4 grid grid-cols-2 gap-4">
                     <div>
                         <h4 className="font-semibold mb-2">Documentos</h4>
@@ -421,17 +495,8 @@ export default function ReportsPage() {
             <h1 className="font-headline text-2xl">Informes de Gestión</h1>
             <p className="text-muted-foreground">Analiza el estado de cuentas y el rendimiento de tu negocio.</p>
         </div>
-        <Button onClick={handlePrint}>
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimir
-        </Button>
       </div>
       
-      <div className="hidden print:block print:mb-8">
-        <Logo />
-        <h1 className="font-headline text-2xl text-center mt-4">Informes de Cuentas</h1>
-      </div>
-
       <Tabs defaultValue="accounts" className="no-print">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="accounts">Estado de Cuentas</TabsTrigger>
@@ -462,6 +527,7 @@ export default function ReportsPage() {
                       <TableHead className="text-right">Total Pagado</TableHead>
                       <TableHead className="text-right">Saldo Pendiente</TableHead>
                       <TableHead className="text-center w-[100px]">Estado</TableHead>
+                      <TableHead className="text-center w-[50px]">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -473,7 +539,7 @@ export default function ReportsPage() {
                       <TableHead className="text-right font-bold text-lg">{formatCurrency(clientTotals.totalBilled)}</TableHead>
                       <TableHead className="text-right font-bold text-lg">{formatCurrency(clientTotals.totalPaid)}</TableHead>
                       <TableHead className="text-right font-bold text-lg">{formatCurrency(clientTotals.pendingBalance)}</TableHead>
-                      <TableHead />
+                      <TableHead colSpan={2}/>
                     </TableRow>
                   </TableFooter>
                 </Table>
@@ -504,6 +570,7 @@ export default function ReportsPage() {
                       <TableHead className="text-right">Total Pagado</TableHead>
                       <TableHead className="text-right">Saldo Pendiente</TableHead>
                       <TableHead className="text-center w-[100px]">Estado</TableHead>
+                      <TableHead className="text-center w-[50px]">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                    <TableBody>
@@ -515,7 +582,7 @@ export default function ReportsPage() {
                       <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.totalBilled)}</TableHead>
                       <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.totalPaid)}</TableHead>
                       <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.pendingBalance)}</TableHead>
-                      <TableHead />
+                      <TableHead colSpan={2} />
                     </TableRow>
                   </TableFooter>
                 </Table>
@@ -537,6 +604,62 @@ export default function ReportsPage() {
             />
         </TabsContent>
       </Tabs>
+      
+      {/* Hidden container for printing */}
+      <div className="hidden print-only">
+        <div ref={printRef}>
+            {printingReport && (
+                <div className="p-8">
+                    <div className="flex justify-between items-center mb-8">
+                        <Logo />
+                        <div className='text-right'>
+                            <h1 className="text-2xl font-bold font-headline">Estado de Cuenta</h1>
+                            <p className='text-muted-foreground'>{format(new Date(), "PPP", { locale: es })}</p>
+                        </div>
+                    </div>
+                    <div className="mb-8">
+                        <h2 className="text-xl font-semibold">{printingReport.contactName}</h2>
+                        <p className="text-muted-foreground">{contacts.find(c=>c.id === printingReport.contactId)?.rut}</p>
+                    </div>
+
+                    <h3 className="text-lg font-semibold mb-2">Detalle de Documentos</h3>
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Doc.</TableHead>
+                                <TableHead>Fecha</TableHead>
+                                <TableHead>Monto</TableHead>
+                                <TableHead>Pagado</TableHead>
+                                <TableHead>Saldo</TableHead>
+                                <TableHead>Estado</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {printingReport.documents.map(doc => (
+                                <TableRow key={doc.id}>
+                                    <TableCell>{doc.id}</TableCell>
+                                    <TableCell>{format(parseISO(doc.date), "dd-MM-yyyy")}</TableCell>
+                                    <TableCell>{formatCurrency(doc.amount)}</TableCell>
+                                    <TableCell>{formatCurrency(doc.paidAmount)}</TableCell>
+                                    <TableCell>{formatCurrency(doc.pendingBalance)}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={doc.status === 'Pagado' ? 'default' : doc.status === 'Abonado' ? 'secondary' : 'destructive'}>{doc.status}</Badge>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                        <TableFooter>
+                            <TableRow>
+                                <TableCell colSpan={4} className="text-right font-bold">Saldo Pendiente Total</TableCell>
+                                <TableCell className="font-bold">{formatCurrency(printingReport.pendingBalance)}</TableCell>
+                                <TableCell/>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </div>
+            )}
+        </div>
+      </div>
     </div>
   );
 }
