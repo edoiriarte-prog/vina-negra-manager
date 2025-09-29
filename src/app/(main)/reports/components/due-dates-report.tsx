@@ -14,7 +14,6 @@ import { format, parseISO, isAfter, startOfDay, isEqual } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CalendarIcon, DollarSign, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 
 type DueDatesReportProps = {
@@ -46,8 +45,7 @@ const formatCurrency = (value: number) =>
 export function DueDatesReport({ salesOrders, financialMovements, contacts }: DueDatesReportProps) {
     const [isClient, setIsClient] = useState(false);
     const [filterDate, setFilterDate] = useState<Date | undefined>(new Date());
-    const [activeTab, setActiveTab] = useState('pending');
-
+    
     useEffect(() => {
         setIsClient(true);
     }, []);
@@ -188,8 +186,9 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         ));
     }
     
-    const renderTable = (items: DueDateItem[], total: number, caption: string) => (
+    const renderTable = (items: DueDateItem[], total: number, caption: string, title: string) => (
          <div className="rounded-md border">
+            <h3 className="font-headline text-xl mb-2 p-4">{title}</h3>
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -210,6 +209,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                         <TableRow>
                             <TableCell colSpan={5} className="text-right font-bold text-lg">{caption}</TableCell>
                             <TableCell className="text-right font-bold text-lg">{formatCurrency(total)}</TableCell>
+                            <TableCell/>
                         </TableRow>
                     </TableFooter>
                 )}
@@ -219,7 +219,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
 
     return (
         <Card className="print-container mt-6">
-            <CardHeader>
+            <CardHeader className="no-print">
                 <CardTitle className="font-headline text-2xl">Informe de Vencimientos</CardTitle>
                 <CardDescription>Seguimiento de vencimientos de pago. Seleccione una fecha para ver el balance a ese día.</CardDescription>
             </CardHeader>
@@ -266,18 +266,10 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                     </div>
                 </div>
                 
-                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="pending">Pendientes y Vencidos</TabsTrigger>
-                        <TabsTrigger value="paid">Pagados</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="pending" className="mt-4">
-                        {renderTable(pendingItems, totalPending, 'Total Pendiente')}
-                    </TabsContent>
-                    <TabsContent value="paid" className="mt-4">
-                        {renderTable(paidItems, totalPaid, 'Total Pagado')}
-                    </TabsContent>
-                </Tabs>
+                <div className="space-y-8">
+                    {renderTable(pendingItems, totalPending, 'Total Pendiente', 'Pendientes y Vencidos')}
+                    {renderTable(paidItems, totalPaid, 'Total Pagado', 'Pagados')}
+                </div>
 
             </CardContent>
         </Card>
@@ -285,5 +277,3 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
 
     
 }
-
-    

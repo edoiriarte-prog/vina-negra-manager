@@ -87,6 +87,8 @@ export default function ReportsPage() {
   const [printingReport, setPrintingReport] = useState<ReportData | null>(null);
 
   const printRef = useRef<HTMLDivElement>(null);
+  const dueDatesPrintRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -268,6 +270,32 @@ export default function ReportsPage() {
   const handlePrintRequest = (report: ReportData) => {
     setPrintingReport(report);
   };
+
+  const handlePrintDueDates = () => {
+    if (dueDatesPrintRef.current) {
+      const printContents = dueDatesPrintRef.current.innerHTML;
+      const printWindow = window.open('', '', 'height=800,width=800');
+      
+      if(printWindow){
+        printWindow.document.write('<html><head><title>Informe de Vencimientos</title>');
+        const styles = Array.from(document.styleSheets)
+          .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
+          .join('');
+        printWindow.document.write(styles);
+        printWindow.document.write('<style>body { padding: 2rem; } .no-print { display: none !important; }</style>');
+        printWindow.document.write('</head><body class="bg-white">');
+        printWindow.document.write(printContents);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.focus();
+        
+        setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+        }, 500);
+      }
+    }
+  }
 
   const toggleCollapsible = (id: string) => {
     setOpenCollapsibles(prev => ({...prev, [id]: !prev[id]}));
@@ -475,7 +503,7 @@ export default function ReportsPage() {
             background: white !important;
           }
           .no-print {
-            display: none;
+            display: none !important;
           }
           .print-container {
             padding: 0;
@@ -590,11 +618,17 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
          <TabsContent value="due-dates">
-            <DueDatesReport 
-                salesOrders={salesOrders}
-                financialMovements={financialMovements}
-                contacts={contacts}
-            />
+             <Button onClick={handlePrintDueDates} className="my-4 no-print">
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir Informe
+            </Button>
+            <div ref={dueDatesPrintRef}>
+                <DueDatesReport 
+                    salesOrders={salesOrders}
+                    financialMovements={financialMovements}
+                    contacts={contacts}
+                />
+            </div>
         </TabsContent>
         <TabsContent value="performance">
             <PerformanceReports
