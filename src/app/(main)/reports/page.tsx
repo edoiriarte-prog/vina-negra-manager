@@ -80,25 +80,29 @@ export default function ReportsPage() {
 
   useEffect(() => {
     if (isClient) {
-      // Client Reports
+      // --- Client Reports ---
       const clients = contacts.filter(c => c.type === 'client');
       const clientReportData = clients.map(client => {
-        const clientSalesOrders = salesOrders.filter(so => so.clientId === client.id);
+        // Total billed to the client from completed sales orders
+        const clientSalesOrders = salesOrders.filter(so => so.clientId === client.id && so.status === 'completed');
         const clientDocuments: DocumentDetail[] = clientSalesOrders.map(so => ({ id: so.id, date: so.date, type: 'O/V', amount: so.totalAmount }));
         const totalBilled = clientDocuments.reduce((sum, doc) => sum + doc.amount, 0);
 
-        const clientMovements = financialMovements.filter(
-          fm => fm.type === 'income' && fm.contactId === client.id
-        );
+        // Total paid by the client
+        const clientMovements = financialMovements.filter(fm => fm.type === 'income' && fm.contactId === client.id);
         const totalPaid = clientMovements.reduce((sum, movement) => sum + movement.amount, 0);
         
         const pendingBalance = totalBilled - totalPaid;
         
         let status: ReportData['status'] = 'Pendiente';
-        if (pendingBalance <= 0 && totalBilled > 0) {
-          status = 'Pagado';
-        } else if (totalPaid > 0 && pendingBalance > 0) {
-          status = 'Abono';
+        if (totalBilled > 0) {
+            if (pendingBalance <= 1) { // Use a small epsilon for floating point comparison
+              status = 'Pagado';
+            } else if (totalPaid > 0) {
+              status = 'Abono';
+            }
+        } else if (totalPaid > 0) {
+             status = 'Abono'; // Client has a credit
         }
 
         return {
@@ -114,14 +118,12 @@ export default function ReportsPage() {
       }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
       setClientReports(clientReportData);
 
-      // Supplier Reports
+      // --- Supplier Reports ---
       const suppliers = contacts.filter(c => c.type === 'supplier');
       const supplierReportData = suppliers.map(supplier => {
-        const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id);
-        const supplierServiceOrders = serviceOrders.filter(so => {
-            const contact = contacts.find(c => c.id === supplier.id);
-            return contact && so.provider.toLowerCase() === contact.name.toLowerCase();
-        });
+        // Total owed to the supplier from completed purchase and service orders
+        const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && po.status === 'completed');
+        const supplierServiceOrders = serviceOrders.filter(so => so.provider === supplier.name); // Note: service orders are linked by name
 
         const supplierDocuments: DocumentDetail[] = [
             ...supplierPurchaseOrders.map(po => ({ id: po.id, date: po.date, type: 'O/C' as const, amount: po.totalAmount })),
@@ -130,18 +132,19 @@ export default function ReportsPage() {
 
         const totalBilled = supplierDocuments.reduce((sum, doc) => sum + doc.amount, 0);
         
-        const supplierMovements = financialMovements.filter(
-            fm => fm.type === 'expense' && fm.contactId === supplier.id
-        );
+        // Total paid to the supplier
+        const supplierMovements = financialMovements.filter(fm => fm.type === 'expense' && fm.contactId === supplier.id);
         const totalPaid = supplierMovements.reduce((sum, movement) => sum + movement.amount, 0);
           
         const pendingBalance = totalBilled - totalPaid;
 
         let status: ReportData['status'] = 'Pendiente';
-        if (pendingBalance <= 0 && totalBilled > 0) {
-          status = 'Pagado';
-        } else if (totalPaid > 0 && pendingBalance > 0) {
-          status = 'Abono';
+        if (totalBilled > 0) {
+            if (pendingBalance <= 1) { // Epsilon for safety
+              status = 'Pagado';
+            } else if (totalPaid > 0) {
+              status = 'Abono';
+            }
         }
 
          return {
