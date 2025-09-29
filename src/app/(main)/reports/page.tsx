@@ -292,7 +292,6 @@ export default function ReportsPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Fecha</TableHead>
-                                    <TableHead>Descripción</TableHead>
                                     <TableHead className="text-right">Monto</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -300,7 +299,6 @@ export default function ReportsPage() {
                                 {item.payments.map(payment => (
                                     <TableRow key={payment.id}>
                                         <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                                        <TableCell className='max-w-[200px] truncate'>{payment.description}</TableCell>
                                         <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
                                     </TableRow>
                                 ))}
@@ -376,7 +374,6 @@ export default function ReportsPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Fecha</TableHead>
-                                    <TableHead>Descripción</TableHead>
                                     <TableHead className="text-right">Monto</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -384,7 +381,6 @@ export default function ReportsPage() {
                                 {item.payments.map(payment => (
                                     <TableRow key={payment.id}>
                                         <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                                        <TableCell className='max-w-[200px] truncate'>{payment.description}</TableCell>
                                         <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
                                     </TableRow>
                                 ))}
