@@ -18,7 +18,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Printer, ChevronDown, MoreHorizontal } from 'lucide-react';
-import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -609,29 +608,39 @@ export default function ReportsPage() {
       <div className="hidden print-only">
         <div ref={printRef}>
             {printingReport && (
-                <div className="p-8">
-                    <div className="flex justify-between items-center mb-8">
-                        <Logo />
-                        <div className='text-right'>
-                            <h1 className="text-2xl font-bold font-headline">Estado de Cuenta</h1>
-                            <p className='text-muted-foreground'>{format(new Date(), "PPP", { locale: es })}</p>
+                <div className="p-8 font-sans">
+                    <div className="grid grid-cols-2 gap-8 mb-12">
+                        <div>
+                            <h2 className="font-bold text-base mb-2">CLIENTE</h2>
+                            <div className="text-sm text-gray-700">
+                                <p className="font-semibold text-base text-black">{printingReport.contactName}</p>
+                                <p>RUT: {contacts.find(c=>c.id === printingReport.contactId)?.rut}</p>
+                                <p>{contacts.find(c=>c.id === printingReport.contactId)?.address}</p>
+                                <p>{contacts.find(c=>c.id === printingReport.contactId)?.commune}</p>
+                            </div>
+                        </div>
+                         <div className='text-right'>
+                            <h1 className="text-2xl font-bold font-headline">ESTADO DE CUENTA</h1>
+                            <p className='text-gray-500 text-sm'>Al {format(new Date(), "PPP", { locale: es })}</p>
+                            <div className="mt-4">
+                                <h3 className="text-base font-bold">VIÑA NEGRA SpA</h3>
+                                <p className="text-sm text-gray-700">RUT: 76.XXX.XXX-X</p>
+                                <p className="text-sm text-gray-700">TULAHUEN S/N</p>
+                                <p className="text-sm text-gray-700">MONTE PATRIA, CHILE</p>
+                            </div>
                         </div>
                     </div>
-                    <div className="mb-8">
-                        <h2 className="text-xl font-semibold">{printingReport.contactName}</h2>
-                        <p className="text-muted-foreground">{contacts.find(c=>c.id === printingReport.contactId)?.rut}</p>
-                    </div>
 
-                    <h3 className="text-lg font-semibold mb-2">Detalle de Documentos</h3>
+                    <h3 className="text-lg font-semibold mb-4 border-b pb-2">Resumen de Documentos</h3>
                      <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Doc.</TableHead>
+                                <TableHead className="w-[100px]">Documento</TableHead>
                                 <TableHead>Fecha</TableHead>
-                                <TableHead>Monto</TableHead>
-                                <TableHead>Pagado</TableHead>
-                                <TableHead>Saldo</TableHead>
-                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-right">Monto Total</TableHead>
+                                <TableHead className="text-right">Monto Pagado</TableHead>
+                                <TableHead className="text-right font-bold">Saldo Pendiente</TableHead>
+                                <TableHead className="text-center">Estado</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -639,19 +648,19 @@ export default function ReportsPage() {
                                 <TableRow key={doc.id}>
                                     <TableCell>{doc.id}</TableCell>
                                     <TableCell>{format(parseISO(doc.date), "dd-MM-yyyy")}</TableCell>
-                                    <TableCell>{formatCurrency(doc.amount)}</TableCell>
-                                    <TableCell>{formatCurrency(doc.paidAmount)}</TableCell>
-                                    <TableCell>{formatCurrency(doc.pendingBalance)}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={doc.status === 'Pagado' ? 'default' : doc.status === 'Abonado' ? 'secondary' : 'destructive'}>{doc.status}</Badge>
+                                    <TableCell className="text-right">{formatCurrency(doc.amount)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(doc.paidAmount)}</TableCell>
+                                    <TableCell className="text-right font-semibold">{formatCurrency(doc.pendingBalance)}</TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge variant={doc.status === 'Pagado' ? 'default' : doc.status === 'Abonado' ? 'secondary' : 'destructive'} className="text-xs">{doc.status}</Badge>
                                     </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                         <TableFooter>
-                            <TableRow>
-                                <TableCell colSpan={4} className="text-right font-bold">Saldo Pendiente Total</TableCell>
-                                <TableCell className="font-bold">{formatCurrency(printingReport.pendingBalance)}</TableCell>
+                            <TableRow className="bg-gray-100">
+                                <TableCell colSpan={4} className="text-right font-bold text-base">Saldo Pendiente Total</TableCell>
+                                <TableCell className="text-right font-bold text-base">{formatCurrency(printingReport.pendingBalance)}</TableCell>
                                 <TableCell/>
                             </TableRow>
                         </TableFooter>
