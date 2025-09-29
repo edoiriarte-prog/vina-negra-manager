@@ -204,6 +204,15 @@ export default function ReportsPage() {
     }
   }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements, isClient]);
 
+  const clientTotals = useMemo(() => {
+    return clientReports.reduce((acc, report) => {
+        acc.totalBilled += report.totalBilled;
+        acc.totalPaid += report.totalPaid;
+        acc.pendingBalance += report.pendingBalance;
+        return acc;
+    }, { totalBilled: 0, totalPaid: 0, pendingBalance: 0 });
+  }, [clientReports]);
+
   const supplierTotals = useMemo(() => {
     return supplierReports.reduce((acc, report) => {
         acc.totalBilled += report.totalBilled;
@@ -458,6 +467,15 @@ export default function ReportsPage() {
                   <TableBody>
                     {renderClientReportRows(clientReports, clientFilter)}
                   </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableHead className="text-right font-bold text-lg">Total General</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatCurrency(clientTotals.totalBilled)}</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatCurrency(clientTotals.totalPaid)}</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatCurrency(clientTotals.pendingBalance)}</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableFooter>
                 </Table>
               </div>
             </CardContent>
@@ -522,4 +540,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
