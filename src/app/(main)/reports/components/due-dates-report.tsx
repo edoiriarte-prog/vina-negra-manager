@@ -15,6 +15,7 @@ import { es } from 'date-fns/locale';
 import { CalendarIcon, DollarSign, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
 
 type DueDatesReportProps = {
     salesOrders: SalesOrder[];
