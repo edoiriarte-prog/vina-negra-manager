@@ -33,8 +33,7 @@ type DueDateItem = {
     amount: number;
     paidAmount: number;
     pendingAmount: number;
-    status: 'Pagado' | 'Pendiente' | 'Vencido';
-    isSubtotal?: false;
+    status: 'Pagado' | 'Pendiente' | 'Vencido' | 'Abonado';
 };
 
 const formatCurrency = (value: number) =>
@@ -64,6 +63,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                 const client = contacts.find(c => c.id === order.clientId);
                 const clientName = client ? client.name : 'Desconocido';
                 
+                const dueDateForCreditOrContado = order.balanceDueDate || order.date;
+
                 if (order.paymentMethod === 'Pago con Anticipo y Saldo' && order.advancePercentage) {
                     if (order.advanceDueDate && new Date(order.advanceDueDate) <= endDate) {
                         const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
@@ -82,23 +83,25 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                             paidAmount: 0, pendingAmount: balanceAmount, status: 'Pendiente',
                         });
                     }
-                } else if (order.paymentMethod === 'Crédito' && new Date(order.date) <= endDate) {
+                } else if (order.paymentMethod === 'Crédito' && new Date(dueDateForCreditOrContado) <= endDate) {
                      allDueItems.push({
                         id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
-                        paymentType: 'Saldo', dueDate: order.date, amount: order.totalAmount,
+                        paymentType: 'Saldo', dueDate: dueDateForCreditOrContado, amount: order.totalAmount,
                         paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
                     });
-                } else if (order.paymentMethod === 'Contado' && new Date(order.date) <= endDate) {
+                } else if (order.paymentMethod === 'Contado' && new Date(dueDateForCreditOrContado) <= endDate) {
                     allDueItems.push({
                         id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
-                        paymentType: 'Saldo', dueDate: order.date, amount: order.totalAmount,
+                        paymentType: 'Saldo', dueDate: dueDateForCreditOrContado, amount: order.totalAmount,
                         paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
                     });
                 }
              }
         });
         
-        const relevantPayments = financialMovements.filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate);
+        const relevantPayments = financialMovements
+            .filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate)
+            .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
         
@@ -108,8 +111,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         });
 
         relevantPayments.forEach(fm => {
-            if (fm.contactId) {
-                 if (!clientData[fm.contactId]) clientData[fm.contactId] = { dues: [], payments: [] };
+            if (fm.contactId && clientData[fm.contactId]) {
                  clientData[fm.contactId].payments.push(fm);
             }
         });
@@ -132,9 +134,11 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         });
 
         allDueItems.forEach(due => {
-            if (due.pendingAmount <= 0.01) {
+            if (due.pendingAmount <= 1) { // Use a small epsilon for float comparison
                 due.status = 'Pagado';
                 due.pendingAmount = 0;
+            } else if (due.paidAmount > 0) {
+                due.status = 'Abonado';
             } else if (isAfter(startOfDay(new Date()), parseISO(due.dueDate)) && !isEqual(startOfDay(new Date()), parseISO(due.dueDate))) {
                 due.status = 'Vencido';
             } else {
@@ -143,7 +147,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         });
 
         const pending = allDueItems
-            .filter(item => item.status === 'Pendiente' || item.status === 'Vencido')
+            .filter(item => item.status === 'Pendiente' || item.status === 'Vencido' || item.status === 'Abonado')
             .sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
         
         const paid = allDueItems
@@ -151,7 +155,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
             .sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
             
         const totalPending = pending.reduce((sum, item) => sum + item.pendingAmount, 0);
-        const totalPaid = paid.reduce((sum, item) => sum + item.amount, 0);
+        const totalPaid = allDueItems.reduce((sum, item) => sum + item.paidAmount, 0);
 
         return { pendingItems: pending, paidItems: paid, totalPending, totalPaid };
 
@@ -256,7 +260,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                             </CardHeader>
                             <CardContent>
                                 {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalPaid)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                <p className="text-xs text-muted-foreground">en cuotas con vencimiento hasta la fecha</p>
+                                <p className="text-xs text-muted-foreground">en cuotas hasta la fecha</p>
                             </CardContent>
                         </Card>
                     </div>
@@ -281,5 +285,3 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
 
     
 }
-
-    
