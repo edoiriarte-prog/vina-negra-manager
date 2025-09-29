@@ -32,6 +32,10 @@ type DocumentDetail = {
   date: string;
   type: 'O/V' | 'O/C' | 'O/S';
   amount: number;
+  paidAmount: number;
+  pendingBalance: number;
+  status: 'Pagado' | 'Abonado' | 'Pendiente';
+  paymentCompleteDate?: string;
 };
 
 type PaymentDetail = {
@@ -80,29 +84,69 @@ export default function ReportsPage() {
 
   useEffect(() => {
     if (isClient) {
-      // --- Client Reports ---
+      // --- Client Reports with chronological settlement ---
       const clients = contacts.filter(c => c.type === 'client');
       const clientReportData = clients.map(client => {
-        // Total billed to the client from completed sales orders
-        const clientSalesOrders = salesOrders.filter(so => so.clientId === client.id && so.status === 'completed');
-        const clientDocuments: DocumentDetail[] = clientSalesOrders.map(so => ({ id: so.id, date: so.date, type: 'O/V', amount: so.totalAmount }));
-        const totalBilled = clientDocuments.reduce((sum, doc) => sum + doc.amount, 0);
+        
+        const clientSalesOrders = salesOrders
+          .filter(so => so.clientId === client.id && so.status === 'completed')
+          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        const clientMovements = financialMovements
+          .filter(fm => fm.type === 'income' && fm.contactId === client.id)
+          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        // Total paid by the client
-        const clientMovements = financialMovements.filter(fm => fm.type === 'income' && fm.contactId === client.id);
-        const totalPaid = clientMovements.reduce((sum, movement) => sum + movement.amount, 0);
+        const paymentPool = clientMovements.map(p => ({ ...p, remaining: p.amount }));
+
+        const clientDocuments: DocumentDetail[] = clientSalesOrders.map(order => {
+            let paidAmount = 0;
+            let lastPaymentDate: string | undefined = undefined;
+
+            paymentPool.forEach(payment => {
+                if (payment.remaining > 0) {
+                    const remainingOnOrder = order.totalAmount - paidAmount;
+                    if (remainingOnOrder > 0) {
+                        const amountToApply = Math.min(payment.remaining, remainingOnOrder);
+                        paidAmount += amountToApply;
+                        payment.remaining -= amountToApply;
+                        lastPaymentDate = payment.date;
+                    }
+                }
+            });
+
+            const pendingBalance = order.totalAmount - paidAmount;
+            let status: DocumentDetail['status'] = 'Pendiente';
+            if (pendingBalance <= 1) {
+                status = 'Pagado';
+            } else if (paidAmount > 0) {
+                status = 'Abonado';
+            }
+
+            return {
+                id: order.id,
+                date: order.date,
+                type: 'O/V',
+                amount: order.totalAmount,
+                paidAmount: paidAmount,
+                pendingBalance: pendingBalance,
+                status: status,
+                paymentCompleteDate: status === 'Pagado' ? lastPaymentDate : undefined,
+            };
+        });
+
+        const totalBilled = clientDocuments.reduce((sum, doc) => sum + doc.amount, 0);
+        const totalPaid = clientDocuments.reduce((sum, doc) => sum + doc.paidAmount, 0);
+        const overallPending = totalBilled - totalPaid;
         
-        const pendingBalance = totalBilled - totalPaid;
-        
-        let status: ReportData['status'] = 'Pendiente';
+        let overallStatus: ReportData['status'] = 'Pendiente';
         if (totalBilled > 0) {
-            if (pendingBalance <= 1) { // Use a small epsilon for floating point comparison
-              status = 'Pagado';
+            if (overallPending <= 1) {
+                overallStatus = 'Pagado';
             } else if (totalPaid > 0) {
-              status = 'Abono';
+                overallStatus = 'Abono';
             }
         } else if (totalPaid > 0) {
-             status = 'Abono'; // Client has a credit
+             overallStatus = 'Abono';
         }
 
         return {
@@ -110,29 +154,27 @@ export default function ReportsPage() {
           contactName: client.name,
           totalBilled,
           totalPaid,
-          pendingBalance,
-          status,
+          pendingBalance: overallPending,
+          status: overallStatus,
           documents: clientDocuments,
           payments: clientMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })),
         };
       }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
       setClientReports(clientReportData);
 
-      // --- Supplier Reports ---
+      // --- Supplier Reports (unchanged) ---
       const suppliers = contacts.filter(c => c.type === 'supplier');
       const supplierReportData = suppliers.map(supplier => {
-        // Total owed to the supplier from completed purchase and service orders
         const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && po.status === 'completed');
-        const supplierServiceOrders = serviceOrders.filter(so => so.provider === supplier.name); // Note: service orders are linked by name
+        const supplierServiceOrders = serviceOrders.filter(so => so.provider === supplier.name);
 
         const supplierDocuments: DocumentDetail[] = [
-            ...supplierPurchaseOrders.map(po => ({ id: po.id, date: po.date, type: 'O/C' as const, amount: po.totalAmount })),
-            ...supplierServiceOrders.map(so => ({ id: so.id, date: so.date, type: 'O/S' as const, amount: so.cost })),
+            ...supplierPurchaseOrders.map(po => ({ id: po.id, date: po.date, type: 'O/C' as const, amount: po.totalAmount, paidAmount: 0, pendingBalance: 0, status: 'Pendiente' as const })),
+            ...supplierServiceOrders.map(so => ({ id: so.id, date: so.date, type: 'O/S' as const, amount: so.cost, paidAmount: 0, pendingBalance: 0, status: 'Pendiente' as const })),
         ];
 
         const totalBilled = supplierDocuments.reduce((sum, doc) => sum + doc.amount, 0);
         
-        // Total paid to the supplier
         const supplierMovements = financialMovements.filter(fm => fm.type === 'expense' && fm.contactId === supplier.id);
         const totalPaid = supplierMovements.reduce((sum, movement) => sum + movement.amount, 0);
           
@@ -140,7 +182,7 @@ export default function ReportsPage() {
 
         let status: ReportData['status'] = 'Pendiente';
         if (totalBilled > 0) {
-            if (pendingBalance <= 1) { // Epsilon for safety
+            if (pendingBalance <= 1) {
               status = 'Pagado';
             } else if (totalPaid > 0) {
               status = 'Abono';
@@ -154,7 +196,7 @@ export default function ReportsPage() {
           totalPaid,
           pendingBalance,
           status,
-          documents: supplierDocuments,
+          documents: supplierDocuments, // This part is not fully detailed for suppliers yet
           payments: supplierMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })),
         };
       }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
@@ -178,7 +220,7 @@ export default function ReportsPage() {
     setOpenCollapsibles(prev => ({...prev, [id]: !prev[id]}));
   }
   
-  const renderReportRows = (data: ReportData[], filter: string) => {
+  const renderClientReportRows = (data: ReportData[], filter: string) => {
     const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
     
     if (!isClient) {
@@ -187,6 +229,100 @@ export default function ReportsPage() {
               <TableCell colSpan={5} className="h-24 text-center">
                 {Array.from({ length: 3 }).map((_, index) => (
                     <Skeleton key={`skeleton-${index}`} className="h-8 w-full my-2" />
+                ))}
+              </TableCell>
+            </TableRow>
+        );
+    }
+    
+    return filteredData.map((item) => (
+      <React.Fragment key={item.contactId}>
+        <TableRow className="cursor-pointer hover:bg-muted/20" onClick={() => toggleCollapsible(item.contactId)}>
+          <TableCell className="font-medium">
+            <div className="flex items-center gap-2">
+              <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
+              {item.contactName}
+            </div>
+          </TableCell>
+          <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
+          <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
+          <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
+          <TableCell className="text-center">
+            <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
+          </TableCell>
+        </TableRow>
+        {openCollapsibles[item.contactId] && (
+          <tr className="bg-muted/20 hover:bg-muted/30">
+            <TableCell colSpan={5} className="p-0">
+                <div className="p-4 grid grid-cols-5 gap-4">
+                    <div className="col-span-3">
+                        <h4 className="font-semibold mb-2">Detalle de Órdenes de Venta</h4>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>O/V</TableHead>
+                                    <TableHead>Fecha O/V</TableHead>
+                                    <TableHead>Monto O/V</TableHead>
+                                    <TableHead>Monto Pagado</TableHead>
+                                    <TableHead>Saldo</TableHead>
+                                    <TableHead>Estado</TableHead>
+                                    <TableHead>Fecha Pago Final</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {item.documents.map(doc => (
+                                    <TableRow key={doc.id}>
+                                        <TableCell>{doc.id}</TableCell>
+                                        <TableCell>{format(parseISO(doc.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                                        <TableCell>{formatCurrency(doc.amount)}</TableCell>
+                                        <TableCell className="text-green-600">{formatCurrency(doc.paidAmount)}</TableCell>
+                                        <TableCell className="font-bold">{formatCurrency(doc.pendingBalance)}</TableCell>
+                                        <TableCell>
+                                             <Badge variant={doc.status === 'Pagado' ? 'default' : doc.status === 'Abonado' ? 'secondary' : 'destructive'}>{doc.status}</Badge>
+                                        </TableCell>
+                                        <TableCell>{doc.paymentCompleteDate ? format(parseISO(doc.paymentCompleteDate), "dd-MM-yyyy") : '-'}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <div className="col-span-2">
+                        <h4 className="font-semibold mb-2">Detalle de Pagos Recibidos</h4>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead>Descripción</TableHead>
+                                    <TableHead className="text-right">Monto</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                             <TableBody>
+                                {item.payments.map(payment => (
+                                    <TableRow key={payment.id}>
+                                        <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                                        <TableCell className='max-w-[200px] truncate'>{payment.description}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+            </TableCell>
+          </tr>
+        )}
+      </React.Fragment>
+    ));
+  };
+   const renderSupplierReportRows = (data: ReportData[], filter: string) => {
+    const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
+    
+    if (!isClient) {
+        return (
+            <TableRow>
+              <TableCell colSpan={5} className="h-24 text-center">
+                {Array.from({ length: 3 }).map((_, index) => (
+                    <Skeleton key={`skeleton-supp-${index}`} className="h-8 w-full my-2" />
                 ))}
               </TableCell>
             </TableRow>
@@ -334,7 +470,7 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {renderReportRows(clientReports, clientFilter)}
+                    {renderClientReportRows(clientReports, clientFilter)}
                   </TableBody>
                 </Table>
               </div>
@@ -367,7 +503,7 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                    <TableBody>
-                    {renderReportRows(supplierReports, supplierFilter)}
+                    {renderSupplierReportRows(supplierReports, supplierFilter)}
                   </TableBody>
                 </Table>
               </div>
