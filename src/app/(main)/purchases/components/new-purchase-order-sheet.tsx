@@ -58,7 +58,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData(order));
   const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 });
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const { products, calibers, units, warehouses } = useMasterData();
+  const { products, calibers, units, warehouses, packagingTypes } = useMasterData();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -98,7 +98,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
         const field = name.split('.')[1] as keyof typeof newItem;
         setNewItem(prev => ({ ...prev, [field]: value }));
     } else {
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData(prev => ({ ...prev, [name as keyof typeof formData]: value }));
     }
   };
 
@@ -119,10 +119,10 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
-        handleItemChange(index, field as keyof OrderItem, field === 'quantity' || field === 'price' ? Number(value) : value);
+        handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'packagingQuantity'].includes(field) ? Number(value) : value);
     } else if (name.startsWith('newItem.')) {
         const field = name.split('.')[1] as keyof typeof newItem;
-        setNewItem(prev => ({ ...prev, [field]: field === 'quantity' || field === 'price' ? Number(value) : value }));
+        setNewItem(prev => ({ ...prev, [field]: field === 'quantity' || field === 'price' || field === 'packagingQuantity' ? Number(value) : value }));
     } else {
         setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -217,9 +217,10 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                 {formData.items.map((item, index) => {
                   const subtotal = (item.quantity || 0) * (item.price || 0);
                   return (
-                    <div key={item.id} className="grid grid-cols-12 gap-2 items-center mb-2 p-3 border rounded-md">
+                    <div key={item.id} className="grid grid-cols-12 gap-2 items-end mb-2 p-3 border rounded-md">
                         {/* Product */}
-                        <div className="col-span-3">
+                        <div className="col-span-6 md:col-span-2">
+                             <Label>Producto</Label>
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.product`, value)} value={item.product}>
                                  <SelectTrigger><SelectValue placeholder="Producto" /></SelectTrigger>
                                  <SelectContent>
@@ -228,7 +229,8 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              </Select>
                         </div>
                         {/* Caliber */}
-                        <div className="col-span-2">
+                        <div className="col-span-6 md:col-span-2">
+                             <Label>Calibre</Label>
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
@@ -236,12 +238,29 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                                  </SelectContent>
                              </Select>
                         </div>
+                         {/* Packaging Type */}
+                         <div className="col-span-6 md:col-span-2">
+                            <Label>T. Envase</Label>
+                            <Select onValueChange={(value) => handleSelectChange(`items.${index}.packagingType`, value)} value={item.packagingType || ''}>
+                                <SelectTrigger><SelectValue placeholder="Envase" /></SelectTrigger>
+                                <SelectContent>
+                                    {packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {/* Packaging Quantity */}
+                        <div className="col-span-6 md:col-span-1">
+                            <Label># Envases</Label>
+                            <Input name={`items.${index}.packagingQuantity`} type="number" value={item.packagingQuantity || ''} onChange={handleInputChange} placeholder="0" />
+                        </div>
                         {/* Quantity */}
-                         <div className="col-span-1">
+                         <div className="col-span-6 md:col-span-1">
+                             <Label>Cantidad</Label>
                              <Input name={`items.${index}.quantity`} type="number" value={item.quantity} onChange={handleInputChange} placeholder="Cant." required />
                         </div>
                         {/* Unit */}
-                        <div className="col-span-1">
+                        <div className="col-span-6 md:col-span-1">
+                            <Label>Unidad</Label>
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.unit`, value)} value={item.unit}>
                                  <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
                                  <SelectContent>
@@ -250,15 +269,23 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              </Select>
                         </div>
                         {/* Price */}
-                         <div className="col-span-1">
+                         <div className="col-span-6 md:col-span-1">
+                            <Label>Precio</Label>
                              <Input name={`items.${index}.price`} type="number" value={item.price} onChange={handleInputChange} placeholder="Precio" required />
                         </div>
                         {/* Subtotal */}
-                         <div className="col-span-2">
+                         <div className="col-span-6 md:col-span-1">
+                            <Label>Subtotal</Label>
                              <Input value={new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(subtotal)} readOnly disabled />
                         </div>
+                        {/* Remove button */}
+                        <div className='col-span-6 md:col-span-1'>
+                             <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                        </div>
                         {/* Lot */}
-                         <div className="col-span-10 md:col-span-10 mt-2">
+                         <div className="col-span-12 mt-2">
                            <Label>Lote</Label>
                            <div className="flex gap-2">
                               <Input name={`items.${index}.lotNumber`} value={item.lotNumber || ''} onChange={handleInputChange} placeholder="Número de lote" />
@@ -267,12 +294,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                               </Button>
                            </div>
                          </div>
-                        {/* Remove button */}
-                        <div className='col-span-2 md:col-span-2 mt-auto self-end'>
-                             <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                        </div>
+                        
                     </div>
                 )})}
             </div>
