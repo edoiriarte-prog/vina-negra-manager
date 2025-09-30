@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { Contact, PurchaseOrder, FinancialMovement, ServiceOrder } from '@/lib/types';
+import { Contact, PurchaseOrder, FinancialMovement, ServiceOrder, OrderItem } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -27,12 +27,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 type DocumentDetail = {
   id: string;
   date: string;
   type: 'O/C' | 'O/S';
   amount: number;
+  items?: OrderItem[]; // Add items for O/C
 };
 
 type PaymentDetail = {
@@ -40,6 +42,11 @@ type PaymentDetail = {
     date: string;
     description: string;
     amount: number;
+}
+
+type CaliberDistribution = {
+    name: string;
+    value: number;
 }
 
 type ReportData = {
@@ -51,6 +58,7 @@ type ReportData = {
   status: 'Pagado' | 'Pendiente' | 'Abono';
   documents: DocumentDetail[];
   payments: PaymentDetail[];
+  caliberDistribution?: CaliberDistribution[];
 };
 
 const formatCurrency = (value: number) =>
@@ -92,7 +100,7 @@ export default function CurrentAccountPage() {
               .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
               .join('');
             printWindow.document.write(styles);
-            printWindow.document.write('<style>body { padding: 2rem; } .print-only { display: block !important; } .no-print { display: none !important; }</style>');
+            printWindow.document.write('<style>body { padding: 2rem; } .print-only { display: block !important; } .no-print { display: none !important; } @page { size: auto; margin: 0.5in; }</style>');
             printWindow.document.write('</head><body class="bg-white">');
             printWindow.document.write(printContents);
             printWindow.document.write('</body></html>');
@@ -106,7 +114,7 @@ export default function CurrentAccountPage() {
             }, 500);
           }
         }
-      }, 100);
+      }, 200); // Increased timeout to allow chart to render
     }
   }, [printingReport]);
 
@@ -117,8 +125,20 @@ export default function CurrentAccountPage() {
         const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && (po.status === 'completed' || po.status === 'pending'));
         const supplierServiceOrders = serviceOrders.filter(so => so.provider === supplier.name);
 
+        const caliberMap: { [key: string]: number } = {};
+        supplierPurchaseOrders.forEach(po => {
+            po.items.forEach(item => {
+                if (item.unit === 'Kilos') {
+                    caliberMap[item.caliber] = (caliberMap[item.caliber] || 0) + item.quantity;
+                }
+            });
+        });
+
+        const caliberDistribution: CaliberDistribution[] = Object.entries(caliberMap).map(([name, value]) => ({ name, value }));
+
+
         const supplierDocuments: DocumentDetail[] = [
-            ...supplierPurchaseOrders.map(po => ({ id: po.id, date: po.date, type: 'O/C' as const, amount: po.totalAmount })),
+            ...supplierPurchaseOrders.map(po => ({ id: po.id, date: po.date, type: 'O/C' as const, amount: po.totalAmount, items: po.items })),
             ...supplierServiceOrders.map(so => ({ id: so.id, date: so.date, type: 'O/S' as const, amount: so.cost })),
         ].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -149,6 +169,7 @@ export default function CurrentAccountPage() {
           status,
           documents: supplierDocuments,
           payments: supplierMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+          caliberDistribution,
         };
       }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
       setSupplierReports(supplierReportData);
@@ -279,6 +300,8 @@ export default function CurrentAccountPage() {
     ));
   };
   
+  const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919'];
+
   return (
     <div className="flex flex-col gap-6">
        <style jsx global>{`
@@ -340,7 +363,7 @@ export default function CurrentAccountPage() {
         <div ref={printRef}>
             {printingReport && (
                 <div className="p-8 font-sans">
-                    <div className="grid grid-cols-2 gap-8 mb-12">
+                    <div className="grid grid-cols-2 gap-8 mb-8">
                         <div>
                             <h2 className="font-bold text-base mb-2">PROVEEDOR</h2>
                             <div className="text-sm text-gray-700">
@@ -362,33 +385,74 @@ export default function CurrentAccountPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-8">
-                        <div>
-                            <h3 className="text-lg font-semibold mb-4 border-b pb-2">Resumen de Documentos (O/C, O/S)</h3>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Documento</TableHead>
-                                        <TableHead>Fecha</TableHead>
-                                        <TableHead className="text-right">Monto</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {printingReport.documents.map(doc => (
-                                        <TableRow key={doc.id}>
-                                            <TableCell>{doc.id}</TableCell>
-                                            <TableCell>{format(parseISO(doc.date), "dd-MM-yyyy")}</TableCell>
-                                            <TableCell className="text-right">{formatCurrency(doc.amount)}</TableCell>
+                    <div className="space-y-6">
+                        {printingReport.documents.filter(d => d.type === 'O/C').map(doc => (
+                            <div key={doc.id}>
+                                <h3 className="text-lg font-semibold mb-2 border-b pb-2">Detalle Orden de Compra: {doc.id} <span className="text-base font-normal text-gray-600">({format(parseISO(doc.date), 'dd-MM-yyyy')})</span></h3>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Producto</TableHead>
+                                            <TableHead>Calibre</TableHead>
+                                            <TableHead className="text-right">Cajas</TableHead>
+                                            <TableHead className="text-right">Kilos</TableHead>
+                                            <TableHead className="text-right">Subtotal</TableHead>
                                         </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {doc.items?.map(item => (
+                                            <TableRow key={item.id}>
+                                                <TableCell>{item.product}</TableCell>
+                                                <TableCell>{item.caliber}</TableCell>
+                                                <TableCell className="text-right">{item.packagingQuantity || 0}</TableCell>
+                                                <TableCell className="text-right">{item.quantity || 0}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                    <TableFooter>
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="text-right font-bold">Total O/C</TableCell>
+                                            <TableCell className="text-right font-bold">{formatCurrency(doc.amount)}</TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                </Table>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-8 mt-8">
+                        <div>
+                           <h3 className="text-lg font-semibold mb-4 border-b pb-2">Distribución por Calibre (Kilos)</h3>
+                            <ResponsiveContainer width="100%" height={300}>
+                               <PieChart>
+                                <Pie
+                                    data={printingReport.caliberDistribution}
+                                    cx="50%"
+                                    cy="50%"
+                                    labelLine={false}
+                                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                                        const RADIAN = Math.PI / 180;
+                                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                        const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                        return (
+                                          <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="12">
+                                            {`${(percent * 100).toFixed(0)}%`}
+                                          </text>
+                                        );
+                                      }}
+                                    outerRadius={80}
+                                    dataKey="value"
+                                >
+                                    {printingReport.caliberDistribution?.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                     ))}
-                                </TableBody>
-                                <TableFooter>
-                                    <TableRow>
-                                        <TableCell colSpan={2} className="text-right font-bold">Total Documentos</TableCell>
-                                        <TableCell className="text-right font-bold">{formatCurrency(printingReport.totalBilled)}</TableCell>
-                                    </TableRow>
-                                </TableFooter>
-                            </Table>
+                                </Pie>
+                                <Tooltip formatter={(value) => `${value.toLocaleString('es-CL')} kg`} />
+                                <Legend />
+                                </PieChart>
+                           </ResponsiveContainer>
                         </div>
                         <div>
                             <h3 className="text-lg font-semibold mb-4 border-b pb-2">Resumen de Pagos</h3>
@@ -418,7 +482,8 @@ export default function CurrentAccountPage() {
                             </Table>
                         </div>
                     </div>
-                     <div className="mt-12 bg-gray-100 p-4 rounded-lg">
+
+                     <div className="mt-8 bg-gray-100 p-4 rounded-lg">
                         <div className="flex justify-between items-center">
                             <span className="text-xl font-bold">SALDO PENDIENTE TOTAL</span>
                             <span className="text-xl font-bold">{formatCurrency(printingReport.pendingBalance)}</span>
@@ -430,4 +495,5 @@ export default function CurrentAccountPage() {
       </div>
     </div>
   );
-}
+
+    
