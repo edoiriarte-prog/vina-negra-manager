@@ -371,45 +371,127 @@ export default function CurrentAccountPage() {
       <div className="hidden print-only">
         <div ref={printRef}>
             {printingReport && (
-                <div className="p-8 font-sans">
+                <div className="p-8 font-sans text-black">
                     <div className="grid grid-cols-2 gap-8 mb-8">
                         <div>
-                            <h2 className="font-bold text-base mb-2">PROVEEDOR</h2>
-                            <div className="text-sm text-gray-700">
-                                <p className="font-semibold text-base text-black">{printingReport.contactName}</p>
+                            <h2 className="font-bold text-lg mb-2">PROVEEDOR</h2>
+                            <div className="text-sm">
+                                <p className="font-semibold text-base">{printingReport.contactName}</p>
                                 <p>RUT: {contacts.find(c=>c.id === printingReport.contactId)?.rut}</p>
                                 <p>{contacts.find(c=>c.id === printingReport.contactId)?.address}</p>
                                 <p>{contacts.find(c=>c.id === printingReport.contactId)?.commune}</p>
                             </div>
                         </div>
                          <div className='text-right'>
-                            <h1 className="text-2xl font-bold font-headline">ESTADO DE CUENTA</h1>
-                            <p className='text-gray-500 text-sm'>Al {format(new Date(), "PPP", { locale: es })}</p>
+                            <h1 className="text-2xl font-bold">ESTADO DE CUENTA</h1>
+                            <p className='text-sm'>Al {format(new Date(), "PPP", { locale: es })}</p>
                             <div className="mt-4">
-                                <h3 className="text-base font-bold">VIÑA NEGRA SpA</h3>
-                                <p className="text-sm text-gray-700">RUT: 76.XXX.XXX-X</p>
-                                <p className="text-sm text-gray-700">TULAHUEN S/N</p>
-                                <p className="text-sm text-gray-700">MONTE PATRIA, CHILE</p>
+                                <h3 className="text-lg font-bold">VIÑA NEGRA SpA</h3>
+                                <p className="text-sm">RUT: 76.XXX.XXX-X</p>
+                                <p className="text-sm">TULAHUEN S/N</p>
+                                <p className="text-sm">MONTE PATRIA, CHILE</p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-8 mt-8">
+                        <div className="bg-gray-50 p-4 rounded-lg print-order-section">
+                            <h3 className="text-lg font-bold mb-2 text-center">Resumen Total de Compras</h3>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                                <div className="font-bold">Total Kilos Comprados:</div>
+                                <div className="text-right font-bold">{totalPurchaseKilos.toLocaleString('es-CL')} kg</div>
+                                <div className="font-bold">Total Envases:</div>
+                                <div className="text-right font-bold">{totalPurchasePackages.toLocaleString('es-CL')}</div>
+                                <div className="font-bold">Valor Total Compra:</div>
+                                <div className="text-right font-bold text-base">{formatCurrency(totalPurchaseValue)}</div>
+                                <div className="font-bold">Precio Promedio por Kilo:</div>
+                                <div className="text-right font-bold text-base">{formatCurrency(avgPricePerKg)}</div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold mb-4 border-b pb-2">Resumen de Pagos</h3>
+                             <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="font-bold">Fecha</TableHead>
+                                        <TableHead className="font-bold">Descripción</TableHead>
+                                        <TableHead className="text-right font-bold">Monto</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {printingReport.payments.map(payment => (
+                                        <TableRow key={payment.id}>
+                                            <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy")}</TableCell>
+                                            <TableCell>{payment.description}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                                 <TableFooter>
+                                    <TableRow>
+                                        <TableCell colSpan={2} className="text-right font-bold text-lg">Total Pagado</TableCell>
+                                        <TableCell className="text-right font-bold text-lg">{formatCurrency(printingReport.totalPaid)}</TableCell>
+                                    </TableRow>
+                                </TableFooter>
+                            </Table>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-8 mt-8">
+                        <div>
+                           <h3 className="text-lg font-bold mb-4 border-b pb-2">Distribución por Calibre (Kilos)</h3>
+                            <Table>
+                                <TableHeader>
+                                <TableRow>
+                                    <TableHead className="font-bold">Calibre</TableHead>
+                                    <TableHead className="text-right font-bold">Kilos</TableHead>
+                                    <TableHead className="text-right font-bold">Porcentaje</TableHead>
+                                </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                {printingReport.caliberDistribution?.map((entry, index) => (
+                                    <TableRow key={index}>
+                                    <TableCell>{entry.name}</TableCell>
+                                    <TableCell className="text-right">{entry.value.toLocaleString('es-CL')} kg</TableCell>
+                                    <TableCell className="text-right">
+                                        {totalKilosForChart > 0 ? ((entry.value / totalKilosForChart) * 100).toFixed(1) + '%' : '0.0%'}
+                                    </TableCell>
+                                    </TableRow>
+                                ))}
+                                </TableBody>
+                                <TableFooter>
+                                    <TableRow>
+                                        <TableHead className="font-bold text-base">Total</TableHead>
+                                        <TableHead className="text-right font-bold text-base">{totalKilosForChart.toLocaleString('es-CL')} kg</TableHead>
+                                        <TableHead className="text-right font-bold text-base">100%</TableHead>
+                                    </TableRow>
+                                </TableFooter>
+                           </Table>
+                        </div>
+                         <div className="mt-8 bg-gray-100 p-4 rounded-lg self-center">
+                            <div className="flex justify-between items-center">
+                                <span className="text-xl font-bold">SALDO PENDIENTE TOTAL</span>
+                                <span className="text-xl font-bold">{formatCurrency(printingReport.pendingBalance)}</span>
+                            </div>
+                         </div>
+                    </div>
+
+                    <div className="space-y-6 mt-8">
                         {allPurchaseOrders.map(doc => {
                              const docTotalKilos = doc.items?.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0) || 0;
                              const docTotalPackages = doc.items?.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0) || 0;
                             return (
                                 <div key={doc.id} className="print-order-section">
-                                    <h3 className="text-lg font-semibold mb-2 border-b pb-2">Detalle Orden de Compra: {doc.id} <span className="text-base font-normal text-gray-600">({format(parseISO(doc.date), 'dd-MM-yyyy')})</span></h3>
+                                    <h3 className="text-lg font-bold mb-2 border-b pb-2">Detalle Orden de Compra: {doc.id} <span className="text-base font-normal">({format(parseISO(doc.date), 'dd-MM-yyyy')})</span></h3>
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>Producto</TableHead>
-                                                <TableHead>Calibre</TableHead>
-                                                <TableHead className="text-right">Envases</TableHead>
-                                                <TableHead className="text-right">Kilos</TableHead>
-                                                <TableHead className="text-right">Precio/kg</TableHead>
-                                                <TableHead className="text-right">Subtotal</TableHead>
+                                                <TableHead className="font-bold">Producto</TableHead>
+                                                <TableHead className="font-bold">Calibre</TableHead>
+                                                <TableHead className="text-right font-bold">Envases</TableHead>
+                                                <TableHead className="text-right font-bold">Kilos</TableHead>
+                                                <TableHead className="text-right font-bold">Precio/kg</TableHead>
+                                                <TableHead className="text-right font-bold">Subtotal</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -426,11 +508,11 @@ export default function CurrentAccountPage() {
                                         </TableBody>
                                         <TableFooter>
                                             <TableRow>
-                                                <TableHead colSpan={2} className="text-right font-bold">Totales O/C</TableHead>
-                                                <TableHead className="text-right font-bold">{docTotalPackages.toLocaleString('es-CL')}</TableHead>
-                                                <TableHead className="text-right font-bold">{docTotalKilos.toLocaleString('es-CL')} kg</TableHead>
+                                                <TableHead colSpan={2} className="text-right font-bold text-base">Totales O/C</TableHead>
+                                                <TableHead className="text-right font-bold text-base">{docTotalPackages.toLocaleString('es-CL')}</TableHead>
+                                                <TableHead className="text-right font-bold text-base">{docTotalKilos.toLocaleString('es-CL')} kg</TableHead>
                                                 <TableHead colSpan={1}></TableHead>
-                                                <TableHead className="text-right font-bold">{formatCurrency(doc.amount)}</TableHead>
+                                                <TableHead className="text-right font-bold text-base">{formatCurrency(doc.amount)}</TableHead>
                                             </TableRow>
                                         </TableFooter>
                                     </Table>
@@ -438,94 +520,14 @@ export default function CurrentAccountPage() {
                             )
                         })}
                     </div>
-                    
-                    <div className="mt-8 bg-gray-50 p-4 rounded-lg print-order-section">
-                        <h3 className="text-lg font-semibold mb-2 text-center">Resumen Total de Compras</h3>
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                            <div className="font-semibold">Total Kilos Comprados:</div>
-                            <div className="text-right">{totalPurchaseKilos.toLocaleString('es-CL')} kg</div>
-                            <div className="font-semibold">Total Envases:</div>
-                            <div className="text-right">{totalPurchasePackages.toLocaleString('es-CL')}</div>
-                            <div className="font-semibold">Valor Total Compra:</div>
-                            <div className="text-right font-bold">{formatCurrency(totalPurchaseValue)}</div>
-                            <div className="font-semibold">Precio Promedio por Kilo:</div>
-                            <div className="text-right font-bold">{formatCurrency(avgPricePerKg)}</div>
-                        </div>
-                    </div>
-
-
-                    <div className="grid grid-cols-2 gap-8 mt-8">
-                        <div>
-                           <h3 className="text-lg font-semibold mb-4 border-b pb-2">Distribución por Calibre (Kilos)</h3>
-                            <Table>
-                                <TableHeader>
-                                <TableRow>
-                                    <TableHead>Calibre</TableHead>
-                                    <TableHead className="text-right">Kilos</TableHead>
-                                    <TableHead className="text-right">Porcentaje</TableHead>
-                                </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                {printingReport.caliberDistribution?.map((entry, index) => (
-                                    <TableRow key={index}>
-                                    <TableCell>{entry.name}</TableCell>
-                                    <TableCell className="text-right">{entry.value.toLocaleString('es-CL')} kg</TableCell>
-                                    <TableCell className="text-right">
-                                        {totalKilosForChart > 0 ? ((entry.value / totalKilosForChart) * 100).toFixed(1) + '%' : '0.0%'}
-                                    </TableCell>
-                                    </TableRow>
-                                ))}
-                                </TableBody>
-                                <TableFooter>
-                                    <TableRow>
-                                        <TableHead>Total</TableHead>
-                                        <TableHead className="text-right">{totalKilosForChart.toLocaleString('es-CL')} kg</TableHead>
-                                        <TableHead className="text-right">100%</TableHead>
-                                    </TableRow>
-                                </TableFooter>
-                           </Table>
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-semibold mb-4 border-b pb-2">Resumen de Pagos</h3>
-                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Fecha</TableHead>
-                                        <TableHead>Descripción</TableHead>
-                                        <TableHead className="text-right">Monto</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {printingReport.payments.map(payment => (
-                                        <TableRow key={payment.id}>
-                                            <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy")}</TableCell>
-                                            <TableCell>{payment.description}</TableCell>
-                                            <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                                 <TableFooter>
-                                    <TableRow>
-                                        <TableCell colSpan={2} className="text-right font-bold">Total Pagado</TableCell>
-                                        <TableCell className="text-right font-bold">{formatCurrency(printingReport.totalPaid)}</TableCell>
-                                    </TableRow>
-                                </TableFooter>
-                            </Table>
-                        </div>
-                    </div>
-
-                     <div className="mt-8 bg-gray-100 p-4 rounded-lg">
-                        <div className="flex justify-between items-center">
-                            <span className="text-xl font-bold">SALDO PENDIENTE TOTAL</span>
-                            <span className="text-xl font-bold">{formatCurrency(printingReport.pendingBalance)}</span>
-                        </div>
-                     </div>
                 </div>
             )}
         </div>
       </div>
     </div>
   );
+
+    
 
     
 
