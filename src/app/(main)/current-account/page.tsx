@@ -27,7 +27,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 type DocumentDetail = {
   id: string;
@@ -100,7 +99,7 @@ export default function CurrentAccountPage() {
               .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
               .join('');
             printWindow.document.write(styles);
-            printWindow.document.write('<style>body { padding: 2rem; } .print-only { display: block !important; } .no-print { display: none !important; } @page { size: auto; margin: 0.5in; }</style>');
+            printWindow.document.write('<style>body { padding: 2rem; } .print-only { display: block !important; } .no-print { display: none !important; } .print-order-section { page-break-inside: avoid; } @page { size: auto; margin: 0.5in; }</style>');
             printWindow.document.write('</head><body class="bg-white">');
             printWindow.document.write(printContents);
             printWindow.document.write('</body></html>');
@@ -114,7 +113,7 @@ export default function CurrentAccountPage() {
             }, 500);
           }
         }
-      }, 200); // Increased timeout to allow chart to render
+      }, 200);
     }
   }, [printingReport]);
 
@@ -300,7 +299,7 @@ export default function CurrentAccountPage() {
     ));
   };
   
-  const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919'];
+  const totalKilosForChart = printingReport?.caliberDistribution?.reduce((sum, item) => sum + item.value, 0) || 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -308,6 +307,7 @@ export default function CurrentAccountPage() {
         @media print {
           body { background: white !important; }
           .no-print { display: none !important; }
+          .print-order-section { page-break-inside: avoid; }
         }
       `}</style>
       <div className="no-print">
@@ -387,7 +387,7 @@ export default function CurrentAccountPage() {
 
                     <div className="space-y-6">
                         {printingReport.documents.filter(d => d.type === 'O/C').map(doc => (
-                            <div key={doc.id}>
+                            <div key={doc.id} className="print-order-section">
                                 <h3 className="text-lg font-semibold mb-2 border-b pb-2">Detalle Orden de Compra: {doc.id} <span className="text-base font-normal text-gray-600">({format(parseISO(doc.date), 'dd-MM-yyyy')})</span></h3>
                                 <Table>
                                     <TableHeader>
@@ -424,35 +424,33 @@ export default function CurrentAccountPage() {
                     <div className="grid grid-cols-2 gap-8 mt-8">
                         <div>
                            <h3 className="text-lg font-semibold mb-4 border-b pb-2">Distribución por Calibre (Kilos)</h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                               <PieChart>
-                                <Pie
-                                    data={printingReport.caliberDistribution}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-                                        const RADIAN = Math.PI / 180;
-                                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                                        const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                                        const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                                        return (
-                                          <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="12">
-                                            {`${(percent * 100).toFixed(0)}%`}
-                                          </text>
-                                        );
-                                      }}
-                                    outerRadius={80}
-                                    dataKey="value"
-                                >
-                                    {printingReport.caliberDistribution?.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip formatter={(value) => `${value.toLocaleString('es-CL')} kg`} />
-                                <Legend />
-                                </PieChart>
-                           </ResponsiveContainer>
+                            <Table>
+                                <TableHeader>
+                                <TableRow>
+                                    <TableHead>Calibre</TableHead>
+                                    <TableHead className="text-right">Kilos</TableHead>
+                                    <TableHead className="text-right">Porcentaje</TableHead>
+                                </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                {printingReport.caliberDistribution?.map((entry, index) => (
+                                    <TableRow key={index}>
+                                    <TableCell>{entry.name}</TableCell>
+                                    <TableCell className="text-right">{entry.value.toLocaleString('es-CL')} kg</TableCell>
+                                    <TableCell className="text-right">
+                                        {totalKilosForChart > 0 ? ((entry.value / totalKilosForChart) * 100).toFixed(1) + '%' : '0.0%'}
+                                    </TableCell>
+                                    </TableRow>
+                                ))}
+                                </TableBody>
+                                <TableFooter>
+                                    <TableRow>
+                                        <TableHead>Total</TableHead>
+                                        <TableHead className="text-right">{totalKilosForChart.toLocaleString('es-CL')} kg</TableHead>
+                                        <TableHead className="text-right">100%</TableHead>
+                                    </TableRow>
+                                </TableFooter>
+                           </Table>
                         </div>
                         <div>
                             <h3 className="text-lg font-semibold mb-4 border-b pb-2">Resumen de Pagos</h3>
@@ -495,5 +493,7 @@ export default function CurrentAccountPage() {
       </div>
     </div>
   );
+
+    
 
     
