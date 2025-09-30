@@ -1,0 +1,433 @@
+
+"use client";
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useLocalStorage } from '@/hooks/use-local-storage';
+import { Contact, PurchaseOrder, FinancialMovement, ServiceOrder } from '@/lib/types';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import {
+  contacts as initialContacts,
+  purchaseOrders as initialPurchaseOrders,
+  financialMovements as initialFinancialMovements,
+  serviceOrders as initialServiceOrders,
+} from '@/lib/data';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Printer, ChevronDown, MoreHorizontal } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+type DocumentDetail = {
+  id: string;
+  date: string;
+  type: 'O/C' | 'O/S';
+  amount: number;
+};
+
+type PaymentDetail = {
+    id: string;
+    date: string;
+    description: string;
+    amount: number;
+}
+
+type ReportData = {
+  contactId: string;
+  contactName: string;
+  totalBilled: number;
+  totalPaid: number;
+  pendingBalance: number;
+  status: 'Pagado' | 'Pendiente' | 'Abono';
+  documents: DocumentDetail[];
+  payments: PaymentDetail[];
+};
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(value);
+
+
+export default function CurrentAccountPage() {
+  const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+  const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+  const [serviceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
+  const [financialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
+  
+  const [supplierReports, setSupplierReports] = useState<ReportData[]>([]);
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [isClient, setIsClient] = useState(false);
+  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
+  const [printingReport, setPrintingReport] = useState<ReportData | null>(null);
+
+  const printRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (printingReport) {
+      setTimeout(() => {
+        if (printRef.current) {
+          const printContents = printRef.current.innerHTML;
+          const printWindow = window.open('', '', 'height=800,width=800');
+          
+          if(printWindow){
+            printWindow.document.write('<html><head><title>Estado de Cuenta Proveedor</title>');
+            const styles = Array.from(document.styleSheets)
+              .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
+              .join('');
+            printWindow.document.write(styles);
+            printWindow.document.write('<style>body { padding: 2rem; } .print-only { display: block !important; } .no-print { display: none !important; }</style>');
+            printWindow.document.write('</head><body class="bg-white">');
+            printWindow.document.write(printContents);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
+            
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+                setPrintingReport(null);
+            }, 500);
+          }
+        }
+      }, 100);
+    }
+  }, [printingReport]);
+
+  useEffect(() => {
+    if (isClient) {
+      const suppliers = contacts.filter(c => c.type === 'supplier');
+      const supplierReportData = suppliers.map(supplier => {
+        const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && (po.status === 'completed' || po.status === 'pending'));
+        const supplierServiceOrders = serviceOrders.filter(so => so.provider === supplier.name);
+
+        const supplierDocuments: DocumentDetail[] = [
+            ...supplierPurchaseOrders.map(po => ({ id: po.id, date: po.date, type: 'O/C' as const, amount: po.totalAmount })),
+            ...supplierServiceOrders.map(so => ({ id: so.id, date: so.date, type: 'O/S' as const, amount: so.cost })),
+        ].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        const totalBilled = supplierDocuments.reduce((sum, doc) => sum + doc.amount, 0);
+        
+        const supplierMovements = financialMovements.filter(fm => fm.type === 'expense' && fm.contactId === supplier.id);
+        const totalPaid = supplierMovements.reduce((sum, movement) => sum + movement.amount, 0);
+          
+        const pendingBalance = totalBilled - totalPaid;
+
+        let status: ReportData['status'] = 'Pendiente';
+        if (totalBilled > 0) {
+            if (pendingBalance <= 1) {
+              status = 'Pagado';
+            } else if (totalPaid > 0) {
+              status = 'Abono';
+            }
+        } else if (totalPaid > 0) {
+            status = 'Abono';
+        }
+
+         return {
+          contactId: supplier.id,
+          contactName: supplier.name,
+          totalBilled,
+          totalPaid,
+          pendingBalance,
+          status,
+          documents: supplierDocuments,
+          payments: supplierMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+        };
+      }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
+      setSupplierReports(supplierReportData);
+    }
+  }, [contacts, purchaseOrders, serviceOrders, financialMovements, isClient]);
+
+  const supplierTotals = useMemo(() => {
+    return supplierReports.reduce((acc, report) => {
+        acc.totalBilled += report.totalBilled;
+        acc.totalPaid += report.totalPaid;
+        acc.pendingBalance += report.pendingBalance;
+        return acc;
+    }, { totalBilled: 0, totalPaid: 0, pendingBalance: 0 });
+  }, [supplierReports]);
+
+
+  const handlePrintRequest = (report: ReportData) => {
+    setPrintingReport(report);
+  };
+
+  const toggleCollapsible = (id: string) => {
+    setOpenCollapsibles(prev => ({...prev, [id]: !prev[id]}));
+  }
+  
+   const renderSupplierReportRows = (data: ReportData[], filter: string) => {
+    const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
+    
+    if (!isClient) {
+        return (
+            <TableRow>
+              <TableCell colSpan={6} className="h-24 text-center">
+                {Array.from({ length: 3 }).map((_, index) => (
+                    <Skeleton key={`skeleton-supp-${index}`} className="h-8 w-full my-2" />
+                ))}
+              </TableCell>
+            </TableRow>
+        );
+    }
+    
+    return filteredData.map((item) => (
+      <React.Fragment key={item.contactId}>
+        <TableRow>
+          <TableCell className="font-medium">
+            <div className="flex items-center gap-2">
+               <Button variant="ghost" size="sm" onClick={() => toggleCollapsible(item.contactId)}>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
+              </Button>
+              {item.contactName}
+            </div>
+          </TableCell>
+          <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
+          <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
+          <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
+          <TableCell className="text-center">
+            <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
+          </TableCell>
+           <TableCell className="text-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Abrir menú</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handlePrintRequest(item)}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir Estado de Cuenta
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        </TableRow>
+        {openCollapsibles[item.contactId] && (
+          <tr className="bg-muted/20 hover:bg-muted/30">
+            <TableCell colSpan={6} className="p-0">
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <h4 className="font-semibold mb-2 text-sm">Documentos Emitidos (O/C, O/S)</h4>
+                        <div className="border rounded-md max-h-60 overflow-y-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>ID</TableHead>
+                                        <TableHead>Fecha</TableHead>
+                                        <TableHead className="text-right">Monto</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {item.documents.map(doc => (
+                                        <TableRow key={doc.id}>
+                                            <TableCell className="text-xs">{doc.id}</TableCell>
+                                            <TableCell className="text-xs">{format(parseISO(doc.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                                            <TableCell className="text-right text-xs">{formatCurrency(doc.amount)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold mb-2 text-sm">Pagos Realizados</h4>
+                         <div className="border rounded-md max-h-60 overflow-y-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Fecha</TableHead>
+                                        <TableHead className="text-right">Monto</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                 <TableBody>
+                                    {item.payments.map(payment => (
+                                        <TableRow key={payment.id}>
+                                            <TableCell className="text-xs">{format(parseISO(payment.date), "dd-MM-yyyy", { locale: es })}</TableCell>
+                                            <TableCell className="text-right text-xs">{formatCurrency(payment.amount)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                </div>
+            </TableCell>
+          </tr>
+        )}
+      </React.Fragment>
+    ));
+  };
+  
+  return (
+    <div className="flex flex-col gap-6">
+       <style jsx global>{`
+        @media print {
+          body { background: white !important; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
+      <div className="no-print">
+        <h1 className="font-headline text-3xl">Gestión de Cuentas Corrientes</h1>
+        <p className="text-muted-foreground">Analiza el estado de cuentas por pagar a proveedores.</p>
+      </div>
+      
+        <Card className="no-print">
+            <CardHeader>
+              <CardTitle className="font-headline text-2xl">Cuentas por Pagar (Proveedores)</CardTitle>
+              <CardDescription>Resumen de compras, pagos y saldos pendientes a proveedores.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="my-4">
+                <Input 
+                    placeholder="Filtrar por proveedor..." 
+                    value={supplierFilter}
+                    onChange={(e) => setSupplierFilter(e.target.value)}
+                    className="max-w-sm"
+                  />
+              </div>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[300px]">Proveedor</TableHead>
+                      <TableHead className="text-right">Total Comprado/Servicios</TableHead>
+                      <TableHead className="text-right">Total Pagado</TableHead>
+                      <TableHead className="text-right">Saldo Pendiente</TableHead>
+                      <TableHead className="text-center w-[100px]">Estado</TableHead>
+                      <TableHead className="text-center w-[50px]">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                   <TableBody>
+                    {renderSupplierReportRows(supplierReports, supplierFilter)}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableHead className="text-right font-bold text-lg">Total General</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.totalBilled)}</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.totalPaid)}</TableHead>
+                      <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.pendingBalance)}</TableHead>
+                      <TableHead colSpan={2} />
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+      
+      {/* Hidden container for printing */}
+      <div className="hidden print-only">
+        <div ref={printRef}>
+            {printingReport && (
+                <div className="p-8 font-sans">
+                    <div className="grid grid-cols-2 gap-8 mb-12">
+                        <div>
+                            <h2 className="font-bold text-base mb-2">PROVEEDOR</h2>
+                            <div className="text-sm text-gray-700">
+                                <p className="font-semibold text-base text-black">{printingReport.contactName}</p>
+                                <p>RUT: {contacts.find(c=>c.id === printingReport.contactId)?.rut}</p>
+                                <p>{contacts.find(c=>c.id === printingReport.contactId)?.address}</p>
+                                <p>{contacts.find(c=>c.id === printingReport.contactId)?.commune}</p>
+                            </div>
+                        </div>
+                         <div className='text-right'>
+                            <h1 className="text-2xl font-bold font-headline">ESTADO DE CUENTA</h1>
+                            <p className='text-gray-500 text-sm'>Al {format(new Date(), "PPP", { locale: es })}</p>
+                            <div className="mt-4">
+                                <h3 className="text-base font-bold">VIÑA NEGRA SpA</h3>
+                                <p className="text-sm text-gray-700">RUT: 76.XXX.XXX-X</p>
+                                <p className="text-sm text-gray-700">TULAHUEN S/N</p>
+                                <p className="text-sm text-gray-700">MONTE PATRIA, CHILE</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-8">
+                        <div>
+                            <h3 className="text-lg font-semibold mb-4 border-b pb-2">Resumen de Documentos (O/C, O/S)</h3>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Documento</TableHead>
+                                        <TableHead>Fecha</TableHead>
+                                        <TableHead className="text-right">Monto</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {printingReport.documents.map(doc => (
+                                        <TableRow key={doc.id}>
+                                            <TableCell>{doc.id}</TableCell>
+                                            <TableCell>{format(parseISO(doc.date), "dd-MM-yyyy")}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(doc.amount)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                                <TableFooter>
+                                    <TableRow>
+                                        <TableCell colSpan={2} className="text-right font-bold">Total Documentos</TableCell>
+                                        <TableCell className="text-right font-bold">{formatCurrency(printingReport.totalBilled)}</TableCell>
+                                    </TableRow>
+                                </TableFooter>
+                            </Table>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold mb-4 border-b pb-2">Resumen de Pagos</h3>
+                             <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Fecha</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead className="text-right">Monto</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {printingReport.payments.map(payment => (
+                                        <TableRow key={payment.id}>
+                                            <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy")}</TableCell>
+                                            <TableCell>{payment.description}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                                 <TableFooter>
+                                    <TableRow>
+                                        <TableCell colSpan={2} className="text-right font-bold">Total Pagado</TableCell>
+                                        <TableCell className="text-right font-bold">{formatCurrency(printingReport.totalPaid)}</TableCell>
+                                    </TableRow>
+                                </TableFooter>
+                            </Table>
+                        </div>
+                    </div>
+                     <div className="mt-12 bg-gray-100 p-4 rounded-lg">
+                        <div className="flex justify-between items-center">
+                            <span className="text-xl font-bold">SALDO PENDIENTE TOTAL</span>
+                            <span className="text-xl font-bold">{formatCurrency(printingReport.pendingBalance)}</span>
+                        </div>
+                     </div>
+                </div>
+            )}
+        </div>
+      </div>
+    </div>
+  );
+}

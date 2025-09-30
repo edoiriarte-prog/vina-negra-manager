@@ -15,6 +15,7 @@ import {
   HelpCircle,
   FileSliders,
   Settings,
+  BookUser,
 } from "lucide-react"
 
 import {
@@ -34,6 +35,7 @@ const menuItems = [
   { href: "/inventory-adjustments", label: "Ajustes de Inventario", icon: FileSliders },
   { href: "/financials", label: "Tesorería", icon: Landmark },
   { href: "/reports", label: "Informes", icon: BarChart },
+  { href: "/current-account", label: "Gestion Cta. Cte.", icon: BookUser },
   { href: "/settings", label: "Configuración", icon: Settings },
   { href: "/help", label: "Ayuda", icon: HelpCircle },
 ]
