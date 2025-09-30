@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -300,6 +301,14 @@ export default function CurrentAccountPage() {
   };
   
   const totalKilosForChart = printingReport?.caliberDistribution?.reduce((sum, item) => sum + item.value, 0) || 0;
+  
+  const allPurchaseOrders = printingReport?.documents.filter(d => d.type === 'O/C') || [];
+  const allPurchaseItems = allPurchaseOrders.flatMap(doc => doc.items || []);
+  const totalPurchasePackages = allPurchaseItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
+  const totalPurchaseKilos = allPurchaseItems.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0);
+  const totalPurchaseValue = allPurchaseItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  const avgPricePerKg = totalPurchaseKilos > 0 ? totalPurchaseValue / totalPurchaseKilos : 0;
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -386,40 +395,64 @@ export default function CurrentAccountPage() {
                     </div>
 
                     <div className="space-y-6">
-                        {printingReport.documents.filter(d => d.type === 'O/C').map(doc => (
-                            <div key={doc.id} className="print-order-section">
-                                <h3 className="text-lg font-semibold mb-2 border-b pb-2">Detalle Orden de Compra: {doc.id} <span className="text-base font-normal text-gray-600">({format(parseISO(doc.date), 'dd-MM-yyyy')})</span></h3>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Producto</TableHead>
-                                            <TableHead>Calibre</TableHead>
-                                            <TableHead className="text-right">Cajas</TableHead>
-                                            <TableHead className="text-right">Kilos</TableHead>
-                                            <TableHead className="text-right">Subtotal</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {doc.items?.map(item => (
-                                            <TableRow key={item.id}>
-                                                <TableCell>{item.product}</TableCell>
-                                                <TableCell>{item.caliber}</TableCell>
-                                                <TableCell className="text-right">{item.packagingQuantity || 0}</TableCell>
-                                                <TableCell className="text-right">{item.quantity || 0}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
+                        {allPurchaseOrders.map(doc => {
+                             const docTotalKilos = doc.items?.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0) || 0;
+                             const docTotalPackages = doc.items?.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0) || 0;
+                            return (
+                                <div key={doc.id} className="print-order-section">
+                                    <h3 className="text-lg font-semibold mb-2 border-b pb-2">Detalle Orden de Compra: {doc.id} <span className="text-base font-normal text-gray-600">({format(parseISO(doc.date), 'dd-MM-yyyy')})</span></h3>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Producto</TableHead>
+                                                <TableHead>Calibre</TableHead>
+                                                <TableHead className="text-right">Envases</TableHead>
+                                                <TableHead className="text-right">Kilos</TableHead>
+                                                <TableHead className="text-right">Precio/kg</TableHead>
+                                                <TableHead className="text-right">Subtotal</TableHead>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                    <TableFooter>
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-right font-bold">Total O/C</TableCell>
-                                            <TableCell className="text-right font-bold">{formatCurrency(doc.amount)}</TableCell>
-                                        </TableRow>
-                                    </TableFooter>
-                                </Table>
-                            </div>
-                        ))}
+                                        </TableHeader>
+                                        <TableBody>
+                                            {doc.items?.map(item => (
+                                                <TableRow key={item.id}>
+                                                    <TableCell>{item.product}</TableCell>
+                                                    <TableCell>{item.caliber}</TableCell>
+                                                    <TableCell className="text-right">{item.packagingQuantity || 0}</TableCell>
+                                                    <TableCell className="text-right">{item.quantity || 0}</TableCell>
+                                                    <TableCell className="text-right">{item.unit === 'Kilos' ? formatCurrency(item.price) : '-'}</TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                        <TableFooter>
+                                            <TableRow>
+                                                <TableHead colSpan={2} className="text-right font-bold">Totales O/C</TableHead>
+                                                <TableHead className="text-right font-bold">{docTotalPackages.toLocaleString('es-CL')}</TableHead>
+                                                <TableHead className="text-right font-bold">{docTotalKilos.toLocaleString('es-CL')} kg</TableHead>
+                                                <TableHead colSpan={1}></TableHead>
+                                                <TableHead className="text-right font-bold">{formatCurrency(doc.amount)}</TableHead>
+                                            </TableRow>
+                                        </TableFooter>
+                                    </Table>
+                                </div>
+                            )
+                        })}
                     </div>
+                    
+                    <div className="mt-8 bg-gray-50 p-4 rounded-lg print-order-section">
+                        <h3 className="text-lg font-semibold mb-2 text-center">Resumen Total de Compras</h3>
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                            <div className="font-semibold">Total Kilos Comprados:</div>
+                            <div className="text-right">{totalPurchaseKilos.toLocaleString('es-CL')} kg</div>
+                            <div className="font-semibold">Total Envases:</div>
+                            <div className="text-right">{totalPurchasePackages.toLocaleString('es-CL')}</div>
+                            <div className="font-semibold">Valor Total Compra:</div>
+                            <div className="text-right font-bold">{formatCurrency(totalPurchaseValue)}</div>
+                            <div className="font-semibold">Precio Promedio por Kilo:</div>
+                            <div className="text-right font-bold">{formatCurrency(avgPricePerKg)}</div>
+                        </div>
+                    </div>
+
 
                     <div className="grid grid-cols-2 gap-8 mt-8">
                         <div>
@@ -493,6 +526,8 @@ export default function CurrentAccountPage() {
       </div>
     </div>
   );
+
+    
 
     
 
