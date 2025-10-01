@@ -194,7 +194,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                   </Label>
                   <Select
                     required
-                    onValueChange={(value: 'client' | 'supplier') => setFormData(p => ({...p, type: value}))}
+                    onValueChange={(value: 'client' | 'supplier' | 'both') => setFormData(p => ({...p, type: value}))}
                     value={formData.type}
                   >
                     <SelectTrigger className="col-span-3">
@@ -203,6 +203,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                     <SelectContent>
                       <SelectItem value="client">Cliente</SelectItem>
                       <SelectItem value="supplier">Proveedor</SelectItem>
+                      <SelectItem value="both">Ambos</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

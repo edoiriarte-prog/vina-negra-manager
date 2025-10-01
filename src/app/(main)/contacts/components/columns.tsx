@@ -1,3 +1,4 @@
+
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
@@ -47,8 +48,18 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Con
     header: 'Tipo',
     cell: ({ row }) => {
         const type = row.getValue('type') as string;
-        const variant = type === 'client' ? 'default' : 'secondary';
-        return <Badge variant={variant}>{type === 'client' ? 'Cliente' : 'Proveedor'}</Badge>
+        let variant: "default" | "secondary" | "outline" = "secondary";
+        let text = 'Proveedor';
+
+        if (type === 'client') {
+            variant = 'default';
+            text = 'Cliente';
+        } else if (type === 'both') {
+            variant = 'outline';
+            text = 'Ambos';
+        }
+
+        return <Badge variant={variant}>{text}</Badge>
     }
   },
    {
