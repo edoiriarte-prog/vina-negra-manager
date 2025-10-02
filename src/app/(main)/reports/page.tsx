@@ -129,7 +129,7 @@ export default function ReportsPage() {
   useEffect(() => {
     if (isClient) {
       // --- Client Reports with chronological settlement ---
-      const clients = contacts.filter(c => c.type === 'client');
+      const clients = contacts.filter(c => c.type === 'client' || c.type === 'both');
       const clientReportData = clients.map(client => {
         
         const clientSalesOrders = salesOrders
@@ -207,7 +207,7 @@ export default function ReportsPage() {
       setClientReports(clientReportData);
 
       // --- Supplier Reports (unchanged) ---
-      const suppliers = contacts.filter(c => c.type === 'supplier');
+      const suppliers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
       const supplierReportData = suppliers.map(supplier => {
         const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && po.status === 'completed');
         const supplierServiceOrders = serviceOrders.filter(so => so.provider === supplier.name);
@@ -642,11 +642,11 @@ export default function ReportsPage() {
       <div className="hidden print-only">
         <div ref={printRef}>
             {printingReport && (
-                <div className="p-8 font-sans">
+                <div className="p-8 font-sans text-black">
                     <div className="grid grid-cols-2 gap-8 mb-12">
                         <div>
                             <h2 className="font-bold text-base mb-2">CLIENTE</h2>
-                            <div className="text-sm text-gray-700">
+                            <div className="text-sm">
                                 <p className="font-semibold text-base text-black">{printingReport.contactName}</p>
                                 <p>RUT: {contacts.find(c=>c.id === printingReport.contactId)?.rut}</p>
                                 <p>{contacts.find(c=>c.id === printingReport.contactId)?.address}</p>
@@ -655,12 +655,12 @@ export default function ReportsPage() {
                         </div>
                          <div className='text-right'>
                             <h1 className="text-2xl font-bold font-headline">ESTADO DE CUENTA</h1>
-                            <p className='text-gray-500 text-sm'>Al {format(new Date(), "PPP", { locale: es })}</p>
+                            <p className='text-sm'>Al {format(new Date(), "PPP", { locale: es })}</p>
                             <div className="mt-4">
                                 <h3 className="text-base font-bold">VIÑA NEGRA SpA</h3>
-                                <p className="text-sm text-gray-700">RUT: 76.XXX.XXX-X</p>
-                                <p className="text-sm text-gray-700">TULAHUEN S/N</p>
-                                <p className="text-sm text-gray-700">MONTE PATRIA, CHILE</p>
+                                <p className="text-sm">RUT: 76.XXX.XXX-X</p>
+                                <p className="text-sm">TULAHUEN S/N</p>
+                                <p className="text-sm">MONTE PATRIA, CHILE</p>
                             </div>
                         </div>
                     </div>
