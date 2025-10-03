@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -8,11 +7,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter
 } from '@/components/ui/dialog';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SalesOrder, Contact } from '@/lib/types';
-import { Logo } from '@/components/logo';
 import { format, parseISO } from 'date-fns';
 import Barcode from 'react-barcode';
 import {
@@ -24,8 +23,6 @@ import {
     TableRow,
     TableFooter,
   } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
-import { Download, Printer } from 'lucide-react';
 
 type SalesOrderPreviewProps = {
   order: SalesOrder;
@@ -33,8 +30,6 @@ type SalesOrderPreviewProps = {
   carrier: Contact | null;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onExport: () => void;
-  onPrint: () => void;
 };
 
 
@@ -221,7 +216,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
 });
 PreviewContent.displayName = "PreviewContent";
 
-export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange, onExport, onPrint }: SalesOrderPreviewProps) {
+export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange }: SalesOrderPreviewProps) {
   
   if (!order) return null;
 
@@ -234,30 +229,18 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
         <div className="max-h-[70vh] overflow-y-auto" id="print-area">
             <PreviewContent order={order} client={client} carrier={carrier} ref={null}/>
         </div>
-        <div className="p-6 pt-4 border-t bg-background flex flex-col-reverse sm:flex-row sm:justify-start gap-2">
-            <button
-              onClick={onExport}
-              className={cn(buttonVariants({ variant: "outline" }))}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Exportar a Excel
-            </button>
-            <button
-              onClick={onPrint}
-              className={cn(buttonVariants())}
-            >
-              <Printer className="mr-2 h-4 w-4" />
-              Imprimir
-            </button>
-            <button
+        <DialogFooter className="p-6 pt-4">
+          <Button
               onClick={() => onOpenChange(false)}
-              className={cn(buttonVariants({ variant: "secondary" }))}
+              variant="outline"
             >
               Cerrar
-            </button>
-          </div>
+            </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
 SalesOrderPreview.displayName = "SalesOrderPreview";
+
+    

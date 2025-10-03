@@ -556,8 +556,6 @@ export default function SalesPage() {
           carrier={carriers.find(s => s.id === (previewingOrder as any).carrierId) || null}
           isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
-          onExport={() => handleExport(previewingOrder)}
-          onPrint={handlePrint}
         />
       )}
       
@@ -578,15 +576,16 @@ export default function SalesPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Exportar a Excel
               </Button>
-              <Button variant="outline" onClick={() => {
+              <Button variant="default" onClick={() => {
                  setPreviewingOrder(postSaveOrderOptions);
+                 handlePrint();
                  setPostSaveOrderOptions(null);
               }}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir O/V
               </Button>
                <AlertDialogCancel asChild>
-                <Button>
+                <Button variant="secondary">
                     <X className="mr-2 h-4 w-4" />
                     Salir
                 </Button>
@@ -598,8 +597,10 @@ export default function SalesPage() {
 
       {/* Hidden component for printing */}
       <div className="hidden">
-         {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} client={clients.find(c => c.id === previewingOrder.clientId) || null} carrier={null} />}
+         {postSaveOrderOptions && <PreviewContent ref={printComponentRef} order={postSaveOrderOptions} client={clients.find(c => c.id === postSaveOrderOptions.clientId) || null} carrier={null} />}
       </div>
     </>
   );
 }
+
+    
