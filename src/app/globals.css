@@ -78,4 +78,38 @@
   }
 }
 
-    
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print, .no-print * {
+    display: none !important;
+  }
+  
+  /* Ensure all text is black for contrast */
+  * {
+    color: black !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Keep table structure */
+  table, th, td, tr {
+    border-color: #666 !important;
+    border-style: solid;
+  }
+
+  thead {
+    display: table-header-group; /* Important for repeating headers */
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+}
