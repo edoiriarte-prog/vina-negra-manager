@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -67,7 +66,18 @@ export default function PurchasesPage() {
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
-      onAfterPrint: () => setPreviewingOrder(null), // Clean up after print
+      onAfterPrint: () => {
+        setPreviewingOrder(null);
+        setIsPrinting(false);
+      },
+      onPrintError: () => {
+        setIsPrinting(false);
+        toast({
+            variant: "destructive",
+            title: "Error de Impresión",
+            description: "No se pudo completar la impresión.",
+        });
+      }
   });
 
   useEffect(() => {
@@ -76,10 +86,7 @@ export default function PurchasesPage() {
   
   useEffect(() => {
     if (isPrinting && previewingOrder) {
-      setTimeout(() => {
-        handlePrint();
-        setIsPrinting(false);
-      }, 50);
+      handlePrint();
     }
   }, [isPrinting, previewingOrder, handlePrint]);
 
@@ -171,7 +178,7 @@ export default function PurchasesPage() {
       });
       const lastId = sortedOrders.length > 0 ? parseInt(sortedOrders[sortedOrders.length - 1].id.split('-')[1]) : 1000;
       const newOrder: PurchaseOrder = {
-        ...(finalOrderData as Omit<PurchaseOrder, 'id'>),
+        ...(finalOrderData as Omit<PurchaseOrder, 'id' | 'totalPackages'>),
         id: `OC-${lastId + 1}`,
         paymentStatus: 'Pendiente',
         totalPackages,
@@ -490,6 +497,3 @@ export default function PurchasesPage() {
     </>
   );
 }
-
-
-
