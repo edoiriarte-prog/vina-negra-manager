@@ -372,6 +372,19 @@ export default function CurrentAccountPage() {
   const totalKilos = allItems.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0);
   const totalValue = allItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
   const avgPricePerKg = totalKilos > 0 ? totalValue / totalKilos : 0;
+  
+  const groupedPayments = printingReport?.payments.reduce((acc, payment) => {
+    const month = format(parseISO(payment.date), 'MMMM yyyy', { locale: es });
+    if (!acc[month]) {
+        acc[month] = {
+            payments: [],
+            total: 0,
+        };
+    }
+    acc[month].payments.push(payment);
+    acc[month].total += payment.amount;
+    return acc;
+  }, {} as Record<string, { payments: PaymentDetail[], total: number }>);
 
 
   return (
@@ -519,30 +532,32 @@ export default function CurrentAccountPage() {
                             </div>
                             <div>
                                 <h3 className="text-lg font-bold mb-4 border-b pb-2">Resumen de Pagos</h3>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="font-bold">Fecha</TableHead>
-                                            <TableHead className="font-bold">Descripción</TableHead>
-                                            <TableHead className="text-right font-bold">Monto</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {printingReport.payments.map(payment => (
-                                            <TableRow key={payment.id}>
-                                                <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy")}</TableCell>
-                                                <TableCell>{payment.description}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
+                                {groupedPayments && Object.entries(groupedPayments).map(([month, data]) => (
+                                <div key={month} className="mb-4">
+                                    <h4 className="font-bold text-md mb-2 capitalize">{month}</h4>
+                                    <Table>
+                                        <TableBody>
+                                            {data.payments.map(payment => (
+                                                <TableRow key={payment.id}>
+                                                    <TableCell className="w-[100px]">{format(parseISO(payment.date), "dd-MM-yyyy")}</TableCell>
+                                                    <TableCell>{payment.description}</TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                        <TableFooter>
+                                            <TableRow>
+                                                <TableCell colSpan={2} className="text-right font-bold">Total {month}</TableCell>
+                                                <TableCell className="text-right font-bold">{formatCurrency(data.total)}</TableCell>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                    <TableFooter>
-                                        <TableRow>
-                                            <TableCell colSpan={2} className="text-right font-bold text-lg">Total Pagado</TableCell>
-                                            <TableCell className="text-right font-bold text-lg">{formatCurrency(printingReport.totalPaid)}</TableCell>
-                                        </TableRow>
-                                    </TableFooter>
-                                </Table>
+                                        </TableFooter>
+                                    </Table>
+                                </div>
+                                ))}
+                                <div className="flex justify-between items-center bg-gray-100 p-2 mt-4 rounded-md">
+                                    <span className="font-bold text-lg">Total Pagado</span>
+                                    <span className="font-bold text-lg">{formatCurrency(printingReport.totalPaid)}</span>
+                                </div>
                             </div>
                         </div>
 
@@ -648,30 +663,32 @@ export default function CurrentAccountPage() {
                             </div>
                             <div>
                                 <h3 className="text-lg font-bold mb-4 border-b pb-2">Resumen de Pagos</h3>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="font-bold">Fecha</TableHead>
-                                            <TableHead className="font-bold">Descripción</TableHead>
-                                            <TableHead className="text-right font-bold">Monto</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {printingReport.payments.map(payment => (
-                                            <TableRow key={payment.id}>
-                                                <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy")}</TableCell>
-                                                <TableCell>{payment.description}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
+                                {groupedPayments && Object.entries(groupedPayments).map(([month, data]) => (
+                                <div key={month} className="mb-4">
+                                    <h4 className="font-bold text-md mb-2 capitalize">{month}</h4>
+                                    <Table>
+                                        <TableBody>
+                                            {data.payments.map(payment => (
+                                                <TableRow key={payment.id}>
+                                                    <TableCell className="w-[100px]">{format(parseISO(payment.date), "dd-MM-yyyy")}</TableCell>
+                                                    <TableCell>{payment.description}</TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                        <TableFooter>
+                                            <TableRow>
+                                                <TableCell colSpan={2} className="text-right font-bold">Total {month}</TableCell>
+                                                <TableCell className="text-right font-bold">{formatCurrency(data.total)}</TableCell>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                    <TableFooter>
-                                        <TableRow>
-                                            <TableCell colSpan={2} className="text-right font-bold text-lg">Total Pagado</TableCell>
-                                            <TableCell className="text-right font-bold text-lg">{formatCurrency(printingReport.totalPaid)}</TableCell>
-                                        </TableRow>
-                                    </TableFooter>
-                                </Table>
+                                        </TableFooter>
+                                    </Table>
+                                </div>
+                                ))}
+                                <div className="flex justify-between items-center bg-gray-100 p-2 mt-4 rounded-md">
+                                    <span className="font-bold text-lg">Total Pagado</span>
+                                    <span className="font-bold text-lg">{formatCurrency(printingReport.totalPaid)}</span>
+                                </div>
                             </div>
                         </div>
 
