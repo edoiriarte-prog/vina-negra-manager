@@ -30,8 +30,14 @@ type PurchaseOrderPreviewProps = {
 export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, onEdit, onDelete, onExport }: PurchaseOrderPreviewProps) {
   const componentRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = useReactToPrint({
-      content: () => componentRef.current,
+  const PrintButton = useReactToPrint({
+    content: () => componentRef.current,
+    trigger: () => (
+      <Button variant="outline">
+        <Printer className="mr-2 h-4 w-4" />
+        Imprimir
+      </Button>
+    ),
   });
   
   if (!order) {
@@ -57,10 +63,7 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
             </Button>
-            <Button variant="outline" onClick={handlePrint}>
-                <Printer className="mr-2 h-4 w-4" />
-                Imprimir
-            </Button>
+            <PrintButton />
              <Button variant="outline" onClick={onExport}>
                 <FileDown className="mr-2 h-4 w-4" />
                 Exportar Excel
