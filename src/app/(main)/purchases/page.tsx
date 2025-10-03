@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts, financialMovements as initialFinancialMovements, salesOrders as initialSalesOrders, serviceOrders as initialServiceOrders } from '@/lib/data';
 import { PurchaseOrder, Contact, OrderItem, FinancialMovement, SalesOrder, ServiceOrder } from '@/lib/types';
@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { PurchaseOrderPreview } from './components/purchase-order-preview';
+import { PurchaseOrderPreview, PreviewContent } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Download, Eye, MoreHorizontal, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { useReactToPrint } from 'react-to-print';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -50,9 +51,7 @@ export default function PurchasesPage() {
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
-  const [salesOrders, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
-  const [serviceOrders, setServiceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
-
+  
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [confirmingEditOrder, setConfirmingEditOrder] = useState<PurchaseOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<PurchaseOrder | null>(null);
@@ -63,14 +62,20 @@ export default function PurchasesPage() {
   const [filter, setFilter] = useState('');
   const { toast } = useToast();
 
+  const printComponentRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = useReactToPrint({
+      content: () => printComponentRef.current,
+  });
+
   useEffect(() => {
     setIsClient(true);
   }, []);
   
-  const suppliers = contacts.filter(c => c.type === 'supplier');
+  const suppliers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
 
   const groupedOrders = useMemo(() => {
-    const groups: Record<string, { supplierName: string; orders: PurchaseOrder[]; subtotal: number; }> = {};
+    const groups: Record<string, { supplierName: string; orders: PurchaseOrder[]; subtotal: number; totalKilos: number; totalPackages: number; }> = {};
     
     purchaseOrders.forEach(order => {
         const supplier = suppliers.find(s => s.id === order.supplierId);
@@ -81,17 +86,26 @@ export default function PurchasesPage() {
                 supplierName: supplier.name,
                 orders: [],
                 subtotal: 0,
+                totalKilos: 0,
+                totalPackages: 0,
             };
         }
         groups[supplier.id].orders.push(order);
         groups[supplier.id].subtotal += order.totalAmount;
+        groups[supplier.id].totalKilos += order.totalKilos;
+        groups[supplier.id].totalPackages += order.totalPackages;
     });
 
     return Object.values(groups).sort((a,b) => a.supplierName.localeCompare(b.supplierName));
   }, [purchaseOrders, suppliers]);
 
-  const grandTotal = useMemo(() => {
-    return groupedOrders.reduce((sum, group) => sum + group.subtotal, 0);
+  const grandTotals = useMemo(() => {
+    return groupedOrders.reduce((acc, group) => {
+        acc.subtotal += group.subtotal;
+        acc.totalKilos += group.totalKilos;
+        acc.totalPackages += group.totalPackages;
+        return acc;
+    }, { subtotal: 0, totalKilos: 0, totalPackages: 0 });
   }, [groupedOrders]);
   
   const filteredGroupedOrders = useMemo(() => {
@@ -102,7 +116,7 @@ export default function PurchasesPage() {
   }, [groupedOrders, filter]);
 
 
-  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>, newItems: OrderItem[] = []) => {
+  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'>, newItems: OrderItem[] = []) => {
     // Combine existing items with new items
     const allItems = 'id' in order
       ? [...order.items, ...newItems]
@@ -115,8 +129,10 @@ export default function PurchasesPage() {
         }
         return sum;
     }, 0);
+    const totalPackages = allItems.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
-    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id'> = { ...order, items: allItems, totalAmount, totalKilos };
+
+    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id'> = { ...order, items: allItems, totalAmount, totalKilos, totalPackages };
 
     if ('id' in finalOrderData) {
       // Update
@@ -147,6 +163,7 @@ export default function PurchasesPage() {
         ...(finalOrderData as Omit<PurchaseOrder, 'id'>),
         id: `OC-${lastId + 1}`,
         paymentStatus: 'Pendiente',
+        totalPackages,
       };
       setPurchaseOrders(prev => [...prev, newOrder]);
       toast({ title: 'Orden Creada', description: `La orden ${newOrder.id} ha sido creada.` });
@@ -170,10 +187,6 @@ export default function PurchasesPage() {
   const handleDelete = (order: PurchaseOrder) => {
     setDeletingOrder(order);
   };
-
-  const handlePreview = (order: PurchaseOrder) => {
-    setPreviewingOrder(order);
-  }
   
   const confirmDelete = () => {
     if (deletingOrder) {
@@ -258,6 +271,8 @@ export default function PurchasesPage() {
                     <TableRow>
                         <TableHead className='w-[400px]'>Proveedor</TableHead>
                         <TableHead className='text-right'>Monto Total</TableHead>
+                        <TableHead className='text-right'>Kilos Totales</TableHead>
+                        <TableHead className='text-right'>Envases Totales</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -273,10 +288,12 @@ export default function PurchasesPage() {
                                         </div>
                                     </TableCell>
                                     <TableCell className='text-right font-bold'>{formatCurrency(group.subtotal)}</TableCell>
+                                    <TableCell className='text-right font-bold'>{group.totalKilos.toLocaleString('es-CL')} kg</TableCell>
+                                    <TableCell className='text-right font-bold'>{group.totalPackages.toLocaleString('es-CL')}</TableCell>
                                 </TableRow>
                                 {openCollapsibles[supplierId] && (
                                     <TableRow>
-                                        <TableCell colSpan={2} className="p-0">
+                                        <TableCell colSpan={4} className="p-0">
                                             <div className='p-4 bg-background'>
                                                 <Table>
                                                     <TableHeader>
@@ -315,7 +332,7 @@ export default function PurchasesPage() {
                                                                       </DropdownMenuTrigger>
                                                                       <DropdownMenuContent align="end">
                                                                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                                        <DropdownMenuItem onClick={() => handlePreview(order)}>
+                                                                        <DropdownMenuItem onClick={() => setPreviewingOrder(order)}>
                                                                           <Eye className='mr-2 h-4 w-4' />
                                                                           Visualizar
                                                                         </DropdownMenuItem>
@@ -347,7 +364,9 @@ export default function PurchasesPage() {
                 <TableFooter>
                     <TableRow>
                         <TableHead className='text-right font-bold text-lg'>Total General</TableHead>
-                        <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotal)}</TableHead>
+                        <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotals.subtotal)}</TableHead>
+                        <TableHead className='text-right font-bold text-lg'>{grandTotals.totalKilos.toLocaleString('es-CL')} kg</TableHead>
+                        <TableHead className='text-right font-bold text-lg'>{grandTotals.totalPackages.toLocaleString('es-CL')}</TableHead>
                     </TableRow>
                 </TableFooter>
             </Table>
@@ -428,15 +447,20 @@ export default function PurchasesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {previewingOrder && (
-        <PurchaseOrderPreview
-          order={previewingOrder}
-          supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
-          isOpen={!!previewingOrder}
-          onOpenChange={(open) => !open && setPreviewingOrder(null)}
-        />
-      )}
+      <PurchaseOrderPreview
+        order={previewingOrder}
+        supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null}
+        isOpen={!!previewingOrder}
+        onOpenChange={(open) => !open && setPreviewingOrder(null)}
+        onPrint={handlePrint}
+      />
+
+       {/* Hidden component for printing */}
+      <div className="hidden">
+         {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null} />}
+      </div>
     </>
   );
 }
+
 

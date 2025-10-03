@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -37,9 +38,9 @@ type NewPurchaseOrderSheetProps = {
 };
 
 
-const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'> => {
+const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
     if (order) {
-        const { totalAmount, totalKilos, ...rest } = order;
+        const { totalAmount, totalKilos, totalPackages, ...rest } = order;
         return {
             ...rest,
             date: format(new Date(order.date), 'yyyy-MM-dd'),
@@ -55,7 +56,7 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
 };
 
 export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, suppliers }: NewPurchaseOrderSheetProps) {
-  const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData(order));
+  const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'>>(getInitialFormData(order));
   const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 });
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, warehouses, packagingTypes } = useMasterData();
