@@ -658,7 +658,7 @@ export default function ReportsPage() {
                             <p className='text-sm'>Al {format(new Date(), "PPP", { locale: es })}</p>
                             <div className="mt-4">
                                 <h3 className="text-base font-bold">VIÑA NEGRA SpA</h3>
-                                <p className="text-sm">RUT: 76.XXX.XXX-X</p>
+                                <p className="text-sm">RUT: 78.261.683-8</p>
                                 <p className="text-sm">TULAHUEN S/N</p>
                                 <p className="text-sm">MONTE PATRIA, CHILE</p>
                             </div>

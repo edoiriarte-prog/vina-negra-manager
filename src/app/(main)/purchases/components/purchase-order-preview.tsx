@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -72,7 +73,12 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange }: 
         <div id="print-area">
           <DialogHeader className="space-y-0">
             <div className="flex items-center justify-between mb-8">
-              <Logo />
+              <div>
+                  <h3 className="text-lg font-bold">VIÑA NEGRA SpA</h3>
+                  <p className="text-sm text-muted-foreground">RUT: 78.261.683-8</p>
+                  <p className="text-sm text-muted-foreground">TULAHUEN S/N</p>
+                  <p className="text-sm text-muted-foreground">MONTE PATRIA, CHILE</p>
+              </div>
               <div className='text-right'>
                 <DialogTitle className="text-2xl font-bold font-headline mb-1">ORDEN DE COMPRA</DialogTitle>
                 <p className="text-muted-foreground font-mono">{order.id}</p>

@@ -55,8 +55,11 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
         {/* Page 1: Commercial Invoice */}
         <div>
             <div className="flex flex-row items-center justify-between mb-8">
-              <div className="print-logo">
-                <Logo />
+              <div>
+                  <h3 className="text-lg font-bold">VIÑA NEGRA SpA</h3>
+                  <p className="text-sm text-muted-foreground">RUT: 78.261.683-8</p>
+                  <p className="text-sm text-muted-foreground">TULAHUEN S/N</p>
+                  <p className="text-sm text-muted-foreground">MONTE PATRIA, CHILE</p>
               </div>
               <div className='text-right'>
                 <h2 className="text-2xl font-bold font-headline mb-1">ORDEN DE VENTA</h2>
@@ -78,7 +81,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
             <div className='text-right'>
                 <h3 className="font-semibold mb-2">VIÑA NEGRA SpA</h3>
                 <div className="text-sm text-muted-foreground">
-                    <p>RUT: 76.XXX.XXX-X</p>
+                    <p>RUT: 78.261.683-8</p>
                     <p>TULAHUEN S/N</p>
                     <p>MONTE PATRIA CHILE</p>
                 </div>
@@ -155,8 +158,11 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
         {/* Page 2: Dispatch Guide / Picking Ticket */}
         <div className="page-break" style={{breakBefore: 'page'}}>
             <div className="flex flex-row items-center justify-between mb-8">
-              <div className="print-logo">
-                <Logo />
+              <div>
+                  <h3 className="text-lg font-bold">VIÑA NEGRA SpA</h3>
+                  <p className="text-sm text-muted-foreground">RUT: 78.261.683-8</p>
+                  <p className="text-sm text-muted-foreground">TULAHUEN S/N</p>
+                  <p className="text-sm text-muted-foreground">MONTE PATRIA, CHILE</p>
               </div>
               <div className='text-right'>
                   <h2 className="text-2xl font-bold font-headline mb-1">GUÍA DE DESPACHO</h2>
@@ -177,7 +183,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
                <div className='text-right'>
                   <h3 className="font-semibold mb-2">VIÑA NEGRA SpA</h3>
                   <div className="text-sm text-muted-foreground">
-                      <p>RUT: 76.XXX.XXX-X</p>
+                      <p>RUT: 78.261.683-8</p>
                       <p>TULAHUEN S/N</p>
                       <p>MONTE PATRIA CHILE</p>
                   </div>
