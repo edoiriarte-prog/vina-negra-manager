@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { PurchaseOrderPreview, PreviewContent } from './components/purchase-order-preview';
+import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Download, Eye, MoreHorizontal, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -289,7 +289,7 @@ export default function PurchasesPage() {
                                     </TableCell>
                                     <TableCell className='text-right font-bold'>{formatCurrency(group.subtotal)}</TableCell>
                                     <TableCell className='text-right font-bold'>{group.totalKilos.toLocaleString('es-CL')} kg</TableCell>
-                                    <TableCell className='text-right font-bold'>{group.totalPackages.toLocaleString('es-CL')}</TableCell>
+                                    <TableCell className='text-right font-bold'>{(group.totalPackages || 0).toLocaleString('es-CL')}</TableCell>
                                 </TableRow>
                                 {openCollapsibles[supplierId] && (
                                     <TableRow>
@@ -313,7 +313,7 @@ export default function PurchasesPage() {
                                                                 <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy')}</TableCell>
                                                                 <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
                                                                 <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')} kg</TableCell>
-                                                                <TableCell className="text-right">{order.totalPackages.toLocaleString('es-CL')}</TableCell>
+                                                                <TableCell className="text-right">{(order.totalPackages || 0).toLocaleString('es-CL')}</TableCell>
                                                                 <TableCell>
                                                                      <DropdownMenu>
                                                                       <DropdownMenuTrigger asChild>
@@ -324,9 +324,12 @@ export default function PurchasesPage() {
                                                                       </DropdownMenuTrigger>
                                                                       <DropdownMenuContent align="end">
                                                                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                                        <DropdownMenuItem onClick={() => setPreviewingOrder(order)}>
-                                                                          <Eye className='mr-2 h-4 w-4' />
-                                                                          Visualizar
+                                                                        <DropdownMenuItem onClick={() => {
+                                                                            setPreviewingOrder(order);
+                                                                            setTimeout(() => handlePrint(), 100);
+                                                                        }}>
+                                                                          <Printer className='mr-2 h-4 w-4' />
+                                                                          Imprimir
                                                                         </DropdownMenuItem>
                                                                         <DropdownMenuItem onClick={() => handleEdit(order)}>
                                                                           Editar
@@ -439,21 +442,14 @@ export default function PurchasesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <PurchaseOrderPreview
-        order={previewingOrder}
-        supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null}
-        isOpen={!!previewingOrder}
-        onOpenChange={(open) => !open && setPreviewingOrder(null)}
-        onPrint={handlePrint}
-      />
-
        {/* Hidden component for printing */}
       <div className="hidden">
-         {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null} />}
+         {previewingOrder && <PurchaseOrderPreview ref={printComponentRef} order={previewingOrder} supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null} />}
       </div>
     </>
   );
 }
+
 
 
 

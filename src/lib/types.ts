@@ -73,7 +73,7 @@ export type PurchaseOrder = {
   items: OrderItem[];
   totalAmount: number;
   totalKilos: number;
-  totalPackages: number;
+  totalPackages?: number;
   status: 'pending' | 'completed' | 'cancelled';
   warehouse: string;
   paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
