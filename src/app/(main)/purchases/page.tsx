@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, MoreHorizontal, ChevronDown, Edit, Trash2, FileDown } from 'lucide-react';
+import { PlusCircle, Download, MoreHorizontal, ChevronDown, Edit, Trash2, FileDown, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';

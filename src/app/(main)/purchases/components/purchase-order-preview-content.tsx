@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Separator } from '@/components/ui/separator';
 import { PurchaseOrder, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
@@ -26,17 +26,9 @@ const formatCurrency = (value: number) =>
 interface PreviewContentProps {
   order: PurchaseOrder;
   supplier: Contact | null;
-  isPrinting: boolean;
-  onPrintRequest: () => void;
 }
 
-export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier, isPrinting, onPrintRequest }, ref) => {
-
-    useEffect(() => {
-        if (isPrinting) {
-            onPrintRequest();
-        }
-    }, [isPrinting, onPrintRequest]);
+export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier }, ref) => {
     
     return (
         <div ref={ref} className="p-6">

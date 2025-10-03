@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -29,19 +29,13 @@ type PurchaseOrderPreviewProps = {
 
 export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, onEdit, onDelete, onExport }: PurchaseOrderPreviewProps) {
   const componentRef = useRef<HTMLDivElement>(null);
-  const [isPrinting, setIsPrinting] = useState(false);
 
   const handlePrint = useReactToPrint({
       content: () => componentRef.current,
-      onAfterPrint: () => setIsPrinting(false),
   });
   
   if (!order) {
     return null;
-  }
-
-  const handlePrintRequest = () => {
-    setIsPrinting(true);
   }
   
   return (
@@ -55,8 +49,6 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
                 ref={componentRef} 
                 order={order} 
                 supplier={supplier} 
-                isPrinting={isPrinting}
-                onPrintRequest={handlePrint}
             />
         </div>
 
@@ -65,7 +57,7 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
             </Button>
-            <Button variant="outline" onClick={handlePrintRequest}>
+            <Button variant="outline" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir
             </Button>
