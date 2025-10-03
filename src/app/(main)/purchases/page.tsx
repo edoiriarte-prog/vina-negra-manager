@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts, financialMovements as initialFinancialMovements } from '@/lib/data';
 import { PurchaseOrder, Contact, OrderItem, FinancialMovement } from '@/lib/types';
@@ -15,10 +15,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { PurchaseOrderPreview, PreviewContent } from './components/purchase-order-preview';
+} from "@/components/ui/alert-dialog";
+import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, Eye, MoreHorizontal, ChevronDown, Printer, Edit, Trash2, FileDown } from 'lucide-react';
+import { PlusCircle, Download, MoreHorizontal, ChevronDown, Edit, Trash2, FileDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -36,7 +36,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { useReactToPrint } from 'react-to-print';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -57,39 +56,14 @@ export default function PurchasesPage() {
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [isPrinting, setIsPrinting] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
   const { toast } = useToast();
-
-  const printComponentRef = useRef<HTMLDivElement>(null);
-
-  const handlePrint = useReactToPrint({
-      content: () => printComponentRef.current,
-      onAfterPrint: () => {
-        setPreviewingOrder(null);
-        setIsPrinting(false);
-      },
-      onPrintError: () => {
-        setIsPrinting(false);
-        toast({
-            variant: "destructive",
-            title: "Error de Impresión",
-            description: "No se pudo completar la impresión.",
-        });
-      }
-  });
 
   useEffect(() => {
     setIsClient(true);
   }, []);
   
-  useEffect(() => {
-    if (isPrinting && previewingOrder) {
-      handlePrint();
-    }
-  }, [isPrinting, previewingOrder, handlePrint]);
-
   const suppliers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
 
   const groupedOrders = useMemo(() => {
@@ -134,7 +108,7 @@ export default function PurchasesPage() {
   }, [groupedOrders, filter]);
 
 
-  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
+  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
     // Combine existing items with new items
     const allItems = 'id' in order
       ? [...order.items, ...newItems]
@@ -150,7 +124,7 @@ export default function PurchasesPage() {
     const totalPackages = allItems.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
 
-    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id'> = { ...order, items: allItems, totalAmount, totalKilos, totalPackages };
+    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalPackages'> = { ...order, items: allItems, totalAmount, totalKilos, totalPackages };
 
     if ('id' in finalOrderData) {
       // Update
@@ -471,7 +445,6 @@ export default function PurchasesPage() {
             supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
             isOpen={!!previewingOrder}
             onOpenChange={() => setPreviewingOrder(null)}
-            onPrint={() => setIsPrinting(true)}
             onEdit={() => {
                 if (previewingOrder) {
                   handleEdit(previewingOrder)
@@ -489,11 +462,6 @@ export default function PurchasesPage() {
             }}
         />
       )}
-
-       {/* Hidden component for printing */}
-      <div className="hidden print:block">
-         {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null} />}
-      </div>
     </>
   );
 }
