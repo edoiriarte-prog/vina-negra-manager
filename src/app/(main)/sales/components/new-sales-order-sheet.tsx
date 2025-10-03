@@ -28,7 +28,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 
-import { SalesOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
+import { SalesOrder, OrderItem, Contact, InventoryItem, PurchaseOrder } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -51,6 +51,7 @@ type NewSalesOrderSheetProps = {
   inventory: InventoryItem[];
   nextOrderId: string;
   getNextLotNumber: () => string;
+  purchaseOrders: PurchaseOrder[];
 };
 
 
@@ -77,7 +78,7 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
     };
 };
 
-export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId, getNextLotNumber }: NewSalesOrderSheetProps) {
+export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId, getNextLotNumber, purchaseOrders }: NewSalesOrderSheetProps) {
   const [formData, setFormData] = useState(() => getInitialFormData(order));
   const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -305,6 +306,27 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
      return totalAmount - advanceAmount;
   }, [totalAmount, advanceAmount, formData.paymentMethod]);
 
+  const handlePurchaseOrderSelect = (purchaseOrderId: string) => {
+    const po = purchaseOrders.find(p => p.id === purchaseOrderId);
+    if (po) {
+      const newItems = po.items.map(item => ({
+        ...item,
+        price: 0, // Reset price to 0
+        id: `temp-po-${po.id}-${item.id}-${Date.now()}`
+      }));
+      setFormData(prev => ({
+        ...prev,
+        items: [...prev.items, ...newItems],
+        relatedPurchaseIds: [...(prev.relatedPurchaseIds || []), po.id],
+        purchaseOrder: purchaseOrderId
+      }));
+      toast({
+        title: "Ítems Agregados",
+        description: `Se agregaron ${newItems.length} ítems desde la O/C ${purchaseOrderId}.`,
+      })
+    }
+  }
+
   if (!formData) return null;
 
   return (
@@ -424,6 +446,22 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                      {!formData.warehouse && <p className="text-xs text-destructive">Seleccione una bodega para agregar items.</p>}
                 </CardHeader>
                 <CardContent>
+                    <div className="grid grid-cols-4 items-center gap-4 my-4">
+                      <Label htmlFor="purchaseOrder" className="text-right">
+                        Agregar desde O/C
+                      </Label>
+                      <Select onValueChange={handlePurchaseOrderSelect} value={formData.purchaseOrder || ''}>
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Seleccione una Orden de Compra para agregar sus ítems" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {purchaseOrders.filter(po => po.status === 'completed').map(po => (
+                            <SelectItem key={po.id} value={po.id}>{po.id}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     {formData.items.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay ítems en la orden.</p>}
 
                     {formData.items.map((item, index) => {

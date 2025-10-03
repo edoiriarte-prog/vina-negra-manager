@@ -37,6 +37,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useReactToPrint } from 'react-to-print';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -60,19 +61,22 @@ export default function SalesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
-  const [orderToPrint, setOrderToPrint] = useState<SalesOrder | null>(null);
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
 
-  const printRef = React.useRef<HTMLDivElement>(null);
+  const printComponentRef = React.useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
 
   const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
   
-  const clients = contacts.filter(c => c.type === 'client');
-  const carriers = contacts.filter(c => c.type === 'supplier');
+  const clients = contacts.filter(c => c.type === 'client' || c.type === 'both');
+  const carriers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
+
+  const handlePrint = useReactToPrint({
+      content: () => printComponentRef.current,
+  });
   
 
   useEffect(() => {
@@ -92,7 +96,7 @@ export default function SalesPage() {
         return max;
     }, 0);
     setNextLotCorrelative(maxLotNumber + 1);
-  }, [salesOrders]);
+  }, []);
 
   const groupedOrders = useMemo(() => {
     const groups: Record<string, { clientName: string; orders: SalesOrder[]; subtotal: number; }> = {};
@@ -127,46 +131,6 @@ export default function SalesPage() {
   }, [groupedOrders, filter]);
 
 
-  const handlePrint = useCallback(() => {
-    if (!printRef.current) return;
-     const printWindow = window.open('', '', 'height=800,width=800');
-     if (printWindow) {
-      printWindow.document.write('<html><head><title>Imprimir Orden de Venta</title>');
-      
-      const styles = Array.from(document.styleSheets)
-        .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
-        .join('');
-      printWindow.document.write(styles);
-
-      printWindow.document.write(`
-        <style>
-          @media print {
-            body { background: white !important; color: black !important; }
-            .print-logo { display: none !important; }
-            * { color: black !important; background-color: transparent !important; }
-          }
-        </style>
-      `);
-      
-      printWindow.document.write('</head><body>');
-      printWindow.document.write(printRef.current.innerHTML);
-      printWindow.document.write('</body></html>');
-      printWindow.document.close();
-      
-      printWindow.onload = () => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      };
-    }
-    setOrderToPrint(null);
-  }, []);
-
-  useEffect(() => {
-    if (orderToPrint && printRef.current) {
-      handlePrint();
-    }
-  }, [orderToPrint, handlePrint]);
   
   const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, editingOrder), [purchaseOrders, salesOrders, editingOrder]);
 
@@ -285,10 +249,6 @@ export default function SalesPage() {
   const handlePreview = (order: SalesOrder) => {
     setPreviewingOrder(order);
   }
-
-  const handlePrintRequest = (order: SalesOrder) => {
-    setOrderToPrint(order);
-  };
   
   const confirmDelete = () => {
     if (deletingOrder) {
@@ -469,7 +429,7 @@ export default function SalesPage() {
                                                                     </DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end">
                                                                       <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                                      <DropdownMenuItem onClick={() => handlePreview(order)}>
+                                                                      <DropdownMenuItem onClick={() => { setPreviewingOrder(order); }}>
                                                                         <Eye className='mr-2 h-4 w-4' />
                                                                         Visualizar
                                                                       </DropdownMenuItem>
@@ -554,6 +514,7 @@ export default function SalesPage() {
             inventory={inventory}
             nextOrderId={nextOrderId}
             getNextLotNumber={getNextLotNumber}
+            purchaseOrders={purchaseOrders}
         />
       )}
 
@@ -596,7 +557,7 @@ export default function SalesPage() {
           isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
           onExport={() => handleExport(previewingOrder)}
-          onPrint={() => handlePrintRequest(previewingOrder)}
+          onPrint={handlePrint}
         />
       )}
       
@@ -637,7 +598,7 @@ export default function SalesPage() {
 
       {/* Hidden component for printing */}
       <div className="hidden">
-        {orderToPrint && <PreviewContent ref={printRef} order={orderToPrint} client={clients.find(c => c.id === orderToPrint.clientId) || null} carrier={null} />}
+         {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} client={clients.find(c => c.id === previewingOrder.clientId) || null} carrier={null} />}
       </div>
     </>
   );

@@ -63,6 +63,7 @@ export type SalesOrder = {
   balanceDueDate?: string;
   warehouse?: string;
   paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
+  purchaseOrder?: string;
 };
 
 export type PurchaseOrder = {
