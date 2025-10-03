@@ -58,6 +58,7 @@ export default function PurchasesPage() {
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
   const { toast } = useToast();
@@ -66,11 +67,21 @@ export default function PurchasesPage() {
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
+      onAfterPrint: () => setPreviewingOrder(null), // Clean up after print
   });
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+  
+  useEffect(() => {
+    if (isPrinting && previewingOrder) {
+      setTimeout(() => {
+        handlePrint();
+        setIsPrinting(false);
+      }, 50);
+    }
+  }, [isPrinting, previewingOrder, handlePrint]);
 
   const suppliers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
 
@@ -453,10 +464,22 @@ export default function PurchasesPage() {
             supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
             isOpen={!!previewingOrder}
             onOpenChange={() => setPreviewingOrder(null)}
-            onPrint={() => handlePrint()}
-            onEdit={() => handleEdit(previewingOrder)}
-            onDelete={() => handleDelete(previewingOrder)}
-            onExport={() => handleExportSingle(previewingOrder)}
+            onPrint={() => setIsPrinting(true)}
+            onEdit={() => {
+                if (previewingOrder) {
+                  handleEdit(previewingOrder)
+                }
+            }}
+            onDelete={() => {
+                if (previewingOrder) {
+                    handleDelete(previewingOrder)
+                }
+            }}
+            onExport={() => {
+                if (previewingOrder) {
+                    handleExportSingle(previewingOrder)
+                }
+            }}
         />
       )}
 
@@ -467,5 +490,6 @@ export default function PurchasesPage() {
     </>
   );
 }
+
 
 
