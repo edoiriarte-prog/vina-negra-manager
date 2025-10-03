@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { PurchaseOrderPreview, PreviewContent } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, Eye, MoreHorizontal, ChevronDown, Printer } from 'lucide-react';
+import { PlusCircle, Download, Eye, MoreHorizontal, ChevronDown, Printer, Edit, Trash2, FileDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -73,7 +73,7 @@ export default function PurchasesPage() {
   }, []);
 
   useEffect(() => {
-    if (previewingOrder) {
+    if (previewingOrder && printComponentRef.current) {
       handlePrint();
     }
   }, [previewingOrder, handlePrint]);
@@ -179,6 +179,7 @@ export default function PurchasesPage() {
   };
 
   const handleEdit = (order: PurchaseOrder) => {
+    setPreviewingOrder(null);
     setConfirmingEditOrder(order);
   };
 
@@ -191,6 +192,7 @@ export default function PurchasesPage() {
   }
 
   const handleDelete = (order: PurchaseOrder) => {
+    setPreviewingOrder(null);
     setDeletingOrder(order);
   };
   
@@ -213,10 +215,44 @@ export default function PurchasesPage() {
     setEditingOrder(null);
     setIsSheetOpen(true);
   }
+
+  const handlePreview = (order: PurchaseOrder) => {
+    setPreviewingOrder(order);
+  };
   
   const toggleCollapsible = (supplierId: string) => {
     setOpenCollapsibles(prev => ({...prev, [supplierId]: !prev[supplierId]}));
   }
+
+   const handleExportSingle = (orderToExport: PurchaseOrder) => {
+    if (!orderToExport) return;
+    const supplier = suppliers.find(s => s.id === orderToExport.supplierId);
+    const dataForSheet = orderToExport.items.map(item => ({
+      'O/C': orderToExport.id,
+      'Fecha': format(new Date(orderToExport.date), "dd-MM-yyyy"),
+      'Proveedor': supplier?.name,
+      'RUT Proveedor': supplier?.rut,
+      'Estado': orderToExport.status,
+      'Bodega': orderToExport.warehouse,
+      'Item ID': item.id,
+      'Producto': item.product,
+      'Calibre': item.caliber,
+      'Cantidad': item.quantity,
+      'Unidad': item.unit,
+      'Precio Unitario': item.price,
+      'Subtotal': item.quantity * item.price,
+      'Tipo Envase': item.packagingType,
+      'Cant. Envase': item.packagingQuantity,
+      'Lote': item.lotNumber,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, `OC-${orderToExport.id}`);
+    XLSX.writeFile(workbook, `Orden_de_Compra_${orderToExport.id}.xlsx`);
+    toast({ title: 'Exportación Exitosa', description: `Se ha exportado la orden ${orderToExport.id}.` });
+    setPreviewingOrder(null);
+  };
 
   const handleExportAll = () => {
     if (purchaseOrders.length === 0) {
@@ -313,7 +349,7 @@ export default function PurchasesPage() {
                                                     </TableHeader>
                                                     <TableBody>
                                                         {group.orders.map(order => (
-                                                            <TableRow key={order.id}>
+                                                            <TableRow key={order.id} className="cursor-pointer" onClick={() => handlePreview(order)}>
                                                                 <TableCell className="font-medium">{order.id}</TableCell>
                                                                 <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy')}</TableCell>
                                                                 <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
@@ -416,18 +452,25 @@ export default function PurchasesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {previewingOrder && (
+          <PurchaseOrderPreview
+            order={previewingOrder}
+            supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
+            isOpen={!!previewingOrder}
+            onOpenChange={() => setPreviewingOrder(null)}
+            onPrint={() => handlePrint()}
+            onEdit={() => handleEdit(previewingOrder)}
+            onDelete={() => handleDelete(previewingOrder)}
+            onExport={() => handleExportSingle(previewingOrder)}
+        />
+      )}
 
        {/* Hidden component for printing */}
-      <div className="hidden">
+      <div className="hidden print:block">
          {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null} />}
       </div>
     </>
   );
 }
-
-
-
-
-
-
 
