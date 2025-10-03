@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,21 +11,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { PurchaseOrder, Contact } from '@/lib/types';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Printer, Edit, Trash2, FileDown } from 'lucide-react';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-    TableFooter,
-  } from '@/components/ui/table';
 import { useReactToPrint } from 'react-to-print';
+import { PreviewContent } from './purchase-order-preview-content';
 
 type PurchaseOrderPreviewProps = {
   order: PurchaseOrder | null;
@@ -37,102 +26,22 @@ type PurchaseOrderPreviewProps = {
   onExport: () => void;
 };
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value);
-
-export const PreviewContent = React.forwardRef<HTMLDivElement, { order: PurchaseOrder; supplier: Contact | null }>(({ order, supplier }, ref) => {
-    return (
-        <div ref={ref} className="p-6">
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h3 className="text-lg font-bold">VIÑA NEGRA SpA</h3>
-                    <p className="text-sm text-muted-foreground">RUT: 78.261.683-8</p>
-                    <p className="text-sm text-muted-foreground">TULAHUEN S/N</p>
-                    <p className="text-sm text-muted-foreground">MONTE PATRIA, CHILE</p>
-                </div>
-                <div className='text-right'>
-                    <h2 className="text-2xl font-bold font-headline mb-1">ORDEN DE COMPRA</h2>
-                    <p className="text-muted-foreground font-mono">{order.id}</p>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-8 mb-8">
-                <div>
-                <h3 className="font-semibold mb-2">Proveedor</h3>
-                <div className="text-sm text-muted-foreground">
-                    <p className="font-bold text-foreground">{supplier?.name}</p>
-                    <p>RUT: {supplier?.rut}</p>
-                    <p>{supplier?.address}</p>
-                    <p>{supplier?.commune}</p>
-                    <p>{supplier?.email}</p>
-                </div>
-                </div>
-                <div className='text-right'>
-                <h3 className="font-semibold mb-2">Detalles</h3>
-                <div className="text-sm text-muted-foreground">
-                    <p><strong>Fecha Emisión:</strong> {format(parseISO(order.date), "PPP", { locale: es })}</p>
-                    <p><strong>Estado:</strong> <span className='capitalize'>{order.status}</span></p>
-                </div>
-                </div>
-            </div>
-
-            <Separator className="my-4" />
-
-            <Table>
-                <TableHeader>
-                <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>Calibre</TableHead>
-                    <TableHead className="text-right">Cantidad</TableHead>
-                    <TableHead className="text-right">Precio Unitario</TableHead>
-                    <TableHead className="text-right">Subtotal</TableHead>
-                </TableRow>
-                </TableHeader>
-                <TableBody>
-                {order.items.map((item) => (
-                    <TableRow key={item.id}>
-                    <TableCell>{item.product}</TableCell>
-                    <TableCell>{item.caliber}</TableCell>
-                    <TableCell className="text-right">{item.quantity.toLocaleString('es-CL')} {item.unit}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
-                    </TableRow>
-                ))}
-                </TableBody>
-                <TableFooter>
-                    <TableRow>
-                        <TableCell colSpan={4} className="text-right font-bold text-lg">Total</TableCell>
-                        <TableCell className="text-right font-bold text-lg">{formatCurrency(order.totalAmount)}</TableCell>
-                    </TableRow>
-                </TableFooter>
-            </Table>
-
-            <Separator className="my-4" />
-            
-            <div className="mt-8 text-xs text-muted-foreground">
-                <p><strong>Observaciones:</strong></p>
-                <p>1. La presente orden de compra es válida por 30 días.</p>
-                <p>2. En caso de discrepancia, favor contactar a nuestro departamento de compras.</p>
-            </div>
-        </div>
-    );
-});
-PreviewContent.displayName = "PreviewContent";
 
 export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, onEdit, onDelete, onExport }: PurchaseOrderPreviewProps) {
-  
   const componentRef = useRef<HTMLDivElement>(null);
-  
+  const [isPrinting, setIsPrinting] = useState(false);
+
   const handlePrint = useReactToPrint({
       content: () => componentRef.current,
+      onAfterPrint: () => setIsPrinting(false),
   });
-
+  
   if (!order) {
     return null;
+  }
+
+  const handlePrintRequest = () => {
+    setIsPrinting(true);
   }
   
   return (
@@ -142,7 +51,13 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
           <DialogTitle>Orden de Compra: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto">
-            <PreviewContent order={order} supplier={supplier} ref={componentRef} />
+            <PreviewContent 
+                ref={componentRef} 
+                order={order} 
+                supplier={supplier} 
+                isPrinting={isPrinting}
+                onPrintRequest={handlePrint}
+            />
         </div>
 
         <DialogFooter className="mt-8 p-6 pt-0 border-t gap-2">
@@ -150,7 +65,7 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
             </Button>
-            <Button variant="outline" onClick={handlePrint}>
+            <Button variant="outline" onClick={handlePrintRequest}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir
             </Button>

@@ -108,7 +108,7 @@ export default function PurchasesPage() {
   }, [groupedOrders, filter]);
 
 
-  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
+  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
     // Combine existing items with new items
     const allItems = 'id' in order
       ? [...order.items, ...newItems]
@@ -124,7 +124,7 @@ export default function PurchasesPage() {
     const totalPackages = allItems.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
 
-    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalPackages'> = { ...order, items: allItems, totalAmount, totalKilos, totalPackages };
+    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id'> = { ...order, items: allItems, totalAmount, totalKilos, totalPackages };
 
     if ('id' in finalOrderData) {
       // Update
@@ -152,7 +152,7 @@ export default function PurchasesPage() {
       });
       const lastId = sortedOrders.length > 0 ? parseInt(sortedOrders[sortedOrders.length - 1].id.split('-')[1]) : 1000;
       const newOrder: PurchaseOrder = {
-        ...(finalOrderData as Omit<PurchaseOrder, 'id' | 'totalPackages'>),
+        ...(finalOrderData as Omit<PurchaseOrder, 'id'>),
         id: `OC-${lastId + 1}`,
         paymentStatus: 'Pendiente',
         totalPackages,
