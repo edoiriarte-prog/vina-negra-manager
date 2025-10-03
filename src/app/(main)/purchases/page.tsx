@@ -17,9 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { PurchaseOrderPreview } from './components/purchase-order-preview';
+import { PurchaseOrderPreview, PreviewContent } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, Eye, MoreHorizontal, ChevronDown } from 'lucide-react';
+import { PlusCircle, Download, Eye, MoreHorizontal, ChevronDown, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -444,11 +444,12 @@ export default function PurchasesPage() {
 
        {/* Hidden component for printing */}
       <div className="hidden">
-         {previewingOrder && <PurchaseOrderPreview ref={printComponentRef} order={previewingOrder} supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null} />}
+         {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null} />}
       </div>
     </>
   );
 }
+
 
 
 
