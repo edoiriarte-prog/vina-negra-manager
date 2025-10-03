@@ -66,11 +66,18 @@ export default function PurchasesPage() {
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
+      onAfterPrint: () => setPreviewingOrder(null), // Clean up after printing
   });
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    if (previewingOrder) {
+      handlePrint();
+    }
+  }, [previewingOrder, handlePrint]);
   
   const suppliers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
 
@@ -326,7 +333,6 @@ export default function PurchasesPage() {
                                                                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                                                         <DropdownMenuItem onClick={() => {
                                                                             setPreviewingOrder(order);
-                                                                            setTimeout(() => handlePrint(), 100);
                                                                         }}>
                                                                           <Printer className='mr-2 h-4 w-4' />
                                                                           Imprimir
@@ -443,12 +449,13 @@ export default function PurchasesPage() {
       </AlertDialog>
 
        {/* Hidden component for printing */}
-      <div className="hidden">
+      <div className="hidden print:block">
          {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null} />}
       </div>
     </>
   );
 }
+
 
 
 
