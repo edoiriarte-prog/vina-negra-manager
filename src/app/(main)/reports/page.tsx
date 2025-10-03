@@ -25,6 +25,7 @@ import { es } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PerformanceReports } from './components/performance-reports';
 import { DueDatesReport } from './components/due-dates-report';
+import { ProfitabilityReport } from './components/profitability-report';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -525,10 +526,11 @@ export default function ReportsPage() {
       </div>
       
       <Tabs defaultValue="accounts" className="no-print">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="accounts">Estado de Cuentas</TabsTrigger>
           <TabsTrigger value="due-dates">Vencimientos</TabsTrigger>
           <TabsTrigger value="performance">Rendimiento</TabsTrigger>
+          <TabsTrigger value="profitability">Rentabilidad</TabsTrigger>
         </TabsList>
         <TabsContent value="accounts">
           <Card className="print-container mt-6">
@@ -632,6 +634,12 @@ export default function ReportsPage() {
         </TabsContent>
         <TabsContent value="performance">
             <PerformanceReports
+                salesOrders={salesOrders}
+                purchaseOrders={purchaseOrders}
+            />
+        </TabsContent>
+        <TabsContent value="profitability">
+            <ProfitabilityReport
                 salesOrders={salesOrders}
                 purchaseOrders={purchaseOrders}
             />
