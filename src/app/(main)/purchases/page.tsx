@@ -66,7 +66,6 @@ export default function PurchasesPage() {
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
-      onAfterPrint: () => setPreviewingOrder(null), // Clean up after printing
   });
 
   useEffect(() => {
@@ -310,7 +309,6 @@ export default function PurchasesPage() {
                                                             <TableHead className="text-right">Monto</TableHead>
                                                             <TableHead className="text-right">Kilos</TableHead>
                                                             <TableHead className="text-right">Envases</TableHead>
-                                                            <TableHead className="w-[50px]"></TableHead>
                                                         </TableRow>
                                                     </TableHeader>
                                                     <TableBody>
@@ -321,35 +319,6 @@ export default function PurchasesPage() {
                                                                 <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
                                                                 <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')} kg</TableCell>
                                                                 <TableCell className="text-right">{(order.totalPackages || 0).toLocaleString('es-CL')}</TableCell>
-                                                                <TableCell>
-                                                                     <DropdownMenu>
-                                                                      <DropdownMenuTrigger asChild>
-                                                                        <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                          <span className="sr-only">Abrir menú</span>
-                                                                          <MoreHorizontal className="h-4 w-4" />
-                                                                        </Button>
-                                                                      </DropdownMenuTrigger>
-                                                                      <DropdownMenuContent align="end">
-                                                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                                        <DropdownMenuItem onClick={() => {
-                                                                            setPreviewingOrder(order);
-                                                                        }}>
-                                                                          <Printer className='mr-2 h-4 w-4' />
-                                                                          Imprimir
-                                                                        </DropdownMenuItem>
-                                                                        <DropdownMenuItem onClick={() => handleEdit(order)}>
-                                                                          Editar
-                                                                        </DropdownMenuItem>
-                                                                        <DropdownMenuSeparator />
-                                                                        <DropdownMenuItem 
-                                                                          className="text-destructive focus:text-destructive"
-                                                                          onClick={() => handleDelete(order)}
-                                                                        >
-                                                                          Eliminar
-                                                                        </DropdownMenuItem>
-                                                                      </DropdownMenuContent>
-                                                                    </DropdownMenu>
-                                                                </TableCell>
                                                             </TableRow>
                                                         ))}
                                                     </TableBody>
@@ -449,12 +418,13 @@ export default function PurchasesPage() {
       </AlertDialog>
 
        {/* Hidden component for printing */}
-      <div className="hidden print:block">
+      <div className="hidden">
          {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} supplier={suppliers.find(s => s.id === previewingOrder?.supplierId) || null} />}
       </div>
     </>
   );
 }
+
 
 
 
