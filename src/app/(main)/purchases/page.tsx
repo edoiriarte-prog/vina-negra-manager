@@ -93,7 +93,7 @@ export default function PurchasesPage() {
         groups[supplier.id].orders.push(order);
         groups[supplier.id].subtotal += order.totalAmount;
         groups[supplier.id].totalKilos += order.totalKilos;
-        groups[supplier.id].totalPackages += order.totalPackages;
+        groups[supplier.id].totalPackages += order.totalPackages || 0;
     });
 
     return Object.values(groups).sort((a,b) => a.supplierName.localeCompare(b.supplierName));
@@ -116,7 +116,7 @@ export default function PurchasesPage() {
   }, [groupedOrders, filter]);
 
 
-  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'>, newItems: OrderItem[] = []) => {
+  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
     // Combine existing items with new items
     const allItems = 'id' in order
       ? [...order.items, ...newItems]
@@ -301,8 +301,8 @@ export default function PurchasesPage() {
                                                             <TableHead>O/C</TableHead>
                                                             <TableHead>Fecha</TableHead>
                                                             <TableHead className="text-right">Monto</TableHead>
-                                                            <TableHead>Estado Pago</TableHead>
-                                                            <TableHead>Estado Orden</TableHead>
+                                                            <TableHead className="text-right">Kilos</TableHead>
+                                                            <TableHead className="text-right">Envases</TableHead>
                                                             <TableHead className="w-[50px]"></TableHead>
                                                         </TableRow>
                                                     </TableHeader>
@@ -312,16 +312,8 @@ export default function PurchasesPage() {
                                                                 <TableCell className="font-medium">{order.id}</TableCell>
                                                                 <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy')}</TableCell>
                                                                 <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
-                                                                <TableCell>
-                                                                    <Badge variant={order.paymentStatus === 'Pagado' ? 'default' : order.paymentStatus === 'Abonado' ? 'secondary' : 'destructive'}>
-                                                                        {order.paymentStatus || 'Pendiente'}
-                                                                    </Badge>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <Badge variant={order.status === 'completed' ? 'default' : order.status === 'pending' ? 'secondary' : 'destructive'}>
-                                                                        {order.status === 'completed' ? 'Completada' : order.status === 'pending' ? 'Pendiente' : 'Cancelada'}
-                                                                    </Badge>
-                                                                </TableCell>
+                                                                <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')} kg</TableCell>
+                                                                <TableCell className="text-right">{order.totalPackages.toLocaleString('es-CL')}</TableCell>
                                                                 <TableCell>
                                                                      <DropdownMenu>
                                                                       <DropdownMenuTrigger asChild>
@@ -462,5 +454,6 @@ export default function PurchasesPage() {
     </>
   );
 }
+
 
 
