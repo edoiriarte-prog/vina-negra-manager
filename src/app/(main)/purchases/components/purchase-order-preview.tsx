@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef } from 'react';
+import React from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,8 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PurchaseOrder, Contact } from '@/lib/types';
-import { Printer, Edit, Trash2, FileDown } from 'lucide-react';
-import { useReactToPrint } from 'react-to-print';
+import { Edit, Trash2, FileDown } from 'lucide-react';
 import { PreviewContent } from './purchase-order-preview-content';
 
 type PurchaseOrderPreviewProps = {
@@ -28,17 +27,6 @@ type PurchaseOrderPreviewProps = {
 
 
 export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, onEdit, onDelete, onExport }: PurchaseOrderPreviewProps) {
-  const componentRef = useRef<HTMLDivElement>(null);
-
-  const PrintButton = useReactToPrint({
-    content: () => componentRef.current,
-    trigger: () => (
-      <Button variant="outline">
-        <Printer className="mr-2 h-4 w-4" />
-        Imprimir
-      </Button>
-    ),
-  });
   
   if (!order) {
     return null;
@@ -52,18 +40,16 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto">
             <PreviewContent 
-                ref={componentRef} 
                 order={order} 
                 supplier={supplier} 
             />
         </div>
 
-        <DialogFooter className="mt-8 p-6 pt-0 border-t gap-2">
+        <DialogFooter className="mt-8 p-6 pt-0 border-t gap-2 no-print">
             <Button variant="outline" onClick={onEdit}>
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
             </Button>
-            <PrintButton />
              <Button variant="outline" onClick={onExport}>
                 <FileDown className="mr-2 h-4 w-4" />
                 Exportar Excel
