@@ -35,7 +35,7 @@ type DocumentDetail = {
   date: string;
   type: 'O/C' | 'O/S' | 'O/V';
   amount: number;
-  items?: OrderItem[]; // Add items for O/C
+  items?: OrderItem[];
 };
 
 type PaymentDetail = {
@@ -104,7 +104,7 @@ export default function CurrentAccountPage() {
               .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
               .join('');
             printWindow.document.write(styles);
-            printWindow.document.write('<style>body { padding: 2rem; } .print-only { display: block !important; } .no-print { display: none !important; } .print-order-section { page-break-inside: avoid; } @page { size: auto; margin: 0.5in; }</style>');
+            printWindow.document.write('<style>body { padding: 2rem; } .print-only { display: block !important; } .no-print { display: none !important; } .print-order-section { page-break-inside: avoid; }</style>');
             printWindow.document.write('</head><body class="bg-white">');
             printWindow.document.write(printContents);
             printWindow.document.write('</body></html>');
@@ -129,8 +129,18 @@ export default function CurrentAccountPage() {
       const clientReportData = clients.map(client => {
         const clientSalesOrders = salesOrders.filter(so => so.clientId === client.id && (so.status === 'completed' || so.status === 'pending'));
         
+        const caliberMap: { [key: string]: number } = {};
+        clientSalesOrders.forEach(so => {
+            so.items.forEach(item => {
+                if (item.unit === 'Kilos') {
+                    caliberMap[item.caliber] = (caliberMap[item.caliber] || 0) + item.quantity;
+                }
+            });
+        });
+        const caliberDistribution: CaliberDistribution[] = Object.entries(caliberMap).map(([name, value]) => ({ name, value }));
+        
         const clientDocuments: DocumentDetail[] = clientSalesOrders
-            .map(so => ({ id: so.id, date: so.date, type: 'O/V' as const, amount: so.totalAmount }))
+            .map(so => ({ id: so.id, date: so.date, type: 'O/V' as const, amount: so.totalAmount, items: so.items }))
             .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         const totalBilled = clientDocuments.reduce((sum, doc) => sum + doc.amount, 0);
@@ -160,6 +170,7 @@ export default function CurrentAccountPage() {
           status,
           documents: clientDocuments,
           payments: clientMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+          caliberDistribution,
         };
       }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
       setClientReports(clientReportData);
@@ -355,12 +366,12 @@ export default function CurrentAccountPage() {
   
   const totalKilosForChart = printingReport?.caliberDistribution?.reduce((sum, item) => sum + item.value, 0) || 0;
   
-  const allPurchaseOrders = printingReport?.documents.filter(d => d.type === 'O/C') || [];
-  const allPurchaseItems = allPurchaseOrders.flatMap(doc => doc.items || []);
-  const totalPurchasePackages = allPurchaseItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
-  const totalPurchaseKilos = allPurchaseItems.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0);
-  const totalPurchaseValue = allPurchaseItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-  const avgPricePerKg = totalPurchaseKilos > 0 ? totalPurchaseValue / totalPurchaseKilos : 0;
+  const allDocuments = printingReport?.documents || [];
+  const allItems = allDocuments.flatMap(doc => doc.items || []);
+  const totalPackages = allItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
+  const totalKilos = allItems.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0);
+  const totalValue = allItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  const avgPricePerKg = totalKilos > 0 ? totalValue / totalKilos : 0;
 
 
   return (
@@ -470,7 +481,7 @@ export default function CurrentAccountPage() {
                 <div className="p-8 font-sans text-black">
                     <div className="grid grid-cols-2 gap-8 mb-8">
                         <div>
-                            <h2 className="font-bold text-lg mb-2">{printingReport.caliberDistribution ? 'PROVEEDOR' : 'CLIENTE'}</h2>
+                            <h2 className="font-bold text-lg mb-2">{printingReport.documents.some(d => d.type === 'O/C') ? 'PROVEEDOR' : 'CLIENTE'}</h2>
                             <div className="text-sm">
                                 <p className="font-semibold text-base">{printingReport.contactName}</p>
                                 <p>RUT: {contacts.find(c=>c.id === printingReport.contactId)?.rut}</p>
@@ -490,18 +501,18 @@ export default function CurrentAccountPage() {
                         </div>
                     </div>
 
-                    {printingReport.caliberDistribution ? (
+                    {printingReport.documents.some(d => d.type === 'O/C') ? (
                       <>
                         <div className="grid grid-cols-2 gap-8 mt-8">
                             <div className="bg-gray-50 p-4 rounded-lg print-order-section">
                                 <h3 className="text-lg font-bold mb-2 text-center">Resumen Total de Compras</h3>
                                 <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                                     <div className="font-bold">Total Kilos Comprados:</div>
-                                    <div className="text-right font-bold">{totalPurchaseKilos.toLocaleString('es-CL')} kg</div>
+                                    <div className="text-right font-bold">{totalKilos.toLocaleString('es-CL')} kg</div>
                                     <div className="font-bold">Total Envases:</div>
-                                    <div className="text-right font-bold">{totalPurchasePackages.toLocaleString('es-CL')}</div>
+                                    <div className="text-right font-bold">{totalPackages.toLocaleString('es-CL')}</div>
                                     <div className="font-bold">Valor Total Compra:</div>
-                                    <div className="text-right font-bold text-base">{formatCurrency(totalPurchaseValue)}</div>
+                                    <div className="text-right font-bold text-base">{formatCurrency(totalValue)}</div>
                                     <div className="font-bold">Precio Promedio por Kilo:</div>
                                     <div className="text-right font-bold text-base">{formatCurrency(avgPricePerKg)}</div>
                                 </div>
@@ -575,7 +586,7 @@ export default function CurrentAccountPage() {
                         </div>
 
                         <div className="space-y-6 mt-8">
-                            {allPurchaseOrders.map(doc => {
+                            {allDocuments.filter(d => d.type === 'O/C').map(doc => {
                                 const docTotalKilos = doc.items?.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0) || 0;
                                 const docTotalPackages = doc.items?.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0) || 0;
                                 return (
@@ -593,8 +604,8 @@ export default function CurrentAccountPage() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {doc.items?.map(item => (
-                                                    <TableRow key={item.id}>
+                                                {doc.items?.map((item, idx) => (
+                                                    <TableRow key={item.id || idx}>
                                                         <TableCell>{item.product}</TableCell>
                                                         <TableCell>{item.caliber}</TableCell>
                                                         <TableCell className="text-right">{item.packagingQuantity || 0}</TableCell>
@@ -621,38 +632,132 @@ export default function CurrentAccountPage() {
                       </>
                     ) : (
                       <>
-                        <h3 className="text-lg font-semibold mb-4 border-b pb-2">Resumen de Documentos</h3>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="font-bold">Documento</TableHead>
-                                    <TableHead className="font-bold">Fecha</TableHead>
-                                    <TableHead className="text-right font-bold">Monto</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {printingReport.documents.map(doc => (
-                                    <TableRow key={doc.id}>
-                                        <TableCell>{doc.id}</TableCell>
-                                        <TableCell>{format(parseISO(doc.date), "dd-MM-yyyy")}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(doc.amount)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableFooter>
-                                <TableRow>
-                                    <TableCell colSpan={2} className="text-right font-bold text-lg">Total Facturado</TableCell>
-                                    <TableCell className="text-right font-bold text-lg">{formatCurrency(printingReport.totalBilled)}</TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-
-                         <div className="mt-8 bg-gray-100 p-4 rounded-lg self-center">
-                            <div className="flex justify-between items-center">
-                                <span className="text-xl font-bold">SALDO PENDIENTE TOTAL</span>
-                                <span className="text-xl font-bold">{formatCurrency(printingReport.pendingBalance)}</span>
+                        <div className="grid grid-cols-2 gap-8 mt-8">
+                            <div className="bg-gray-50 p-4 rounded-lg print-order-section">
+                                <h3 className="text-lg font-bold mb-2 text-center">Resumen Total de Ventas</h3>
+                                <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                                    <div className="font-bold">Total Kilos Vendidos:</div>
+                                    <div className="text-right font-bold">{totalKilos.toLocaleString('es-CL')} kg</div>
+                                    <div className="font-bold">Total Envases:</div>
+                                    <div className="text-right font-bold">{totalPackages.toLocaleString('es-CL')}</div>
+                                    <div className="font-bold">Valor Total Venta:</div>
+                                    <div className="text-right font-bold text-base">{formatCurrency(totalValue)}</div>
+                                    <div className="font-bold">Precio Promedio por Kilo:</div>
+                                    <div className="text-right font-bold text-base">{formatCurrency(avgPricePerKg)}</div>
+                                </div>
                             </div>
-                         </div>
+                            <div>
+                                <h3 className="text-lg font-bold mb-4 border-b pb-2">Resumen de Pagos</h3>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="font-bold">Fecha</TableHead>
+                                            <TableHead className="font-bold">Descripción</TableHead>
+                                            <TableHead className="text-right font-bold">Monto</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {printingReport.payments.map(payment => (
+                                            <TableRow key={payment.id}>
+                                                <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy")}</TableCell>
+                                                <TableCell>{payment.description}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                    <TableFooter>
+                                        <TableRow>
+                                            <TableCell colSpan={2} className="text-right font-bold text-lg">Total Pagado</TableCell>
+                                            <TableCell className="text-right font-bold text-lg">{formatCurrency(printingReport.totalPaid)}</TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                </Table>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-8 mt-8">
+                            <div>
+                              <h3 className="text-lg font-bold mb-4 border-b pb-2">Distribución por Calibre (Kilos)</h3>
+                                <Table>
+                                    <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="font-bold">Calibre</TableHead>
+                                        <TableHead className="text-right font-bold">Kilos</TableHead>
+                                        <TableHead className="text-right font-bold">Porcentaje</TableHead>
+                                    </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                    {printingReport.caliberDistribution?.map((entry, index) => (
+                                        <TableRow key={index}>
+                                        <TableCell>{entry.name}</TableCell>
+                                        <TableCell className="text-right">{entry.value.toLocaleString('es-CL')} kg</TableCell>
+                                        <TableCell className="text-right">
+                                            {totalKilosForChart > 0 ? ((entry.value / totalKilosForChart) * 100).toFixed(1) + '%' : '0.0%'}
+                                        </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    </TableBody>
+                                    <TableFooter>
+                                        <TableRow>
+                                            <TableHead className="font-bold text-base">Total</TableHead>
+                                            <TableHead className="text-right font-bold text-base">{totalKilosForChart.toLocaleString('es-CL')} kg</TableHead>
+                                            <TableHead className="text-right font-bold text-base">100%</TableHead>
+                                        </TableRow>
+                                    </TableFooter>
+                              </Table>
+                            </div>
+                            <div className="mt-8 bg-gray-100 p-4 rounded-lg self-center">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xl font-bold">SALDO PENDIENTE TOTAL</span>
+                                    <span className="text-xl font-bold">{formatCurrency(printingReport.pendingBalance)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6 mt-8">
+                            {allDocuments.filter(d => d.type === 'O/V').map(doc => {
+                                const docTotalKilos = doc.items?.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0) || 0;
+                                const docTotalPackages = doc.items?.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0) || 0;
+                                return (
+                                    <div key={doc.id} className="print-order-section">
+                                        <h3 className="text-lg font-bold mb-2 border-b pb-2">Detalle Orden de Venta: {doc.id} <span className="text-base font-normal">({format(parseISO(doc.date), 'dd-MM-yyyy')})</span></h3>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead className="font-bold">Producto</TableHead>
+                                                    <TableHead className="font-bold">Calibre</TableHead>
+                                                    <TableHead className="text-right font-bold">Envases</TableHead>
+                                                    <TableHead className="text-right font-bold">Kilos</TableHead>
+                                                    <TableHead className="text-right font-bold">Precio/kg</TableHead>
+                                                    <TableHead className="text-right font-bold">Subtotal</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {doc.items?.map((item, idx) => (
+                                                    <TableRow key={item.id || idx}>
+                                                        <TableCell>{item.product}</TableCell>
+                                                        <TableCell>{item.caliber}</TableCell>
+                                                        <TableCell className="text-right">{item.packagingQuantity || 0}</TableCell>
+                                                        <TableCell className="text-right">{item.quantity || 0}</TableCell>
+                                                        <TableCell className="text-right">{item.unit === 'Kilos' ? formatCurrency(item.price) : '-'}</TableCell>
+                                                        <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                            <TableFooter>
+                                                <TableRow>
+                                                    <TableHead colSpan={2} className="text-right font-bold text-base">Totales O/V</TableHead>
+                                                    <TableHead className="text-right font-bold text-base">{docTotalPackages.toLocaleString('es-CL')}</TableHead>
+                                                    <TableHead className="text-right font-bold text-base">{docTotalKilos.toLocaleString('es-CL')} kg</TableHead>
+                                                    <TableHead colSpan={1}></TableHead>
+                                                    <TableHead className="text-right font-bold text-base">{formatCurrency(doc.amount)}</TableHead>
+                                                </TableRow>
+                                            </TableFooter>
+                                        </Table>
+                                    </div>
+                                )
+                            })}
+                        </div>
                       </>
                     )}
                 </div>
@@ -661,3 +766,5 @@ export default function CurrentAccountPage() {
       </div>
     </div>
   );
+
+    
