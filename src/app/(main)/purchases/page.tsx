@@ -4,8 +4,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts, financialMovements as initialFinancialMovements, salesOrders as initialSalesOrders, serviceOrders as initialServiceOrders } from '@/lib/data';
-import { PurchaseOrder, Contact, OrderItem, FinancialMovement, SalesOrder, ServiceOrder } from '@/lib/types';
+import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts, financialMovements as initialFinancialMovements } from '@/lib/data';
+import { PurchaseOrder, Contact, OrderItem, FinancialMovement } from '@/lib/types';
 import { NewPurchaseOrderSheet } from './components/new-purchase-order-sheet';
 import {
   AlertDialog,
@@ -72,12 +72,6 @@ export default function PurchasesPage() {
     setIsClient(true);
   }, []);
 
-  useEffect(() => {
-    if (previewingOrder && printComponentRef.current) {
-      handlePrint();
-    }
-  }, [previewingOrder, handlePrint]);
-  
   const suppliers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
 
   const groupedOrders = useMemo(() => {
@@ -473,4 +467,5 @@ export default function PurchasesPage() {
     </>
   );
 }
+
 
