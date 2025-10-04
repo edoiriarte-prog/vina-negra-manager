@@ -64,7 +64,21 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
           }))
       );
 
-    const combined = [...inflows, ...outflows].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const combined = [...inflows, ...outflows].sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        if (dateA !== dateB) {
+            return dateA - dateB;
+        }
+        // If dates are the same, 'in' comes before 'out'
+        if (a.type === 'in' && b.type === 'out') {
+            return -1;
+        }
+        if (a.type === 'out' && b.type === 'in') {
+            return 1;
+        }
+        return 0;
+    });
     
     let runningBalance = 0;
     const chronologicalHistory: Transaction[] = combined.map(tx => {
