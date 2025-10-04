@@ -11,6 +11,7 @@ import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrd
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 type InventoryHistoryDialogProps = {
   item: InventoryItem | null;
@@ -20,41 +21,65 @@ type InventoryHistoryDialogProps = {
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 
+type Transaction = {
+    date: string;
+    type: 'in' | 'out';
+    orderId: string;
+    contactName: string;
+    quantity: number;
+    balance: number;
+}
+
 export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: InventoryHistoryDialogProps) {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
 
   const history = useMemo(() => {
-    if (!item) return { inflows: [], outflows: [] };
+    if (!item) return [];
 
     const inflows = purchaseOrders
       .flatMap(po => 
         po.items
           .filter(i => i.product === item.product && i.caliber === item.caliber && (item.warehouse === 'All' || po.warehouse === item.warehouse))
           .map(i => ({
-            orderId: po.id,
             date: po.date,
+            type: 'in' as const,
+            orderId: po.id,
             contactName: contacts.find(c => c.id === po.supplierId)?.name || 'N/A',
             quantity: i.quantity,
           }))
-      )
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      );
 
     const outflows = salesOrders
       .flatMap(so => 
         so.items
           .filter(i => i.product === item.product && i.caliber === item.caliber && (item.warehouse === 'All' || so.warehouse === item.warehouse))
           .map(i => ({
-            orderId: so.id,
             date: so.date,
+            type: 'out' as const,
+            orderId: so.id,
             contactName: contacts.find(c => c.id === so.clientId)?.name || 'N/A',
             quantity: i.quantity,
           }))
-      )
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      );
 
-    return { inflows, outflows };
+    const combined = [...inflows, ...outflows].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    let runningBalance = 0;
+    const chronologicalHistory: Transaction[] = combined.map(tx => {
+        if (tx.type === 'in') {
+            runningBalance += tx.quantity;
+        } else {
+            runningBalance -= tx.quantity;
+        }
+        return {
+            ...tx,
+            balance: runningBalance,
+        };
+    });
+
+    return chronologicalHistory;
   }, [item, purchaseOrders, salesOrders, contacts]);
   
   if (!item) return null;
@@ -63,70 +88,55 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Historial de Movimientos: {item.product} - {item.caliber}</DialogTitle>
+          <DialogTitle>Seguimiento Histórico: {item.product} - {item.caliber}</DialogTitle>
           <DialogDescription>
-            Seguimiento de todas las entradas y salidas para este ítem en la bodega: {item.warehouse}.
+            Historial cronológico de transacciones y balance de stock para este ítem en la bodega: {item.warehouse}.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto p-1">
-          <div>
-            <h3 className="font-semibold mb-2 flex items-center gap-2 text-green-600">
-                <ArrowUpCircle className="h-5 w-5" />
-                Entradas (Compras)
-            </h3>
+        <div className="max-h-[60vh] overflow-y-auto p-1">
             <div className="border rounded-md">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>O/C</TableHead>
                             <TableHead>Fecha</TableHead>
-                            <TableHead>Proveedor</TableHead>
+                            <TableHead>Orden ID</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead>Contacto</TableHead>
                             <TableHead className="text-right">Cantidad</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {history.inflows.length === 0 && <TableRow><TableCell colSpan={4} className="h-24 text-center">Sin entradas.</TableCell></TableRow>}
-                        {history.inflows.map(inflow => (
-                            <TableRow key={inflow.orderId}>
-                                <TableCell>{inflow.orderId}</TableCell>
-                                <TableCell>{format(parseISO(inflow.date), 'dd-MM-yy')}</TableCell>
-                                <TableCell className="text-xs truncate">{inflow.contactName}</TableCell>
-                                <TableCell className="text-right font-medium">{formatKilos(inflow.quantity)}</TableCell>
+                        {history.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
+                        {history.map((tx, index) => (
+                            <TableRow key={`${tx.orderId}-${index}`}>
+                                <TableCell>{format(parseISO(tx.date), 'dd-MM-yy')}</TableCell>
+                                <TableCell>{tx.orderId}</TableCell>
+                                <TableCell>
+                                    {tx.type === 'in' ? (
+                                        <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300">
+                                            <ArrowUpCircle className="mr-1 h-3 w-3" />
+                                            Entrada
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="destructive" className="bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300">
+                                            <ArrowDownCircle className="mr-1 h-3 w-3" />
+                                            Salida
+                                        </Badge>
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-xs truncate">{tx.contactName}</TableCell>
+                                <TableCell className="text-right font-medium">
+                                    {tx.type === 'in' ? '+' : '-'} {formatKilos(tx.quantity)}
+                                </TableCell>
+                                <TableCell className="text-right font-bold text-primary">
+                                    {formatKilos(tx.balance)}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
             </div>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-2 flex items-center gap-2 text-red-600">
-                <ArrowDownCircle className="h-5 w-5" />
-                Salidas (Ventas)
-            </h3>
-            <div className="border rounded-md">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>O/V</TableHead>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Cliente</TableHead>
-                            <TableHead className="text-right">Cantidad</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {history.outflows.length === 0 && <TableRow><TableCell colSpan={4} className="h-24 text-center">Sin salidas.</TableCell></TableRow>}
-                        {history.outflows.map(outflow => (
-                            <TableRow key={outflow.orderId}>
-                                <TableCell>{outflow.orderId}</TableCell>
-                                <TableCell>{format(parseISO(outflow.date), 'dd-MM-yy')}</TableCell>
-                                <TableCell className="text-xs truncate">{outflow.contactName}</TableCell>
-                                <TableCell className="text-right font-medium">{formatKilos(outflow.quantity)}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
-          </div>
         </div>
         <DialogFooter>
           <DialogClose asChild>
