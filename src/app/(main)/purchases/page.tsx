@@ -32,10 +32,12 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { useReactToPrint } from 'react-to-print';
+import { PreviewContent } from './components/purchase-order-preview-content';
+
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -108,7 +110,7 @@ export default function PurchasesPage() {
   }, [groupedOrders, filter]);
 
 
-  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
+  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
     // Combine existing items with new items
     const allItems = 'id' in order
       ? [...order.items, ...newItems]
@@ -124,7 +126,7 @@ export default function PurchasesPage() {
     const totalPackages = allItems.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
 
-    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id'> = { ...order, items: allItems, totalAmount, totalKilos, totalPackages };
+    let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id'> = { ...(order as any), items: allItems, totalAmount, totalKilos, totalPackages };
 
     if ('id' in finalOrderData) {
       // Update
@@ -446,19 +448,19 @@ export default function PurchasesPage() {
             isOpen={!!previewingOrder}
             onOpenChange={() => setPreviewingOrder(null)}
             onEdit={() => {
-                if (previewingOrder) {
-                  handleEdit(previewingOrder)
-                }
+              if (previewingOrder) {
+                handleEdit(previewingOrder);
+              }
             }}
             onDelete={() => {
-                if (previewingOrder) {
-                    handleDelete(previewingOrder)
-                }
+              if (previewingOrder) {
+                handleDelete(previewingOrder);
+              }
             }}
             onExport={() => {
-                if (previewingOrder) {
-                    handleExportSingle(previewingOrder)
-                }
+              if (previewingOrder) {
+                handleExportSingle(previewingOrder);
+              }
             }}
         />
       )}

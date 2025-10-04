@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 type NewPurchaseOrderSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems?: OrderItem[]) => void;
+  onSave: (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalPackages'>, newItems?: OrderItem[]) => void;
   order: PurchaseOrder | null;
   suppliers: Contact[];
 };
