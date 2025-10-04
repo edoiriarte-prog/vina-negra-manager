@@ -42,7 +42,10 @@ export default function InventoryAdjustmentsPage() {
       setAdjustments(prev => prev.map(a => a.id === adjustment.id ? adjustment : a));
       toast({ title: "Ajuste Actualizado" });
     } else {
-      const lastId = adjustments.reduce((max, a) => Math.max(max, parseInt(a.id.split('-')[1])), 0);
+      const lastId = adjustments.reduce((max, a) => {
+        const num = parseInt(a.id.split('-')[1]);
+        return num > max ? num : max;
+      }, 0);
       const newAdjustment = {
         ...adjustment,
         id: `ADJ-${lastId + 1}`,

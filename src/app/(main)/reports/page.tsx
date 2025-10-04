@@ -502,6 +502,7 @@ export default function ReportsPage() {
         @media print {
           body {
             background: white !important;
+            color: black !important;
           }
           .no-print {
             display: none !important;

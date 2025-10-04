@@ -2,15 +2,15 @@
 "use client";
 
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { getInventory } from '@/lib/data';
-import { PurchaseOrder, SalesOrder, InventoryItem } from '@/lib/types';
+import { getInventory, inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
+import { PurchaseOrder, SalesOrder, InventoryItem, InventoryAdjustment } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
 import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
 import { useEffect, useState, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PerformanceReports } from './components/performance-reports';
+import { PerformanceReports } from '../reports/components/performance-reports';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/label';
 export default function InventoryPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
+  const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isClient, setIsClient] = useState(false);
   const { warehouses } = useMasterData();
@@ -42,10 +43,11 @@ export default function InventoryPage() {
 
         const filteredPurchases = purchaseOrders.filter(po => new Date(po.date) <= endDate);
         const filteredSales = salesOrders.filter(so => new Date(so.date) <= endDate);
+        const filteredAdjustments = inventoryAdjustments.filter(adj => new Date(adj.date) <= endDate);
 
-        setInventory(getInventory(filteredPurchases, filteredSales));
+        setInventory(getInventory(filteredPurchases, filteredSales, filteredAdjustments));
     }
-  }, [purchaseOrders, salesOrders, isClient, filterDate]);
+  }, [purchaseOrders, salesOrders, inventoryAdjustments, isClient, filterDate]);
   
   const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 
