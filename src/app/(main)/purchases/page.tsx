@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -110,7 +111,7 @@ export default function PurchasesPage() {
   }, [groupedOrders, filter]);
 
 
-  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
+  const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
     // Combine existing items with new items
     const allItems = 'id' in order
       ? [...order.items, ...newItems]
