@@ -15,6 +15,12 @@ import { useMasterData } from '@/hooks/use-master-data';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { format, startOfDay } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Label } from '@/components/ui/label';
 
 export default function InventoryPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
@@ -24,6 +30,7 @@ export default function InventoryPage() {
   const { warehouses } = useMasterData();
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('All');
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
+  const [filterDate, setFilterDate] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
     setIsClient(true);
@@ -31,9 +38,14 @@ export default function InventoryPage() {
 
   useEffect(() => {
     if (isClient) {
-        setInventory(getInventory(purchaseOrders, salesOrders));
+        const endDate = filterDate ? startOfDay(filterDate) : new Date();
+
+        const filteredPurchases = purchaseOrders.filter(po => new Date(po.date) <= endDate);
+        const filteredSales = salesOrders.filter(so => new Date(so.date) <= endDate);
+
+        setInventory(getInventory(filteredPurchases, filteredSales));
     }
-  }, [purchaseOrders, salesOrders, isClient]);
+  }, [purchaseOrders, salesOrders, isClient, filterDate]);
   
   const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 
@@ -122,22 +134,49 @@ export default function InventoryPage() {
                     <CardDescription>Stock disponible calculado a partir de las compras y ventas completadas. Haz clic en una fila para ver el historial.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex items-center gap-2 mb-4">
-                      <Button
-                        variant={selectedWarehouse === 'All' ? 'default' : 'outline'}
-                        onClick={() => setSelectedWarehouse('All')}
-                      >
-                        Todas las bodegas
-                      </Button>
-                      {warehouses.map(w => (
-                        <Button
-                          key={w}
-                          variant={selectedWarehouse === w ? 'default' : 'outline'}
-                          onClick={() => setSelectedWarehouse(w)}
-                        >
-                          {w}
-                        </Button>
-                      ))}
+                    <div className="flex items-center gap-4 mb-4">
+                      <div>
+                        <Label>Bodega</Label>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant={selectedWarehouse === 'All' ? 'default' : 'outline'}
+                            onClick={() => setSelectedWarehouse('All')}
+                          >
+                            Todas las bodegas
+                          </Button>
+                          {warehouses.map(w => (
+                            <Button
+                              key={w}
+                              variant={selectedWarehouse === w ? 'default' : 'outline'}
+                              onClick={() => setSelectedWarehouse(w)}
+                            >
+                              {w}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                          <Label>Ver inventario al</Label>
+                          <Popover>
+                              <PopoverTrigger asChild>
+                              <Button
+                                  variant={"outline"}
+                                  className={cn("w-[280px] justify-start text-left font-normal", !filterDate && "text-muted-foreground")}
+                              >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                              </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                  mode="single"
+                                  selected={filterDate}
+                                  onSelect={setFilterDate}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                          </Popover>
+                      </div>
                     </div>
                     <div className="rounded-md border">
                         <Table>
