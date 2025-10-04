@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useLocalStorage } from '@/hooks/use-local-storage';
@@ -13,6 +14,7 @@ import { PerformanceReports } from './components/performance-reports';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 
 export default function InventoryPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
@@ -21,6 +23,7 @@ export default function InventoryPage() {
   const [isClient, setIsClient] = useState(false);
   const { warehouses } = useMasterData();
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('All');
+  const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -70,6 +73,10 @@ export default function InventoryPage() {
     );
   }, [filteredInventory]);
 
+  const handleShowHistory = (item: InventoryItem) => {
+    setHistoryItem(item);
+  };
+
   const renderInventoryRows = () => {
     if (!isClient) {
       // Render skeleton rows on the server and initial client render
@@ -85,7 +92,7 @@ export default function InventoryPage() {
     }
     
     return filteredInventory.map((item) => (
-        <TableRow key={item.key}>
+        <TableRow key={item.key} onClick={() => handleShowHistory(item)} className="cursor-pointer">
             <TableCell className="font-medium">{item.product}</TableCell>
             <TableCell>{item.caliber}</TableCell>
             <TableCell className="text-right">{formatKilos(item.kilosPurchased)}</TableCell>
@@ -96,7 +103,8 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
+      <div className="flex flex-col gap-6">
        <div>
         <h1 className="font-headline text-3xl">Inventario y Rendimiento</h1>
         <p className="text-muted-foreground">Analiza el stock actual y el rendimiento de tus productos.</p>
@@ -111,7 +119,7 @@ export default function InventoryPage() {
             <Card className="mt-6">
                 <CardHeader>
                     <CardTitle className="font-headline text-2xl">Inventario en Tiempo Real</CardTitle>
-                    <CardDescription>Stock disponible calculado a partir de las compras y ventas completadas.</CardDescription>
+                    <CardDescription>Stock disponible calculado a partir de las compras y ventas completadas. Haz clic en una fila para ver el historial.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="flex items-center gap-2 mb-4">
@@ -167,6 +175,12 @@ export default function InventoryPage() {
             />
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+      <InventoryHistoryDialog
+        item={historyItem}
+        isOpen={!!historyItem}
+        onOpenChange={() => setHistoryItem(null)}
+      />
+    </>
   );
 }
