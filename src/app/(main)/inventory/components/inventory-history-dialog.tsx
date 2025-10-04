@@ -86,7 +86,7 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>Seguimiento Histórico: {item.product} - {item.caliber}</DialogTitle>
           <DialogDescription>
@@ -102,12 +102,13 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
                             <TableHead>Orden ID</TableHead>
                             <TableHead>Tipo</TableHead>
                             <TableHead>Contacto</TableHead>
-                            <TableHead className="text-right">Cantidad</TableHead>
-                            <TableHead className="text-right">Balance</TableHead>
+                            <TableHead className="text-right">Ingresos (kg)</TableHead>
+                            <TableHead className="text-right">Egresos (kg)</TableHead>
+                            <TableHead className="text-right">Saldo (kg)</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {history.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
+                        {history.length === 0 && <TableRow><TableCell colSpan={7} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
                         {history.map((tx, index) => (
                             <TableRow key={`${tx.orderId}-${index}`}>
                                 <TableCell>{format(parseISO(tx.date), 'dd-MM-yy')}</TableCell>
@@ -126,8 +127,11 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
                                     )}
                                 </TableCell>
                                 <TableCell className="text-xs truncate">{tx.contactName}</TableCell>
-                                <TableCell className="text-right font-medium">
-                                    {tx.type === 'in' ? '+' : '-'} {formatKilos(tx.quantity)}
+                                 <TableCell className="text-right font-medium text-green-600">
+                                    {tx.type === 'in' ? formatKilos(tx.quantity) : '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-medium text-red-600">
+                                    {tx.type === 'out' ? formatKilos(tx.quantity) : '-'}
                                 </TableCell>
                                 <TableCell className="text-right font-bold text-primary">
                                     {formatKilos(tx.balance)}
