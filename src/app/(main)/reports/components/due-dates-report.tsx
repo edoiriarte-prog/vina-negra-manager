@@ -12,7 +12,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isAfter, startOfDay, isEqual } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CalendarIcon, DollarSign, Clock, Forward, FileText, Download } from 'lucide-react';
+import { CalendarIcon, DollarSign, Clock, Forward, FileText, Download, Printer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
@@ -22,6 +22,7 @@ type DueDatesReportProps = {
     salesOrders: SalesOrder[];
     financialMovements: FinancialMovement[];
     contacts: Contact[];
+    onPrint: () => void;
 }
 
 type DueDateItem = {
@@ -44,7 +45,7 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-export function DueDatesReport({ salesOrders, financialMovements, contacts }: DueDatesReportProps) {
+export function DueDatesReport({ salesOrders, financialMovements, contacts, onPrint }: DueDatesReportProps) {
     const [isClient, setIsClient] = useState(false);
     const [filterDate, setFilterDate] = useState<Date | undefined>(new Date());
     const { toast } = useToast();
@@ -279,10 +280,16 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                         <CardTitle className="font-headline text-2xl">Informe de Vencimientos</CardTitle>
                         <CardDescription>Seguimiento de vencimientos de pago. Seleccione una fecha para ver el balance a ese día.</CardDescription>
                     </div>
-                    <Button onClick={handleExport} variant="outline">
-                        <Download className="mr-2 h-4 w-4" />
-                        Exportar a Excel
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={handleExport} variant="outline">
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar a Excel
+                        </Button>
+                        <Button onClick={onPrint} variant="outline">
+                            <Printer className="mr-2 h-4 w-4" />
+                            Imprimir
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent>
@@ -360,5 +367,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
 
     
 }
+
+    
 
     

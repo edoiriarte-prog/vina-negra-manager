@@ -621,15 +621,12 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
          <TabsContent value="due-dates">
-            <Button onClick={handlePrintDueDates} className="my-4 no-print">
-                <Printer className="mr-2 h-4 w-4" />
-                Imprimir Informe
-            </Button>
             <div ref={dueDatesPrintRef}>
                 <DueDatesReport 
                     salesOrders={salesOrders}
                     financialMovements={financialMovements}
                     contacts={contacts}
+                    onPrint={handlePrintDueDates}
                 />
             </div>
         </TabsContent>
@@ -715,3 +712,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
