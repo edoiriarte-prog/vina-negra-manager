@@ -106,9 +106,9 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
              }
         });
 
-        // 3. Populate payments for each client
+        // 3. Populate payments for each client up to the filter date
         financialMovements
-            .filter(fm => fm.type === 'income' && fm.contactId && clientData[fm.contactId])
+            .filter(fm => fm.type === 'income' && fm.contactId && clientData[fm.contactId] && new Date(fm.date) <= endDate)
             .forEach(fm => {
                 clientData[fm.contactId].payments.push(fm);
             });
@@ -169,7 +169,11 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             .sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
             
         const totalPending = pending.reduce((sum, item) => sum + item.pendingAmount, 0);
-        const totalPaid = pastAndPresentItems.reduce((sum, item) => sum + item.paidAmount, 0);
+        
+        const totalPaid = financialMovements
+            .filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate)
+            .reduce((sum, mov) => sum + mov.amount, 0);
+
 
         return { pendingItems: pending, paidItems: paid, upcomingItems: upcoming, totalPending, totalPaid, totalUpcoming, totalBilled };
 
@@ -331,7 +335,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                             </CardHeader>
                             <CardContent>
                                 {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalPaid)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                <p className="text-xs text-muted-foreground">en cuotas hasta la fecha</p>
+                                <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
                             </CardContent>
                         </Card>
                          <Card>
@@ -359,7 +363,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 
                 <div className="space-y-8">
                     {renderTable(pendingItems, totalPending, 'Total Pendiente', 'Pendientes y Vencidos')}
-                    {renderTable(paidItems, totalPaid, 'Total Pagado', 'Pagados')}
+                    {renderTable(paidItems, pastAndPresentItems.reduce((sum, item) => sum + item.paidAmount, 0), 'Total Pagado', 'Pagados')}
                     {renderTable(upcomingItems, totalUpcoming, 'Total por Vencer', 'Próximos Vencimientos')}
                 </div>
 
