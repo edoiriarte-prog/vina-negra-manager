@@ -143,11 +143,17 @@ export default function InventoryPage() {
         <TabsContent value="stock">
             <Card className="mt-6">
                 <CardHeader>
-                    <CardTitle className="font-headline text-2xl">Inventario en Tiempo Real</CardTitle>
-                    <CardDescription>
-                      Stock disponible calculado a partir de las compras y ventas completadas.
-                      <span className="no-print"> Haz clic en una fila para ver el historial.</span>
-                    </CardDescription>
+                    <div className="no-print">
+                      <CardTitle className="font-headline text-2xl">Inventario en Tiempo Real</CardTitle>
+                      <CardDescription>
+                        Stock disponible calculado a partir de las compras y ventas completadas.
+                        <span className="no-print"> Haz clic en una fila para ver el historial.</span>
+                      </CardDescription>
+                    </div>
+                     <div className="print-only hidden">
+                        <CardTitle className="font-headline text-2xl">Inventario al {filterDate ? format(filterDate, "PPP", { locale: es }) : ''}</CardTitle>
+                        <CardDescription>Bodega: {selectedWarehouse === 'All' ? 'Todas' : selectedWarehouse}</CardDescription>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="flex items-center gap-4 mb-4 no-print">
