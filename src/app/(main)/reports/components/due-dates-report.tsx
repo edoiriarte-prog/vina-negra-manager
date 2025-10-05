@@ -12,7 +12,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isAfter, startOfDay, isEqual } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CalendarIcon, DollarSign, Clock, Forward } from 'lucide-react';
+import { CalendarIcon, DollarSign, Clock, Forward, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 
@@ -50,8 +50,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         setIsClient(true);
     }, []);
     
-    const { pendingItems, paidItems, totalPending, totalPaid, totalUpcoming } = useMemo(() => {
-        if (!isClient) return { pendingItems: [], paidItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0 };
+    const { pendingItems, paidItems, totalPending, totalPaid, totalUpcoming, totalBilled } = useMemo(() => {
+        if (!isClient) return { pendingItems: [], paidItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0, totalBilled: 0 };
         
         const allDueItems: DueDateItem[] = [];
         
@@ -134,6 +134,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         // Separate items into upcoming and past/present
         const upcomingItems = allDueItems.filter(item => isAfter(parseISO(item.dueDate), endDate));
         const pastAndPresentItems = allDueItems.filter(item => !isAfter(parseISO(item.dueDate), endDate));
+        
+        const totalBilled = pastAndPresentItems.reduce((sum, item) => sum + item.amount, 0);
 
         const totalUpcoming = upcomingItems.reduce((sum, item) => sum + item.pendingAmount, 0);
 
@@ -161,7 +163,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         const totalPending = pending.reduce((sum, item) => sum + item.pendingAmount, 0);
         const totalPaid = pastAndPresentItems.reduce((sum, item) => sum + item.paidAmount, 0);
 
-        return { pendingItems: pending, paidItems: paid, totalPending, totalPaid, totalUpcoming };
+        return { pendingItems: pending, paidItems: paid, totalPending, totalPaid, totalUpcoming, totalBilled };
 
     }, [salesOrders, financialMovements, contacts, isClient, filterDate]);
 
@@ -213,9 +215,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                 {isClient && items.length > 0 && (
                     <TableFooter>
                         <TableRow>
-                            <TableCell colSpan={5} className="text-right font-bold text-lg">{caption}</TableCell>
+                            <TableCell colSpan={6} className="text-right font-bold text-lg">{caption}</TableCell>
                             <TableCell className="text-right font-bold text-lg">{formatCurrency(total)}</TableCell>
-                            <TableCell/>
                         </TableRow>
                     </TableFooter>
                 )}
@@ -230,7 +231,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                 <CardDescription>Seguimiento de vencimientos de pago. Seleccione una fecha para ver el balance a ese día.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid md:grid-cols-4 gap-4 mb-6">
+                <div className="grid md:grid-cols-5 gap-4 mb-6">
                     <div className="md:col-span-1">
                         <Label>Ver balance al:</Label>
                         <Popover>
@@ -248,7 +249,17 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                             </PopoverContent>
                         </Popover>
                     </div>
-                     <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Total Facturado</CardTitle>
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalBilled)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
+                            </CardContent>
+                        </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">Total Pagado</CardTitle>
@@ -293,3 +304,5 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
 
     
 }
+
+    
