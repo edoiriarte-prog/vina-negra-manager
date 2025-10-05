@@ -20,8 +20,8 @@ import {
 } from '@/lib/data';
 import { PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, BankAccount, InventoryItem, Contact } from '@/lib/types';
 import KpiCard from './components/kpi-card';
-import { Boxes, DollarSign, MinusCircle, PlusCircle, ShoppingBag, ShoppingCart, TrendingUp, Wallet, Scale, Users } from 'lucide-react';
-import { WeeklyPurchasesChart, CaliberDistributionChart, IncomeVsExpenseChart, WeeklySalesChart, PurchasesBySupplierChart, PurchasesByProductCaliberChart } from './components/charts';
+import { Boxes, DollarSign, MinusCircle, PlusCircle, ShoppingBag, ShoppingCart, TrendingUp, Wallet, Scale, Users, FileWarning } from 'lucide-react';
+import { WeeklyPurchasesChart, CaliberDistributionChart, IncomeVsExpenseChart, WeeklySalesChart, PurchasesBySupplierChart, PurchasesByProductCaliberChart, SalesByOrderChart } from './components/charts';
 import AiSummary from './components/ai-summary';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -106,6 +106,19 @@ export default function DashboardPage() {
 
   const supplierCount = useMemo(() => {
     return new Set(contacts.filter(c => c.type === 'supplier' || c.type === 'both').map(c => c.id)).size;
+  }, [contacts]);
+
+  const totalCollectedFromClients = useMemo(() => {
+    const clientIds = new Set(contacts.filter(c => c.type === 'client' || c.type === 'both').map(c => c.id));
+    return financialMovements
+      .filter(fm => fm.type === 'income' && fm.contactId && clientIds.has(fm.contactId))
+      .reduce((sum, fm) => sum + fm.amount, 0);
+  }, [financialMovements, contacts]);
+  
+  const clientBalance = totalSalesAmount - totalCollectedFromClients;
+  
+  const clientCount = useMemo(() => {
+    return new Set(contacts.filter(c => c.type === 'client' || c.type === 'both').map(c => c.id)).size;
   }, [contacts]);
 
 
@@ -245,7 +258,7 @@ export default function DashboardPage() {
                    <KpiCard
                     title="Saldo por Pagar"
                     value={formatCurrency(supplierBalance)}
-                    icon={<MinusCircle className="h-5 w-5 text-red-500" />}
+                    icon={<FileWarning className="h-5 w-5 text-red-500" />}
                     description="Balance pendiente con proveedores"
                   />
                   <KpiCard
@@ -300,25 +313,45 @@ export default function DashboardPage() {
                     description="Suma de todas las O/V completadas"
                   />
                   <KpiCard
-                    title="Kilos Totales Vendidos"
-                    value={formatKilos(totalKilosSold)}
-                    icon={<Scale className="h-5 w-5 text-lime-500" />}
-                    description="Total de kilos en O/V completadas"
+                    title="Total Cobrado (Clientes)"
+                    value={formatCurrency(totalCollectedFromClients)}
+                    icon={<DollarSign className="h-5 w-5 text-green-500" />}
+                    description="Total de ingresos de clientes"
+                  />
+                  <KpiCard
+                    title="Saldo por Cobrar"
+                    value={formatCurrency(clientBalance)}
+                    icon={<FileWarning className="h-5 w-5 text-orange-500" />}
+                    description="Balance pendiente de clientes"
+                  />
+                  <KpiCard
+                    title="Nº de Clientes"
+                    value={clientCount.toString()}
+                    icon={<Users className="h-5 w-5 text-lime-500" />}
+                    description="Total de clientes activos"
                   />
                 </>
               ) : (
-                 Array.from({ length: 2 }).map((_, i) => (
+                 Array.from({ length: 4 }).map((_, i) => (
                    <Card key={`sk-s-${i}`}><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
                 ))
               )}
            </div>
-           <div className="grid gap-6 mt-6">
+           <div className="grid gap-6 mt-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle className='font-headline text-xl'>Ventas Semanales</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {isClient ? <WeeklySalesChart data={salesOrders} /> : <Skeleton className="h-[300px] w-full" />}
+                </CardContent>
+              </Card>
+               <Card>
+                <CardHeader>
+                  <CardTitle className='font-headline text-xl'>Distribución por Kilos en O/V</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isClient ? <SalesByOrderChart data={salesOrders} /> : <Skeleton className="h-[300px] w-full" />}
                 </CardContent>
               </Card>
            </div>
@@ -354,9 +387,5 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
-
-    
 
     

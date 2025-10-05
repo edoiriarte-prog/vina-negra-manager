@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { FinancialMovement, PurchaseOrder, SalesOrder, InventoryItem } from '@/lib/types';
 import { format, getWeek, parseISO } from 'date-fns';
+import { useMasterData } from '@/hooks/use-master-data';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -96,6 +97,51 @@ export function WeeklySalesChart({ data }: { data: SalesOrder[] }) {
     </ResponsiveContainer>
   );
 }
+
+// Sales by Order Chart (New)
+export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
+    const { calibers } = useMasterData();
+    const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+
+    const chartData = data
+        .filter(order => order.status === 'completed')
+        .map(order => {
+            const orderData: { [key: string]: string | number } = { name: order.id };
+            calibers.forEach(caliber => {
+                const totalKilosForCaliber = order.items
+                    .filter(item => item.caliber === caliber && item.unit === 'Kilos')
+                    .reduce((sum, item) => sum + item.quantity, 0);
+                if (totalKilosForCaliber > 0) {
+                    orderData[caliber] = totalKilosForCaliber;
+                }
+            });
+            return orderData;
+        })
+        .filter(d => Object.keys(d).length > 1) // Only include orders with items
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 50)}>
+      <BarChart data={chartData} layout="vertical" margin={{ left: 50 }}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
+        <YAxis type="category" dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'hsl(var(--background))',
+            borderColor: 'hsl(var(--border))',
+          }}
+          formatter={(value: number, name: string) => [`${formatKilos(value)}`, name]}
+        />
+        <Legend />
+        {calibers.map((caliber, index) => (
+            <Bar key={caliber} dataKey={caliber} stackId="a" fill={COLORS[index % COLORS.length]} radius={[0, 4, 4, 0]} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 
 // Income vs Expense Chart
 export function IncomeVsExpenseChart({ data }: { data: FinancialMovement[] }) {
@@ -237,4 +283,6 @@ export function PurchasesByProductCaliberChart({ data }: { data: PurchaseOrder[]
     </ResponsiveContainer>
   );
 }
+    
+
     
