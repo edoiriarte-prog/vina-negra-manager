@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type DueDatesReportProps = {
     salesOrders: SalesOrder[];
@@ -48,26 +49,35 @@ const formatCurrency = (value: number) =>
 export function DueDatesReport({ salesOrders, financialMovements, contacts, onPrint }: DueDatesReportProps) {
     const [isClient, setIsClient] = useState(false);
     const [filterDate, setFilterDate] = useState<Date | undefined>(new Date());
+    const [selectedClientId, setSelectedClientId] = useState<string>('');
     const { toast } = useToast();
     
     useEffect(() => {
         setIsClient(true);
     }, []);
+
+    const clientOptions = useMemo(() => {
+        return contacts.filter(c => c.type === 'client' || c.type === 'both');
+    }, [contacts]);
     
     const { pendingItems, paidItems, upcomingItems, totalPending, totalPaid, totalUpcoming, totalBilled, totalPaidInPeriod } = useMemo(() => {
         if (!isClient) return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0, totalBilled: 0, totalPaidInPeriod: 0 };
+        
+        const filteredSalesOrders = selectedClientId ? salesOrders.filter(o => o.clientId === selectedClientId) : salesOrders;
+        const filteredFinancialMovements = selectedClientId ? financialMovements.filter(m => m.contactId === selectedClientId) : financialMovements;
         
         const allDueItems: DueDateItem[] = [];
         const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
         const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
 
         // 1. Initialize client data structure
-        contacts.filter(c => c.type === 'client' || c.type === 'both').forEach(client => {
+        const clientsToProcess = selectedClientId ? contacts.filter(c => c.id === selectedClientId) : contacts.filter(c => c.type === 'client' || c.type === 'both');
+        clientsToProcess.forEach(client => {
             clientData[client.id] = { dues: [], payments: [] };
         });
 
         // 2. Populate all possible due items from sales orders
-        salesOrders.forEach(order => {
+        filteredSalesOrders.forEach(order => {
              if (order.status !== 'cancelled' && clientData[order.clientId]) {
                 const clientName = contacts.find(c => c.id === order.clientId)?.name || 'Desconocido';
                 
@@ -107,7 +117,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         });
 
         // 3. Populate payments for each client up to the filter date
-        financialMovements
+        filteredFinancialMovements
             .filter(fm => fm.type === 'income' && fm.contactId && clientData[fm.contactId] && new Date(fm.date) <= endDate)
             .forEach(fm => {
                 clientData[fm.contactId].payments.push(fm);
@@ -123,7 +133,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             sortedDues.forEach(due => {
                 paymentPool.forEach(payment => {
                     if (payment.remaining > 0 && due.pendingAmount > 0) {
-                        // Apply payment to the due item
                         const amountToApply = Math.min(payment.remaining, due.pendingAmount);
                         due.paidAmount += amountToApply;
                         due.pendingAmount -= amountToApply;
@@ -132,8 +141,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 });
             });
         });
-
-        // 5. Filter and categorize based on the selected date
         
         const upcoming = allDueItems
             .filter(item => isAfter(parseISO(item.dueDate), endDate))
@@ -141,7 +148,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
         const pastAndPresentItems = allDueItems.filter(item => !isAfter(parseISO(item.dueDate), endDate));
         
-        const totalBilled = salesOrders
+        const totalBilled = filteredSalesOrders
             .filter(order => order.status !== 'cancelled' && new Date(order.date) <= endDate)
             .reduce((sum, order) => sum + order.totalAmount, 0);
 
@@ -170,7 +177,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             
         const totalPending = pending.reduce((sum, item) => sum + item.pendingAmount, 0);
         
-        const totalPaid = financialMovements
+        const totalPaid = filteredFinancialMovements
             .filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate)
             .reduce((sum, mov) => sum + mov.amount, 0);
 
@@ -178,7 +185,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
         return { pendingItems: pending, paidItems: paid, upcomingItems: upcoming, totalPending, totalPaid, totalUpcoming, totalBilled, totalPaidInPeriod };
 
-    }, [salesOrders, financialMovements, contacts, isClient, filterDate]);
+    }, [salesOrders, financialMovements, contacts, isClient, filterDate, selectedClientId]);
 
 
     const handleExport = () => {
@@ -301,7 +308,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             </CardHeader>
             <CardContent>
                 <div className="grid md:grid-cols-5 gap-4 mb-6">
-                    <div className="md:col-span-1">
+                    <div className="md:col-span-1 flex flex-col gap-1.5">
                         <Label>Ver balance al:</Label>
                         <Popover>
                             <PopoverTrigger asChild>
@@ -318,7 +325,21 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                             </PopoverContent>
                         </Popover>
                     </div>
-                     <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="md:col-span-1 flex flex-col gap-1.5">
+                        <Label>Cliente:</Label>
+                        <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Todos los clientes" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="">Todos los clientes</SelectItem>
+                                {clientOptions.map(client => (
+                                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-4 gap-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">Total Facturado</CardTitle>
@@ -364,7 +385,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 
                 <div className="space-y-8">
                     {renderTable(pendingItems, totalPending, 'Total Pendiente', 'Pendientes y Vencidos')}
-                    {renderTable(paidItems, totalPaidInPeriod, 'Total Pagado', 'Pagados')}
+                    {renderTable(paidItems, totalPaidInPeriod, 'Total Pagado', 'Pagados en el Período')}
                     {renderTable(upcomingItems, totalUpcoming, 'Total por Vencer', 'Próximos Vencimientos')}
                 </div>
 
@@ -374,5 +395,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
     
 }
+
+    
 
     
