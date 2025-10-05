@@ -374,7 +374,7 @@ export default function DashboardPage() {
                 ))
               )}
            </div>
-           <div className="grid gap-6 mt-6 lg:grid-cols-2">
+           <div className="grid gap-6 mt-6">
               <Card>
                 <CardHeader>
                   <CardTitle className='font-headline text-xl'>Ventas Semanales</CardTitle>
