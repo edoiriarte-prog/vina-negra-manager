@@ -47,16 +47,33 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Con
     accessorKey: 'type',
     header: 'Tipo',
     cell: ({ row }) => {
-        const type = row.getValue('type') as string;
-        let variant: "default" | "secondary" | "outline" = "secondary";
-        let text = 'Proveedor';
+        const type = row.getValue('type') as Contact['type'];
+        let variant: "default" | "secondary" | "outline" | "destructive" = "secondary";
+        let text = '';
 
-        if (type === 'client') {
-            variant = 'default';
-            text = 'Cliente';
-        } else if (type === 'both') {
-            variant = 'outline';
-            text = 'Ambos';
+        switch (type) {
+            case 'client':
+                variant = 'default';
+                text = 'Cliente';
+                break;
+            case 'supplier':
+                variant = 'secondary';
+                text = 'Proveedor';
+                break;
+            case 'both':
+                variant = 'outline';
+                text = 'Ambos';
+                break;
+            case 'other_income':
+                variant = 'default';
+                text = 'Otros Ingresos';
+                break;
+            case 'other_expense':
+                variant = 'destructive';
+                text = 'Otros Egresos';
+                break;
+            default:
+                text = 'N/A';
         }
 
         return <Badge variant={variant}>{text}</Badge>

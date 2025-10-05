@@ -15,7 +15,7 @@ export type Contact = {
   commune: string;
   email: string;
   contactPerson: string;
-  type: 'client' | 'supplier' | 'both';
+  type: 'client' | 'supplier' | 'both' | 'other_income' | 'other_expense';
   tags?: string[];
   interactions?: Interaction[];
 };
