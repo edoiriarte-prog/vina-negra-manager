@@ -254,8 +254,10 @@ export default function SettingsPage() {
                 <h1 className="font-headline text-3xl">Configuración</h1>
                 <p className="text-muted-foreground">Administra los datos maestros y otras configuraciones de la aplicación.</p>
             </div>
+
+            <DataExport />
             
-            <Tabs defaultValue="masters">
+            <Tabs defaultValue="masters" className="mt-6">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="masters">Datos Maestros</TabsTrigger>
                     <TabsTrigger value="accounts">Cuentas Bancarias</TabsTrigger>
@@ -276,9 +278,6 @@ export default function SettingsPage() {
                 </TabsContent>
             </Tabs>
 
-            <div className='mt-6'>
-                <DataExport />
-            </div>
         </div>
     );
 }
