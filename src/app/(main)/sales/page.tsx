@@ -398,9 +398,8 @@ export default function SalesPage() {
                                                       <TableRow>
                                                           <TableHead>O/V</TableHead>
                                                           <TableHead>Fecha</TableHead>
+                                                          <TableHead className="text-right">Kilos</TableHead>
                                                           <TableHead className="text-right">Monto</TableHead>
-                                                          <TableHead>Estado Pago</TableHead>
-                                                          <TableHead>Estado Orden</TableHead>
                                                           <TableHead className="w-[50px]"></TableHead>
                                                       </TableRow>
                                                   </TableHeader>
@@ -409,17 +408,8 @@ export default function SalesPage() {
                                                           <TableRow key={order.id}>
                                                               <TableCell className="font-medium">{order.id}</TableCell>
                                                               <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy')}</TableCell>
+                                                              <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')} kg</TableCell>
                                                               <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
-                                                              <TableCell>
-                                                                  <Badge variant={order.paymentStatus === 'Pagado' ? 'default' : order.paymentStatus === 'Abonado' ? 'secondary' : 'destructive'}>
-                                                                      {order.paymentStatus || 'Pendiente'}
-                                                                  </Badge>
-                                                              </TableCell>
-                                                              <TableCell>
-                                                                  <Badge variant={order.status === 'completed' ? 'default' : order.status === 'pending' ? 'secondary' : 'destructive'}>
-                                                                      {order.status === 'completed' ? 'Completada' : order.status === 'pending' ? 'Pendiente' : 'Cancelada'}
-                                                                  </Badge>
-                                                              </TableCell>
                                                               <TableCell>
                                                                    <DropdownMenu>
                                                                     <DropdownMenuTrigger asChild>
