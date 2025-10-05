@@ -14,6 +14,7 @@ import {
   Pie,
   PieChart,
   Cell,
+  CartesianGrid,
 } from 'recharts';
 import { FinancialMovement, PurchaseOrder, SalesOrder, InventoryItem } from '@/lib/types';
 import { format, getWeek, parseISO } from 'date-fns';
@@ -168,4 +169,72 @@ export function CaliberDistributionChart({ data }: { data: InventoryItem[] }) {
   );
 }
 
+// Purchases by Supplier Chart
+export function PurchasesBySupplierChart({ data, suppliers }: { data: PurchaseOrder[], suppliers: {id: string, name: string}[] }) {
+  const supplierData = data
+    .filter((order) => order.status === 'completed')
+    .reduce((acc, order) => {
+      const supplierName = suppliers.find(s => s.id === order.supplierId)?.name || 'Desconocido';
+      acc[supplierName] = (acc[supplierName] || 0) + order.totalKilos;
+      return acc;
+    }, {} as { [name: string]: number });
+
+  const chartData = Object.entries(supplierData).map(([name, total]) => ({
+    name,
+    Kilos: total,
+  })).sort((a, b) => b.Kilos - a.Kilos);
+
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={chartData} layout="vertical">
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
+        <YAxis type="category" dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} width={120} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'hsl(var(--background))',
+            borderColor: 'hsl(var(--border))',
+          }}
+          formatter={(value: number) => formatKilos(value)}
+        />
+        <Bar dataKey="Kilos" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// Purchases by Product/Caliber Chart
+export function PurchasesByProductCaliberChart({ data }: { data: PurchaseOrder[] }) {
+  const productData = data
+    .filter(order => order.status === 'completed')
+    .flatMap(order => order.items.map(item => ({...item, total: item.quantity * item.price})))
+    .reduce((acc, item) => {
+      const key = `${item.product} - ${item.caliber}`;
+      acc[key] = (acc[key] || 0) + item.total;
+      return acc;
+    }, {} as Record<string, number>);
+
+  const chartData = Object.entries(productData).map(([name, total]) => ({
+    name,
+    Monto: total,
+  })).sort((a,b) => a.Monto - b.Monto);
+
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 30)}>
+      <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
+        <YAxis type="category" dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'hsl(var(--background))',
+            borderColor: 'hsl(var(--border))',
+          }}
+          formatter={(value: number) => formatCurrency(value)}
+        />
+        <Bar dataKey="Monto" fill="hsl(var(--chart-5))" radius={[0, 4, 4, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
     

@@ -16,11 +16,12 @@ import {
   serviceOrders as initialServiceOrders,
   financialMovements as initialFinancialMovements,
   getInventory,
+  contacts as initialContacts
 } from '@/lib/data';
-import { PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, BankAccount, InventoryItem } from '@/lib/types';
+import { PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, BankAccount, InventoryItem, Contact } from '@/lib/types';
 import KpiCard from './components/kpi-card';
-import { Boxes, DollarSign, MinusCircle, PlusCircle, ShoppingBag, ShoppingCart, TrendingUp, Wallet, Scale } from 'lucide-react';
-import { WeeklyPurchasesChart, CaliberDistributionChart, IncomeVsExpenseChart, WeeklySalesChart } from './components/charts';
+import { Boxes, DollarSign, MinusCircle, PlusCircle, ShoppingBag, ShoppingCart, TrendingUp, Wallet, Scale, Users } from 'lucide-react';
+import { WeeklyPurchasesChart, CaliberDistributionChart, IncomeVsExpenseChart, WeeklySalesChart, PurchasesBySupplierChart, PurchasesByProductCaliberChart } from './components/charts';
 import AiSummary from './components/ai-summary';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -31,6 +32,7 @@ export default function DashboardPage() {
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [serviceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
   const [financialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
+  const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   const [inventory, setInventory] = useLocalStorage<InventoryItem[]>('inventory', []);
   const { bankAccounts } = useMasterData();
   const [isClient, setIsClient] = useState(false);
@@ -85,6 +87,18 @@ export default function DashboardPage() {
       .reduce((sum, order) => sum + order.totalAmount, 0),
     [purchaseOrders]
   );
+
+  const totalPaidForPurchases = useMemo(() => {
+    const purchaseOrderIds = new Set(purchaseOrders.filter(po => po.status === 'completed').map(po => po.id));
+    return financialMovements
+      .filter(fm => fm.type === 'expense' && fm.relatedDocument?.type === 'OC' && purchaseOrderIds.has(fm.relatedDocument.id))
+      .reduce((sum, fm) => sum + fm.amount, 0);
+  }, [financialMovements, purchaseOrders]);
+
+  const supplierCount = useMemo(() => {
+    return new Set(contacts.filter(c => c.type === 'supplier' || c.type === 'both').map(c => c.id)).size;
+  }, [contacts]);
+
 
   const totalAccountBalance = useMemo(() => {
     const balanceByAccount: Record<string, number> = {};
@@ -219,20 +233,48 @@ export default function DashboardPage() {
                     icon={<Scale className="h-5 w-5 text-cyan-500" />}
                     description="Total de kilos en O/C completadas"
                   />
+                   <KpiCard
+                    title="Total Pagado (Compras)"
+                    value={formatCurrency(totalPaidForPurchases)}
+                    icon={<DollarSign className="h-5 w-5 text-cyan-500" />}
+                    description="Suma de pagos asociados a O/C"
+                  />
+                  <KpiCard
+                    title="Nº de Proveedores"
+                    value={supplierCount.toString()}
+                    icon={<Users className="h-5 w-5 text-cyan-500" />}
+                    description="Total de proveedores activos"
+                  />
                 </>
               ) : (
-                 Array.from({ length: 2 }).map((_, i) => (
+                 Array.from({ length: 4 }).map((_, i) => (
                    <Card key={`sk-p-${i}`}><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
                 ))
               )}
            </div>
-           <div className="grid gap-6 mt-6">
+           <div className="grid gap-6 mt-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle className='font-headline text-xl'>Compras Semanales</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {isClient ? <WeeklyPurchasesChart data={purchaseOrders} /> : <Skeleton className="h-[300px] w-full" />}
+                </CardContent>
+              </Card>
+               <Card>
+                <CardHeader>
+                  <CardTitle className='font-headline text-xl'>Kilos Comprados por Proveedor</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isClient ? <PurchasesBySupplierChart data={purchaseOrders} suppliers={contacts} /> : <Skeleton className="h-[300px] w-full" />}
+                </CardContent>
+              </Card>
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className='font-headline text-xl'>Monto de Compra por Producto y Calibre</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isClient ? <PurchasesByProductCaliberChart data={purchaseOrders} /> : <Skeleton className="h-[400px] w-full" />}
                 </CardContent>
               </Card>
            </div>
