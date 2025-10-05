@@ -59,6 +59,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         
         const allDueItems: DueDateItem[] = [];
         const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
+        const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
 
         // 1. Initialize client data structure
         contacts.filter(c => c.type === 'client' || c.type === 'both').forEach(client => {
@@ -133,7 +134,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         });
 
         // 5. Filter and categorize based on the selected date
-        const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
         
         const upcoming = allDueItems
             .filter(item => isAfter(parseISO(item.dueDate), endDate))
@@ -141,7 +141,10 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
         const pastAndPresentItems = allDueItems.filter(item => !isAfter(parseISO(item.dueDate), endDate));
         
-        const totalBilled = pastAndPresentItems.reduce((sum, item) => sum + item.amount, 0);
+        const totalBilled = salesOrders
+            .filter(order => order.status !== 'cancelled' && new Date(order.date) <= endDate)
+            .reduce((sum, order) => sum + order.totalAmount, 0);
+
         const totalUpcoming = upcoming.reduce((sum, item) => sum + item.pendingAmount, 0);
 
         pastAndPresentItems.forEach(due => {
@@ -366,3 +369,5 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
     
 }
+
+    
