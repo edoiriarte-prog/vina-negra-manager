@@ -31,10 +31,11 @@ export default function InventoryPage() {
   const { warehouses } = useMasterData();
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('All');
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
-  const [filterDate, setFilterDate] = useState<Date | undefined>(new Date());
+  const [filterDate, setFilterDate] = useState<Date | undefined>();
 
   useEffect(() => {
     setIsClient(true);
+    setFilterDate(new Date());
   }, []);
 
   useEffect(() => {
