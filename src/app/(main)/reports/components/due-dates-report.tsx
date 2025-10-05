@@ -207,6 +207,22 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         }
 
         const workbook = XLSX.utils.book_new();
+        
+        // Summary Sheet
+        const summaryData = [
+            ["Informe de Vencimientos"],
+            ["Balance al:", filterDate ? format(filterDate, "PPP", { locale: es }) : "N/A"],
+            ["Cliente:", selectedClient ? selectedClient.name : "Todos los clientes"],
+            [], // Empty row
+            ["Concepto", "Monto"],
+            ["Total Facturado", totalBilled],
+            ["Total Pagado", totalPaid],
+            ["Pendiente / Vencido", totalPending],
+            ["Total por Vencer", totalUpcoming]
+        ];
+        const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen');
+
 
         const formatForSheet = (items: DueDateItem[]) => items.map(item => ({
             'Fecha Vencimiento': format(parseISO(item.dueDate), "dd-MM-yyyy"),
