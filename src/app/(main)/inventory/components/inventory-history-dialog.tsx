@@ -5,13 +5,11 @@ import { useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { InventoryItem, PurchaseOrder, SalesOrder, Contact } from '@/lib/types';
+import { InventoryItem, PurchaseOrder, SalesOrder } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, contacts as initialContacts } from '@/lib/data';
+import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 
 type InventoryHistoryDialogProps = {
   item: InventoryItem | null;
@@ -19,92 +17,80 @@ type InventoryHistoryDialogProps = {
   onOpenChange: (isOpen: boolean) => void;
 };
 
-const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
-
-type Transaction = {
+type DailySummary = {
     date: string;
-    type: 'in' | 'out';
-    orderId: string;
-    contactName: string;
-    quantity: number;
+    inflows: number;
+    outflows: number;
     balance: number;
 }
+
+const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 
 export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: InventoryHistoryDialogProps) {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
-  const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
-
-  const history = useMemo(() => {
+  
+  const dailySummary = useMemo(() => {
     if (!item) return [];
 
-    const inflows = purchaseOrders
+    const transactionsByDate: Record<string, { inflows: number, outflows: number }> = {};
+
+    // Aggregate inflows from purchase orders
+    purchaseOrders
       .flatMap(po => 
         po.items
-          .filter(i => i.product === item.product && i.caliber === item.caliber && (item.warehouse === 'All' || po.warehouse === item.warehouse))
-          .map(i => ({
-            date: po.date,
-            type: 'in' as const,
-            orderId: po.id,
-            contactName: contacts.find(c => c.id === po.supplierId)?.name || 'N/A',
-            quantity: i.quantity,
-          }))
-      );
+          .filter(i => i.product === item.product && i.caliber === item.caliber && (item.warehouse === 'All' || po.warehouse === item.warehouse) && po.status === 'completed')
+          .map(i => ({ date: po.date, quantity: i.quantity }))
+      )
+      .forEach(tx => {
+        const dateStr = format(parseISO(tx.date), 'yyyy-MM-dd');
+        if (!transactionsByDate[dateStr]) {
+          transactionsByDate[dateStr] = { inflows: 0, outflows: 0 };
+        }
+        transactionsByDate[dateStr].inflows += tx.quantity;
+      });
 
-    const outflows = salesOrders
+    // Aggregate outflows from sales orders
+    salesOrders
       .flatMap(so => 
         so.items
-          .filter(i => i.product === item.product && i.caliber === item.caliber && (item.warehouse === 'All' || so.warehouse === item.warehouse))
-          .map(i => ({
-            date: so.date,
-            type: 'out' as const,
-            orderId: so.id,
-            contactName: contacts.find(c => c.id === so.clientId)?.name || 'N/A',
-            quantity: i.quantity,
-          }))
-      );
+          .filter(i => i.product === item.product && i.caliber === item.caliber && (item.warehouse === 'All' || so.warehouse === item.warehouse) && (so.status === 'completed' || so.status === 'pending'))
+          .map(i => ({ date: so.date, quantity: i.quantity }))
+      )
+      .forEach(tx => {
+        const dateStr = format(parseISO(tx.date), 'yyyy-MM-dd');
+        if (!transactionsByDate[dateStr]) {
+          transactionsByDate[dateStr] = { inflows: 0, outflows: 0 };
+        }
+        transactionsByDate[dateStr].outflows += tx.quantity;
+      });
 
-    const combined = [...inflows, ...outflows].sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        if (dateA !== dateB) {
-            return dateA - dateB;
-        }
-        // If dates are the same, 'in' comes before 'out'
-        if (a.type === 'in' && b.type === 'out') {
-            return -1;
-        }
-        if (a.type === 'out' && b.type === 'in') {
-            return 1;
-        }
-        return 0;
-    });
-    
+    const sortedDates = Object.keys(transactionsByDate).sort();
+
     let runningBalance = 0;
-    const chronologicalHistory: Transaction[] = combined.map(tx => {
-        if (tx.type === 'in') {
-            runningBalance += tx.quantity;
-        } else {
-            runningBalance -= tx.quantity;
-        }
+    const summary: DailySummary[] = sortedDates.map(dateStr => {
+        const dailyTx = transactionsByDate[dateStr];
+        runningBalance += dailyTx.inflows - dailyTx.outflows;
         return {
-            ...tx,
+            date: dateStr,
+            inflows: dailyTx.inflows,
+            outflows: dailyTx.outflows,
             balance: runningBalance,
         };
     });
 
-    return chronologicalHistory;
-  }, [item, purchaseOrders, salesOrders, contacts]);
+    return summary;
+  }, [item, purchaseOrders, salesOrders]);
   
   if (!item) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Seguimiento Histórico: {item.product} - {item.caliber}</DialogTitle>
           <DialogDescription>
-            Historial cronológico de transacciones y balance de stock para este ítem en la bodega: {item.warehouse}.
+            Resumen de movimientos diarios y balance de stock para este ítem en la bodega: {item.warehouse}.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] overflow-y-auto p-1">
@@ -113,42 +99,24 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
                     <TableHeader>
                         <TableRow>
                             <TableHead>Fecha</TableHead>
-                            <TableHead>Orden ID</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Contacto</TableHead>
                             <TableHead className="text-right">Ingresos (kg)</TableHead>
                             <TableHead className="text-right">Egresos (kg)</TableHead>
                             <TableHead className="text-right">Saldo (kg)</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {history.length === 0 && <TableRow><TableCell colSpan={7} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
-                        {history.map((tx, index) => (
-                            <TableRow key={`${tx.orderId}-${index}`}>
-                                <TableCell>{format(parseISO(tx.date), 'dd-MM-yy')}</TableCell>
-                                <TableCell>{tx.orderId}</TableCell>
-                                <TableCell>
-                                    {tx.type === 'in' ? (
-                                        <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300">
-                                            <ArrowUpCircle className="mr-1 h-3 w-3" />
-                                            Entrada
-                                        </Badge>
-                                    ) : (
-                                        <Badge variant="destructive" className="bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300">
-                                            <ArrowDownCircle className="mr-1 h-3 w-3" />
-                                            Salida
-                                        </Badge>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-xs truncate">{tx.contactName}</TableCell>
-                                 <TableCell className="text-right font-medium text-green-600">
-                                    {tx.type === 'in' ? formatKilos(tx.quantity) : '-'}
+                        {dailySummary.length === 0 && <TableRow><TableCell colSpan={4} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
+                        {dailySummary.map((day) => (
+                            <TableRow key={day.date}>
+                                <TableCell className="font-medium">{format(parseISO(day.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
+                                <TableCell className="text-right font-medium text-green-600">
+                                    {day.inflows > 0 ? formatKilos(day.inflows) : '-'}
                                 </TableCell>
                                 <TableCell className="text-right font-medium text-red-600">
-                                    {tx.type === 'out' ? formatKilos(tx.quantity) : '-'}
+                                    {day.outflows > 0 ? formatKilos(day.outflows) : '-'}
                                 </TableCell>
                                 <TableCell className="text-right font-bold text-primary">
-                                    {formatKilos(tx.balance)}
+                                    {formatKilos(day.balance)}
                                 </TableCell>
                             </TableRow>
                         ))}
