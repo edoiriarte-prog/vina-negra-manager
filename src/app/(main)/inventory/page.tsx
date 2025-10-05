@@ -1,14 +1,12 @@
 
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { getInventory, inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
+import { getInventory, inventoryAdjustments as initialInventoryAdjustments, purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
 import { PurchaseOrder, SalesOrder, InventoryItem, InventoryAdjustment } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
-import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
-import { useEffect, useState, useMemo, useRef } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PerformanceReports } from '../reports/components/performance-reports';
@@ -25,85 +23,6 @@ import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { useReactToPrint } from 'react-to-print';
-
-const PrintableInventory = React.forwardRef<HTMLDivElement, {
-    filteredInventory: InventoryItem[],
-    totals: { kilosPurchased: number, kilosSold: number, stock: number },
-    isClient: boolean,
-    selectedWarehouse: string,
-    filterDate: Date | null,
-    formatKilos: (value: number) => string
-}>(({ filteredInventory, totals, isClient, selectedWarehouse, filterDate, formatKilos }, ref) => {
-    return (
-        <div ref={ref} className="p-4">
-              <Card className="mt-6 print:shadow-none print:border-none">
-                  <CardHeader>
-                      <div className="no-print">
-                        <CardTitle className="font-headline text-2xl">Inventario en Tiempo Real</CardTitle>
-                        <CardDescription>
-                          Stock disponible calculado a partir de las compras y ventas completadas.
-                          <span className="no-print"> Haz clic en una fila para ver el historial.</span>
-                        </CardDescription>
-                      </div>
-                      <div className="print-only hidden print:block">
-                          <CardTitle className="font-headline text-2xl">Inventario al {filterDate ? format(filterDate, "PPP", { locale: es }) : format(new Date(), "PPP", { locale: es })}</CardTitle>
-                          <CardDescription>Bodega: {selectedWarehouse === 'All' ? 'Todas' : selectedWarehouse}</CardDescription>
-                      </div>
-                  </CardHeader>
-                  <CardContent>
-                      <div className="rounded-md border">
-                          <Table>
-                              <TableHeader>
-                                  <TableRow>
-                                      <TableHead className='font-bold'>Producto</TableHead>
-                                      <TableHead className='font-bold'>Calibre</TableHead>
-                                      <TableHead className='text-right font-bold'>Kilos Comprados</TableHead>
-                                      <TableHead className='text-right font-bold'>Kilos Vendidos</TableHead>
-                                      <TableHead className='text-right font-bold text-primary'>Stock Actual</TableHead>
-                                  </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                  {!isClient ? (
-                                    Array.from({ length: 5 }).map((_, index) => (
-                                        <TableRow key={index}>
-                                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                                        </TableRow>
-                                    ))
-                                  ) : (
-                                    filteredInventory.map((item) => (
-                                        <TableRow key={item.key} className="cursor-pointer">
-                                            <TableCell className="font-medium">{item.product}</TableCell>
-                                            <TableCell>{item.caliber}</TableCell>
-                                            <TableCell className="text-right">{formatKilos(item.kilosPurchased)}</TableCell>
-                                            <TableCell className="text-right">{formatKilos(item.kilosSold)}</TableCell>
-                                            <TableCell className="text-right font-bold text-primary">{formatKilos(item.stock)}</TableCell>
-                                        </TableRow>
-                                    ))
-                                  )}
-                              </TableBody>
-                              {isClient && (
-                              <TableFooter>
-                                  <TableRow>
-                                  <TableHead colSpan={2} className="font-bold text-lg">Total ({selectedWarehouse === 'All' ? 'Global' : selectedWarehouse})</TableHead>
-                                  <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosPurchased)}</TableHead>
-                                  <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosSold)}</TableHead>
-                                  <TableHead className="text-right font-bold text-lg text-primary">{formatKilos(totals.stock)}</TableHead>
-                                  </TableRow>
-                              </TableFooter>
-                              )}
-                          </Table>
-                      </div>
-                  </CardContent>
-              </Card>
-            </div>
-    )
-});
-PrintableInventory.displayName = 'PrintableInventory';
-
 
 export default function InventoryPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
@@ -337,16 +256,56 @@ export default function InventoryPage() {
                   </CardContent>
               </Card>
             </div>
-            <div className="hidden print:block">
-                <PrintableInventory
-                    ref={printRef}
-                    filteredInventory={filteredInventory}
-                    totals={totals}
-                    isClient={isClient}
-                    selectedWarehouse={selectedWarehouse}
-                    filterDate={filterDate}
-                    formatKilos={formatKilos}
-                />
+            {/* Hidden printable content */}
+            <div className="hidden">
+                 <div ref={printRef} className="p-4">
+                    <Card className="mt-6 print:shadow-none print:border-none">
+                        <CardHeader>
+                            <div className="print-only hidden print:block">
+                                <CardTitle className="font-headline text-2xl">Inventario al {filterDate ? format(filterDate, "PPP", { locale: es }) : format(new Date(), "PPP", { locale: es })}</CardTitle>
+                                <CardDescription>Bodega: {selectedWarehouse === 'All' ? 'Todas' : selectedWarehouse}</CardDescription>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className='font-bold'>Producto</TableHead>
+                                            <TableHead className='font-bold'>Calibre</TableHead>
+                                            <TableHead className='text-right font-bold'>Kilos Comprados</TableHead>
+                                            <TableHead className='text-right font-bold'>Kilos Vendidos</TableHead>
+                                            <TableHead className='text-right font-bold text-primary'>Stock Actual</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {isClient ? (
+                                          filteredInventory.map((item) => (
+                                              <TableRow key={item.key}>
+                                                  <TableCell className="font-medium">{item.product}</TableCell>
+                                                  <TableCell>{item.caliber}</TableCell>
+                                                  <TableCell className="text-right">{formatKilos(item.kilosPurchased)}</TableCell>
+                                                  <TableCell className="text-right">{formatKilos(item.kilosSold)}</TableCell>
+                                                  <TableCell className="text-right font-bold text-primary">{formatKilos(item.stock)}</TableCell>
+                                              </TableRow>
+                                          ))
+                                        ) : null}
+                                    </TableBody>
+                                    {isClient && (
+                                    <TableFooter>
+                                        <TableRow>
+                                        <TableHead colSpan={2} className="font-bold text-lg">Total ({selectedWarehouse === 'All' ? 'Global' : selectedWarehouse})</TableHead>
+                                        <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosPurchased)}</TableHead>
+                                        <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosSold)}</TableHead>
+                                        <TableHead className="text-right font-bold text-lg text-primary">{formatKilos(totals.stock)}</TableHead>
+                                        </TableRow>
+                                    </TableFooter>
+                                    )}
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </TabsContent>
         <TabsContent value="performance">
