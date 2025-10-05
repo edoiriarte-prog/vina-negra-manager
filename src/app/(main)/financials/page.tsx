@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX, MoreHorizontal, ChevronDown, Eye, ArrowRightCircle, Wallet } from 'lucide-react';
+import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX, MoreHorizontal, ChevronDown, Eye, ArrowRightCircle, Wallet, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -39,6 +39,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
 
 type AccountSummary = {
     id: string;
@@ -269,6 +270,41 @@ export default function FinancialsPage() {
     return { traspasos: traspasoMovements.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()), totalTraspasado: total };
   }, [filteredData]);
 
+  const handleExport = () => {
+    if (dataWithContactNames.length === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No hay movimientos para exportar.' });
+      return;
+    }
+
+    const formatMovement = (m: FinancialMovement & { contactName?: string }) => ({
+      'ID Movimiento': m.id,
+      'Fecha': format(parseISO(m.date), 'dd-MM-yyyy'),
+      'Tipo': m.type,
+      'Centro de Costo': m.description,
+      'Monto': m.amount,
+      'Forma de Pago': m.paymentMethod,
+      'Cuenta Origen': bankAccounts.find(a => a.id === m.sourceAccountId)?.name || '',
+      'Cuenta Destino': bankAccounts.find(a => a.id === m.destinationAccountId)?.name || '',
+      'Contacto Asociado': m.contactName,
+      'Documento Relacionado': m.relatedDocument ? `${m.relatedDocument.type}-${m.relatedDocument.id}` : '',
+      'Concepto Interno': m.internalConcept || '',
+      'Referencia': m.reference || '',
+    });
+
+    const incomeSheet = dataWithContactNames.filter(m => m.type === 'income').map(formatMovement);
+    const expenseSheet = dataWithContactNames.filter(m => m.type === 'expense').map(formatMovement);
+    const transferSheet = dataWithContactNames.filter(m => m.type === 'traspaso').map(formatMovement);
+
+    const wb = XLSX.utils.book_new();
+    if (incomeSheet.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(incomeSheet), 'Ingresos');
+    if (expenseSheet.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expenseSheet), 'Egresos');
+    if (transferSheet.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(transferSheet), 'Traspasos');
+
+    XLSX.writeFile(wb, `Tesorería_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast({ title: 'Exportación Exitosa', description: 'Se ha exportado la base de datos de tesorería.' });
+  };
+
+
   const toggleCollapsible = (id: string) => {
     setOpenCollapsibles(prev => ({ ...prev, [id]: !prev[id] }));
   }
@@ -321,10 +357,16 @@ export default function FinancialsPage() {
               <h1 className="font-headline text-3xl">Tesorería y Movimientos Bancarios</h1>
               <p className="text-muted-foreground">Registra todos los ingresos, egresos y traspasos de la empresa.</p>
             </div>
-            <Button onClick={openNewMovementSheet}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Nuevo Movimiento
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar a Excel
+              </Button>
+              <Button onClick={openNewMovementSheet}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Nuevo Movimiento
+              </Button>
+            </div>
         </div>
 
         <Card>
@@ -553,4 +595,5 @@ export default function FinancialsPage() {
 
 
     
+
 
