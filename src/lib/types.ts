@@ -145,3 +145,5 @@ export type BankAccount = {
     status: 'Activa' | 'Inactiva';
     owner?: string;
 }
+
+    

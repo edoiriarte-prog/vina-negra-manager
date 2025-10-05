@@ -1,3 +1,4 @@
+
 import {
   Card,
   CardContent,
@@ -5,12 +6,14 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import React from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type KpiCardProps = {
   title: string;
   value: string;
   icon: React.ReactNode;
   description: string;
+  isLoading?: boolean;
 };
 
 export default function KpiCard({
@@ -18,7 +21,22 @@ export default function KpiCard({
   value,
   icon,
   description,
+  isLoading = false,
 }: KpiCardProps) {
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+           <Skeleton className="h-5 w-24" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-3 w-48 mt-2" />
+        </CardContent>
+      </Card>
+    );
+  }
+  
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -32,3 +50,5 @@ export default function KpiCard({
     </Card>
   );
 }
+
+    

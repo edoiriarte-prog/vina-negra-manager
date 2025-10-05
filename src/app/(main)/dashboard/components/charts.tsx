@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -61,6 +62,40 @@ export function WeeklyPurchasesChart({ data }: { data: PurchaseOrder[] }) {
   );
 }
 
+// Weekly Sales Chart
+export function WeeklySalesChart({ data }: { data: SalesOrder[] }) {
+  const weeklyData = data
+    .filter((order) => order.status === 'completed')
+    .reduce((acc, order) => {
+      const week = getWeek(parseISO(order.date));
+      acc[week] = (acc[week] || 0) + order.totalAmount;
+      return acc;
+    }, {} as { [week: number]: number });
+
+  const chartData = Object.entries(weeklyData).map(([week, total]) => ({
+    name: `Semana ${week}`,
+    Ventas: total,
+  })).sort((a, b) => parseInt(a.name.split(' ')[1]) - parseInt(b.name.split(' ')[1]));
+
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={chartData}>
+        <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
+        <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'hsl(var(--background))',
+            borderColor: 'hsl(var(--border))',
+          }}
+          formatter={(value: number) => formatCurrency(value)}
+        />
+        <Legend wrapperStyle={{fontSize: "12px"}}/>
+        <Bar dataKey="Ventas" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 // Income vs Expense Chart
 export function IncomeVsExpenseChart({ data }: { data: FinancialMovement[] }) {
     const weeklyData: { [week: number]: { income: number; expense: number } } = {};
@@ -71,7 +106,7 @@ export function IncomeVsExpenseChart({ data }: { data: FinancialMovement[] }) {
         
         if (mov.type === 'income') {
             weeklyData[week].income += mov.amount;
-        } else {
+        } else if (mov.type === 'expense') {
             weeklyData[week].expense += mov.amount;
         }
     });
@@ -103,68 +138,10 @@ export function IncomeVsExpenseChart({ data }: { data: FinancialMovement[] }) {
 }
 
 
-// Expense Breakdown Chart
-export function ExpenseBreakdownChart({ purchases, services }: { purchases: number; services: number }) {
-  const data = [
-    { name: 'Compras', value: purchases },
-    { name: 'Servicios', value: services },
-  ];
-  const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))'];
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
-        <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-        <Legend />
-      </PieChart>
-    </ResponsiveContainer>
-  );
-}
-
-// Kilo Comparison Chart
-export function KiloComparisonChart({ purchases, sales }: { purchases: PurchaseOrder[]; sales: SalesOrder[] }) {
-    const weeklyData: { [week: number]: { purchased: number; sold: number } } = {};
-
-    purchases.forEach(p => {
-        const week = getWeek(parseISO(p.date));
-        if(!weeklyData[week]) weeklyData[week] = { purchased: 0, sold: 0 };
-        weeklyData[week].purchased += p.totalKilos;
-    });
-
-    sales.forEach(s => {
-        const week = getWeek(parseISO(s.date));
-        if(!weeklyData[week]) weeklyData[week] = { purchased: 0, sold: 0 };
-        weeklyData[week].sold += s.totalKilos;
-    });
-
-    const chartData = Object.entries(weeklyData).map(([week, data]) => ({
-        name: `Semana ${week}`,
-        Comprados: data.purchased,
-        Vendidos: data.sold,
-    })).sort((a, b) => parseInt(a.name.split(' ')[1]) - parseInt(b.name.split(' ')[1]));
-
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <LineChart data={chartData}>
-        <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
-        <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `${value / 1000}k`} />
-        <Tooltip formatter={(value: number) => formatKilos(value)} />
-        <Legend wrapperStyle={{fontSize: "12px"}}/>
-        <Line type="monotone" dataKey="Comprados" stroke="hsl(var(--chart-1))" strokeWidth={2} />
-        <Line type="monotone" dataKey="Vendidos" stroke="hsl(var(--chart-2))" strokeWidth={2} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
 // Caliber Distribution Chart
 export function CaliberDistributionChart({ data }: { data: InventoryItem[] }) {
     const chartData = data.filter(item => item.stock > 0).map(item => ({ name: item.caliber, value: item.stock }));
-    const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
+    const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
     
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -190,3 +167,5 @@ export function CaliberDistributionChart({ data }: { data: InventoryItem[] }) {
     </ResponsiveContainer>
   );
 }
+
+    
