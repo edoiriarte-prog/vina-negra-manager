@@ -7,7 +7,7 @@ import { PurchaseOrder, SalesOrder, InventoryItem, InventoryAdjustment } from '@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
 import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PerformanceReports } from '../reports/components/performance-reports';
@@ -23,6 +23,7 @@ import { es } from 'date-fns/locale';
 import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
+import { useReactToPrint } from 'react-to-print';
 
 export default function InventoryPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
@@ -35,6 +36,11 @@ export default function InventoryPage() {
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
   const [filterDate, setFilterDate] = useState<Date | null>(null);
   const { toast } = useToast();
+
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+      content: () => printRef.current,
+  });
 
   useEffect(() => {
     setIsClient(true);
@@ -95,10 +101,6 @@ export default function InventoryPage() {
     setHistoryItem(item);
   };
   
-  const handlePrint = () => {
-    window.print();
-  }
-
   const handleExportSummary = () => {
     if (filteredInventory.length === 0) {
       toast({ variant: 'destructive', title: 'Error', description: 'No hay datos de inventario para exportar.' });
@@ -170,93 +172,95 @@ export default function InventoryPage() {
           <TabsTrigger value="performance">Rendimiento de Productos</TabsTrigger>
         </TabsList>
         <TabsContent value="stock">
-            <Card className="mt-6">
-                <CardHeader>
-                    <div className="no-print">
-                      <CardTitle className="font-headline text-2xl">Inventario en Tiempo Real</CardTitle>
-                      <CardDescription>
-                        Stock disponible calculado a partir de las compras y ventas completadas.
-                        <span className="no-print"> Haz clic en una fila para ver el historial.</span>
-                      </CardDescription>
-                    </div>
-                     <div className="print-only hidden">
-                        <CardTitle className="font-headline text-2xl">Inventario al {filterDate ? format(filterDate, "PPP", { locale: es }) : ''}</CardTitle>
-                        <CardDescription>Bodega: {selectedWarehouse === 'All' ? 'Todas' : selectedWarehouse}</CardDescription>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex items-center gap-4 mb-4 no-print">
-                      <div>
-                        <Label>Bodega</Label>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant={selectedWarehouse === 'All' ? 'default' : 'outline'}
-                            onClick={() => setSelectedWarehouse('All')}
-                          >
-                            Todas las bodegas
-                          </Button>
-                          {warehouses.map(w => (
+            <div ref={printRef}>
+              <Card className="mt-6 print:shadow-none print:border-none">
+                  <CardHeader>
+                      <div className="no-print">
+                        <CardTitle className="font-headline text-2xl">Inventario en Tiempo Real</CardTitle>
+                        <CardDescription>
+                          Stock disponible calculado a partir de las compras y ventas completadas.
+                          <span className="no-print"> Haz clic en una fila para ver el historial.</span>
+                        </CardDescription>
+                      </div>
+                      <div className="print-only hidden">
+                          <CardTitle className="font-headline text-2xl">Inventario al {filterDate ? format(filterDate, "PPP", { locale: es }) : ''}</CardTitle>
+                          <CardDescription>Bodega: {selectedWarehouse === 'All' ? 'Todas' : selectedWarehouse}</CardDescription>
+                      </div>
+                  </CardHeader>
+                  <CardContent>
+                      <div className="flex items-center gap-4 mb-4 no-print">
+                        <div>
+                          <Label>Bodega</Label>
+                          <div className="flex items-center gap-2">
                             <Button
-                              key={w}
-                              variant={selectedWarehouse === w ? 'default' : 'outline'}
-                              onClick={() => setSelectedWarehouse(w)}
+                              variant={selectedWarehouse === 'All' ? 'default' : 'outline'}
+                              onClick={() => setSelectedWarehouse('All')}
                             >
-                              {w}
+                              Todas las bodegas
                             </Button>
-                          ))}
+                            {warehouses.map(w => (
+                              <Button
+                                key={w}
+                                variant={selectedWarehouse === w ? 'default' : 'outline'}
+                                onClick={() => setSelectedWarehouse(w)}
+                              >
+                                {w}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <Label>Ver inventario al</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn("w-[280px] justify-start text-left font-normal", !filterDate && "text-muted-foreground")}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={filterDate || undefined}
+                                    onSelect={(date) => setFilterDate(date || null)}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                            </Popover>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1.5">
-                          <Label>Ver inventario al</Label>
-                          <Popover>
-                              <PopoverTrigger asChild>
-                              <Button
-                                  variant={"outline"}
-                                  className={cn("w-[280px] justify-start text-left font-normal", !filterDate && "text-muted-foreground")}
-                              >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
-                              </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                  mode="single"
-                                  selected={filterDate || undefined}
-                                  onSelect={(date) => setFilterDate(date || null)}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                          </Popover>
+                      <div className="rounded-md border">
+                          <Table>
+                              <TableHeader>
+                                  <TableRow>
+                                      <TableHead className='font-bold'>Producto</TableHead>
+                                      <TableHead className='font-bold'>Calibre</TableHead>
+                                      <TableHead className='text-right font-bold'>Kilos Comprados</TableHead>
+                                      <TableHead className='text-right font-bold'>Kilos Vendidos</TableHead>
+                                      <TableHead className='text-right font-bold text-primary'>Stock Actual</TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {renderInventoryRows()}
+                              </TableBody>
+                              {isClient && (
+                              <TableFooter>
+                                  <TableRow>
+                                  <TableHead colSpan={2} className="font-bold text-lg">Total ({selectedWarehouse === 'All' ? 'Global' : selectedWarehouse})</TableHead>
+                                  <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosPurchased)}</TableHead>
+                                  <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosSold)}</TableHead>
+                                  <TableHead className="text-right font-bold text-lg text-primary">{formatKilos(totals.stock)}</TableHead>
+                                  </TableRow>
+                              </TableFooter>
+                              )}
+                          </Table>
                       </div>
-                    </div>
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className='font-bold'>Producto</TableHead>
-                                    <TableHead className='font-bold'>Calibre</TableHead>
-                                    <TableHead className='text-right font-bold'>Kilos Comprados</TableHead>
-                                    <TableHead className='text-right font-bold'>Kilos Vendidos</TableHead>
-                                    <TableHead className='text-right font-bold text-primary'>Stock Actual</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {renderInventoryRows()}
-                            </TableBody>
-                            {isClient && (
-                            <TableFooter>
-                                <TableRow>
-                                <TableHead colSpan={2} className="font-bold text-lg">Total ({selectedWarehouse === 'All' ? 'Global' : selectedWarehouse})</TableHead>
-                                <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosPurchased)}</TableHead>
-                                <TableHead className="text-right font-bold text-lg">{formatKilos(totals.kilosSold)}</TableHead>
-                                <TableHead className="text-right font-bold text-lg text-primary">{formatKilos(totals.stock)}</TableHead>
-                                </TableRow>
-                            </TableFooter>
-                            )}
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
+                  </CardContent>
+              </Card>
+            </div>
         </TabsContent>
         <TabsContent value="performance">
              <PerformanceReports
