@@ -32,12 +32,12 @@ export const serviceOrders: ServiceOrder[] = [
 ];
 
 export const financialMovements: FinancialMovement[] = [
-  { id: 'M-001', date: '2023-10-07', type: 'income', description: 'Pago OV-001 - Exportadora Frutillar', amount: 28000000, paymentMethod: 'Transferencia', accountId: 'acc-1', contactId: '2', relatedDocument: { type: 'OV', id: 'OV-2001' } },
-  { id: 'M-002', date: '2023-10-02', type: 'expense', description: 'Pago 50% OC-1001 - Agrícola Santa Cruz', amount: 11250000, paymentMethod: 'Transferencia', accountId: 'acc-1', contactId: '1', relatedDocument: { type: 'OC', id: 'OC-1001' } },
-  { id: 'M-003', date: '2023-10-02', type: 'expense', description: 'Pago OS-001 - Transportes Rapido', amount: 300000, paymentMethod: 'Efectivo', accountId: 'acc-2', relatedDocument: { type: 'OS', id: 'OS-001' } },
-  { id: 'M-004', date: '2023-10-04', type: 'expense', description: 'Pago OS-002 - Personal Externo', amount: 800000, paymentMethod: 'Transferencia', accountId: 'acc-1', relatedDocument: { type: 'OS', id: 'OS-002' } },
-  { id: 'M-005', date: '2023-10-14', type: 'income', description: 'Pago OV-002 - Supermercados del Sur', amount: 37500000, paymentMethod: 'Transferencia', accountId: 'acc-1', contactId: '3', relatedDocument: { type: 'OV', id: 'OV-2002' } },
-  { id: 'M-006', date: '2023-10-09', type: 'expense', description: 'Pago 50% OC-1002 - Agrícola Santa Cruz', amount: 19000000, paymentMethod: 'Transferencia', accountId: 'acc-1', contactId: '5', relatedDocument: { type: 'OC', id: 'OC-1002' } },
+  { id: 'M-001', date: '2023-10-07', type: 'income', description: 'Pago OV-001 - Exportadora Frutillar', amount: 28000000, paymentMethod: 'Transferencia', destinationAccountId: 'acc-1', contactId: '2', relatedDocument: { type: 'OV', id: 'OV-2001' } },
+  { id: 'M-002', date: '2023-10-02', type: 'expense', description: 'Pago 50% OC-1001 - Agrícola Santa Cruz', amount: 11250000, paymentMethod: 'Transferencia', sourceAccountId: 'acc-1', contactId: '1', relatedDocument: { type: 'OC', id: 'OC-1001' } },
+  { id: 'M-003', date: '2023-10-02', type: 'expense', description: 'Pago OS-001 - Transportes Rapido', amount: 300000, paymentMethod: 'Efectivo', sourceAccountId: 'acc-2', relatedDocument: { type: 'OS', id: 'OS-001' } },
+  { id: 'M-004', date: '2023-10-04', type: 'expense', description: 'Pago OS-002 - Personal Externo', amount: 800000, paymentMethod: 'Transferencia', sourceAccountId: 'acc-1', relatedDocument: { type: 'OS', id: 'OS-002' } },
+  { id: 'M-005', date: '2023-10-14', type: 'income', description: 'Pago OV-002 - Supermercados del Sur', amount: 37500000, paymentMethod: 'Transferencia', destinationAccountId: 'acc-1', contactId: '3', relatedDocument: { type: 'OV', id: 'OV-2002' } },
+  { id: 'M-006', date: '2023-10-09', type: 'expense', description: 'Pago 50% OC-1002 - Agrícola Santa Cruz', amount: 19000000, paymentMethod: 'Transferencia', sourceAccountId: 'acc-1', contactId: '5', relatedDocument: { type: 'OC', id: 'OC-1002' } },
 ];
 
 export const inventoryAdjustments: InventoryAdjustment[] = [
@@ -85,16 +85,18 @@ export const getInventory = (
   });
 
   // Process adjustments
-  currentAdjustments.forEach(adj => {
-    const key = `${adj.product} - ${adj.caliber} - ${adj.warehouse}`;
-    const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
-    if (adj.type === 'increase') {
-      existing.adjusted += adj.quantity;
-    } else {
-      existing.adjusted -= adj.quantity;
-    }
-    inventoryMap.set(key, existing);
-  });
+  if (currentAdjustments) {
+    currentAdjustments.forEach(adj => {
+      const key = `${adj.product} - ${adj.caliber} - ${adj.warehouse}`;
+      const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
+      if (adj.type === 'increase') {
+        existing.adjusted += adj.quantity;
+      } else {
+        existing.adjusted -= adj.quantity;
+      }
+      inventoryMap.set(key, existing);
+    });
+  }
 
 
   const inventory: InventoryItem[] = [];

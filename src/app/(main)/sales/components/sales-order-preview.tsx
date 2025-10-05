@@ -219,6 +219,8 @@ PreviewContent.displayName = "PreviewContent";
 export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange }: SalesOrderPreviewProps) {
   
   if (!order) return null;
+  
+  const contentRef = React.useRef(null);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -227,7 +229,7 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
            <DialogTitle>Previsualización de Orden de Venta: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto" id="print-area">
-            <PreviewContent order={order} client={client} carrier={carrier} ref={null}/>
+            <PreviewContent order={order} client={client} carrier={carrier} ref={contentRef}/>
         </div>
         <DialogFooter className="p-6 pt-4">
           <Button
@@ -242,5 +244,3 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
   );
 };
 SalesOrderPreview.displayName = "SalesOrderPreview";
-
-    

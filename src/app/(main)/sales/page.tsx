@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory, serviceOrders as initialServiceOrders, financialMovements as initialFinancialMovements } from '@/lib/data';
-import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem, ServiceOrder, FinancialMovement } from '@/lib/types';
+import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory, serviceOrders as initialServiceOrders, financialMovements as initialFinancialMovements, inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
+import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem, ServiceOrder, FinancialMovement, InventoryAdjustment } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { NewSalesOrderSheet } from './components/new-sales-order-sheet';
 import {
@@ -50,6 +50,7 @@ const formatCurrency = (value: number) =>
 export default function SalesPage() {
   const [salesOrders, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+  const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
   const [serviceOrders, setServiceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
   const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
@@ -132,7 +133,7 @@ export default function SalesPage() {
 
 
   
-  const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, editingOrder), [purchaseOrders, salesOrders, editingOrder]);
+  const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, inventoryAdjustments, editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
 
   const nextOrderId = useMemo(() => {
     const lastIdNumber = salesOrders.reduce((max, order) => {
@@ -253,7 +254,7 @@ export default function SalesPage() {
   const confirmDelete = () => {
     if (deletingOrder) {
       setSalesOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id));
-      toast({ variant: 'destructive', title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
+      toast({ variant: "destructive", title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
       setDeletingOrder(null);
     }
   }
@@ -602,5 +603,3 @@ export default function SalesPage() {
     </>
   );
 }
-
-    
