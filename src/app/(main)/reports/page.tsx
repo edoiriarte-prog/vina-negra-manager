@@ -134,7 +134,7 @@ export default function ReportsPage() {
       const clientReportData = clients.map(client => {
         
         const clientSalesOrders = salesOrders
-          .filter(so => so.clientId === client.id && so.status === 'completed')
+          .filter(so => so.clientId === client.id && (so.status === 'completed' || so.status === 'pending'))
           .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
         const clientMovements = financialMovements
