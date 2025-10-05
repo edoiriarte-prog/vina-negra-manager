@@ -12,7 +12,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isAfter, startOfDay, isEqual } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CalendarIcon, DollarSign, Clock } from 'lucide-react';
+import { CalendarIcon, DollarSign, Clock, Forward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 
@@ -50,12 +50,12 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         setIsClient(true);
     }, []);
     
-    const { pendingItems, paidItems, totalPending, totalPaid } = useMemo(() => {
-        if (!isClient) return { pendingItems: [], paidItems: [], totalPending: 0, totalPaid: 0 };
+    const { pendingItems, paidItems, totalPending, totalPaid, totalUpcoming } = useMemo(() => {
+        if (!isClient) return { pendingItems: [], paidItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0 };
         
         const allDueItems: DueDateItem[] = [];
-        const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
-
+        
+        // First, create all possible due items from all orders, regardless of date.
         salesOrders.forEach(order => {
              if (order.status !== 'cancelled') {
                 const client = contacts.find(c => c.id === order.clientId);
@@ -64,7 +64,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                 const dueDateForCreditOrContado = order.balanceDueDate || order.date;
 
                 if (order.paymentMethod === 'Pago con Anticipo y Saldo' && order.advancePercentage) {
-                    if (order.advanceDueDate && new Date(order.advanceDueDate) <= endDate) {
+                    if (order.advanceDueDate) {
                         const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
                         allDueItems.push({
                             id: `${order.id}-advance`, clientId: order.clientId, clientName, orderId: order.id,
@@ -72,7 +72,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                             paidAmount: 0, pendingAmount: advanceAmount, status: 'Pendiente',
                         });
                     }
-                    if (order.balanceDueDate && new Date(order.balanceDueDate) <= endDate) {
+                    if (order.balanceDueDate) {
                         const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
                         const balanceAmount = order.totalAmount - advanceAmount;
                         allDueItems.push({
@@ -81,13 +81,13 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                             paidAmount: 0, pendingAmount: balanceAmount, status: 'Pendiente',
                         });
                     }
-                } else if (order.paymentMethod === 'Crédito' && new Date(dueDateForCreditOrContado) <= endDate) {
+                } else if (order.paymentMethod === 'Crédito' && dueDateForCreditOrContado) {
                      allDueItems.push({
                         id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
                         paymentType: 'Saldo', dueDate: dueDateForCreditOrContado, amount: order.totalAmount,
                         paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
                     });
-                } else if (order.paymentMethod === 'Contado' && new Date(dueDateForCreditOrContado) <= endDate) {
+                } else if (order.paymentMethod === 'Contado' && dueDateForCreditOrContado) {
                     allDueItems.push({
                         id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
                         paymentType: 'Saldo', dueDate: dueDateForCreditOrContado, amount: order.totalAmount,
@@ -97,31 +97,29 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
              }
         });
         
-        const relevantPayments = financialMovements
-            .filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate)
-            .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
+        // Settle payments chronologically
         const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
-        
         allDueItems.forEach(due => {
             if (!clientData[due.clientId]) clientData[due.clientId] = { dues: [], payments: [] };
             clientData[due.clientId].dues.push(due);
         });
 
-        relevantPayments.forEach(fm => {
-            if (fm.contactId && clientData[fm.contactId]) {
-                 clientData[fm.contactId].payments.push(fm);
-            }
-        });
-
+        financialMovements
+            .filter(fm => fm.type === 'income')
+            .forEach(fm => {
+                if (fm.contactId && clientData[fm.contactId]) {
+                    clientData[fm.contactId].payments.push(fm);
+                }
+            });
 
         Object.values(clientData).forEach(({ dues, payments }) => {
             const sortedDues = dues.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-            const paymentPool = payments.map(p => ({ ...p, remaining: p.amount }));
+            const sortedPayments = payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            const paymentPool = sortedPayments.map(p => ({ ...p, remaining: p.amount }));
 
             sortedDues.forEach(due => {
                 paymentPool.forEach(payment => {
-                    if (payment.remaining > 0 && due.pendingAmount > 0) {
+                    if (payment.remaining > 0 && due.pendingAmount > 0 && !isAfter(parseISO(payment.date), parseISO(due.dueDate))) {
                         const amountToApply = Math.min(payment.remaining, due.pendingAmount);
                         due.paidAmount += amountToApply;
                         due.pendingAmount -= amountToApply;
@@ -131,7 +129,15 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
             });
         });
 
-        allDueItems.forEach(due => {
+        const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
+        
+        // Separate items into upcoming and past/present
+        const upcomingItems = allDueItems.filter(item => isAfter(parseISO(item.dueDate), endDate));
+        const pastAndPresentItems = allDueItems.filter(item => !isAfter(parseISO(item.dueDate), endDate));
+
+        const totalUpcoming = upcomingItems.reduce((sum, item) => sum + item.pendingAmount, 0);
+
+        pastAndPresentItems.forEach(due => {
             if (due.pendingAmount <= 1) { // Use a small epsilon for float comparison
                 due.status = 'Pagado';
                 due.pendingAmount = 0;
@@ -144,18 +150,18 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
             }
         });
 
-        const pending = allDueItems
+        const pending = pastAndPresentItems
             .filter(item => item.status === 'Pendiente' || item.status === 'Vencido' || item.status === 'Abonado')
             .sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
         
-        const paid = allDueItems
+        const paid = pastAndPresentItems
             .filter(item => item.status === 'Pagado')
             .sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
             
         const totalPending = pending.reduce((sum, item) => sum + item.pendingAmount, 0);
-        const totalPaid = allDueItems.reduce((sum, item) => sum + item.paidAmount, 0);
+        const totalPaid = pastAndPresentItems.reduce((sum, item) => sum + item.paidAmount, 0);
 
-        return { pendingItems: pending, paidItems: paid, totalPending, totalPaid };
+        return { pendingItems: pending, paidItems: paid, totalPending, totalPaid, totalUpcoming };
 
     }, [salesOrders, financialMovements, contacts, isClient, filterDate]);
 
@@ -224,7 +230,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                 <CardDescription>Seguimiento de vencimientos de pago. Seleccione una fecha para ver el balance a ese día.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid md:grid-cols-3 gap-4 mb-6">
+                <div className="grid md:grid-cols-4 gap-4 mb-6">
                     <div className="md:col-span-1">
                         <Label>Ver balance al:</Label>
                         <Popover>
@@ -242,25 +248,35 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                             </PopoverContent>
                         </Popover>
                     </div>
-                     <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                     <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Pendiente / Vencido</CardTitle>
-                                <Clock className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalPending)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">Total Pagado</CardTitle>
                                 <DollarSign className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
                                 {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalPaid)}</div> : <Skeleton className="h-8 w-3/4" />}
                                 <p className="text-xs text-muted-foreground">en cuotas hasta la fecha</p>
+                            </CardContent>
+                        </Card>
+                         <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Pendiente / Vencido</CardTitle>
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                {isClient ? <div className="text-2xl font-bold text-destructive">{formatCurrency(totalPending)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Total por Vencer</CardTitle>
+                                <Forward className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                {isClient ? <div className="text-2xl font-bold text-blue-500">{formatCurrency(totalUpcoming)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                <p className="text-xs text-muted-foreground">después de la fecha</p>
                             </CardContent>
                         </Card>
                     </div>
