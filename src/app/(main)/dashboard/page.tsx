@@ -87,13 +87,22 @@ export default function DashboardPage() {
       .reduce((sum, order) => sum + order.totalAmount, 0),
     [purchaseOrders]
   );
+  
+  const totalServicesAmount = useMemo(() =>
+    serviceOrders.reduce((sum, order) => sum + order.cost, 0),
+    [serviceOrders]
+  );
+  
+  const totalPurchasesAndServicesAmount = totalPurchasesAmount + totalServicesAmount;
 
-  const totalPaidForPurchases = useMemo(() => {
-    const purchaseOrderIds = new Set(purchaseOrders.filter(po => po.status === 'completed').map(po => po.id));
+  const totalPaidToSuppliers = useMemo(() => {
+    const supplierIds = new Set(contacts.filter(c => c.type === 'supplier' || c.type === 'both').map(c => c.id));
     return financialMovements
-      .filter(fm => fm.type === 'expense' && fm.relatedDocument?.type === 'OC' && purchaseOrderIds.has(fm.relatedDocument.id))
+      .filter(fm => fm.type === 'expense' && fm.contactId && supplierIds.has(fm.contactId))
       .reduce((sum, fm) => sum + fm.amount, 0);
-  }, [financialMovements, purchaseOrders]);
+  }, [financialMovements, contacts]);
+
+  const supplierBalance = totalPurchasesAndServicesAmount - totalPaidToSuppliers;
 
   const supplierCount = useMemo(() => {
     return new Set(contacts.filter(c => c.type === 'supplier' || c.type === 'both').map(c => c.id)).size;
@@ -222,22 +231,22 @@ export default function DashboardPage() {
               {isClient ? (
                 <>
                   <KpiCard
-                    title="Monto Total Comprado"
-                    value={formatCurrency(totalPurchasesAmount)}
+                    title="Total Comprado/Servicios"
+                    value={formatCurrency(totalPurchasesAndServicesAmount)}
                     icon={<ShoppingBag className="h-5 w-5 text-cyan-500" />}
-                    description="Suma de todas las O/C completadas"
+                    description="Suma de O/C completadas y O/S"
                   />
                   <KpiCard
-                    title="Kilos Totales Comprados"
-                    value={formatKilos(totalKilosPurchased)}
-                    icon={<Scale className="h-5 w-5 text-cyan-500" />}
-                    description="Total de kilos en O/C completadas"
+                    title="Total Pagado (Proveedores)"
+                    value={formatCurrency(totalPaidToSuppliers)}
+                    icon={<DollarSign className="h-5 w-5 text-green-500" />}
+                    description="Suma de pagos a proveedores"
                   />
                    <KpiCard
-                    title="Total Pagado (Compras)"
-                    value={formatCurrency(totalPaidForPurchases)}
-                    icon={<DollarSign className="h-5 w-5 text-cyan-500" />}
-                    description="Suma de pagos asociados a O/C"
+                    title="Saldo por Pagar"
+                    value={formatCurrency(supplierBalance)}
+                    icon={<MinusCircle className="h-5 w-5 text-red-500" />}
+                    description="Balance pendiente con proveedores"
                   />
                   <KpiCard
                     title="Nº de Proveedores"
@@ -345,6 +354,8 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
 
     
 
