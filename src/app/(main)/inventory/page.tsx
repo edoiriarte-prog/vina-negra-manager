@@ -1,6 +1,7 @@
 
 "use client";
 
+import React from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { getInventory, inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
 import { PurchaseOrder, SalesOrder, InventoryItem, InventoryAdjustment } from '@/lib/types';
@@ -34,7 +35,7 @@ const PrintableInventory = React.forwardRef<HTMLDivElement, {
     formatKilos: (value: number) => string
 }>(({ filteredInventory, totals, isClient, selectedWarehouse, filterDate, formatKilos }, ref) => {
     return (
-        <div ref={ref}>
+        <div ref={ref} className="p-4">
               <Card className="mt-6 print:shadow-none print:border-none">
                   <CardHeader>
                       <div className="no-print">
@@ -44,8 +45,8 @@ const PrintableInventory = React.forwardRef<HTMLDivElement, {
                           <span className="no-print"> Haz clic en una fila para ver el historial.</span>
                         </CardDescription>
                       </div>
-                      <div className="print-only hidden">
-                          <CardTitle className="font-headline text-2xl">Inventario al {filterDate ? format(filterDate, "PPP", { locale: es }) : ''}</CardTitle>
+                      <div className="print-only hidden print:block">
+                          <CardTitle className="font-headline text-2xl">Inventario al {filterDate ? format(filterDate, "PPP", { locale: es }) : format(new Date(), "PPP", { locale: es })}</CardTitle>
                           <CardDescription>Bodega: {selectedWarehouse === 'All' ? 'Todas' : selectedWarehouse}</CardDescription>
                       </div>
                   </CardHeader>
@@ -336,7 +337,7 @@ export default function InventoryPage() {
                   </CardContent>
               </Card>
             </div>
-            <div className="hidden">
+            <div className="hidden print:block">
                 <PrintableInventory
                     ref={printRef}
                     filteredInventory={filteredInventory}
