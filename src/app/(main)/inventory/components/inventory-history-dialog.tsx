@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, forwardRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,45 @@ type Transaction = {
 };
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
+
+const PrintableContent = forwardRef<HTMLDivElement, { history: (Transaction & { balance: number })[] }>(({ history }, ref) => (
+    <div ref={ref} className="max-h-[60vh] overflow-y-auto p-1">
+        <div className="border rounded-md">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Documento</TableHead>
+                        <TableHead>Contacto</TableHead>
+                        <TableHead className="text-right">Cantidad</TableHead>
+                        <TableHead className="text-right">Saldo</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {history.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
+                    {history.map((tx, index) => (
+                        <TableRow key={index}>
+                            <TableCell className="font-medium">{format(parseISO(tx.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
+                            <TableCell>
+                                <Badge variant={tx.type === 'Entrada' ? 'secondary' : 'destructive'}>{tx.type}</Badge>
+                            </TableCell>
+                            <TableCell>{tx.orderId}</TableCell>
+                            <TableCell>{tx.contact}</TableCell>
+                            <TableCell className={`text-right font-medium ${tx.type === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
+                                {tx.type === 'Entrada' ? '+' : '-'} {formatKilos(tx.quantity)}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-primary">
+                                {formatKilos(tx.balance)}
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </div>
+    </div>
+));
+PrintableContent.displayName = 'PrintableContent';
 
 export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: InventoryHistoryDialogProps) {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
@@ -115,41 +154,7 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
             Historial de transacciones y balance de stock para este ítem en la bodega: {item.warehouse}.
           </DialogDescription>
         </DialogHeader>
-        <div className="max-h-[60vh] overflow-y-auto p-1" ref={componentRef}>
-            <div className="border rounded-md">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Documento</TableHead>
-                            <TableHead>Contacto</TableHead>
-                            <TableHead className="text-right">Cantidad</TableHead>
-                            <TableHead className="text-right">Saldo</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {transactionHistory.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
-                        {transactionHistory.map((tx, index) => (
-                            <TableRow key={index}>
-                                <TableCell className="font-medium">{format(parseISO(tx.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
-                                <TableCell>
-                                    <Badge variant={tx.type === 'Entrada' ? 'secondary' : 'destructive'}>{tx.type}</Badge>
-                                </TableCell>
-                                <TableCell>{tx.orderId}</TableCell>
-                                <TableCell>{tx.contact}</TableCell>
-                                <TableCell className={`text-right font-medium ${tx.type === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                                    {tx.type === 'Entrada' ? '+' : '-'} {formatKilos(tx.quantity)}
-                                </TableCell>
-                                <TableCell className="text-right font-bold text-primary">
-                                    {formatKilos(tx.balance)}
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
-        </div>
+        <PrintableContent ref={componentRef} history={transactionHistory} />
         <DialogFooter className="no-print">
           <Button type="button" variant="outline" onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
