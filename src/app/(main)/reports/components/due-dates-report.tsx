@@ -64,15 +64,21 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         if (!isClient) return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0, totalBilled: 0, totalPaidInPeriod: 0 };
         
         const isAllClients = selectedClientId === 'all';
-        const filteredSalesOrders = isAllClients ? salesOrders : salesOrders.filter(o => o.clientId === selectedClientId);
         
+        const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
+        
+        const filteredSalesOrders = salesOrders.filter(o => {
+            const orderDate = new Date(o.date);
+            const clientMatch = isAllClients ? true : o.clientId === selectedClientId;
+            return clientMatch;
+        });
+
         const allDueItems: DueDateItem[] = [];
         const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
-        const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
 
         const clientsToProcess = isAllClients ? contacts.filter(c => c.type === 'client' || c.type === 'both') : contacts.filter(c => c.id === selectedClientId);
         clientsToProcess.forEach(client => {
-            clientData[client.id] = { dues: [], payments: [] };
+            if (client) clientData[client.id] = { dues: [], payments: [] };
         });
 
         filteredSalesOrders.forEach(order => {
@@ -118,7 +124,9 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         financialMovements
             .filter(fm => fm.type === 'income' && fm.contactId && clientIdsToFilter.includes(fm.contactId) && new Date(fm.date) <= endDate)
             .forEach(fm => {
-                clientData[fm.contactId].payments.push(fm);
+                if(clientData[fm.contactId!]) {
+                  clientData[fm.contactId!].payments.push(fm);
+                }
             });
 
         Object.values(clientData).forEach(({ dues, payments }) => {
@@ -254,7 +262,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
     }
     
     const renderTable = (items: DueDateItem[], total: number, caption: string, title: string) => (
-         <div className="rounded-md border">
+         <div className="rounded-md border print-container">
             <h3 className="font-headline text-xl mb-2 p-4">{title}</h3>
             <Table>
                 <TableHeader>
@@ -304,39 +312,42 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="grid md:grid-cols-5 gap-4 mb-6 no-print">
-                    <div className="md:col-span-1 flex flex-col gap-1.5">
-                        <Label>Ver balance al:</Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                            <Button
-                                variant={"outline"}
-                                className={cn("w-full justify-start text-left font-normal", !filterDate && "text-muted-foreground")}
-                            >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
-                            </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                            <Calendar mode="single" selected={filterDate} onSelect={setFilterDate} initialFocus />
-                            </PopoverContent>
-                        </Popover>
+                <div className="mb-6 space-y-4">
+                    <div className="flex flex-col md:flex-row gap-4 items-end no-print">
+                        <div className="flex-1 min-w-48">
+                            <Label>Ver balance al:</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn("w-full justify-start text-left font-normal", !filterDate && "text-muted-foreground")}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={filterDate} onSelect={setFilterDate} initialFocus />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <div className="flex-1 min-w-48">
+                            <Label>Cliente:</Label>
+                            <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Todos los clientes" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos los clientes</SelectItem>
+                                    {clientOptions.map(client => (
+                                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
-                    <div className="md:col-span-1 flex flex-col gap-1.5">
-                        <Label>Cliente:</Label>
-                        <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Todos los clientes" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Todos los clientes</SelectItem>
-                                {clientOptions.map(client => (
-                                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                     <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-4 gap-4">
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">Total Facturado</CardTitle>
@@ -382,7 +393,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 
                 <div className="space-y-8">
                     {renderTable(pendingItems, totalPending, 'Total Pendiente', 'Pendientes y Vencidos')}
-                    {renderTable(paidItems, totalPaidInPeriod, 'Total Pagado', 'Pagados en el Período')}
+                    {renderTable(paidItems, totalPaidInPeriod, 'Total Pagado', 'Pagados')}
                     {renderTable(upcomingItems, totalUpcoming, 'Total por Vencer', 'Próximos Vencimientos')}
                 </div>
 
