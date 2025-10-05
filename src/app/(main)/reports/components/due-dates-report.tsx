@@ -191,7 +191,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             'Orden (O/V)': item.orderId,
             'Tipo de Pago': item.paymentType,
             'Monto Cuota': item.amount,
-            'Monto Pagado': item.paidAmount,
             'Saldo Pendiente': item.pendingAmount,
             'Estado': item.status,
         }));
@@ -287,7 +286,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                         </Button>
                         <Button onClick={onPrint} variant="outline">
                             <Printer className="mr-2 h-4 w-4" />
-                            Imprimir
+                            Imprimir Informe
                         </Button>
                     </div>
                 </div>
@@ -367,7 +366,3 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
     
 }
-
-    
-
-    
