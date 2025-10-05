@@ -2,7 +2,7 @@
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
-import { Contact } from '@/lib/types';
+import { Contact, ContactType } from '@/lib/types';
 import { MoreHorizontal, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +18,20 @@ type GetColumnsProps = {
   onEdit: (contact: Contact) => void;
   onDelete: (contact: Contact) => void;
 }
+
+const typeVariantMap: Record<ContactType, "default" | "secondary" | "destructive" | "outline"> = {
+    client: 'default',
+    supplier: 'secondary',
+    other_income: 'default',
+    other_expense: 'destructive',
+};
+const typeLabelMap: Record<ContactType, string> = {
+    client: 'Cliente',
+    supplier: 'Proveedor',
+    other_income: 'Otros Ingresos',
+    other_expense: 'Otros Egresos',
+};
+
 
 export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Contact>[] => [
   {
@@ -47,36 +61,20 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Con
     accessorKey: 'type',
     header: 'Tipo',
     cell: ({ row }) => {
-        const type = row.getValue('type') as Contact['type'];
-        let variant: "default" | "secondary" | "outline" | "destructive" = "secondary";
-        let text = '';
+        const types = row.getValue('type') as ContactType[] | ContactType;
+        const typeArray = Array.isArray(types) ? types : (types === 'both' ? ['client', 'supplier'] : [types]);
+        
+        if (!typeArray || typeArray.length === 0) return 'N/A';
 
-        switch (type) {
-            case 'client':
-                variant = 'default';
-                text = 'Cliente';
-                break;
-            case 'supplier':
-                variant = 'secondary';
-                text = 'Proveedor';
-                break;
-            case 'both':
-                variant = 'outline';
-                text = 'Ambos';
-                break;
-            case 'other_income':
-                variant = 'default';
-                text = 'Otros Ingresos';
-                break;
-            case 'other_expense':
-                variant = 'destructive';
-                text = 'Otros Egresos';
-                break;
-            default:
-                text = 'N/A';
-        }
-
-        return <Badge variant={variant}>{text}</Badge>
+        return (
+            <div className="flex flex-wrap gap-1">
+                {typeArray.map(type => {
+                    const variant = typeVariantMap[type] || "outline";
+                    const text = typeLabelMap[type] || 'N/A';
+                    return <Badge key={type} variant={variant}>{text}</Badge>
+                })}
+            </div>
+        )
     }
   },
    {
@@ -129,3 +127,5 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Con
     },
   },
 ];
+
+    

@@ -56,6 +56,7 @@ export default function ContactsPage() {
         id: `contact-${Date.now()}`,
         interactions: [],
         tags: contact.tags || [],
+        type: contact.type || [],
       };
       if (newInteraction) {
          const interaction: Interaction = { ...newInteraction, id: `int-${Date.now()}` };
@@ -168,3 +169,5 @@ export default function ContactsPage() {
     </>
   );
 }
+
+    

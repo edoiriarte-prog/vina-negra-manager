@@ -15,20 +15,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Contact, Interaction } from '@/lib/types';
+import { Contact, Interaction, ContactType } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { X, PlusCircle, Calendar, Users, Mail, Phone, Handshake } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type NewContactSheetProps = {
   isOpen: boolean;
@@ -38,8 +32,20 @@ type NewContactSheetProps = {
   defaultTab?: string;
 };
 
+const contactTypes: { id: ContactType, label: string }[] = [
+    { id: 'client', label: 'Cliente' },
+    { id: 'supplier', label: 'Proveedor' },
+    { id: 'other_income', label: 'Otros Ingresos' },
+    { id: 'other_expense', label: 'Otros Egresos' },
+];
+
 const getInitialFormData = (contact: Contact | null): Omit<Contact, 'id' | 'interactions'> => {
   if (contact) {
+    // Backward compatibility: if type is a string, convert to array
+    const contactType = Array.isArray(contact.type) 
+        ? contact.type 
+        : (contact.type === 'both' ? ['client', 'supplier'] : [contact.type]);
+      
     return {
       name: contact.name,
       rut: contact.rut,
@@ -47,7 +53,7 @@ const getInitialFormData = (contact: Contact | null): Omit<Contact, 'id' | 'inte
       contactPerson: contact.contactPerson,
       address: contact.address,
       commune: contact.commune,
-      type: contact.type,
+      type: contactType as ContactType[],
       tags: contact.tags || []
     }
   }
@@ -58,7 +64,7 @@ const getInitialFormData = (contact: Contact | null): Omit<Contact, 'id' | 'inte
     contactPerson: '',
     address: '',
     commune: '',
-    type: 'client',
+    type: [],
     tags: []
   }
 }
@@ -125,6 +131,16 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
     // Don't close sheet automatically, page will handle it.
   };
 
+  const handleTypeChange = (typeId: ContactType) => {
+    setFormData(prev => {
+        const currentTypes = prev.type || [];
+        const newTypes = currentTypes.includes(typeId)
+            ? currentTypes.filter(t => t !== typeId)
+            : [...currentTypes, typeId];
+        return { ...prev, type: newTypes };
+    });
+  }
+
   const title = contact ? 'Editar Contacto' : 'Crear Nuevo Contacto';
   const description = contact 
     ? 'Actualice la información del contacto y su control de eventos.'
@@ -188,26 +204,25 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                   </Label>
                   <Input id="commune" name="commune" value={formData.commune} onChange={handleInputChange} className="col-span-3" />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="type" className="text-right">
-                    Tipo
-                  </Label>
-                  <Select
-                    required
-                    onValueChange={(value: 'client' | 'supplier' | 'both' | 'other_income' | 'other_expense') => setFormData(p => ({...p, type: value}))}
-                    value={formData.type}
-                  >
-                    <SelectTrigger className="col-span-3">
-                      <SelectValue placeholder="Seleccione un tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="client">Cliente</SelectItem>
-                      <SelectItem value="supplier">Proveedor</SelectItem>
-                      <SelectItem value="both">Ambos</SelectItem>
-                      <SelectItem value="other_income">Otros Ingresos</SelectItem>
-                      <SelectItem value="other_expense">Otros Egresos</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-4 items-start gap-4">
+                    <Label className="text-right pt-2">Tipo</Label>
+                    <div className="col-span-3 grid grid-cols-2 gap-4">
+                        {contactTypes.map(typeOption => (
+                            <div key={typeOption.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={`type-${typeOption.id}`}
+                                    checked={formData.type?.includes(typeOption.id)}
+                                    onCheckedChange={() => handleTypeChange(typeOption.id)}
+                                />
+                                <label
+                                    htmlFor={`type-${typeOption.id}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                    {typeOption.label}
+                                </label>
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 <div className="grid grid-cols-4 items-start gap-4">
                     <Label htmlFor="tags" className="text-right pt-2">
@@ -257,7 +272,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                                 value={newInteraction.date}
                                 onChange={(e) => setNewInteraction(p => ({ ...p, date: e.target.value }))}
                             />
-                            <Select
+                             <Select
                                 value={newInteraction.type}
                                 onValueChange={(value: Interaction['type']) => setNewInteraction(p => ({...p, type: value}))}
                             >
@@ -312,3 +327,5 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
     </Sheet>
   );
 }
+
+    

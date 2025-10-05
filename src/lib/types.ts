@@ -7,6 +7,8 @@ export type Interaction = {
   notes: string;
 };
 
+export type ContactType = 'client' | 'supplier' | 'other_income' | 'other_expense';
+
 export type Contact = {
   id: string;
   name: string;
@@ -15,7 +17,7 @@ export type Contact = {
   commune: string;
   email: string;
   contactPerson: string;
-  type: 'client' | 'supplier' | 'both' | 'other_income' | 'other_expense';
+  type: ContactType[] | 'client' | 'supplier' | 'both'; // `both` is for backwards compatibility
   tags?: string[];
   interactions?: Interaction[];
 };
@@ -145,5 +147,7 @@ export type BankAccount = {
     status: 'Activa' | 'Inactiva';
     owner?: string;
 }
+
+    
 
     
