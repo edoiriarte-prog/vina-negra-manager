@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Printer } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -90,6 +90,10 @@ export default function InventoryPage() {
   const handleShowHistory = (item: InventoryItem) => {
     setHistoryItem(item);
   };
+  
+  const handlePrint = () => {
+    window.print();
+  }
 
   const renderInventoryRows = () => {
     if (!isClient) {
@@ -119,13 +123,19 @@ export default function InventoryPage() {
   return (
     <>
       <div className="flex flex-col gap-6">
-       <div>
-        <h1 className="font-headline text-3xl">Inventario y Rendimiento</h1>
-        <p className="text-muted-foreground">Analiza el stock actual y el rendimiento de tus productos.</p>
-      </div>
+       <div className="flex justify-between items-start no-print">
+          <div>
+            <h1 className="font-headline text-3xl">Inventario y Rendimiento</h1>
+            <p className="text-muted-foreground">Analiza el stock actual y el rendimiento de tus productos.</p>
+          </div>
+          <Button onClick={handlePrint} variant="outline">
+            <Printer className="mr-2 h-4 w-4" />
+            Imprimir Inventario
+          </Button>
+        </div>
 
       <Tabs defaultValue="stock">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-2 no-print">
           <TabsTrigger value="stock">Stock Actual</TabsTrigger>
           <TabsTrigger value="performance">Rendimiento de Productos</TabsTrigger>
         </TabsList>
@@ -133,10 +143,13 @@ export default function InventoryPage() {
             <Card className="mt-6">
                 <CardHeader>
                     <CardTitle className="font-headline text-2xl">Inventario en Tiempo Real</CardTitle>
-                    <CardDescription>Stock disponible calculado a partir de las compras y ventas completadas. Haz clic en una fila para ver el historial.</CardDescription>
+                    <CardDescription>
+                      Stock disponible calculado a partir de las compras y ventas completadas.
+                      <span className="no-print"> Haz clic en una fila para ver el historial.</span>
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex items-center gap-4 mb-4">
+                    <div className="flex items-center gap-4 mb-4 no-print">
                       <div>
                         <Label>Bodega</Label>
                         <div className="flex items-center gap-2">
