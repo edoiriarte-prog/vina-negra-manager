@@ -6,9 +6,9 @@ import { useReactToPrint } from 'react-to-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { InventoryItem, PurchaseOrder, SalesOrder } from '@/lib/types';
+import { InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
+import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +25,7 @@ type InventoryHistoryDialogProps = {
 type Transaction = {
   date: string;
   orderId: string;
-  type: 'Entrada' | 'Salida';
+  type: 'Entrada' | 'Salida' | 'Ajuste Aumento' | 'Ajuste Disminución';
   contact: string;
   inflow: number;
   outflow: number;
@@ -48,8 +48,8 @@ const PrintableContent = forwardRef<HTMLDivElement, PrintableContentProps>(({ hi
                         <TableRow>
                             <TableHead>Fecha</TableHead>
                             <TableHead>Tipo</TableHead>
-                            <TableHead>Documento</TableHead>
-                            <TableHead>Contacto</TableHead>
+                            <TableHead>Documento/Motivo</TableHead>
+                            <TableHead>Contacto/Origen</TableHead>
                             <TableHead className="text-right">Ingresos</TableHead>
                             <TableHead className="text-right">Egresos</TableHead>
                             <TableHead className="text-right">Saldo</TableHead>
@@ -61,7 +61,15 @@ const PrintableContent = forwardRef<HTMLDivElement, PrintableContentProps>(({ hi
                             <TableRow key={index}>
                                 <TableCell className="font-medium">{format(parseISO(tx.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
                                 <TableCell>
-                                    <Badge variant={tx.type === 'Entrada' ? 'secondary' : 'destructive'}>{tx.type}</Badge>
+                                    <Badge 
+                                        variant={
+                                            tx.type === 'Entrada' ? 'secondary' : 
+                                            tx.type === 'Salida' ? 'destructive' :
+                                            tx.type === 'Ajuste Aumento' ? 'default' : 'outline'
+                                        }
+                                    >
+                                        {tx.type}
+                                    </Badge>
                                 </TableCell>
                                 <TableCell>{tx.orderId}</TableCell>
                                 <TableCell>{tx.contact}</TableCell>
@@ -87,6 +95,7 @@ PrintableContent.displayName = 'PrintableContent';
 export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: InventoryHistoryDialogProps) {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
+  const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
   const [contacts] = useLocalStorage('contacts', []);
   const { toast } = useToast();
 
@@ -137,15 +146,34 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
             });
           });
       });
+      
+    // Aggregate adjustments
+    inventoryAdjustments
+      .filter(adj => (item.warehouse === 'All' || adj.warehouse === item.warehouse) && adj.product === item.product && adj.caliber === item.caliber)
+      .forEach(adj => {
+          allTransactions.push({
+              date: adj.date,
+              orderId: adj.reason,
+              type: adj.type === 'increase' ? 'Ajuste Aumento' : 'Ajuste Disminución',
+              contact: 'Ajuste Interno',
+              inflow: adj.type === 'increase' ? adj.quantity : 0,
+              outflow: adj.type === 'decrease' ? adj.quantity : 0,
+          });
+      });
 
-    // Sort transactions: by date, then by type ('Entrada' first)
+    // Sort transactions: by date, then by type ('Entrada' and 'Ajuste Aumento' first)
     allTransactions.sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
       if (dateA !== dateB) {
         return dateA - dateB;
       }
-      return a.type === 'Entrada' ? -1 : 1;
+      // Inflows first
+      const aIsInflow = a.type === 'Entrada' || a.type === 'Ajuste Aumento';
+      const bIsInflow = b.type === 'Entrada' || b.type === 'Ajuste Aumento';
+      if (aIsInflow && !bIsInflow) return -1;
+      if (!aIsInflow && bIsInflow) return 1;
+      return 0;
     });
 
     let runningBalance = 0;
@@ -154,7 +182,7 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
         return { ...tx, balance: runningBalance };
     });
 
-  }, [item, purchaseOrders, salesOrders, contacts]);
+  }, [item, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
   
   const handleExportHistory = () => {
     if (!item || transactionHistory.length === 0) {
@@ -164,8 +192,8 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
     const dataForSheet = transactionHistory.map(tx => ({
       'Fecha': format(parseISO(tx.date), 'dd-MM-yyyy'),
       'Tipo': tx.type,
-      'Documento': tx.orderId,
-      'Contacto': tx.contact,
+      'Documento/Motivo': tx.orderId,
+      'Contacto/Origen': tx.contact,
       'Ingresos (kg)': tx.inflow,
       'Egresos (kg)': tx.outflow,
       'Saldo (kg)': tx.balance,
