@@ -12,7 +12,9 @@ import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrd
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
-import { Printer } from 'lucide-react';
+import { Printer, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { useToast } from '@/hooks/use-toast';
 
 type InventoryHistoryDialogProps = {
   item: InventoryItem | null;
@@ -25,14 +27,21 @@ type Transaction = {
   orderId: string;
   type: 'Entrada' | 'Salida';
   contact: string;
-  quantity: number;
+  inflow: number;
+  outflow: number;
 };
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 
-const PrintableContent = forwardRef<HTMLDivElement, { history: (Transaction & { balance: number })[] }>(({ history }, ref) => {
+type PrintableContentProps = {
+  history: (Transaction & { balance: number })[];
+  item: InventoryItem;
+}
+
+const PrintableContent = forwardRef<HTMLDivElement, PrintableContentProps>(({ history, item }, ref) => {
     return (
         <div ref={ref} className="max-h-[60vh] overflow-y-auto p-1">
+            <h3 className="text-lg font-semibold print:block hidden mb-2">Historial: {item.product} - {item.caliber}</h3>
             <div className="border rounded-md">
                 <Table>
                     <TableHeader>
@@ -41,12 +50,13 @@ const PrintableContent = forwardRef<HTMLDivElement, { history: (Transaction & { 
                             <TableHead>Tipo</TableHead>
                             <TableHead>Documento</TableHead>
                             <TableHead>Contacto</TableHead>
-                            <TableHead className="text-right">Cantidad</TableHead>
+                            <TableHead className="text-right">Ingresos</TableHead>
+                            <TableHead className="text-right">Egresos</TableHead>
                             <TableHead className="text-right">Saldo</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {history.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
+                        {history.length === 0 && <TableRow><TableCell colSpan={7} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
                         {history.map((tx, index) => (
                             <TableRow key={index}>
                                 <TableCell className="font-medium">{format(parseISO(tx.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
@@ -55,8 +65,11 @@ const PrintableContent = forwardRef<HTMLDivElement, { history: (Transaction & { 
                                 </TableCell>
                                 <TableCell>{tx.orderId}</TableCell>
                                 <TableCell>{tx.contact}</TableCell>
-                                <TableCell className={`text-right font-medium ${tx.type === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                                    {tx.type === 'Entrada' ? '+' : '-'} {formatKilos(tx.quantity)}
+                                <TableCell className="text-right text-green-600">
+                                    {tx.inflow > 0 ? `+${formatKilos(tx.inflow)}` : '-'}
+                                </TableCell>
+                                <TableCell className="text-right text-red-600">
+                                    {tx.outflow > 0 ? `-${formatKilos(tx.outflow)}` : '-'}
                                 </TableCell>
                                 <TableCell className="text-right font-bold text-primary">
                                     {formatKilos(tx.balance)}
@@ -75,6 +88,7 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [contacts] = useLocalStorage('contacts', []);
+  const { toast } = useToast();
 
   const componentRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -99,7 +113,8 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
               orderId: po.id,
               type: 'Entrada',
               contact: supplier?.name || 'N/A',
-              quantity: i.quantity,
+              inflow: i.quantity,
+              outflow: 0,
             });
           });
       });
@@ -117,7 +132,8 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
               orderId: so.id,
               type: 'Salida',
               contact: client?.name || 'N/A',
-              quantity: i.quantity,
+              inflow: 0,
+              outflow: i.quantity,
             });
           });
       });
@@ -129,22 +145,38 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
       if (dateA !== dateB) {
         return dateA - dateB;
       }
-      // If dates are same, 'Entrada' comes before 'Salida'
       return a.type === 'Entrada' ? -1 : 1;
     });
 
     let runningBalance = 0;
     return allTransactions.map(tx => {
-      if (tx.type === 'Entrada') {
-        runningBalance += tx.quantity;
-      } else {
-        runningBalance -= tx.quantity;
-      }
-      return { ...tx, balance: runningBalance };
+        runningBalance += tx.inflow - tx.outflow;
+        return { ...tx, balance: runningBalance };
     });
 
   }, [item, purchaseOrders, salesOrders, contacts]);
   
+  const handleExportHistory = () => {
+    if (!item || transactionHistory.length === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No hay historial para exportar.' });
+      return;
+    }
+    const dataForSheet = transactionHistory.map(tx => ({
+      'Fecha': format(parseISO(tx.date), 'dd-MM-yyyy'),
+      'Tipo': tx.type,
+      'Documento': tx.orderId,
+      'Contacto': tx.contact,
+      'Ingresos (kg)': tx.inflow,
+      'Egresos (kg)': tx.outflow,
+      'Saldo (kg)': tx.balance,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, `Historial_${item.product}_${item.caliber}`);
+    XLSX.writeFile(workbook, `Historial_Inventario_${item.product}_${item.caliber}.xlsx`);
+    toast({ title: 'Exportación Exitosa', description: 'El historial del ítem ha sido exportado.' });
+  }
+
   if (!item) return null;
 
   return (
@@ -156,14 +188,18 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
             Historial de transacciones y balance de stock para este ítem en la bodega: {item.warehouse}.
           </DialogDescription>
         </DialogHeader>
-        <PrintableContent ref={componentRef} history={transactionHistory} />
-        <DialogFooter className="no-print">
+        <PrintableContent ref={componentRef} history={transactionHistory} item={item}/>
+        <DialogFooter className="no-print gap-2">
+          <Button type="button" variant="outline" onClick={handleExportHistory}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar a Excel
+          </Button>
           <Button type="button" variant="outline" onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
             Imprimir Historial
           </Button>
           <DialogClose asChild>
-            <Button type="button" variant="outline">Cerrar</Button>
+            <Button type="button">Cerrar</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>

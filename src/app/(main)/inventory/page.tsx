@@ -16,11 +16,13 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Printer } from 'lucide-react';
+import { CalendarIcon, Printer, Download } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Label } from '@/components/ui/label';
+import * as XLSX from 'xlsx';
+import { useToast } from '@/hooks/use-toast';
 
 export default function InventoryPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
@@ -31,7 +33,8 @@ export default function InventoryPage() {
   const { warehouses } = useMasterData();
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('All');
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
-  const [filterDate, setFilterDate] = useState<Date | undefined>();
+  const [filterDate, setFilterDate] = useState<Date | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
@@ -96,6 +99,26 @@ export default function InventoryPage() {
     window.print();
   }
 
+  const handleExportSummary = () => {
+    if (filteredInventory.length === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No hay datos de inventario para exportar.' });
+      return;
+    }
+    const dataForSheet = filteredInventory.map(item => ({
+      'Producto': item.product,
+      'Calibre': item.caliber,
+      'Bodega': selectedWarehouse,
+      'Kilos Comprados': item.kilosPurchased,
+      'Kilos Vendidos': item.kilosSold,
+      'Stock Actual': item.stock,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Resumen de Inventario');
+    XLSX.writeFile(workbook, `Resumen_Inventario_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast({ title: 'Exportación Exitosa', description: 'El resumen de inventario ha sido exportado.' });
+  }
+
   const renderInventoryRows = () => {
     if (!isClient) {
       // Render skeleton rows on the server and initial client render
@@ -129,10 +152,16 @@ export default function InventoryPage() {
             <h1 className="font-headline text-3xl">Inventario y Rendimiento</h1>
             <p className="text-muted-foreground">Analiza el stock actual y el rendimiento de tus productos.</p>
           </div>
-          <Button onClick={handlePrint} variant="outline">
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimir Inventario
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleExportSummary} variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Exportar Resumen
+            </Button>
+            <Button onClick={handlePrint} variant="outline">
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimir Inventario
+            </Button>
+          </div>
         </div>
 
       <Tabs defaultValue="stock">
@@ -192,8 +221,8 @@ export default function InventoryPage() {
                               <PopoverContent className="w-auto p-0">
                               <Calendar
                                   mode="single"
-                                  selected={filterDate}
-                                  onSelect={setFilterDate}
+                                  selected={filterDate || undefined}
+                                  onSelect={(date) => setFilterDate(date || null)}
                                   initialFocus
                                 />
                               </PopoverContent>
