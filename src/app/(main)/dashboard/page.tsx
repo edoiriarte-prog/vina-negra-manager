@@ -11,6 +11,14 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   purchaseOrders as initialPurchaseOrders,
   salesOrders as initialSalesOrders,
   serviceOrders as initialServiceOrders,
@@ -412,10 +420,39 @@ export default function DashboardPage() {
            <div className="grid gap-6 mt-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className='font-headline text-xl'>Distribución por Calibre (Stock)</CardTitle>
+                  <CardTitle className='font-headline text-xl'>Distribución de Stock por Calibre</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {isClient ? <CaliberDistributionChart data={inventory} /> : <Skeleton className="h-[300px] w-full" />}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline text-xl">Resumen de Stock</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="rounded-md border max-h-[300px] overflow-y-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Producto</TableHead>
+                                    <TableHead>Calibre</TableHead>
+                                    <TableHead className="text-right">Stock (kg)</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isClient ? inventory.filter(i => i.stock > 0).map(item => (
+                                    <TableRow key={item.key}>
+                                        <TableCell>{item.product}</TableCell>
+                                        <TableCell>{item.caliber}</TableCell>
+                                        <TableCell className="text-right font-medium">{item.stock.toLocaleString('es-CL')}</TableCell>
+                                    </TableRow>
+                                )) : Array.from({length: 5}).map((_, i) => (
+                                    <TableRow key={`sk-inv-${i}`}><TableCell colSpan={3}><Skeleton className="h-6 w-full"/></TableCell></TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
               </Card>
            </div>

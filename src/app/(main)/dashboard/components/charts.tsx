@@ -187,30 +187,26 @@ export function IncomeVsExpenseChart({ data }: { data: FinancialMovement[] }) {
 
 // Caliber Distribution Chart
 export function CaliberDistributionChart({ data }: { data: InventoryItem[] }) {
-    const chartData = data.filter(item => item.stock > 0).map(item => ({ name: item.caliber, value: item.stock }));
-    const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
-    
+    const chartData = data.filter(item => item.stock > 0).map(item => ({ 
+        name: `${item.product.substring(0,3)}. ${item.caliber}`, 
+        value: item.stock 
+    })).sort((a, b) => b.value - a.value);
+
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
-        <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
-            const RADIAN = Math.PI / 180;
-            const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-            const x = cx + radius * Math.cos(-midAngle * RADIAN);
-            const y = cy + radius * Math.sin(-midAngle * RADIAN);
-            return (
-              <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
-                {`${(percent * 100).toFixed(0)}%`}
-              </text>
-            );
-          }}>
-          {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip formatter={(value: number) => formatKilos(value)} />
-        <Legend />
-      </PieChart>
+      <BarChart data={chartData}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={10} angle={-45} textAnchor="end" height={60} />
+        <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'hsl(var(--background))',
+            borderColor: 'hsl(var(--border))',
+          }}
+          formatter={(value: number) => formatKilos(value)}
+        />
+        <Bar dataKey="value" name="Stock" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+      </BarChart>
     </ResponsiveContainer>
   );
 }
