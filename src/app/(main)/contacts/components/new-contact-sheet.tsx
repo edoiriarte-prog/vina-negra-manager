@@ -23,6 +23,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 type NewContactSheetProps = {
   isOpen: boolean;
@@ -327,5 +329,3 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
     </Sheet>
   );
 }
-
-    
