@@ -49,7 +49,7 @@ const formatCurrency = (value: number) =>
 export function DueDatesReport({ salesOrders, financialMovements, contacts, onPrint }: DueDatesReportProps) {
     const [isClient, setIsClient] = useState(false);
     const [filterDate, setFilterDate] = useState<Date | undefined>(new Date());
-    const [selectedClientId, setSelectedClientId] = useState<string>('');
+    const [selectedClientId, setSelectedClientId] = useState<string>('all');
     const { toast } = useToast();
     
     useEffect(() => {
@@ -63,20 +63,18 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
     const { pendingItems, paidItems, upcomingItems, totalPending, totalPaid, totalUpcoming, totalBilled, totalPaidInPeriod } = useMemo(() => {
         if (!isClient) return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0, totalBilled: 0, totalPaidInPeriod: 0 };
         
-        const filteredSalesOrders = selectedClientId ? salesOrders.filter(o => o.clientId === selectedClientId) : salesOrders;
-        const filteredFinancialMovements = selectedClientId ? financialMovements.filter(m => m.contactId === selectedClientId) : financialMovements;
+        const isAllClients = selectedClientId === 'all';
+        const filteredSalesOrders = isAllClients ? salesOrders : salesOrders.filter(o => o.clientId === selectedClientId);
         
         const allDueItems: DueDateItem[] = [];
         const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
         const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
 
-        // 1. Initialize client data structure
-        const clientsToProcess = selectedClientId ? contacts.filter(c => c.id === selectedClientId) : contacts.filter(c => c.type === 'client' || c.type === 'both');
+        const clientsToProcess = isAllClients ? contacts.filter(c => c.type === 'client' || c.type === 'both') : contacts.filter(c => c.id === selectedClientId);
         clientsToProcess.forEach(client => {
             clientData[client.id] = { dues: [], payments: [] };
         });
 
-        // 2. Populate all possible due items from sales orders
         filteredSalesOrders.forEach(order => {
              if (order.status !== 'cancelled' && clientData[order.clientId]) {
                 const clientName = contacts.find(c => c.id === order.clientId)?.name || 'Desconocido';
@@ -116,14 +114,13 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
              }
         });
 
-        // 3. Populate payments for each client up to the filter date
-        filteredFinancialMovements
-            .filter(fm => fm.type === 'income' && fm.contactId && clientData[fm.contactId] && new Date(fm.date) <= endDate)
+        const clientIdsToFilter = Object.keys(clientData);
+        financialMovements
+            .filter(fm => fm.type === 'income' && fm.contactId && clientIdsToFilter.includes(fm.contactId) && new Date(fm.date) <= endDate)
             .forEach(fm => {
                 clientData[fm.contactId].payments.push(fm);
             });
 
-        // 4. Settle payments for each client individually
         Object.values(clientData).forEach(({ dues, payments }) => {
             const sortedDues = dues.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
             const sortedPayments = payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -177,8 +174,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             
         const totalPending = pending.reduce((sum, item) => sum + item.pendingAmount, 0);
         
-        const totalPaid = filteredFinancialMovements
-            .filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate)
+        const totalPaid = financialMovements
+            .filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate && (isAllClients || fm.contactId === selectedClientId))
             .reduce((sum, mov) => sum + mov.amount, 0);
 
         const totalPaidInPeriod = pastAndPresentItems.reduce((sum, item) => sum + item.paidAmount, 0);
@@ -307,7 +304,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="grid md:grid-cols-5 gap-4 mb-6">
+                <div className="grid md:grid-cols-5 gap-4 mb-6 no-print">
                     <div className="md:col-span-1 flex flex-col gap-1.5">
                         <Label>Ver balance al:</Label>
                         <Popover>
@@ -332,7 +329,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                 <SelectValue placeholder="Todos los clientes" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">Todos los clientes</SelectItem>
+                                <SelectItem value="all">Todos los clientes</SelectItem>
                                 {clientOptions.map(client => (
                                     <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                                 ))}
@@ -395,7 +392,5 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
     
 }
-
-    
 
     
