@@ -12,9 +12,11 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isAfter, startOfDay, isEqual } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CalendarIcon, DollarSign, Clock, Forward, FileText } from 'lucide-react';
+import { CalendarIcon, DollarSign, Clock, Forward, FileText, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
+import * as XLSX from 'xlsx';
+import { useToast } from '@/hooks/use-toast';
 
 type DueDatesReportProps = {
     salesOrders: SalesOrder[];
@@ -45,6 +47,7 @@ const formatCurrency = (value: number) =>
 export function DueDatesReport({ salesOrders, financialMovements, contacts }: DueDatesReportProps) {
     const [isClient, setIsClient] = useState(false);
     const [filterDate, setFilterDate] = useState<Date | undefined>(new Date());
+    const { toast } = useToast();
     
     useEffect(() => {
         setIsClient(true);
@@ -171,6 +174,49 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
     }, [salesOrders, financialMovements, contacts, isClient, filterDate]);
 
 
+    const handleExport = () => {
+        if (!pendingItems.length && !paidItems.length && !upcomingItems.length) {
+            toast({
+                variant: 'destructive',
+                title: 'Error de Exportación',
+                description: 'No hay datos para exportar.',
+            });
+            return;
+        }
+
+        const workbook = XLSX.utils.book_new();
+
+        const formatForSheet = (items: DueDateItem[]) => items.map(item => ({
+            'Fecha Vencimiento': format(parseISO(item.dueDate), "dd-MM-yyyy"),
+            'Cliente': item.clientName,
+            'Orden (O/V)': item.orderId,
+            'Tipo de Pago': item.paymentType,
+            'Monto Cuota': item.amount,
+            'Monto Pagado': item.paidAmount,
+            'Saldo Pendiente': item.pendingAmount,
+            'Estado': item.status,
+        }));
+        
+        if (pendingItems.length > 0) {
+            const pendingSheet = XLSX.utils.json_to_sheet(formatForSheet(pendingItems));
+            XLSX.utils.book_append_sheet(workbook, pendingSheet, 'Pendientes y Vencidos');
+        }
+        if (paidItems.length > 0) {
+            const paidSheet = XLSX.utils.json_to_sheet(formatForSheet(paidItems));
+            XLSX.utils.book_append_sheet(workbook, paidSheet, 'Pagados');
+        }
+        if (upcomingItems.length > 0) {
+            const upcomingSheet = XLSX.utils.json_to_sheet(formatForSheet(upcomingItems));
+            XLSX.utils.book_append_sheet(workbook, upcomingSheet, 'Próximos Vencimientos');
+        }
+
+        XLSX.writeFile(workbook, `Informe_Vencimientos_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+        toast({
+            title: 'Exportación Exitosa',
+            description: 'El informe de vencimientos ha sido exportado a Excel.',
+        });
+    };
+
     const renderReportRows = (data: DueDateItem[]) => {
         if (!isClient) {
             return Array.from({ length: 5 }).map((_, index) => (
@@ -230,8 +276,16 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
     return (
         <Card className="print-container mt-6">
             <CardHeader className="no-print">
-                <CardTitle className="font-headline text-2xl">Informe de Vencimientos</CardTitle>
-                <CardDescription>Seguimiento de vencimientos de pago. Seleccione una fecha para ver el balance a ese día.</CardDescription>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle className="font-headline text-2xl">Informe de Vencimientos</CardTitle>
+                        <CardDescription>Seguimiento de vencimientos de pago. Seleccione una fecha para ver el balance a ese día.</CardDescription>
+                    </div>
+                    <Button onClick={handleExport} variant="outline">
+                        <Download className="mr-2 h-4 w-4" />
+                        Exportar a Excel
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent>
                 <div className="grid md:grid-cols-5 gap-4 mb-6">
