@@ -10,6 +10,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders } from '@/lib/data';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
 
 type InventoryHistoryDialogProps = {
   item: InventoryItem | null;
@@ -17,80 +18,94 @@ type InventoryHistoryDialogProps = {
   onOpenChange: (isOpen: boolean) => void;
 };
 
-type DailySummary = {
-    date: string;
-    inflows: number;
-    outflows: number;
-    balance: number;
-}
+type Transaction = {
+  date: string;
+  orderId: string;
+  type: 'Entrada' | 'Salida';
+  contact: string;
+  quantity: number;
+};
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 
 export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: InventoryHistoryDialogProps) {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
+  const [contacts] = useLocalStorage('contacts', []);
   
-  const dailySummary = useMemo(() => {
+  const transactionHistory = useMemo(() => {
     if (!item) return [];
 
-    const transactionsByDate: Record<string, { inflows: number, outflows: number }> = {};
+    const allTransactions: Transaction[] = [];
 
     // Aggregate inflows from purchase orders
     purchaseOrders
-      .flatMap(po => 
+      .filter(po => (item.warehouse === 'All' || po.warehouse === item.warehouse) && po.status === 'completed')
+      .forEach(po => {
         po.items
-          .filter(i => i.product === item.product && i.caliber === item.caliber && (item.warehouse === 'All' || po.warehouse === item.warehouse) && po.status === 'completed')
-          .map(i => ({ date: po.date, quantity: i.quantity }))
-      )
-      .forEach(tx => {
-        const dateStr = format(parseISO(tx.date), 'yyyy-MM-dd');
-        if (!transactionsByDate[dateStr]) {
-          transactionsByDate[dateStr] = { inflows: 0, outflows: 0 };
-        }
-        transactionsByDate[dateStr].inflows += tx.quantity;
+          .filter(i => i.product === item.product && i.caliber === item.caliber)
+          .forEach(i => {
+            const supplier = (contacts as any[]).find(c => c.id === po.supplierId);
+            allTransactions.push({
+              date: po.date,
+              orderId: po.id,
+              type: 'Entrada',
+              contact: supplier?.name || 'N/A',
+              quantity: i.quantity,
+            });
+          });
       });
 
     // Aggregate outflows from sales orders
     salesOrders
-      .flatMap(so => 
+      .filter(so => (item.warehouse === 'All' || so.warehouse === item.warehouse) && (so.status === 'completed' || so.status === 'pending'))
+      .forEach(so => {
         so.items
-          .filter(i => i.product === item.product && i.caliber === item.caliber && (item.warehouse === 'All' || so.warehouse === item.warehouse) && (so.status === 'completed' || so.status === 'pending'))
-          .map(i => ({ date: so.date, quantity: i.quantity }))
-      )
-      .forEach(tx => {
-        const dateStr = format(parseISO(tx.date), 'yyyy-MM-dd');
-        if (!transactionsByDate[dateStr]) {
-          transactionsByDate[dateStr] = { inflows: 0, outflows: 0 };
-        }
-        transactionsByDate[dateStr].outflows += tx.quantity;
+          .filter(i => i.product === item.product && i.caliber === item.caliber)
+          .forEach(i => {
+            const client = (contacts as any[]).find(c => c.id === so.clientId);
+            allTransactions.push({
+              date: so.date,
+              orderId: so.id,
+              type: 'Salida',
+              contact: client?.name || 'N/A',
+              quantity: i.quantity,
+            });
+          });
       });
 
-    const sortedDates = Object.keys(transactionsByDate).sort();
-
-    let runningBalance = 0;
-    const summary: DailySummary[] = sortedDates.map(dateStr => {
-        const dailyTx = transactionsByDate[dateStr];
-        runningBalance += dailyTx.inflows - dailyTx.outflows;
-        return {
-            date: dateStr,
-            inflows: dailyTx.inflows,
-            outflows: dailyTx.outflows,
-            balance: runningBalance,
-        };
+    // Sort transactions: by date, then by type ('Entrada' first)
+    allTransactions.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      if (dateA !== dateB) {
+        return dateA - dateB;
+      }
+      // If dates are same, 'Entrada' comes before 'Salida'
+      return a.type === 'Entrada' ? -1 : 1;
     });
 
-    return summary;
-  }, [item, purchaseOrders, salesOrders]);
+    let runningBalance = 0;
+    return allTransactions.map(tx => {
+      if (tx.type === 'Entrada') {
+        runningBalance += tx.quantity;
+      } else {
+        runningBalance -= tx.quantity;
+      }
+      return { ...tx, balance: runningBalance };
+    });
+
+  }, [item, purchaseOrders, salesOrders, contacts]);
   
   if (!item) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Seguimiento Histórico: {item.product} - {item.caliber}</DialogTitle>
           <DialogDescription>
-            Resumen de movimientos diarios y balance de stock para este ítem en la bodega: {item.warehouse}.
+            Historial de transacciones y balance de stock para este ítem en la bodega: {item.warehouse}.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] overflow-y-auto p-1">
@@ -99,24 +114,28 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
                     <TableHeader>
                         <TableRow>
                             <TableHead>Fecha</TableHead>
-                            <TableHead className="text-right">Ingresos (kg)</TableHead>
-                            <TableHead className="text-right">Egresos (kg)</TableHead>
-                            <TableHead className="text-right">Saldo (kg)</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead>Documento</TableHead>
+                            <TableHead>Contacto</TableHead>
+                            <TableHead className="text-right">Cantidad</TableHead>
+                            <TableHead className="text-right">Saldo</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {dailySummary.length === 0 && <TableRow><TableCell colSpan={4} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
-                        {dailySummary.map((day) => (
-                            <TableRow key={day.date}>
-                                <TableCell className="font-medium">{format(parseISO(day.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
-                                <TableCell className="text-right font-medium text-green-600">
-                                    {day.inflows > 0 ? formatKilos(day.inflows) : '-'}
+                        {transactionHistory.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
+                        {transactionHistory.map((tx, index) => (
+                            <TableRow key={index}>
+                                <TableCell className="font-medium">{format(parseISO(tx.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
+                                <TableCell>
+                                    <Badge variant={tx.type === 'Entrada' ? 'secondary' : 'destructive'}>{tx.type}</Badge>
                                 </TableCell>
-                                <TableCell className="text-right font-medium text-red-600">
-                                    {day.outflows > 0 ? formatKilos(day.outflows) : '-'}
+                                <TableCell>{tx.orderId}</TableCell>
+                                <TableCell>{tx.contact}</TableCell>
+                                <TableCell className={`text-right font-medium ${tx.type === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
+                                    {tx.type === 'Entrada' ? '+' : '-'} {formatKilos(tx.quantity)}
                                 </TableCell>
                                 <TableCell className="text-right font-bold text-primary">
-                                    {formatKilos(day.balance)}
+                                    {formatKilos(tx.balance)}
                                 </TableCell>
                             </TableRow>
                         ))}
