@@ -50,8 +50,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         setIsClient(true);
     }, []);
     
-    const { pendingItems, paidItems, totalPending, totalPaid, totalUpcoming, totalBilled } = useMemo(() => {
-        if (!isClient) return { pendingItems: [], paidItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0, totalBilled: 0 };
+    const { pendingItems, paidItems, upcomingItems, totalPending, totalPaid, totalUpcoming, totalBilled } = useMemo(() => {
+        if (!isClient) return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0, totalBilled: 0 };
         
         const allDueItems: DueDateItem[] = [];
         
@@ -132,12 +132,15 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
         
         // Separate items into upcoming and past/present
-        const upcomingItems = allDueItems.filter(item => isAfter(parseISO(item.dueDate), endDate));
+        const upcoming = allDueItems
+            .filter(item => isAfter(parseISO(item.dueDate), endDate))
+            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
         const pastAndPresentItems = allDueItems.filter(item => !isAfter(parseISO(item.dueDate), endDate));
         
         const totalBilled = pastAndPresentItems.reduce((sum, item) => sum + item.amount, 0);
 
-        const totalUpcoming = upcomingItems.reduce((sum, item) => sum + item.pendingAmount, 0);
+        const totalUpcoming = upcoming.reduce((sum, item) => sum + item.pendingAmount, 0);
 
         pastAndPresentItems.forEach(due => {
             if (due.pendingAmount <= 1) { // Use a small epsilon for float comparison
@@ -163,7 +166,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
         const totalPending = pending.reduce((sum, item) => sum + item.pendingAmount, 0);
         const totalPaid = pastAndPresentItems.reduce((sum, item) => sum + item.paidAmount, 0);
 
-        return { pendingItems: pending, paidItems: paid, totalPending, totalPaid, totalUpcoming, totalBilled };
+        return { pendingItems: pending, paidItems: paid, upcomingItems: upcoming, totalPending, totalPaid, totalUpcoming, totalBilled };
 
     }, [salesOrders, financialMovements, contacts, isClient, filterDate]);
 
@@ -296,6 +299,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts }: Du
                 <div className="space-y-8">
                     {renderTable(pendingItems, totalPending, 'Total Pendiente', 'Pendientes y Vencidos')}
                     {renderTable(paidItems, totalPaid, 'Total Pagado', 'Pagados')}
+                    {renderTable(upcomingItems, totalUpcoming, 'Total por Vencer', 'Próximos Vencimientos')}
                 </div>
 
             </CardContent>
