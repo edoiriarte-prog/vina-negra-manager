@@ -102,6 +102,15 @@ export default function PurchasesPage() {
         return acc;
     }, { subtotal: 0, totalKilos: 0, totalPackages: 0 });
   }, [groupedOrders]);
+
+  const totalPaidForPurchases = useMemo(() => {
+    const purchaseOrderIds = new Set(purchaseOrders.map(po => po.id));
+    return financialMovements
+      .filter(fm => fm.type === 'expense' && fm.relatedDocument?.type === 'OC' && purchaseOrderIds.has(fm.relatedDocument.id))
+      .reduce((sum, fm) => sum + fm.amount, 0);
+  }, [financialMovements, purchaseOrders]);
+
+  const pendingBalance = useMemo(() => grandTotals.subtotal - totalPaidForPurchases, [grandTotals.subtotal, totalPaidForPurchases]);
   
   const filteredGroupedOrders = useMemo(() => {
       if (!filter) return groupedOrders;
@@ -357,11 +366,17 @@ export default function PurchasesPage() {
                     })}
                 </TableBody>
                 <TableFooter>
-                    <TableRow>
-                        <TableHead className='text-right font-bold text-lg'>Total General</TableHead>
+                    <TableRow className="bg-muted/50">
+                        <TableHead className='text-right font-bold text-lg' colSpan={3}>Total General</TableHead>
                         <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotals.subtotal)}</TableHead>
-                        <TableHead className='text-right font-bold text-lg'>{grandTotals.totalKilos.toLocaleString('es-CL')} kg</TableHead>
-                        <TableHead className='text-right font-bold text-lg'>{grandTotals.totalPackages.toLocaleString('es-CL')}</TableHead>
+                    </TableRow>
+                    <TableRow className="bg-muted/50">
+                        <TableHead className='text-right font-bold' colSpan={3}>Total Pagado a la Fecha</TableHead>
+                        <TableHead className='text-right font-bold text-green-600'>{formatCurrency(totalPaidForPurchases)}</TableHead>
+                    </TableRow>
+                    <TableRow className="bg-muted/50">
+                        <TableHead className='text-right font-bold' colSpan={3}>Saldo por Pagar</TableHead>
+                        <TableHead className='text-right font-bold text-destructive'>{formatCurrency(pendingBalance)}</TableHead>
                     </TableRow>
                 </TableFooter>
             </Table>
@@ -468,3 +483,4 @@ export default function PurchasesPage() {
     </>
   );
 }
+
