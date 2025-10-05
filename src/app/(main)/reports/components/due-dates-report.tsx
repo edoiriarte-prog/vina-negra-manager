@@ -60,15 +60,18 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         return contacts.filter(c => c.type === 'client' || c.type === 'both');
     }, [contacts]);
     
-    const { pendingItems, paidItems, upcomingItems, totalPending, totalPaid, totalUpcoming, totalBilled, totalPaidInPeriod } = useMemo(() => {
-        if (!isClient) return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0, totalBilled: 0, totalPaidInPeriod: 0 };
+    const selectedClient = useMemo(() => {
+        if (selectedClientId === 'all') return null;
+        return contacts.find(c => c.id === selectedClientId);
+    }, [selectedClientId, contacts]);
+
+    const { pendingItems, paidItems, upcomingItems, totalPending, totalPaidInPeriod, totalUpcoming, totalBilled, totalPaid } = useMemo(() => {
+        if (!isClient) return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaidInPeriod: 0, totalUpcoming: 0, totalBilled: 0, totalPaid: 0 };
         
         const isAllClients = selectedClientId === 'all';
-        
         const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
         
         const filteredSalesOrders = salesOrders.filter(o => {
-            const orderDate = new Date(o.date);
             const clientMatch = isAllClients ? true : o.clientId === selectedClientId;
             return clientMatch;
         });
@@ -94,7 +97,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                             paidAmount: 0, pendingAmount: advanceAmount, status: 'Pendiente',
                         };
                         allDueItems.push(dueItem);
-                        clientData[order.clientId].dues.push(dueItem);
+                        if(clientData[order.clientId]) clientData[order.clientId].dues.push(dueItem);
                     }
                     if (order.balanceDueDate) {
                         const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
@@ -105,7 +108,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                             paidAmount: 0, pendingAmount: balanceAmount, status: 'Pendiente',
                         };
                         allDueItems.push(dueItem);
-                        clientData[order.clientId].dues.push(dueItem);
+                        if(clientData[order.clientId]) clientData[order.clientId].dues.push(dueItem);
                     }
                 } else if (order.paymentMethod === 'Crédito' || order.paymentMethod === 'Contado') {
                      const dueDate = order.balanceDueDate || order.date;
@@ -115,7 +118,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                         paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
                     };
                     allDueItems.push(dueItem);
-                    clientData[order.clientId].dues.push(dueItem);
+                    if(clientData[order.clientId]) clientData[order.clientId].dues.push(dueItem);
                 }
              }
         });
@@ -186,9 +189,9 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             .filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate && (isAllClients || fm.contactId === selectedClientId))
             .reduce((sum, mov) => sum + mov.amount, 0);
 
-        const totalPaidInPeriod = pastAndPresentItems.reduce((sum, item) => sum + item.paidAmount, 0);
+        const totalPaidInPeriod = paid.reduce((sum, item) => sum + item.amount, 0);
 
-        return { pendingItems: pending, paidItems: paid, upcomingItems: upcoming, totalPending, totalPaid, totalUpcoming, totalBilled, totalPaidInPeriod };
+        return { pendingItems: pending, paidItems: paid, upcomingItems: upcoming, totalPending, totalPaidInPeriod, totalUpcoming, totalBilled, totalPaid };
 
     }, [salesOrders, financialMovements, contacts, isClient, filterDate, selectedClientId]);
 
@@ -299,95 +302,122 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                         <CardTitle className="font-headline text-2xl">Informe de Vencimientos</CardTitle>
                         <CardDescription>Seguimiento de vencimientos de pago. Seleccione una fecha para ver el balance a ese día.</CardDescription>
                     </div>
-                    <div className="flex gap-2">
-                        <Button onClick={handleExport} variant="outline">
-                            <Download className="mr-2 h-4 w-4" />
-                            Exportar a Excel
-                        </Button>
-                        <Button onClick={onPrint} variant="outline">
-                            <Printer className="mr-2 h-4 w-4" />
-                            Imprimir Informe
-                        </Button>
-                    </div>
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="mb-6 space-y-4">
-                    <div className="flex flex-col md:flex-row gap-4 items-end no-print">
-                        <div className="flex-1 min-w-48">
-                            <Label>Ver balance al:</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn("w-full justify-start text-left font-normal", !filterDate && "text-muted-foreground")}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={filterDate} onSelect={setFilterDate} initialFocus />
-                                </PopoverContent>
-                            </Popover>
+                <div className="mb-6 space-y-4 print:mb-8">
+                     <div className="hidden print:block mb-8">
+                        <div className="flex flex-row items-center justify-between">
+                             <div>
+                                <h3 className="text-lg font-bold">VIÑA NEGRA SpA</h3>
+                                <p className="text-sm">RUT: 78.261.683-8</p>
+                                <p className="text-sm">TULAHUEN S/N</p>
+                                <p className="text-sm">MONTE PATRIA, CHILE</p>
+                            </div>
+                            <div className="text-right">
+                                <h2 className="text-2xl font-bold font-headline mb-1">INFORME DE VENCIMIENTOS</h2>
+                                <p className="text-sm">Balance al: {filterDate ? format(filterDate, "PPP", { locale: es }) : 'N/A'}</p>
+                            </div>
                         </div>
-                        <div className="flex-1 min-w-48">
-                            <Label>Cliente:</Label>
-                            <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Todos los clientes" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todos los clientes</SelectItem>
-                                    {clientOptions.map(client => (
-                                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                         {selectedClient && (
+                            <div className="mt-6 border-t pt-4">
+                                <h3 className="font-semibold mb-1">Cliente</h3>
+                                <div className="text-sm">
+                                    <p className="font-bold">{selectedClient.name}</p>
+                                    <p>RUT: {selectedClient.rut}</p>
+                                    <p>{selectedClient.address}, {selectedClient.commune}</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Facturado</CardTitle>
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalBilled)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Pagado</CardTitle>
-                                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalPaid)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
-                            </CardContent>
-                        </Card>
-                         <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Pendiente / Vencido</CardTitle>
-                                <Clock className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                {isClient ? <div className="text-2xl font-bold text-destructive">{formatCurrency(totalPending)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total por Vencer</CardTitle>
-                                <Forward className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                {isClient ? <div className="text-2xl font-bold text-blue-500">{formatCurrency(totalUpcoming)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                <p className="text-xs text-muted-foreground">después de la fecha</p>
-                            </CardContent>
-                        </Card>
+                    <div className="space-y-4">
+                         <div className="flex flex-col md:flex-row gap-4 items-end no-print">
+                            <div className="flex-1 min-w-48">
+                                <Label>Ver balance al:</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn("w-full justify-start text-left font-normal", !filterDate && "text-muted-foreground")}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Seleccione una fecha</span>}
+                                    </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                    <Calendar mode="single" selected={filterDate} onSelect={setFilterDate} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="flex-1 min-w-48">
+                                <Label>Cliente:</Label>
+                                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Todos los clientes" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todos los clientes</SelectItem>
+                                        {clientOptions.map(client => (
+                                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex gap-2 no-print">
+                                <Button onClick={handleExport} variant="outline">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Exportar a Excel
+                                </Button>
+                                <Button onClick={onPrint} variant="outline">
+                                    <Printer className="mr-2 h-4 w-4" />
+                                    Imprimir Informe
+                                </Button>
+                            </div>
+                        </div>
+
+                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Total Facturado</CardTitle>
+                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent>
+                                    {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalBilled)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                    <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Total Pagado</CardTitle>
+                                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent>
+                                    {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalPaid)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                    <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Pendiente / Vencido</CardTitle>
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent>
+                                    {isClient ? <div className="text-2xl font-bold text-destructive">{formatCurrency(totalPending)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                    <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Total por Vencer</CardTitle>
+                                    <Forward className="h-4 w-4 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent>
+                                    {isClient ? <div className="text-2xl font-bold text-blue-500">{formatCurrency(totalUpcoming)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                    <p className="text-xs text-muted-foreground">después de la fecha</p>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </div>
                 </div>
                 
@@ -403,5 +433,3 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
     
 }
-
-    
