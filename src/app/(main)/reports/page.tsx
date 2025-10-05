@@ -621,7 +621,7 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
          <TabsContent value="due-dates">
-             <Button onClick={handlePrintDueDates} className="my-4 no-print">
+            <Button onClick={handlePrintDueDates} className="my-4 no-print">
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir Informe
             </Button>
