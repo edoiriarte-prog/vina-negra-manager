@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useReactToPrint } from 'react-to-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,6 +12,7 @@ import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrd
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { Printer } from 'lucide-react';
 
 type InventoryHistoryDialogProps = {
   item: InventoryItem | null;
@@ -32,6 +34,11 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [contacts] = useLocalStorage('contacts', []);
+
+  const componentRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    content: () => componentRef.current,
+  });
   
   const transactionHistory = useMemo(() => {
     if (!item) return [];
@@ -108,7 +115,7 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
             Historial de transacciones y balance de stock para este ítem en la bodega: {item.warehouse}.
           </DialogDescription>
         </DialogHeader>
-        <div className="max-h-[60vh] overflow-y-auto p-1">
+        <div className="max-h-[60vh] overflow-y-auto p-1" ref={componentRef}>
             <div className="border rounded-md">
                 <Table>
                     <TableHeader>
@@ -143,7 +150,11 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
                 </Table>
             </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="no-print">
+          <Button type="button" variant="outline" onClick={handlePrint}>
+            <Printer className="mr-2 h-4 w-4" />
+            Imprimir Historial
+          </Button>
           <DialogClose asChild>
             <Button type="button" variant="outline">Cerrar</Button>
           </DialogClose>
