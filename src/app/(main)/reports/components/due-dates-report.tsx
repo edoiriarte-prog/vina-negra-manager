@@ -54,8 +54,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         setIsClient(true);
     }, []);
     
-    const { pendingItems, paidItems, upcomingItems, totalPending, totalPaid, totalUpcoming, totalBilled } = useMemo(() => {
-        if (!isClient) return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0, totalBilled: 0 };
+    const { pendingItems, paidItems, upcomingItems, totalPending, totalPaid, totalUpcoming, totalBilled, totalPaidInPeriod } = useMemo(() => {
+        if (!isClient) return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaid: 0, totalUpcoming: 0, totalBilled: 0, totalPaidInPeriod: 0 };
         
         const allDueItems: DueDateItem[] = [];
         const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
@@ -174,8 +174,9 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             .filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate)
             .reduce((sum, mov) => sum + mov.amount, 0);
 
+        const totalPaidInPeriod = pastAndPresentItems.reduce((sum, item) => sum + item.paidAmount, 0);
 
-        return { pendingItems: pending, paidItems: paid, upcomingItems: upcoming, totalPending, totalPaid, totalUpcoming, totalBilled };
+        return { pendingItems: pending, paidItems: paid, upcomingItems: upcoming, totalPending, totalPaid, totalUpcoming, totalBilled, totalPaidInPeriod };
 
     }, [salesOrders, financialMovements, contacts, isClient, filterDate]);
 
@@ -363,7 +364,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 
                 <div className="space-y-8">
                     {renderTable(pendingItems, totalPending, 'Total Pendiente', 'Pendientes y Vencidos')}
-                    {renderTable(paidItems, pastAndPresentItems.reduce((sum, item) => sum + item.paidAmount, 0), 'Total Pagado', 'Pagados')}
+                    {renderTable(paidItems, totalPaidInPeriod, 'Total Pagado', 'Pagados')}
                     {renderTable(upcomingItems, totalUpcoming, 'Total por Vencer', 'Próximos Vencimientos')}
                 </div>
 
