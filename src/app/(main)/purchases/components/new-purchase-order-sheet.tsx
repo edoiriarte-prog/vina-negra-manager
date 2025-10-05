@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -41,9 +40,15 @@ type NewPurchaseOrderSheetProps = {
 const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
     if (order) {
         const { totalAmount, totalKilos, totalPackages, ...rest } = order;
+        // The date from the order is already a 'yyyy-MM-dd' string.
+        // We need to adjust for timezone differences when creating a new Date object.
+        const date = new Date(order.date);
+        const timezoneOffset = date.getTimezoneOffset() * 60000;
+        const adjustedDate = new Date(date.getTime() + timezoneOffset);
+
         return {
             ...rest,
-            date: format(new Date(order.date), 'yyyy-MM-dd'),
+            date: format(adjustedDate, 'yyyy-MM-dd'),
         };
     }
     return {
@@ -362,3 +367,5 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     </>
   );
 }
+
+    
