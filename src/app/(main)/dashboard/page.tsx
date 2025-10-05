@@ -26,6 +26,8 @@ import AiSummary from './components/ai-summary';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 export default function DashboardPage() {
   const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
@@ -36,6 +38,7 @@ export default function DashboardPage() {
   const [inventory, setInventory] = useLocalStorage<InventoryItem[]>('inventory', []);
   const { bankAccounts } = useMasterData();
   const [isClient, setIsClient] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState('all');
 
   useEffect(() => {
     setIsClient(true);
@@ -108,18 +111,38 @@ export default function DashboardPage() {
     return new Set(contacts.filter(c => c.type === 'supplier' || c.type === 'both').map(c => c.id)).size;
   }, [contacts]);
 
-  const totalCollectedFromClients = useMemo(() => {
+  // --- Sales KPIs based on filter ---
+  const filteredSalesOrders = useMemo(() => {
+    if (selectedClientId === 'all') {
+      return salesOrders;
+    }
+    return salesOrders.filter(order => order.clientId === selectedClientId);
+  }, [salesOrders, selectedClientId]);
+
+  const filteredTotalSalesAmount = useMemo(() =>
+    filteredSalesOrders
+      .filter(so => so.status === 'completed')
+      .reduce((sum, order) => sum + order.totalAmount, 0),
+    [filteredSalesOrders]
+  );
+
+  const filteredTotalCollected = useMemo(() => {
     const clientIds = new Set(contacts.filter(c => c.type === 'client' || c.type === 'both').map(c => c.id));
     return financialMovements
-      .filter(fm => fm.type === 'income' && fm.contactId && clientIds.has(fm.contactId))
+      .filter(fm => fm.type === 'income' && fm.contactId && clientIds.has(fm.contactId) && (selectedClientId === 'all' || fm.contactId === selectedClientId))
       .reduce((sum, fm) => sum + fm.amount, 0);
-  }, [financialMovements, contacts]);
-  
-  const clientBalance = totalSalesAmount - totalCollectedFromClients;
-  
+  }, [financialMovements, contacts, selectedClientId]);
+
+  const filteredClientBalance = filteredTotalSalesAmount - filteredTotalCollected;
+
   const clientCount = useMemo(() => {
+    if (selectedClientId !== 'all') return 1;
     return new Set(contacts.filter(c => c.type === 'client' || c.type === 'both').map(c => c.id)).size;
-  }, [contacts]);
+  }, [contacts, selectedClientId]);
+  
+  const clientOptions = useMemo(() => 
+    contacts.filter(c => c.type === 'client' || c.type === 'both'),
+  [contacts]);
 
 
   const totalAccountBalance = useMemo(() => {
@@ -303,24 +326,38 @@ export default function DashboardPage() {
         </TabsContent>
         
         <TabsContent value="sales" className="mt-6">
+            <div className="mb-4">
+                <Label htmlFor="client-filter">Filtrar por Cliente</Label>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                    <SelectTrigger id="client-filter" className="max-w-sm">
+                        <SelectValue placeholder="Seleccionar cliente..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todos los Clientes</SelectItem>
+                        {clientOptions.map(client => (
+                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {isClient ? (
                 <>
                   <KpiCard
                     title="Monto Total Vendido"
-                    value={formatCurrency(totalSalesAmount)}
+                    value={formatCurrency(filteredTotalSalesAmount)}
                     icon={<ShoppingCart className="h-5 w-5 text-lime-500" />}
                     description="Suma de todas las O/V completadas"
                   />
                   <KpiCard
                     title="Total Cobrado (Clientes)"
-                    value={formatCurrency(totalCollectedFromClients)}
+                    value={formatCurrency(filteredTotalCollected)}
                     icon={<DollarSign className="h-5 w-5 text-green-500" />}
                     description="Total de ingresos de clientes"
                   />
                   <KpiCard
                     title="Saldo por Cobrar"
-                    value={formatCurrency(clientBalance)}
+                    value={formatCurrency(filteredClientBalance)}
                     icon={<FileWarning className="h-5 w-5 text-orange-500" />}
                     description="Balance pendiente de clientes"
                   />
@@ -328,7 +365,7 @@ export default function DashboardPage() {
                     title="Nº de Clientes"
                     value={clientCount.toString()}
                     icon={<Users className="h-5 w-5 text-lime-500" />}
-                    description="Total de clientes activos"
+                    description={selectedClientId === 'all' ? "Total de clientes activos" : "Cliente seleccionado"}
                   />
                 </>
               ) : (
@@ -343,7 +380,7 @@ export default function DashboardPage() {
                   <CardTitle className='font-headline text-xl'>Ventas Semanales</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {isClient ? <WeeklySalesChart data={salesOrders} /> : <Skeleton className="h-[300px] w-full" />}
+                  {isClient ? <WeeklySalesChart data={filteredSalesOrders} /> : <Skeleton className="h-[300px] w-full" />}
                 </CardContent>
               </Card>
                <Card>
@@ -351,7 +388,7 @@ export default function DashboardPage() {
                   <CardTitle className='font-headline text-xl'>Distribución por Kilos en O/V</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {isClient ? <SalesByOrderChart data={salesOrders} /> : <Skeleton className="h-[300px] w-full" />}
+                  {isClient ? <SalesByOrderChart data={filteredSalesOrders} /> : <Skeleton className="h-[300px] w-full" />}
                 </CardContent>
               </Card>
            </div>
@@ -387,5 +424,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

@@ -121,11 +121,11 @@ export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
         .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 50)}>
-      <BarChart data={chartData} layout="vertical" margin={{ left: 50 }}>
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
-        <YAxis type="category" dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
+        <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
+        <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
         <Tooltip
           contentStyle={{
             backgroundColor: 'hsl(var(--background))',
@@ -135,7 +135,7 @@ export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
         />
         <Legend />
         {calibers.map((caliber, index) => (
-            <Bar key={caliber} dataKey={caliber} stackId="a" fill={COLORS[index % COLORS.length]} radius={[0, 4, 4, 0]} />
+            <Bar key={caliber} dataKey={caliber} stackId="a" fill={COLORS[index % COLORS.length]} radius={[4, 4, 0, 0]} />
         ))}
       </BarChart>
     </ResponsiveContainer>
@@ -283,6 +283,3 @@ export function PurchasesByProductCaliberChart({ data }: { data: PurchaseOrder[]
     </ResponsiveContainer>
   );
 }
-    
-
-    
