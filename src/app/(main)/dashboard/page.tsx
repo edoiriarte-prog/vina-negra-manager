@@ -107,7 +107,7 @@ export default function DashboardPage() {
   const totalPurchasesAndServicesAmount = totalPurchasesAmount + totalServicesAmount;
 
   const totalPaidToSuppliers = useMemo(() => {
-    const supplierIds = new Set(contacts.filter(c => c.type === 'supplier' || c.type === 'both').map(c => c.id));
+    const supplierIds = new Set(contacts.filter(c => c.type.includes('supplier')).map(c => c.id));
     return financialMovements
       .filter(fm => fm.type === 'expense' && fm.contactId && supplierIds.has(fm.contactId))
       .reduce((sum, fm) => sum + fm.amount, 0);
@@ -116,7 +116,7 @@ export default function DashboardPage() {
   const supplierBalance = totalPurchasesAndServicesAmount - totalPaidToSuppliers;
 
   const supplierCount = useMemo(() => {
-    return new Set(contacts.filter(c => c.type === 'supplier' || c.type === 'both').map(c => c.id)).size;
+    return new Set(contacts.filter(c => c.type.includes('supplier')).map(c => c.id)).size;
   }, [contacts]);
 
   // --- Sales KPIs based on filter ---
@@ -135,7 +135,7 @@ export default function DashboardPage() {
   );
 
   const filteredTotalCollected = useMemo(() => {
-    const clientIds = new Set(contacts.filter(c => c.type === 'client' || c.type === 'both').map(c => c.id));
+    const clientIds = new Set(contacts.filter(c => c.type.includes('client')).map(c => c.id));
     return financialMovements
       .filter(fm => fm.type === 'income' && fm.contactId && clientIds.has(fm.contactId) && (selectedClientId === 'all' || fm.contactId === selectedClientId))
       .reduce((sum, fm) => sum + fm.amount, 0);
@@ -145,11 +145,11 @@ export default function DashboardPage() {
 
   const clientCount = useMemo(() => {
     if (selectedClientId !== 'all') return 1;
-    return new Set(contacts.filter(c => c.type === 'client' || c.type === 'both').map(c => c.id)).size;
+    return new Set(contacts.filter(c => c.type.includes('client')).map(c => c.id)).size;
   }, [contacts, selectedClientId]);
   
   const clientOptions = useMemo(() => 
-    contacts.filter(c => c.type === 'client' || c.type === 'both'),
+    contacts.filter(c => c.type.includes('client')),
   [contacts]);
 
 
@@ -382,7 +382,7 @@ export default function DashboardPage() {
                 ))
               )}
            </div>
-           <div className="grid gap-6 mt-6 lg:grid-cols-2">
+           <div className="grid gap-6 mt-6 grid-cols-1">
               <Card>
                 <CardHeader>
                   <CardTitle className='font-headline text-xl'>Ventas Semanales</CardTitle>

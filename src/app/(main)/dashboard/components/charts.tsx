@@ -101,7 +101,13 @@ export function WeeklySalesChart({ data }: { data: SalesOrder[] }) {
 // Sales by Order Chart (New)
 export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
     const { calibers: masterCalibers } = useMasterData();
-    const calibers = masterCalibers.map(c => c.name);
+    const allCalibersInOrders = Array.from(new Set(data.flatMap(order => order.items.map(item => item.caliber))));
+    
+    // Sort the discovered calibers according to the master data order
+    const calibers = masterCalibers
+      .filter(mc => allCalibersInOrders.includes(mc.name))
+      .map(mc => mc.name);
+
     const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
     const chartData = data
