@@ -43,8 +43,10 @@ export default function InventoryPage() {
 
   useEffect(() => {
     setIsClient(true);
-    setFilterDate(new Date());
-  }, []);
+    if (filterDate === null) {
+        setFilterDate(new Date());
+    }
+  }, [filterDate]);
 
   useEffect(() => {
     if (isClient) {
