@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { FinancialMovement, PurchaseOrder, SalesOrder, InventoryItem } from '@/lib/types';
 import { format, getWeek, parseISO } from 'date-fns';
+import { useMasterData } from '@/hooks/use-master-data';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -99,7 +100,8 @@ export function WeeklySalesChart({ data }: { data: SalesOrder[] }) {
 
 // Sales by Order Chart (New)
 export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
-    const calibers = ["JUMBO", "EXTRA", "PRIMERA", "SEGUNDA", "TERCERA"];
+    const { calibers: masterCalibers } = useMasterData();
+    const calibers = masterCalibers.map(c => c.name);
     const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
     const chartData = data
