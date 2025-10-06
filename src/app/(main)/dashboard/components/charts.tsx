@@ -18,7 +18,6 @@ import {
 } from 'recharts';
 import { FinancialMovement, PurchaseOrder, SalesOrder, InventoryItem } from '@/lib/types';
 import { format, getWeek, parseISO } from 'date-fns';
-import { useMasterData } from '@/hooks/use-master-data';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -100,7 +99,7 @@ export function WeeklySalesChart({ data }: { data: SalesOrder[] }) {
 
 // Sales by Order Chart (New)
 export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
-    const { calibers } = useMasterData();
+    const calibers = ["JUMBO", "EXTRA", "PRIMERA", "SEGUNDA", "TERCERA"];
     const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
     const chartData = data
@@ -109,10 +108,10 @@ export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
             const orderData: { [key: string]: string | number } = { name: order.id };
             calibers.forEach(caliber => {
                 const totalKilosForCaliber = order.items
-                    .filter(item => item.caliber === caliber.name && item.unit === 'Kilos')
+                    .filter(item => item.caliber === caliber && item.unit === 'Kilos')
                     .reduce((sum, item) => sum + item.quantity, 0);
                 if (totalKilosForCaliber > 0) {
-                    orderData[`${caliber.name} (${caliber.code})`] = totalKilosForCaliber;
+                    orderData[caliber] = totalKilosForCaliber;
                 }
             });
             return orderData;
@@ -135,7 +134,7 @@ export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
         />
         <Legend />
         {calibers.map((caliber, index) => (
-            <Bar key={caliber.name} dataKey={`${caliber.name} (${caliber.code})`} stackId="a" fill={COLORS[index % COLORS.length]} radius={[4, 4, 0, 0]} />
+            <Bar key={caliber} dataKey={caliber} stackId="a" fill={COLORS[index % COLORS.length]} radius={[4, 4, 0, 0]} />
         ))}
       </BarChart>
     </ResponsiveContainer>
@@ -187,24 +186,12 @@ export function IncomeVsExpenseChart({ data }: { data: FinancialMovement[] }) {
 
 // Caliber Distribution Chart
 export function CaliberDistributionChart({ data }: { data: InventoryItem[] }) {
-    const { calibers } = useMasterData();
-    const caliberMap = new Map(calibers.map((c, i) => [c.name, i]));
-    
-    const chartData = data
-        .filter(item => item.stock > 0)
-        .map(item => {
-            const caliberInfo = calibers.find(c => c.name === item.caliber);
-            return {
-                name: caliberInfo ? `${item.product.substring(0,3)}. ${caliberInfo.name} (${caliberInfo.code})` : `${item.product.substring(0,3)}. ${item.caliber}`,
-                value: item.stock,
-                caliberName: item.caliber,
-            };
-        })
-        .sort((a, b) => {
-            const orderA = caliberMap.get(a.caliberName) ?? Infinity;
-            const orderB = caliberMap.get(b.caliberName) ?? Infinity;
-            return orderA - orderB;
-        });
+  const chartData = data
+    .filter(item => item.stock > 0)
+    .map(item => ({
+        name: `${item.product.substring(0,3)}. ${item.caliber}`,
+        value: item.stock
+    }));
 
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -261,30 +248,19 @@ export function PurchasesBySupplierChart({ data, suppliers }: { data: PurchaseOr
 
 // Purchases by Product/Caliber Chart
 export function PurchasesByProductCaliberChart({ data }: { data: PurchaseOrder[] }) {
-  const { calibers } = useMasterData();
-  const caliberMap = new Map(calibers.map((c, i) => [c.name, i]));
-
   const productData = data
     .filter(order => order.status === 'completed')
     .flatMap(order => order.items.map(item => ({...item, total: item.quantity * item.price})))
     .reduce((acc, item) => {
       const key = `${item.product} - ${item.caliber}`;
-      acc[key] = {
-        total: (acc[key]?.total || 0) + item.total,
-        caliberName: item.caliber,
-      };
+      acc[key] = (acc[key] || 0) + item.total;
       return acc;
-    }, {} as Record<string, { total: number, caliberName: string }>);
+    }, {} as Record<string, number>);
 
-  const chartData = Object.entries(productData).map(([name, data]) => ({
+  const chartData = Object.entries(productData).map(([name, total]) => ({
     name,
-    Monto: data.total,
-    caliberName: data.caliberName,
-  })).sort((a,b) => {
-      const orderA = caliberMap.get(a.caliberName) ?? Infinity;
-      const orderB = caliberMap.get(b.caliberName) ?? Infinity;
-      return orderA - orderB;
-  });
+    Monto: total,
+  })).sort((a,b) => b.Monto - a.Monto);
 
   return (
     <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 30)}>
