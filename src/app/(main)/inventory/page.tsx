@@ -43,10 +43,9 @@ export default function InventoryPage() {
 
   useEffect(() => {
     setIsClient(true);
-    if (filterDate === null) {
-        setFilterDate(new Date());
-    }
-  }, [filterDate]);
+    // Set the date only on the client side to avoid hydration mismatch
+    setFilterDate(new Date());
+  }, []);
 
   useEffect(() => {
     if (isClient) {
@@ -264,7 +263,7 @@ export default function InventoryPage() {
                     <Card className="mt-6 print:shadow-none print:border-none">
                         <CardHeader>
                             <div className="print-only hidden print:block">
-                                <CardTitle className="font-headline text-2xl">Inventario al {filterDate ? format(filterDate, "PPP", { locale: es }) : format(new Date(), "PPP", { locale: es })}</CardTitle>
+                                <CardTitle className="font-headline text-2xl">Inventario al {filterDate ? format(filterDate, "PPP", { locale: es }) : ""}</CardTitle>
                                 <CardDescription>Bodega: {selectedWarehouse === 'All' ? 'Todas' : selectedWarehouse}</CardDescription>
                             </div>
                         </CardHeader>
