@@ -49,16 +49,24 @@ type MatrixRow = {
 export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inventory = [] }: ItemMatrixDialogProps) {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [matrixData, setMatrixData] = useState<MatrixRow[]>([]);
-  const { products, units, packagingTypes } = useMasterData();
+  const { products, units, packagingTypes, calibers } = useMasterData();
 
   const handleProductSelect = (product: string) => {
     setSelectedProduct(product);
     const calibersForProduct = productCaliberMatrix[product] || [];
-    setMatrixData(calibersForProduct.map(caliber => {
-        const inventoryItem = inventory.find(i => i.caliber === caliber && i.product === product);
+    
+    // Sort calibers according to master data order
+    const sortedCalibers = calibersForProduct.sort((a, b) => {
+        const indexA = calibers.findIndex(c => c.name === a);
+        const indexB = calibers.findIndex(c => c.name === b);
+        return indexA - indexB;
+    });
+
+    setMatrixData(sortedCalibers.map(caliberName => {
+        const inventoryItem = inventory.find(i => i.caliber === caliberName && i.product === product);
         return {
             product: product,
-            caliber: caliber,
+            caliber: caliberName,
             quantity: 0,
             price: 0,
             unit: 'Kilos',
@@ -101,6 +109,11 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
           reset();
       }
       onOpenChange(open);
+  }
+  
+  const getCaliberDisplayName = (caliberName: string) => {
+    const caliber = calibers.find(c => c.name === caliberName);
+    return caliber ? `${caliber.name} (${caliber.code})` : caliberName;
   }
 
   return (
@@ -146,7 +159,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
               <TableBody>
                 {matrixData.map((row, index) => (
                   <TableRow key={index}>
-                    <TableCell className="font-medium">{row.caliber}</TableCell>
+                    <TableCell className="font-medium">{getCaliberDisplayName(row.caliber)}</TableCell>
                      {orderType === 'sale' && (
                         <TableCell>
                             <Badge variant={row.stock > 0 ? 'secondary' : 'destructive'}>

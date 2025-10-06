@@ -173,6 +173,11 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     ? 'Actualice la información de la orden.'
     : 'Complete la información para registrar una nueva orden de compra.';
 
+  const getCaliberDisplayName = (caliberName: string) => {
+    const caliber = calibers.find(c => c.name === caliberName);
+    return caliber ? `${caliber.name} (${caliber.code})` : caliberName;
+  }
+
   return (
     <>
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -240,7 +245,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
-                                     {calibers.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                     {calibers.map(c => <SelectItem key={c.name} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
                                  </SelectContent>
                              </Select>
                         </div>
@@ -367,5 +372,3 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     </>
   );
 }
-
-    

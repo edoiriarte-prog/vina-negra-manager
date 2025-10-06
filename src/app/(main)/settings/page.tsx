@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { useMasterData } from '@/hooks/use-master-data';
+import { useMasterData, CaliberMaster } from '@/hooks/use-master-data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Trash2, PlusCircle, Download, Edit } from 'lucide-react';
@@ -68,6 +68,69 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
                     {isClient && data.map(item => (
                         <div key={item} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                             <span>{item}</span>
+                            <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function CaliberMasterEditor() {
+    const { calibers, setCalibers } = useMasterData();
+    const [newItem, setNewItem] = useState({ name: '', code: '' });
+    const [isClient, setIsClient] = useState(false);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
+    const handleAddItem = () => {
+        if (newItem.name && newItem.code && !calibers.find(c => c.name === newItem.name)) {
+            setCalibers(prev => [...prev, newItem]);
+            setNewItem({ name: '', code: '' });
+            toast({ title: `Calibre Agregado`, description: `Se agregó "${newItem.name} (${newItem.code})".` });
+        } else if (calibers.find(c => c.name === newItem.name)) {
+             toast({ variant: "destructive", title: 'Error', description: 'Este calibre ya existe.' });
+        }
+    };
+
+    const handleRemoveItem = (itemToRemove: CaliberMaster) => {
+        setCalibers(prev => prev.filter(item => item.name !== itemToRemove.name));
+        toast({ title: `Calibre Eliminado`, description: `Se eliminó "${itemToRemove.name}".` });
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="font-headline text-lg">Calibres</CardTitle>
+                <CardDescription>Gestiona los calibres y sus códigos.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="flex gap-2 mb-4">
+                    <Input 
+                        value={newItem.name}
+                        onChange={(e) => setNewItem(prev => ({...prev, name: e.target.value}))}
+                        placeholder="Nuevo Calibre (ej: JUMBO)"
+                    />
+                     <Input 
+                        value={newItem.code}
+                        onChange={(e) => setNewItem(prev => ({...prev, code: e.target.value}))}
+                        placeholder="Código (ej: 40)"
+                    />
+                    <Button onClick={handleAddItem}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Agregar
+                    </Button>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                    {isClient && calibers.map(item => (
+                        <div key={item.name} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                            <span>{`${item.name} (${item.code})`}</span>
                             <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -246,7 +309,7 @@ function DataExport() {
 
 
 export default function SettingsPage() {
-    const { products, setProducts, calibers, setCalibers, units, setUnits, packagingTypes, setPackagingTypes, warehouses, setWarehouses } = useMasterData();
+    const { products, setProducts, units, setUnits, packagingTypes, setPackagingTypes, warehouses, setWarehouses } = useMasterData();
     
     return (
         <div className="flex flex-col gap-6">
@@ -265,7 +328,7 @@ export default function SettingsPage() {
                 <TabsContent value="masters">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                         <MasterDataEditor title="Productos" data={products} setData={setProducts} />
-                        <MasterDataEditor title="Calibres" data={calibers} setData={setCalibers} />
+                        <CaliberMasterEditor />
                         <MasterDataEditor title="Unidades" data={units} setData={setUnits} />
                         <MasterDataEditor title="Tipos de Envase" data={packagingTypes} setData={setPackagingTypes} />
                         <MasterDataEditor title="Bodegas" data={warehouses} setData={setWarehouses} />

@@ -114,7 +114,7 @@ export function NewAdjustmentSheet({ isOpen, onOpenChange, onSave, adjustment }:
                <Select required onValueChange={(value) => handleSelectChange('caliber', value)} value={formData.caliber}>
                   <SelectTrigger className="col-span-3"><SelectValue placeholder="Seleccione un calibre" /></SelectTrigger>
                   <SelectContent>
-                      {calibers.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      {calibers.map(c => <SelectItem key={c.name} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
                   </SelectContent>
               </Select>
             </div>

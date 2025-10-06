@@ -1,7 +1,19 @@
 
 
 export const initialProducts = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MANDARINAS"];
-export const initialCalibers = ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"];
+
+// Updated to an array of objects to include code and name for proper sorting and display.
+export const initialCalibers = [
+    { code: "50", name: "EXTRA" },
+    { code: "60", name: "PRIMERA" },
+    { code: "70", name: "SEGUNDA" },
+    { code: "84", name: "TERCERA" },
+    { code: "96", name: "CUARTA" },
+    { code: "111", name: "QUINTA" },
+    { code: "ET", name: "ETIOLADAS" },
+    { code: "DES", name: "DESCARTES" },
+];
+
 export const initialUnits = ["Kilos", "Cajas"];
 export const initialPackagingTypes = ["CAJAS", "BINS", "PALLETS", "SACOS"];
 export const initialWarehouses = ["Bodega Principal", "Cámara de Frío 1", "Campo A"];
@@ -32,6 +44,7 @@ export type ProductMatrix = {
 }
 
 // Defines which calibers are available for each product in the matrix entry.
+// Note: This now uses just the name for matching. The full display name is constructed in components.
 export const productCaliberMatrix: ProductMatrix = {
     "PALTAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
     "UVAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
@@ -39,4 +52,3 @@ export const productCaliberMatrix: ProductMatrix = {
     "CLEMENTINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
     "MANDARINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLadas"],
 };
-
