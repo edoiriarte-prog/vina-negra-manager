@@ -277,7 +277,7 @@ export default function FinancialsPage() {
 
     const formatMovement = (m: FinancialMovement & { contactName?: string }) => ({
       'ID Movimiento': m.id,
-      'Fecha': parseISO(m.date), // Export as a Date object for Excel
+      'Fecha': format(parseISO(m.date), 'dd-MM-yyyy'),
       'Tipo': m.type,
       'Centro de Costo': m.description,
       'Monto': m.amount,
@@ -299,15 +299,6 @@ export default function FinancialsPage() {
     const addSheet = (data: any[], name: string) => {
         if (data.length === 0) return;
         const ws = XLSX.utils.json_to_sheet(data);
-        const dateColumn = 'B';
-        // Apply date format to the date column
-        for (let i = 1; i <= data.length; i++) {
-          const cell_address = `${dateColumn}${i + 1}`;
-          if (ws[cell_address]) {
-            ws[cell_address].t = 'd';
-            ws[cell_address].z = 'dd-mm-yyyy';
-          }
-        }
         XLSX.utils.book_append_sheet(wb, ws, name);
     };
 
@@ -605,14 +596,5 @@ export default function FinancialsPage() {
     </>
   );
 }
-
-    
-
-
-    
-
-
-
-
 
     
