@@ -278,7 +278,7 @@ export default function FinancialsPage() {
 
     const formatMovement = (m: FinancialMovement & { contactName?: string }) => ({
       'ID Movimiento': m.id,
-      'Fecha': format(parseISO(m.date), 'dd-MM-yyyy'),
+      'Fecha': parseISO(m.date), // Export as a Date object for Excel
       'Tipo': m.type,
       'Centro de Costo': m.description,
       'Monto': m.amount,
@@ -296,9 +296,25 @@ export default function FinancialsPage() {
     const transferSheet = dataWithContactNames.filter(m => m.type === 'traspaso').map(formatMovement);
 
     const wb = XLSX.utils.book_new();
-    if (incomeSheet.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(incomeSheet), 'Ingresos');
-    if (expenseSheet.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expenseSheet), 'Egresos');
-    if (transferSheet.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(transferSheet), 'Traspasos');
+
+    const addSheet = (data: any[], name: string) => {
+        if (data.length === 0) return;
+        const ws = XLSX.utils.json_to_sheet(data);
+        const dateColumn = 'B';
+        // Apply date format to the date column
+        for (let i = 1; i <= data.length; i++) {
+          const cell_address = `${dateColumn}${i + 1}`;
+          if (ws[cell_address]) {
+            ws[cell_address].t = 'd';
+            ws[cell_address].z = 'dd-mm-yyyy';
+          }
+        }
+        XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+
+    addSheet(incomeSheet, 'Ingresos');
+    addSheet(expenseSheet, 'Egresos');
+    addSheet(transferSheet, 'Traspasos');
 
     XLSX.writeFile(wb, `Tesorería_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
     toast({ title: 'Exportación Exitosa', description: 'Se ha exportado la base de datos de tesorería.' });
@@ -595,5 +611,6 @@ export default function FinancialsPage() {
 
 
     
+
 
 
