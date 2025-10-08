@@ -267,9 +267,9 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
     }
     
     const renderTable = (items: DueDateItem[], total: number, caption: string, title: string) => (
-         <div className="rounded-md border print-container">
-            <h3 className="font-headline text-xl mb-2 p-4">{title}</h3>
-            <Table>
+         <div className="rounded-md border print-container print-section">
+            <h3 className="font-headline text-xl mb-2 p-4 print:text-lg">{title}</h3>
+            <Table className="print:text-sm">
                 <TableHeader>
                     <TableRow>
                         <TableHead>Fecha Venc.</TableHead>
@@ -288,8 +288,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 {isClient && items.length > 0 && (
                     <TableFooter>
                         <TableRow>
-                            <TableCell colSpan={7} className="text-right font-bold text-lg">{caption}</TableCell>
-                            <TableCell className="text-right font-bold text-lg">{formatCurrency(total)}</TableCell>
+                            <TableCell colSpan={7} className="text-right font-bold text-lg print:text-base">{caption}</TableCell>
+                            <TableCell className="text-right font-bold text-lg print:text-base">{formatCurrency(total)}</TableCell>
                         </TableRow>
                     </TableFooter>
                 )}
@@ -328,7 +328,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                 <div className="text-sm">
                                     <p className="font-bold">{selectedClient.name}</p>
                                     <p>RUT: {selectedClient.rut}</p>
-                                    <p>{selectedClient.address}, {selectedClient.commune}</p>
                                 </div>
                             </div>
                         )}
@@ -379,8 +378,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                             </div>
                         </div>
 
-                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                            <Card>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 print:grid-cols-4">
+                            <Card className="print-summary-card">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                     <CardTitle className="text-sm font-medium">Total Facturado</CardTitle>
                                     <FileText className="h-4 w-4 text-muted-foreground" />
@@ -390,7 +389,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                     <p className="text-xs text-muted-foreground">total para el cliente</p>
                                 </CardContent>
                             </Card>
-                            <Card>
+                            <Card className="print-summary-card">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                     <CardTitle className="text-sm font-medium">Total Pagado</CardTitle>
                                     <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -400,7 +399,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                     <p className="text-xs text-muted-foreground">total para el cliente</p>
                                 </CardContent>
                             </Card>
-                            <Card>
+                            <Card className="print-summary-card">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                     <CardTitle className="text-sm font-medium">Pendiente / Vencido</CardTitle>
                                     <Clock className="h-4 w-4 text-muted-foreground" />
@@ -410,7 +409,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                     <p className="text-xs text-muted-foreground">en el periodo</p>
                                 </CardContent>
                             </Card>
-                            <Card>
+                            <Card className="print-summary-card">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                     <CardTitle className="text-sm font-medium">Total por Vencer</CardTitle>
                                     <Forward className="h-4 w-4 text-muted-foreground" />
@@ -424,7 +423,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                     </div>
                 </div>
                 
-                <div className="space-y-8">
+                <div className="space-y-8 print:space-y-6">
                     {renderTable(pendingItems, totalPending, 'Total Pendiente', 'Pendientes y Vencidos')}
                     {renderTable(paidItems, totalPaidInPeriod, 'Total Pagado en Periodo', 'Pagados en Periodo')}
                     {renderTable(upcomingItems, totalUpcoming, 'Total por Vencer', 'Próximos Vencimientos')}
