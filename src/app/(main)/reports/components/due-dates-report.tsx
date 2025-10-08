@@ -71,14 +71,14 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         const isAllClients = selectedClientId === 'all';
         const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
         
-        const filteredSalesOrders = salesOrders.filter(o => 
+        const allDueItems: DueDateItem[] = [];
+
+        const relevantSalesOrders = salesOrders.filter(o => 
             (isAllClients || o.clientId === selectedClientId) &&
             o.status !== 'cancelled'
         );
 
-        const allDueItems: DueDateItem[] = [];
-
-        filteredSalesOrders.forEach(order => {
+        relevantSalesOrders.forEach(order => {
             const clientName = contacts.find(c => c.id === order.clientId)?.name || 'Desconocido';
             
             if (order.paymentMethod === 'Pago con Anticipo y Saldo' && order.advancePercentage) {
@@ -102,35 +102,39 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             } else if (order.paymentMethod === 'Crédito' || order.paymentMethod === 'Contado') {
                  const dueDate = order.balanceDueDate || order.date;
                  allDueItems.push({
-                    id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
+                    id: `${order.id}-full`, clientId: order.clientId, clientName, orderId: order.id,
                     paymentType: order.paymentMethod, dueDate: dueDate, amount: order.totalAmount,
                     paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
                 });
             }
         });
         
+        // Chronological sort of all dues to be paid
         const sortedDues = allDueItems.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
         
+        // Get all relevant payments
         const clientMovements = financialMovements
-            .filter(fm => fm.type === 'income' && (isAllClients || fm.contactId === selectedClientId) && new Date(fm.date) <= endDate)
+            .filter(fm => fm.type === 'income' && (isAllClients || fm.contactId === selectedClientId))
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             
+        // Create a mutable pool of payments
         const paymentPool = clientMovements.map(p => ({ ...p, remaining: p.amount }));
 
-        // Correct chronological payment allocation
+        // Apply payments chronologically to dues
         sortedDues.forEach(due => {
-            if (new Date(due.dueDate) > endDate) return;
-
             for (const payment of paymentPool) {
+                // Ensure payment is for the correct client and has money left
                 if (payment.remaining > 0 && payment.contactId === due.clientId) {
                     const remainingOnDue = due.pendingAmount;
                     if (remainingOnDue > 0) {
                         const amountToApply = Math.min(payment.remaining, remainingOnDue);
+                        
                         due.paidAmount += amountToApply;
                         due.pendingAmount -= amountToApply;
                         payment.remaining -= amountToApply;
                     }
                 }
+                if (due.pendingAmount <= 1) break; // Move to next due if this one is paid
             }
         });
         
@@ -141,7 +145,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         const pastAndPresentItems = sortedDues.filter(item => !isAfter(parseISO(item.dueDate), endDate));
         
         const totalBilled = pastAndPresentItems.reduce((sum, item) => sum + item.amount, 0);
-
         const totalUpcoming = upcoming.reduce((sum, item) => sum + item.pendingAmount, 0);
 
         pastAndPresentItems.forEach(due => {
@@ -166,10 +169,10 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             .sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
             
         const totalPending = pending.reduce((sum, item) => sum + item.pendingAmount, 0);
-        
-        const totalPaid = clientMovements.reduce((sum, mov) => sum + mov.amount, 0);
-
         const totalPaidInPeriod = paid.reduce((sum, item) => sum + item.amount, 0) + pending.reduce((sum, item) => sum + item.paidAmount, 0);
+
+        const allTimeClientMovements = financialMovements.filter(fm => fm.type === 'income' && (isAllClients || fm.contactId === selectedClientId));
+        const totalPaid = allTimeClientMovements.reduce((sum, mov) => sum + mov.amount, 0);
 
         return { pendingItems: pending, paidItems: paid, upcomingItems: upcoming, totalPending, totalPaidInPeriod, totalUpcoming, totalBilled, totalPaid };
 
@@ -432,3 +435,5 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
     
 }
+
+    
