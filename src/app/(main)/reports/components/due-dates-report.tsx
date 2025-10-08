@@ -57,7 +57,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
     }, []);
 
     const clientOptions = useMemo(() => {
-        return contacts.filter(c => c.type === 'client' || c.type === 'both');
+        return contacts.filter(c => c.type.includes('client'));
     }, [contacts]);
     
     const selectedClient = useMemo(() => {
@@ -72,89 +72,67 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
         
         const filteredSalesOrders = salesOrders.filter(o => {
-            const clientMatch = isAllClients ? true : o.clientId === selectedClientId;
-            return clientMatch;
+            return isAllClients ? true : o.clientId === selectedClientId;
         });
 
         const allDueItems: DueDateItem[] = [];
-        const clientData: Record<string, { dues: DueDateItem[], payments: FinancialMovement[] }> = {};
-
-        const clientsToProcess = isAllClients ? contacts.filter(c => c.type === 'client' || c.type === 'both') : contacts.filter(c => c.id === selectedClientId);
-        clientsToProcess.forEach(client => {
-            if (client) clientData[client.id] = { dues: [], payments: [] };
-        });
-
+        
         filteredSalesOrders.forEach(order => {
-             if (order.status !== 'cancelled' && clientData[order.clientId]) {
+             if (order.status !== 'cancelled') {
                 const clientName = contacts.find(c => c.id === order.clientId)?.name || 'Desconocido';
                 
                 if (order.paymentMethod === 'Pago con Anticipo y Saldo' && order.advancePercentage) {
                     if (order.advanceDueDate) {
                         const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
-                        const dueItem: DueDateItem = {
+                        allDueItems.push({
                             id: `${order.id}-advance`, clientId: order.clientId, clientName, orderId: order.id,
                             paymentType: 'Anticipo', dueDate: order.advanceDueDate, amount: advanceAmount,
                             paidAmount: 0, pendingAmount: advanceAmount, status: 'Pendiente',
-                        };
-                        allDueItems.push(dueItem);
-                        if(clientData[order.clientId]) clientData[order.clientId].dues.push(dueItem);
+                        });
                     }
                     if (order.balanceDueDate) {
                         const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
                         const balanceAmount = order.totalAmount - advanceAmount;
-                         const dueItem: DueDateItem = {
+                         allDueItems.push({
                             id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
                             paymentType: 'Saldo', dueDate: order.balanceDueDate, amount: balanceAmount,
                             paidAmount: 0, pendingAmount: balanceAmount, status: 'Pendiente',
-                        };
-                        allDueItems.push(dueItem);
-                        if(clientData[order.clientId]) clientData[order.clientId].dues.push(dueItem);
+                        });
                     }
                 } else if (order.paymentMethod === 'Crédito' || order.paymentMethod === 'Contado') {
                      const dueDate = order.balanceDueDate || order.date;
-                     const dueItem: DueDateItem = {
+                     allDueItems.push({
                         id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
                         paymentType: 'Saldo', dueDate: dueDate, amount: order.totalAmount,
                         paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
-                    };
-                    allDueItems.push(dueItem);
-                    if(clientData[order.clientId]) clientData[order.clientId].dues.push(dueItem);
+                    });
                 }
              }
         });
-
-        const clientIdsToFilter = Object.keys(clientData);
-        financialMovements
-            .filter(fm => fm.type === 'income' && fm.contactId && clientIdsToFilter.includes(fm.contactId) && new Date(fm.date) <= endDate)
-            .forEach(fm => {
-                if(clientData[fm.contactId!]) {
-                  clientData[fm.contactId!].payments.push(fm);
-                }
-            });
-
-        Object.values(clientData).forEach(({ dues, payments }) => {
-            const sortedDues = dues.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-            const sortedPayments = payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        // Sort all dues chronologically
+        const sortedDues = allDueItems.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        
+        const clientMovements = financialMovements
+            .filter(fm => fm.type === 'income' && (isAllClients ? true : fm.contactId === selectedClientId) && new Date(fm.date) <= endDate)
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             
-            let paymentPool = sortedPayments.map(p => ({ ...p, remaining: p.amount }));
+        let paymentPool = clientMovements.reduce((sum, mov) => sum + mov.amount, 0);
 
-            sortedDues.forEach(due => {
-                paymentPool.forEach(payment => {
-                    if (payment.remaining > 0 && due.pendingAmount > 0) {
-                        const amountToApply = Math.min(payment.remaining, due.pendingAmount);
-                        due.paidAmount += amountToApply;
-                        due.pendingAmount -= amountToApply;
-                        payment.remaining -= amountToApply;
-                    }
-                });
-            });
+        sortedDues.forEach(due => {
+            if (paymentPool > 0) {
+                const amountToApply = Math.min(paymentPool, due.pendingAmount);
+                due.paidAmount += amountToApply;
+                due.pendingAmount -= amountToApply;
+                paymentPool -= amountToApply;
+            }
         });
         
-        const upcoming = allDueItems
+        const upcoming = sortedDues
             .filter(item => isAfter(parseISO(item.dueDate), endDate))
             .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
-        const pastAndPresentItems = allDueItems.filter(item => !isAfter(parseISO(item.dueDate), endDate));
+        const pastAndPresentItems = sortedDues.filter(item => !isAfter(parseISO(item.dueDate), endDate));
         
         const totalBilled = filteredSalesOrders
             .filter(order => order.status !== 'cancelled' && new Date(order.date) <= endDate)
@@ -449,3 +427,5 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
     
 }
+
+    
