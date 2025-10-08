@@ -8,7 +8,7 @@ import { PurchaseOrder, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, FileDown, Printer } from 'lucide-react';
+import { Edit, Trash2, FileDown } from 'lucide-react';
 import {
     Table,
     TableBody,
@@ -34,15 +34,14 @@ interface PreviewContentProps {
   onExport: () => void;
 }
 
-export const PreviewContent = ({ order, supplier, onEdit, onDelete, onExport }: PreviewContentProps) => {
-    const componentRef = React.useRef<HTMLDivElement>(null);
+export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier, onEdit, onDelete, onExport }, ref) => {
     const handlePrint = useReactToPrint({
-        content: () => componentRef.current,
+        content: () => ref.current,
     });
 
     return (
         <>
-            <div ref={componentRef} className="p-6">
+            <div ref={ref} className="p-6">
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h3 className="text-lg font-bold">VIÑA NEGRA SpA</h3>
@@ -125,8 +124,8 @@ export const PreviewContent = ({ order, supplier, onEdit, onDelete, onExport }: 
                     Exportar Excel
                 </Button>
                 <Button variant="outline" onClick={handlePrint}>
-                    <Printer className="mr-2 h-4 w-4" />
-                    Imprimir
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Generar PDF
                 </Button>
                 <Button variant="destructive" onClick={onDelete}>
                     <Trash2 className="mr-2 h-4 w-4" />
@@ -135,6 +134,6 @@ export const PreviewContent = ({ order, supplier, onEdit, onDelete, onExport }: 
             </div>
         </>
     );
-};
+});
 
 PreviewContent.displayName = 'PreviewContent';
