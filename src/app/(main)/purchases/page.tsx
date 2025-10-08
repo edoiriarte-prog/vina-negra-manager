@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -61,13 +60,33 @@ export default function PurchasesPage() {
   const [isClient, setIsClient] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
+  const [orderToPrint, setOrderToPrint] = useState<PurchaseOrder | null>(null);
   const { toast } = useToast();
+
+  const printComponentRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = useReactToPrint({
+      content: () => printComponentRef.current,
+      onAfterPrint: () => setOrderToPrint(null),
+  });
+
+  useEffect(() => {
+    if (orderToPrint) {
+      handlePrint();
+    }
+  }, [orderToPrint, handlePrint]);
+
+  const handlePrintRequest = (order: PurchaseOrder) => {
+    setOrderToPrint(order);
+    setPreviewingOrder(null);
+  };
+
 
   useEffect(() => {
     setIsClient(true);
   }, []);
   
-  const suppliers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
+  const suppliers = contacts.filter(c => c.type.includes('supplier'));
 
   const groupedOrders = useMemo(() => {
     const groups: Record<string, { supplierName: string; orders: PurchaseOrder[]; subtotal: number; totalKilos: number; totalPackages: number; }> = {};
@@ -478,8 +497,28 @@ export default function PurchasesPage() {
                 handleExportSingle(previewingOrder);
               }
             }}
+            onPrintRequest={() => {
+              if (previewingOrder) {
+                handlePrintRequest(previewingOrder);
+              }
+            }}
         />
       )}
+
+      {/* Hidden component for printing */}
+      <div className="hidden">
+        {orderToPrint && (
+            <PreviewContent
+                ref={printComponentRef}
+                order={orderToPrint}
+                supplier={suppliers.find(s => s.id === orderToPrint.supplierId) || null}
+                onEdit={() => {}}
+                onDelete={() => {}}
+                onExport={() => {}}
+                onPrintRequest={() => {}}
+            />
+        )}
+      </div>
     </>
   );
 }

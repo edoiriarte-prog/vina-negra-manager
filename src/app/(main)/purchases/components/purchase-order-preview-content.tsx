@@ -2,7 +2,6 @@
 "use client";
 
 import React from 'react';
-import { useReactToPrint } from 'react-to-print';
 import { Separator } from '@/components/ui/separator';
 import { PurchaseOrder, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
@@ -32,17 +31,14 @@ interface PreviewContentProps {
   onEdit: () => void;
   onDelete: () => void;
   onExport: () => void;
+  onPrintRequest: () => void;
 }
 
-export const PreviewContent = ({ order, supplier, onEdit, onDelete, onExport }: PreviewContentProps) => {
-    const printRef = React.useRef<HTMLDivElement>(null);
-    const handlePrint = useReactToPrint({
-        content: () => printRef.current,
-    });
-
+export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier, onEdit, onDelete, onExport, onPrintRequest }, ref) => {
+    
     return (
         <>
-            <div ref={printRef} className="p-6">
+            <div ref={ref} className="p-6">
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h3 className="text-lg font-bold">VIÑA NEGRA SpA</h3>
@@ -124,7 +120,7 @@ export const PreviewContent = ({ order, supplier, onEdit, onDelete, onExport }: 
                     <FileDown className="mr-2 h-4 w-4" />
                     Exportar Excel
                 </Button>
-                <Button variant="outline" onClick={handlePrint}>
+                <Button variant="outline" onClick={onPrintRequest}>
                     <FileDown className="mr-2 h-4 w-4" />
                     Generar PDF
                 </Button>
@@ -135,6 +131,6 @@ export const PreviewContent = ({ order, supplier, onEdit, onDelete, onExport }: 
             </div>
         </>
     );
-};
+});
 
 PreviewContent.displayName = 'PreviewContent';
