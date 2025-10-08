@@ -2,6 +2,7 @@
 "use client";
 
 import React from 'react';
+import { useReactToPrint } from 'react-to-print';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PurchaseOrder, Contact } from '@/lib/types';
-import { Edit, Trash2, FileDown } from 'lucide-react';
+import { Edit, Trash2, FileDown, Printer } from 'lucide-react';
 import { PreviewContent } from './purchase-order-preview-content';
 
 type PurchaseOrderPreviewProps = {
@@ -27,7 +28,12 @@ type PurchaseOrderPreviewProps = {
 
 
 export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, onEdit, onDelete, onExport }: PurchaseOrderPreviewProps) {
+  const componentRef = React.useRef<HTMLDivElement>(null);
   
+  const handlePrint = useReactToPrint({
+      content: () => componentRef.current,
+  });
+
   if (!order) {
     return null;
   }
@@ -35,11 +41,12 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl p-0">
-        <DialogHeader className="p-6 pb-0">
+        <DialogHeader className="p-6 pb-0 no-print">
           <DialogTitle>Orden de Compra: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto">
             <PreviewContent 
+                ref={componentRef}
                 order={order} 
                 supplier={supplier} 
             />
@@ -53,6 +60,10 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
              <Button variant="outline" onClick={onExport}>
                 <FileDown className="mr-2 h-4 w-4" />
                 Exportar Excel
+            </Button>
+            <Button variant="outline" onClick={handlePrint}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir
             </Button>
             <Button variant="destructive" onClick={onDelete}>
                 <Trash2 className="mr-2 h-4 w-4" />
