@@ -67,16 +67,16 @@ export default function PurchasesPage() {
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
-      onAfterPrint: () => setOrderToPrint(null),
   });
 
-  const handlePrintRequest = (order: PurchaseOrder) => {
+  const handlePrintRequest = useCallback((order: PurchaseOrder) => {
     setPreviewingOrder(null); // Close the preview dialog
     setOrderToPrint(order);
     setTimeout(() => {
         handlePrint();
+        setOrderToPrint(null);
     }, 100);
-  };
+  }, [handlePrint]);
 
 
   useEffect(() => {
@@ -494,11 +494,6 @@ export default function PurchasesPage() {
                 handleExportSingle(previewingOrder);
               }
             }}
-            onPrintRequest={() => {
-              if (previewingOrder) {
-                handlePrintRequest(previewingOrder);
-              }
-            }}
         />
       )}
 
@@ -512,7 +507,6 @@ export default function PurchasesPage() {
                 onEdit={() => {}}
                 onDelete={() => {}}
                 onExport={() => {}}
-                onPrintRequest={() => {}}
             />
         )}
       </div>

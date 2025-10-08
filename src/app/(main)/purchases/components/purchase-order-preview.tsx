@@ -22,11 +22,10 @@ type PurchaseOrderPreviewProps = {
   onEdit: () => void;
   onDelete: () => void;
   onExport: () => void;
-  onPrintRequest: () => void;
 };
 
 
-export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, onEdit, onDelete, onExport, onPrintRequest }: PurchaseOrderPreviewProps) {
+export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, onEdit, onDelete, onExport }: PurchaseOrderPreviewProps) {
 
   if (!order) {
     return null;
@@ -45,7 +44,6 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onExport={onExport}
-                onPrintRequest={onPrintRequest}
             />
         </div>
 

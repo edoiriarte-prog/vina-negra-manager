@@ -31,10 +31,9 @@ interface PreviewContentProps {
   onEdit: () => void;
   onDelete: () => void;
   onExport: () => void;
-  onPrintRequest: () => void;
 }
 
-export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier, onEdit, onDelete, onExport, onPrintRequest }, ref) => {
+export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier, onEdit, onDelete, onExport }, ref) => {
     
     return (
         <>
@@ -119,10 +118,6 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentPro
                  <Button variant="outline" onClick={onExport}>
                     <FileDown className="mr-2 h-4 w-4" />
                     Exportar Excel
-                </Button>
-                <Button variant="outline" onClick={onPrintRequest}>
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Generar PDF
                 </Button>
                 <Button variant="destructive" onClick={onDelete}>
                     <Trash2 className="mr-2 h-4 w-4" />
