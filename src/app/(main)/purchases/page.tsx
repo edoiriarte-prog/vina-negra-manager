@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { purchaseOrders as initialPurchaseOrders, contacts as initialContacts, financialMovements as initialFinancialMovements } from '@/lib/data';
 import { PurchaseOrder, Contact, OrderItem, FinancialMovement } from '@/lib/types';
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, MoreHorizontal, ChevronDown, Edit, Trash2, FileDown, Printer } from 'lucide-react';
+import { PlusCircle, Download, MoreHorizontal, ChevronDown, Edit, Trash2, FileDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -50,7 +50,7 @@ const formatCurrency = (value: number) =>
 export default function PurchasesPage() {
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
-  const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
+  const [financialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
   
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [confirmingEditOrder, setConfirmingEditOrder] = useState<PurchaseOrder | null>(null);
@@ -69,14 +69,13 @@ export default function PurchasesPage() {
       content: () => printComponentRef.current,
   });
 
-  const handlePrintRequest = useCallback((order: PurchaseOrder) => {
-    setPreviewingOrder(null); // Close the preview dialog
+  const handlePrintRequest = (order: PurchaseOrder) => {
     setOrderToPrint(order);
     setTimeout(() => {
         handlePrint();
         setOrderToPrint(null);
     }, 100);
-  }, [handlePrint]);
+  };
 
 
   useEffect(() => {
