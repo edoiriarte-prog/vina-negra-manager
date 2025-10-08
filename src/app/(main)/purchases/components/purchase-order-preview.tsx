@@ -2,7 +2,6 @@
 "use client";
 
 import React from 'react';
-import { useReactToPrint } from 'react-to-print';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PurchaseOrder, Contact } from '@/lib/types';
-import { Edit, Trash2, FileDown, Printer } from 'lucide-react';
+import { Edit, Trash2, FileDown } from 'lucide-react';
 import { PreviewContent } from './purchase-order-preview-content';
 
 type PurchaseOrderPreviewProps = {
@@ -28,11 +27,6 @@ type PurchaseOrderPreviewProps = {
 
 
 export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, onEdit, onDelete, onExport }: PurchaseOrderPreviewProps) {
-  const componentRef = React.useRef<HTMLDivElement>(null);
-  
-  const handlePrint = useReactToPrint({
-      content: () => componentRef.current,
-  });
 
   if (!order) {
     return null;
@@ -45,30 +39,16 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
           <DialogTitle>Orden de Compra: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto">
-            <PreviewContent 
-                ref={componentRef}
+            <PreviewContent
                 order={order} 
-                supplier={supplier} 
+                supplier={supplier}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onExport={onExport}
             />
         </div>
 
         <DialogFooter className="mt-8 p-6 pt-0 border-t gap-2 no-print">
-            <Button variant="outline" onClick={onEdit}>
-                <Edit className="mr-2 h-4 w-4" />
-                Editar
-            </Button>
-             <Button variant="outline" onClick={onExport}>
-                <FileDown className="mr-2 h-4 w-4" />
-                Exportar Excel
-            </Button>
-            <Button variant="outline" onClick={handlePrint}>
-                <Printer className="mr-2 h-4 w-4" />
-                Imprimir
-            </Button>
-            <Button variant="destructive" onClick={onDelete}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar
-            </Button>
             <DialogClose asChild>
                 <Button type="button">Cerrar</Button>
             </DialogClose>
