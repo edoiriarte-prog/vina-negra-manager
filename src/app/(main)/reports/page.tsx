@@ -32,7 +32,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 
 type DocumentDetail = {
@@ -100,7 +99,6 @@ export default function ReportsPage() {
       setTimeout(() => {
         if (printRef.current) {
           const printContents = printRef.current.innerHTML;
-          const originalContents = document.body.innerHTML;
           const printWindow = window.open('', '', 'height=800,width=800');
           
           if(printWindow){
@@ -129,17 +127,15 @@ export default function ReportsPage() {
 
   useEffect(() => {
     if (isClient) {
-      // --- Client Reports with chronological settlement ---
-      const clients = contacts.filter(c => c.type === 'client' || c.type === 'both');
+      const clients = contacts.filter(c => c.type.includes('client'));
       const clientReportData = clients.map(client => {
-        
         const clientSalesOrders = salesOrders
           .filter(so => so.clientId === client.id && (so.status === 'completed' || so.status === 'pending'))
-          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
         const clientMovements = financialMovements
           .filter(fm => fm.type === 'income' && fm.contactId === client.id)
-          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         const paymentPool = clientMovements.map(p => ({ ...p, remaining: p.amount }));
 
@@ -147,7 +143,7 @@ export default function ReportsPage() {
             let paidAmount = 0;
             let lastPaymentDate: string | undefined = undefined;
 
-            paymentPool.forEach(payment => {
+            for (const payment of paymentPool) {
                 if (payment.remaining > 0) {
                     const remainingOnOrder = order.totalAmount - paidAmount;
                     if (remainingOnOrder > 0) {
@@ -157,11 +153,11 @@ export default function ReportsPage() {
                         lastPaymentDate = payment.date;
                     }
                 }
-            });
+            }
 
             const pendingBalance = order.totalAmount - paidAmount;
             let status: DocumentDetail['status'] = 'Pendiente';
-            if (pendingBalance <= 1) {
+            if (pendingBalance <= 1) { // Epsilon for float comparison
                 status = 'Pagado';
             } else if (paidAmount > 0) {
                 status = 'Abonado';
@@ -207,8 +203,8 @@ export default function ReportsPage() {
       }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
       setClientReports(clientReportData);
 
-      // --- Supplier Reports (unchanged) ---
-      const suppliers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
+      // --- Supplier Reports ---
+      const suppliers = contacts.filter(c => c.type.includes('supplier'));
       const supplierReportData = suppliers.map(supplier => {
         const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && po.status === 'completed');
         const supplierServiceOrders = serviceOrders.filter(so => so.provider === supplier.name);

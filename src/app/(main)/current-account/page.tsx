@@ -124,10 +124,11 @@ export default function CurrentAccountPage() {
 
   useEffect(() => {
     if (isClient) {
-      // Client Reports
-      const clients = contacts.filter(c => c.type === 'client' || c.type === 'both');
+      const clients = contacts.filter(c => c.type.includes('client'));
       const clientReportData = clients.map(client => {
-        const clientSalesOrders = salesOrders.filter(so => so.clientId === client.id && (so.status === 'completed' || so.status === 'pending'));
+        const clientSalesOrders = salesOrders
+          .filter(so => so.clientId === client.id && (so.status === 'completed' || so.status === 'pending'))
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
         const caliberMap: { [key: string]: number } = {};
         clientSalesOrders.forEach(so => {
@@ -138,10 +139,9 @@ export default function CurrentAccountPage() {
             });
         });
         const caliberDistribution: CaliberDistribution[] = Object.entries(caliberMap).map(([name, value]) => ({ name, value }));
-        
+
         const clientDocuments: DocumentDetail[] = clientSalesOrders
-            .map(so => ({ id: so.id, date: so.date, type: 'O/V' as const, amount: so.totalAmount, items: so.items }))
-            .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            .map(so => ({ id: so.id, date: so.date, type: 'O/V' as const, amount: so.totalAmount, items: so.items }));
 
         const totalBilled = clientDocuments.reduce((sum, doc) => sum + doc.amount, 0);
         
@@ -152,13 +152,13 @@ export default function CurrentAccountPage() {
 
         let status: ReportData['status'] = 'Pendiente';
         if (totalBilled > 0) {
-            if (pendingBalance <= 1) {
+            if (pendingBalance <= 1) { // Use epsilon for float comparison
               status = 'Pagado';
             } else if (totalPaid > 0) {
               status = 'Abono';
             }
         } else if (totalPaid > 0) {
-            status = 'Abono';
+            status = 'Abono'; // Paid more than billed
         }
 
          return {
@@ -168,19 +168,20 @@ export default function CurrentAccountPage() {
           totalPaid,
           pendingBalance,
           status,
-          documents: clientDocuments,
+          documents: clientDocuments.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
           payments: clientMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
           caliberDistribution,
         };
       }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
       setClientReports(clientReportData);
 
-
-      // Supplier Reports
-      const suppliers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
+      const suppliers = contacts.filter(c => c.type.includes('supplier'));
       const supplierReportData = suppliers.map(supplier => {
         const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && (po.status === 'completed' || po.status === 'pending'));
-        const supplierServiceOrders = serviceOrders.filter(so => so.provider === supplier.name);
+        const supplierServiceOrders = serviceOrders.filter(so => {
+            const contact = contacts.find(c => c.name === so.provider);
+            return contact?.id === supplier.id;
+        });
 
         const caliberMap: { [key: string]: number } = {};
         supplierPurchaseOrders.forEach(po => {
@@ -190,14 +191,12 @@ export default function CurrentAccountPage() {
                 }
             });
         });
-
         const caliberDistribution: CaliberDistribution[] = Object.entries(caliberMap).map(([name, value]) => ({ name, value }));
-
 
         const supplierDocuments: DocumentDetail[] = [
             ...supplierPurchaseOrders.map(po => ({ id: po.id, date: po.date, type: 'O/C' as const, amount: po.totalAmount, items: po.items })),
             ...supplierServiceOrders.map(so => ({ id: so.id, date: so.date, type: 'O/S' as const, amount: so.cost })),
-        ].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        ];
 
         const totalBilled = supplierDocuments.reduce((sum, doc) => sum + doc.amount, 0);
         
@@ -208,7 +207,7 @@ export default function CurrentAccountPage() {
 
         let status: ReportData['status'] = 'Pendiente';
         if (totalBilled > 0) {
-            if (pendingBalance <= 1) {
+            if (pendingBalance <= 1) { // Use epsilon for float comparison
               status = 'Pagado';
             } else if (totalPaid > 0) {
               status = 'Abono';
@@ -222,7 +221,7 @@ export default function CurrentAccountPage() {
           totalPaid,
           pendingBalance,
           status,
-          documents: supplierDocuments,
+          documents: supplierDocuments.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
           payments: supplierMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
           caliberDistribution,
         };
@@ -326,7 +325,7 @@ export default function CurrentAccountPage() {
                                 <TableBody>
                                     {item.documents.map(doc => (
                                         <TableRow key={doc.id}>
-                                            <TableCell className="text-xs">{doc.id}</TableCell>
+                                            <TableCell className="text-xs">{doc.type}-{doc.id.split('-')[1]}</TableCell>
                                             <TableCell className="text-xs">{format(parseISO(doc.date), "dd-MM-yyyy", { locale: es })}</TableCell>
                                             <TableCell className="text-right text-xs">{formatCurrency(doc.amount)}</TableCell>
                                         </TableRow>
