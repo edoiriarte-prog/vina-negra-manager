@@ -70,15 +70,12 @@ export default function PurchasesPage() {
       onAfterPrint: () => setOrderToPrint(null),
   });
 
-  useEffect(() => {
-    if (orderToPrint) {
-      handlePrint();
-    }
-  }, [orderToPrint, handlePrint]);
-
   const handlePrintRequest = (order: PurchaseOrder) => {
+    setPreviewingOrder(null); // Close the preview dialog
     setOrderToPrint(order);
-    setPreviewingOrder(null);
+    setTimeout(() => {
+        handlePrint();
+    }, 100);
   };
 
 
@@ -216,7 +213,7 @@ export default function PurchasesPage() {
   const confirmDelete = () => {
     if (deletingOrder) {
       setPurchaseOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id));
-      toast({ variant: 'destructive', title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
+      toast({ variant: "destructive", title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
       setDeletingOrder(null);
     }
   }
