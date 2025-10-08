@@ -117,8 +117,18 @@ export function NewFinancialMovementSheet({
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: name === 'amount' ? Number(value) : value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
+  
+  const handleAmountChange = (value: string) => {
+    const numericValue = parseInt(value.replace(/\D/g, ''), 10) || 0;
+    setFormData(prev => ({...prev, amount: numericValue}));
+  }
+  
+  const handleBatchAmountChange = (batchId: number, value: string) => {
+    const numericValue = parseInt(value.replace(/\D/g, ''), 10) || 0;
+    handleBatchChange(batchId, 'amount', numericValue);
+  }
 
   const handleSelectChange = (name: keyof typeof formData, value: any) => {
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -399,7 +409,12 @@ export function NewFinancialMovementSheet({
                                         <Input placeholder="Descripción del movimiento" value={bm.description} onChange={(e) => handleBatchChange(bm.batchId, 'description', e.target.value)} />
                                     </TableCell>
                                     <TableCell>
-                                        <Input type="number" placeholder="$" value={bm.amount || ''} onChange={(e) => handleBatchChange(bm.batchId, 'amount', Number(e.target.value))} />
+                                        <Input 
+                                            type="text" 
+                                            placeholder="$" 
+                                            value={new Intl.NumberFormat('es-CL').format(bm.amount)}
+                                            onChange={(e) => handleBatchAmountChange(bm.batchId, e.target.value)}
+                                        />
                                     </TableCell>
                                     <TableCell>
                                          <Select onValueChange={(value) => handleBatchChange(bm.batchId, 'paymentMethod', value)} value={bm.paymentMethod}>
@@ -463,7 +478,16 @@ export function NewFinancialMovementSheet({
                     <Label htmlFor="amount" className="text-right">
                         Monto
                     </Label>
-                    <Input id="amount" name="amount" type="number" value={formData.amount} onChange={handleInputChange} className="col-span-3" required placeholder="$" />
+                    <Input 
+                        id="amount"
+                        name="amount"
+                        type="text"
+                        value={new Intl.NumberFormat('es-CL').format(formData.amount)}
+                        onChange={(e) => handleAmountChange(e.target.value)}
+                        className="col-span-3"
+                        required
+                        placeholder="$"
+                    />
                 </div>
                 
                 {formData.type === 'traspaso' ? (
@@ -662,5 +686,3 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
-
-    
