@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -23,7 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PurchaseOrder, OrderItem, Contact } from '@/lib/types';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -37,12 +38,16 @@ type NewPurchaseOrderSheetProps = {
 };
 
 
-const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'> => {
+const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
     if (order) {
-        const { totalAmount, totalKilos, ...rest } = order;
+        const { totalAmount, totalKilos, totalPackages, ...rest } = order;
+        // The date from the order is already a 'yyyy-MM-dd' string from local storage.
+        // To avoid timezone issues, parse it as UTC.
+        const date = parseISO(order.date);
+
         return {
             ...rest,
-            date: format(new Date(order.date), 'yyyy-MM-dd'),
+            date: format(date, 'yyyy-MM-dd'),
         };
     }
     return {
@@ -55,7 +60,7 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
 };
 
 export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, suppliers }: NewPurchaseOrderSheetProps) {
-  const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos'>>(getInitialFormData(order));
+  const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'>>(getInitialFormData(order));
   const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 });
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, warehouses, packagingTypes } = useMasterData();
@@ -167,6 +172,11 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     ? 'Actualice la información de la orden.'
     : 'Complete la información para registrar una nueva orden de compra.';
 
+  const getCaliberDisplayName = (caliberName: string) => {
+    const caliber = calibers.find(c => c.name === caliberName);
+    return caliber ? `${caliber.name} (${caliber.code})` : caliberName;
+  }
+
   return (
     <>
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -234,7 +244,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
-                                     {calibers.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                     {calibers.map(c => <SelectItem key={c.name} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
                                  </SelectContent>
                              </Select>
                         </div>

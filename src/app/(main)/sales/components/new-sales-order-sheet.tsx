@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -35,7 +36,7 @@ import { useMasterData } from '@/hooks/use-master-data';
 import { SalesOrderPreview } from './sales-order-preview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
+import { ItemMatrixDialog } from './item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
@@ -487,7 +488,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                 <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                     <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                     <SelectContent>
-                                        {calibers.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                        {calibers.map(c => <SelectItem key={c.name} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
