@@ -31,7 +31,7 @@ type DueDateItem = {
     clientId: string;
     clientName: string;
     orderId: string;
-    paymentType: 'Anticipo' | 'Saldo';
+    paymentType: 'Anticipo' | 'Saldo' | 'Contado' | 'Crédito';
     dueDate: string;
     amount: number;
     paidAmount: number;
@@ -67,45 +67,46 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
     const { pendingItems, paidItems, upcomingItems, totalPending, totalPaidInPeriod, totalUpcoming, totalBilled, totalPaid } = useMemo(() => {
         if (!isClient) return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaidInPeriod: 0, totalUpcoming: 0, totalBilled: 0, totalPaid: 0 };
-        
+
         const isAllClients = selectedClientId === 'all';
         const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
         
-        const filteredSalesOrders = salesOrders.filter(o => isAllClients ? true : o.clientId === selectedClientId);
+        const filteredSalesOrders = salesOrders.filter(o => 
+            (isAllClients || o.clientId === selectedClientId) &&
+            o.status !== 'cancelled'
+        );
 
         const allDueItems: DueDateItem[] = [];
-        
+
         filteredSalesOrders.forEach(order => {
-             if (order.status !== 'cancelled') {
-                const clientName = contacts.find(c => c.id === order.clientId)?.name || 'Desconocido';
-                
-                if (order.paymentMethod === 'Pago con Anticipo y Saldo' && order.advancePercentage) {
-                    if (order.advanceDueDate) {
-                        const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
-                        allDueItems.push({
-                            id: `${order.id}-advance`, clientId: order.clientId, clientName, orderId: order.id,
-                            paymentType: 'Anticipo', dueDate: order.advanceDueDate, amount: advanceAmount,
-                            paidAmount: 0, pendingAmount: advanceAmount, status: 'Pendiente',
-                        });
-                    }
-                    if (order.balanceDueDate) {
-                        const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
-                        const balanceAmount = order.totalAmount - advanceAmount;
-                         allDueItems.push({
-                            id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
-                            paymentType: 'Saldo', dueDate: order.balanceDueDate, amount: balanceAmount,
-                            paidAmount: 0, pendingAmount: balanceAmount, status: 'Pendiente',
-                        });
-                    }
-                } else if (order.paymentMethod === 'Crédito' || order.paymentMethod === 'Contado') {
-                     const dueDate = order.balanceDueDate || order.date;
-                     allDueItems.push({
-                        id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
-                        paymentType: 'Saldo', dueDate: dueDate, amount: order.totalAmount,
-                        paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
+            const clientName = contacts.find(c => c.id === order.clientId)?.name || 'Desconocido';
+            
+            if (order.paymentMethod === 'Pago con Anticipo y Saldo' && order.advancePercentage) {
+                if (order.advanceDueDate) {
+                    const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
+                    allDueItems.push({
+                        id: `${order.id}-advance`, clientId: order.clientId, clientName, orderId: order.id,
+                        paymentType: 'Anticipo', dueDate: order.advanceDueDate, amount: advanceAmount,
+                        paidAmount: 0, pendingAmount: advanceAmount, status: 'Pendiente',
                     });
                 }
-             }
+                if (order.balanceDueDate) {
+                    const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
+                    const balanceAmount = order.totalAmount - advanceAmount;
+                     allDueItems.push({
+                        id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
+                        paymentType: 'Saldo', dueDate: order.balanceDueDate, amount: balanceAmount,
+                        paidAmount: 0, pendingAmount: balanceAmount, status: 'Pendiente',
+                    });
+                }
+            } else if (order.paymentMethod === 'Crédito' || order.paymentMethod === 'Contado') {
+                 const dueDate = order.balanceDueDate || order.date;
+                 allDueItems.push({
+                    id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
+                    paymentType: order.paymentMethod, dueDate: dueDate, amount: order.totalAmount,
+                    paidAmount: 0, pendingAmount: order.totalAmount, status: 'Pendiente',
+                });
+            }
         });
         
         const sortedDues = allDueItems.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
@@ -116,11 +117,12 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             
         const paymentPool = clientMovements.map(p => ({ ...p, remaining: p.amount }));
 
+        // Correct chronological payment allocation
         sortedDues.forEach(due => {
             if (new Date(due.dueDate) > endDate) return;
 
             for (const payment of paymentPool) {
-                if (payment.remaining > 0) {
+                if (payment.remaining > 0 && payment.contactId === due.clientId) {
                     const remainingOnDue = due.pendingAmount;
                     if (remainingOnDue > 0) {
                         const amountToApply = Math.min(payment.remaining, remainingOnDue);
@@ -138,9 +140,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
         const pastAndPresentItems = sortedDues.filter(item => !isAfter(parseISO(item.dueDate), endDate));
         
-        const totalBilled = filteredSalesOrders
-            .filter(order => order.status !== 'cancelled' && new Date(order.date) <= endDate)
-            .reduce((sum, order) => sum + order.totalAmount, 0);
+        const totalBilled = pastAndPresentItems.reduce((sum, item) => sum + item.amount, 0);
 
         const totalUpcoming = upcoming.reduce((sum, item) => sum + item.pendingAmount, 0);
 
@@ -169,7 +169,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         
         const totalPaid = clientMovements.reduce((sum, mov) => sum + mov.amount, 0);
 
-        const totalPaidInPeriod = paid.reduce((sum, item) => sum + item.amount, 0);
+        const totalPaidInPeriod = paid.reduce((sum, item) => sum + item.amount, 0) + pending.reduce((sum, item) => sum + item.paidAmount, 0);
 
         return { pendingItems: pending, paidItems: paid, upcomingItems: upcoming, totalPending, totalPaidInPeriod, totalUpcoming, totalBilled, totalPaid };
 
@@ -195,8 +195,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             ["Cliente:", selectedClient ? selectedClient.name : "Todos los clientes"],
             [], // Empty row
             ["Concepto", "Monto"],
-            ["Total Facturado", totalBilled],
-            ["Total Pagado", totalPaid],
+            ["Total Facturado (Periodo)", totalBilled],
+            ["Total Pagado (Periodo)", totalPaidInPeriod],
             ["Pendiente / Vencido", totalPending],
             ["Total por Vencer", totalUpcoming]
         ];
@@ -210,6 +210,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             'Orden (O/V)': item.orderId,
             'Tipo de Pago': item.paymentType,
             'Monto Cuota': item.amount,
+            'Monto Pagado': item.paidAmount,
             'Saldo Pendiente': item.pendingAmount,
             'Estado': item.status,
         }));
@@ -237,11 +238,11 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
     const renderReportRows = (data: DueDateItem[]) => {
         if (!isClient) {
             return Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={`skeleton-due-${index}`}><TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                <TableRow key={`skeleton-due-${index}`}><TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
             ));
         }
         if (data.length === 0) {
-            return ( <TableRow><TableCell colSpan={7} className="h-24 text-center">No hay datos que mostrar para esta selección.</TableCell></TableRow> )
+            return ( <TableRow><TableCell colSpan={8} className="h-24 text-center">No hay datos que mostrar para esta selección.</TableCell></TableRow> )
         }
         return data.map(item => (
             <TableRow key={item.id}>
@@ -250,6 +251,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 <TableCell>{item.orderId}</TableCell>
                 <TableCell>{item.paymentType}</TableCell>
                 <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
+                <TableCell className="text-right text-green-500">{item.paidAmount > 0 ? formatCurrency(item.paidAmount) : '-'}</TableCell>
                 <TableCell className="text-right font-bold text-orange-500">{item.pendingAmount > 0 ? formatCurrency(item.pendingAmount) : '-'}</TableCell>
                 <TableCell className="text-center">
                     <Badge variant={item.status === 'Pagado' ? 'default' : item.status === 'Vencido' ? 'destructive' : item.status === 'Abonado' ? 'secondary' : 'outline'}>
@@ -271,6 +273,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                         <TableHead>Orden (O/V)</TableHead>
                         <TableHead>Tipo de Pago</TableHead>
                         <TableHead className="text-right">Monto Cuota</TableHead>
+                        <TableHead className="text-right">Monto Pagado</TableHead>
                         <TableHead className="text-right">Saldo Pendiente</TableHead>
                         <TableHead className="text-center">Estado</TableHead>
                     </TableRow>
@@ -281,7 +284,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 {isClient && items.length > 0 && (
                     <TableFooter>
                         <TableRow>
-                            <TableCell colSpan={6} className="text-right font-bold text-lg">{caption}</TableCell>
+                            <TableCell colSpan={7} className="text-right font-bold text-lg">{caption}</TableCell>
                             <TableCell className="text-right font-bold text-lg">{formatCurrency(total)}</TableCell>
                         </TableRow>
                     </TableFooter>
@@ -380,7 +383,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                 </CardHeader>
                                 <CardContent>
                                     {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalBilled)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                    <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
+                                    <p className="text-xs text-muted-foreground">en el periodo</p>
                                 </CardContent>
                             </Card>
                             <Card>
@@ -389,8 +392,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                                 </CardHeader>
                                 <CardContent>
-                                    {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalPaid)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                    <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
+                                    {isClient ? <div className="text-2xl font-bold text-green-500">{formatCurrency(totalPaidInPeriod)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                    <p className="text-xs text-muted-foreground">en el periodo</p>
                                 </CardContent>
                             </Card>
                             <Card>
@@ -400,7 +403,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                 </CardHeader>
                                 <CardContent>
                                     {isClient ? <div className="text-2xl font-bold text-destructive">{formatCurrency(totalPending)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                    <p className="text-xs text-muted-foreground">a la fecha seleccionada</p>
+                                    <p className="text-xs text-muted-foreground">en el periodo</p>
                                 </CardContent>
                             </Card>
                             <Card>
@@ -410,7 +413,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                 </CardHeader>
                                 <CardContent>
                                     {isClient ? <div className="text-2xl font-bold text-blue-500">{formatCurrency(totalUpcoming)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                    <p className="text-xs text-muted-foreground">después de la fecha</p>
+                                    <p className="text-xs text-muted-foreground">fuera del periodo</p>
                                 </CardContent>
                             </Card>
                         </div>
@@ -419,7 +422,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 
                 <div className="space-y-8">
                     {renderTable(pendingItems, totalPending, 'Total Pendiente', 'Pendientes y Vencidos')}
-                    {renderTable(paidItems, totalPaidInPeriod, 'Total Pagado', 'Pagados')}
+                    {renderTable(paidItems, totalPaidInPeriod, 'Total Pagado en Periodo', 'Pagados en Periodo')}
                     {renderTable(upcomingItems, totalUpcoming, 'Total por Vencer', 'Próximos Vencimientos')}
                 </div>
 
@@ -429,5 +432,3 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
     
 }
-
-    
