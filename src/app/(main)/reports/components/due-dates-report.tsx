@@ -78,6 +78,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             o.status !== 'cancelled'
         );
 
+        const totalBilled = relevantSalesOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+
         relevantSalesOrders.forEach(order => {
             const clientName = contacts.find(c => c.id === order.clientId)?.name || 'Desconocido';
             
@@ -144,7 +146,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
         const pastAndPresentItems = sortedDues.filter(item => !isAfter(parseISO(item.dueDate), endDate));
         
-        const totalBilled = pastAndPresentItems.reduce((sum, item) => sum + item.amount, 0);
         const totalUpcoming = upcoming.reduce((sum, item) => sum + item.pendingAmount, 0);
 
         pastAndPresentItems.forEach(due => {
@@ -386,7 +387,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                 </CardHeader>
                                 <CardContent>
                                     {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalBilled)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                    <p className="text-xs text-muted-foreground">en el periodo</p>
+                                    <p className="text-xs text-muted-foreground">total para el cliente</p>
                                 </CardContent>
                             </Card>
                             <Card>
@@ -395,8 +396,8 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                                 </CardHeader>
                                 <CardContent>
-                                    {isClient ? <div className="text-2xl font-bold text-green-500">{formatCurrency(totalPaidInPeriod)}</div> : <Skeleton className="h-8 w-3/4" />}
-                                    <p className="text-xs text-muted-foreground">en el periodo</p>
+                                    {isClient ? <div className="text-2xl font-bold text-green-500">{formatCurrency(totalPaid)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                    <p className="text-xs text-muted-foreground">total para el cliente</p>
                                 </CardContent>
                             </Card>
                             <Card>
