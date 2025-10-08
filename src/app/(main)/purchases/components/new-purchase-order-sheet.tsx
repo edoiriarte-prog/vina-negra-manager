@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PurchaseOrder, OrderItem, Contact } from '@/lib/types';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -40,15 +40,13 @@ type NewPurchaseOrderSheetProps = {
 const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
     if (order) {
         const { totalAmount, totalKilos, totalPackages, ...rest } = order;
-        // The date from the order is already a 'yyyy-MM-dd' string.
-        // We need to adjust for timezone differences when creating a new Date object.
-        const date = new Date(order.date);
-        const timezoneOffset = date.getTimezoneOffset() * 60000;
-        const adjustedDate = new Date(date.getTime() + timezoneOffset);
+        // The date from the order is already a 'yyyy-MM-dd' string from local storage.
+        // To avoid timezone issues, parse it as UTC.
+        const date = parseISO(order.date);
 
         return {
             ...rest,
-            date: format(adjustedDate, 'yyyy-MM-dd'),
+            date: format(date, 'yyyy-MM-dd'),
         };
     }
     return {

@@ -206,8 +206,11 @@ export default function ReportsPage() {
       // --- Supplier Reports ---
       const suppliers = contacts.filter(c => c.type.includes('supplier'));
       const supplierReportData = suppliers.map(supplier => {
-        const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && po.status === 'completed');
-        const supplierServiceOrders = serviceOrders.filter(so => so.provider === supplier.name);
+        const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && (po.status === 'completed' || po.status === 'pending'));
+        const supplierServiceOrders = serviceOrders.filter(so => {
+            const contact = contacts.find(c => c.name === so.provider);
+            return contact?.id === supplier.id;
+        });
 
         const supplierDocuments: DocumentDetail[] = [
             ...supplierPurchaseOrders.map(po => ({ id: po.id, date: po.date, type: 'O/C' as const, amount: po.totalAmount, paidAmount: 0, pendingBalance: 0, status: 'Pendiente' as const })),
