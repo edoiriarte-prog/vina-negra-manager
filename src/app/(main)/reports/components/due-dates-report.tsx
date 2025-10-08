@@ -71,9 +71,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         const isAllClients = selectedClientId === 'all';
         const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
         
-        const filteredSalesOrders = salesOrders.filter(o => {
-            return isAllClients ? true : o.clientId === selectedClientId;
-        });
+        const filteredSalesOrders = salesOrders.filter(o => isAllClients ? true : o.clientId === selectedClientId);
 
         const allDueItems: DueDateItem[] = [];
         
@@ -110,21 +108,27 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
              }
         });
         
-        // Sort all dues chronologically
         const sortedDues = allDueItems.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
         
         const clientMovements = financialMovements
-            .filter(fm => fm.type === 'income' && (isAllClients ? true : fm.contactId === selectedClientId) && new Date(fm.date) <= endDate)
+            .filter(fm => fm.type === 'income' && (isAllClients || fm.contactId === selectedClientId) && new Date(fm.date) <= endDate)
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             
-        let paymentPool = clientMovements.reduce((sum, mov) => sum + mov.amount, 0);
+        const paymentPool = clientMovements.map(p => ({ ...p, remaining: p.amount }));
 
         sortedDues.forEach(due => {
-            if (paymentPool > 0) {
-                const amountToApply = Math.min(paymentPool, due.pendingAmount);
-                due.paidAmount += amountToApply;
-                due.pendingAmount -= amountToApply;
-                paymentPool -= amountToApply;
+            if (new Date(due.dueDate) > endDate) return;
+
+            for (const payment of paymentPool) {
+                if (payment.remaining > 0) {
+                    const remainingOnDue = due.pendingAmount;
+                    if (remainingOnDue > 0) {
+                        const amountToApply = Math.min(payment.remaining, remainingOnDue);
+                        due.paidAmount += amountToApply;
+                        due.pendingAmount -= amountToApply;
+                        payment.remaining -= amountToApply;
+                    }
+                }
             }
         });
         
@@ -163,9 +167,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             
         const totalPending = pending.reduce((sum, item) => sum + item.pendingAmount, 0);
         
-        const totalPaid = financialMovements
-            .filter(fm => fm.type === 'income' && new Date(fm.date) <= endDate && (isAllClients || fm.contactId === selectedClientId))
-            .reduce((sum, mov) => sum + mov.amount, 0);
+        const totalPaid = clientMovements.reduce((sum, mov) => sum + mov.amount, 0);
 
         const totalPaidInPeriod = paid.reduce((sum, item) => sum + item.amount, 0);
 
