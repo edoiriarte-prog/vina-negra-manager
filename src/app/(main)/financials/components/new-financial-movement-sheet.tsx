@@ -299,8 +299,8 @@ export function NewFinancialMovementSheet({
     : 'Complete la información para registrar un nuevo ingreso o egreso.';
 
   const filteredContacts = formData.type === 'income' 
-    ? contacts.filter(c => c.type === 'client' || c.type === 'both') 
-    : contacts.filter(c => c.type === 'supplier' || c.type === 'both');
+    ? contacts.filter(c => c.type.includes('client') || c.type.includes('other_income')) 
+    : contacts.filter(c => c.type.includes('supplier') || c.type.includes('other_expense'));
 
   const onAssociationChange = (value: 'document' | 'abono' | 'concept') => {
       setAssociationType(value);
@@ -686,3 +686,5 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
+
+    
