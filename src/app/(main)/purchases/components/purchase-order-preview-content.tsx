@@ -34,14 +34,15 @@ interface PreviewContentProps {
   onExport: () => void;
 }
 
-export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier, onEdit, onDelete, onExport }, ref) => {
+export const PreviewContent = ({ order, supplier, onEdit, onDelete, onExport }: PreviewContentProps) => {
+    const printRef = React.useRef<HTMLDivElement>(null);
     const handlePrint = useReactToPrint({
-        content: () => ref.current,
+        content: () => printRef.current,
     });
 
     return (
         <>
-            <div ref={ref} className="p-6">
+            <div ref={printRef} className="p-6">
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h3 className="text-lg font-bold">VIÑA NEGRA SpA</h3>
@@ -134,6 +135,6 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentPro
             </div>
         </>
     );
-});
+};
 
 PreviewContent.displayName = 'PreviewContent';

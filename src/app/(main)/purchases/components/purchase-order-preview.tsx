@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PurchaseOrder, Contact } from '@/lib/types';
-import { Edit, Trash2, FileDown } from 'lucide-react';
 import { PreviewContent } from './purchase-order-preview-content';
 
 type PurchaseOrderPreviewProps = {
