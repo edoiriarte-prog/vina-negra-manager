@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useRef } from 'react';
-import { useReactToPrint } from 'react-to-print';
 import { Separator } from '@/components/ui/separator';
 import { PurchaseOrder, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
@@ -27,7 +26,7 @@ interface PreviewContentProps {
   supplier: Contact | null;
   onEdit: () => void;
   onDelete: () => void;
-  onExport: () => void;
+  onPrintRequest: () => void;
 }
 
 const formatCurrency = (value: number) =>
@@ -38,11 +37,8 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 
-export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier, onEdit, onDelete, onExport }, ref) => {
+export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier, onEdit, onDelete, onPrintRequest }, ref) => {
     const localPrintRef = useRef<HTMLDivElement>(null);
-    const handlePrint = useReactToPrint({
-        content: () => localPrintRef.current,
-    });
     const { calibers } = useMasterData();
 
     const getCaliberCode = (caliberName: string) => {
@@ -56,7 +52,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentPro
 
     return (
         <>
-            <div ref={localPrintRef} className="p-8 bg-white text-black font-sans">
+            <div ref={ref || localPrintRef} className="p-8 bg-white text-black font-sans">
                 {/* Header */}
                 <div className="flex justify-between items-start pb-4 border-b-2 border-neutral-800">
                     <div className="w-48">
@@ -154,7 +150,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentPro
                     <Edit className="mr-2 h-4 w-4" />
                     Editar
                 </Button>
-                <Button variant="outline" onClick={handlePrint}>
+                <Button variant="outline" onClick={onPrintRequest}>
                     <FileDown className="mr-2 h-4 w-4" />
                     Generar PDF
                 </Button>

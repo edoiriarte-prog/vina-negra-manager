@@ -238,36 +238,6 @@ export default function PurchasesPage() {
     setOpenCollapsibles(prev => ({...prev, [supplierId]: !prev[supplierId]}));
   }
 
-   const handleExportSingle = (orderToExport: PurchaseOrder) => {
-    if (!orderToExport) return;
-    const supplier = suppliers.find(s => s.id === orderToExport.supplierId);
-    const dataForSheet = orderToExport.items.map(item => ({
-      'O/C': orderToExport.id,
-      'Fecha': format(new Date(orderToExport.date), "dd-MM-yyyy"),
-      'Proveedor': supplier?.name,
-      'RUT Proveedor': supplier?.rut,
-      'Estado': orderToExport.status,
-      'Bodega': orderToExport.warehouse,
-      'Item ID': item.id,
-      'Producto': item.product,
-      'Calibre': item.caliber,
-      'Cantidad': item.quantity,
-      'Unidad': item.unit,
-      'Precio Unitario': item.price,
-      'Subtotal': item.quantity * item.price,
-      'Tipo Envase': item.packagingType,
-      'Cant. Envase': item.packagingQuantity,
-      'Lote': item.lotNumber,
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, `OC-${orderToExport.id}`);
-    XLSX.writeFile(workbook, `Orden_de_Compra_${orderToExport.id}.xlsx`);
-    toast({ title: 'Exportación Exitosa', description: `Se ha exportado la orden ${orderToExport.id}.` });
-    setPreviewingOrder(null);
-  };
-
   const handleExportAll = () => {
     if (purchaseOrders.length === 0) {
         toast({
@@ -489,9 +459,9 @@ export default function PurchasesPage() {
                 handleDelete(previewingOrder);
               }
             }}
-            onExport={() => {
+            onPrintRequest={() => {
               if (previewingOrder) {
-                handleExportSingle(previewingOrder);
+                handlePrintRequest(previewingOrder);
               }
             }}
         />
@@ -506,7 +476,7 @@ export default function PurchasesPage() {
                 supplier={suppliers.find(s => s.id === orderToPrint.supplierId) || null}
                 onEdit={() => {}}
                 onDelete={() => {}}
-                onExport={() => {}}
+                onPrintRequest={() => {}}
             />
         )}
       </div>
