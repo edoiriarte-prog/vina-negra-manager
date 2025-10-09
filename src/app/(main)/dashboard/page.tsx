@@ -293,10 +293,10 @@ export default function DashboardPage() {
                     description="Balance pendiente con proveedores"
                   />
                   <KpiCard
-                    title="Nº de Proveedores"
-                    value={supplierCount.toString()}
-                    icon={<Users className="h-5 w-5 text-cyan-500" />}
-                    description="Total de proveedores activos"
+                    title="Total Kilos Comprados"
+                    value={formatKilos(totalKilosPurchased)}
+                    icon={<Scale className="h-5 w-5 text-cyan-500" />}
+                    description="Kilos de O/C completadas"
                   />
                 </>
               ) : (
