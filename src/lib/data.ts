@@ -29,19 +29,13 @@ export const purchaseOrders: PurchaseOrder[] = [
   { id: 'OC-1001', supplierId: '1', date: '2023-10-01', items: [{ id: 'p1', product: 'UVAS', caliber: getOfficialCaliber('PRIMERA'), quantity: 5000, unit: 'Kilos', price: 3000, packagingQuantity: 250, packagingType: 'CAJAS' }, { id: 'p2', product: 'UVAS', caliber: getOfficialCaliber('SEGUNDA'), quantity: 3000, unit: 'Kilos', price: 2500, packagingQuantity: 150, packagingType: 'CAJAS' }], totalAmount: 22500000, totalKilos: 8000, totalPackages: 400, status: 'completed', warehouse: 'Bodega Principal', paymentStatus: 'Abonado' },
   { id: 'OC-1002', supplierId: '5', date: '2023-10-08', items: [{ id: 'p3', product: 'PALTAS', caliber: getOfficialCaliber('EXTRA'), quantity: 6000, unit: 'Kilos', price: 4000, packagingQuantity: 300, packagingType: 'CAJAS' }, { id: 'p4', product: 'PALTAS', caliber: getOfficialCaliber('PRIMERA'), quantity: 4000, unit: 'Kilos', price: 3500, packagingQuantity: 200, packagingType: 'CAJAS' }], totalAmount: 38000000, totalKilos: 10000, totalPackages: 500, status: 'completed', warehouse: 'Bodega Principal', paymentStatus: 'Abonado' },
   { id: 'OC-1003', supplierId: '1', date: '2023-10-15', items: [{ id: 'p5', product: 'DURAZNOS', caliber: getOfficialCaliber('EXTRA'), quantity: 7000, unit: 'Kilos', price: 2000, packagingQuantity: 350, packagingType: 'CAJAS' }, { id: 'p6', product: 'DURAZNOS', caliber: getOfficialCaliber('PRIMERA'), quantity: 2000, unit: 'Kilos', price: 1500, packagingQuantity: 100, packagingType: 'CAJAS' }], totalAmount: 17000000, totalKilos: 9000, totalPackages: 450, status: 'completed', warehouse: 'Bodega Principal', paymentStatus: 'Pendiente' },
-].map(po => ({
-    ...po,
-    items: po.items.map(item => ({...item, caliber: getOfficialCaliber(item.caliber)}))
-}));
+];
 
 export const salesOrders: SalesOrder[] = [
   { id: 'OV-2001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'UVAS', caliber: getOfficialCaliber('PRIMERA'), quantity: 4000, unit: 'Kilos', price: 4500, packagingQuantity: 200 }, { id: 's2', product: 'UVAS', caliber: getOfficialCaliber('SEGUNDA'), quantity: 2000, unit: 'Kilos', price: 5000, packagingQuantity: 100 }], totalKilos: 6000, totalPackages: 300, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed', paymentMethod: 'Contado', warehouse: 'Bodega Principal', paymentStatus: 'Pagado' },
   { id: 'OV-2002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'PALTAS', caliber: getOfficialCaliber('EXTRA'), quantity: 5000, unit: 'Kilos', price: 4500, packagingQuantity: 250 }, { id: 's4', product: 'PALTAS', caliber: getOfficialCaliber('PRIMERA'), quantity: 3000, unit: 'Kilos', price: 5000, packagingQuantity: 150 }], totalKilos: 8000, totalPackages: 400, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed', paymentMethod: 'Pago con Anticipo y Saldo', advancePercentage: 50, advanceDueDate: '2023-10-20', balanceDueDate: '2023-11-20', warehouse: 'Cámara de Frío 1', paymentStatus: 'Pagado' },
   { id: 'OV-2003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'DURAZNOS', caliber: getOfficialCaliber('EXTRA'), quantity: 6000, unit: 'Kilos', price: 5500, packagingQuantity: 300 }], totalKilos: 6000, totalPackages: 300, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending', paymentMethod: 'Crédito', warehouse: 'Bodega Principal', paymentStatus: 'Pendiente' },
-].map(so => ({
-    ...so,
-    items: so.items.map(item => ({...item, caliber: getOfficialCaliber(item.caliber)}))
-}));
+];
 
 export const serviceOrders: ServiceOrder[] = [
   { id: 'OS-001', provider: 'Transportes Rapido', date: '2023-10-01', serviceType: 'Flete', cost: 300000, relatedPurchaseId: 'OC-1001', description: 'Flete OC-1001 desde Santa Cruz a planta', paymentStatus: 'Pagado' },
@@ -60,10 +54,7 @@ export const financialMovements: FinancialMovement[] = [
 
 export const inventoryAdjustments: InventoryAdjustment[] = [
   { id: 'ADJ-1', date: '2023-10-10', product: 'UVAS', caliber: getOfficialCaliber('PRIMERA'), warehouse: 'Bodega Principal', type: 'decrease', quantity: 50, reason: 'Merma por manipulación' },
-].map(adj => ({
-    ...adj,
-    caliber: getOfficialCaliber(adj.caliber)
-}));
+];
 
 
 export const getInventory = (
