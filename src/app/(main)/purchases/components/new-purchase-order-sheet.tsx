@@ -27,6 +27,7 @@ import { format, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { productCaliberMatrix } from '@/lib/master-data';
 
 type NewPurchaseOrderSheetProps = {
   isOpen: boolean;
@@ -89,6 +90,12 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     const newItems = [...formData.items];
     const item = { ...newItems[index] };
     (item[field] as any) = value; // Type assertion
+
+    // If product changes, reset caliber
+    if (field === 'product') {
+        item.caliber = '';
+    }
+
     newItems[index] = item;
     setFormData(prev => ({ ...prev, items: newItems }));
   };
@@ -225,6 +232,9 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                 
                 {formData.items.map((item, index) => {
                   const subtotal = (item.quantity || 0) * (item.price || 0);
+                  const availableCalibers = productCaliberMatrix[item.product] || [];
+                  const sortedAvailableCalibers = calibers.filter(c => availableCalibers.includes(c.name));
+
                   return (
                     <div key={item.id} className="grid grid-cols-12 gap-2 items-end mb-2 p-3 border rounded-md">
                         {/* Product */}
@@ -240,10 +250,10 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                         {/* Caliber */}
                         <div className="col-span-6 md:col-span-2">
                              <Label>Calibre</Label>
-                             <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
+                             <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber} disabled={!item.product}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
-                                     {calibers.map(c => <SelectItem key={`${item.id}-${c.name}`} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
+                                     {sortedAvailableCalibers.map(c => <SelectItem key={`${item.id}-${c.name}`} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
                                  </SelectContent>
                              </Select>
                         </div>
@@ -370,5 +380,3 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     </>
   );
 }
-
-    
