@@ -27,21 +27,27 @@ type InventoryReportItem = {
     product: string;
     caliber: string;
     caliberCode: string;
-    initialStock: number;
-    inflows: number;
-    outflows: number;
-    adjustments: number;
-    finalStock: number;
+    initialStockKg: number;
+    inflowKg: number;
+    outflowKg: number;
+    adjustmentsKg: number;
+    finalStockKg: number;
+    initialStockPackages: number;
+    inflowPackages: number;
+    outflowPackages: number;
+    adjustmentsPackages: number;
+    finalStockPackages: number;
 };
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
+const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
+
 
 export default function InventoryPage() {
     const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
     const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
     const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
-    const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
-    const { calibers: masterCalibers, warehouses } = useMasterData();
+    const { calibers: masterCalibers, warehouses, products: masterProducts } = useMasterData();
 
     const [isClient, setIsClient] = useState(false);
     const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
@@ -49,8 +55,9 @@ export default function InventoryPage() {
         to: endOfMonth(new Date()),
     });
     const [selectedWarehouse, setSelectedWarehouse] = useState<string>('All');
+    const [selectedProduct, setSelectedProduct] = useState<string>(masterProducts[0] || '');
     const [inventoryData, setInventoryData] = useState<InventoryReportItem[]>([]);
-    const [viewingHistory, setViewingHistory] = useState<InventoryReportItem | null>(null);
+    const [viewingHistory, setViewingHistory] = useState<any | null>(null);
 
     const { toast } = useToast();
 
@@ -59,20 +66,32 @@ export default function InventoryPage() {
     }, []);
 
     useEffect(() => {
-        if (isClient) {
-            const getStockAsOf = (date: Date) => {
-                const stockMap = new Map<string, number>();
+        if (!selectedProduct && masterProducts.length > 0) {
+            setSelectedProduct(masterProducts[0]);
+        }
+    }, [masterProducts, selectedProduct]);
 
-                const relevantPOs = purchaseOrders.filter(po => po.status === 'completed' && !isAfter(parseISO(po.date), date));
-                const relevantSOs = salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date));
-                const relevantAdjs = inventoryAdjustments.filter(adj => !isAfter(parseISO(adj.date), date));
+    useEffect(() => {
+        if (isClient && selectedProduct) {
+            const getStockAsOf = (date: Date) => {
+                const stockMap = new Map<string, { kg: number, packages: number }>();
+
+                const relevantPOs = purchaseOrders.filter(po => po.product === selectedProduct && po.status === 'completed' && !isAfter(parseISO(po.date), date));
+                const relevantSOs = salesOrders.filter(so => so.items.some(i => i.product === selectedProduct) && (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date));
+                const relevantAdjs = inventoryAdjustments.filter(adj => adj.product === selectedProduct && !isAfter(parseISO(adj.date), date));
 
                 const processItems = (items: any[], warehouse: string, isPurchase: boolean) => {
                     items.forEach(item => {
-                        if (item.unit === 'Kilos' && (selectedWarehouse === 'All' || warehouse === selectedWarehouse)) {
+                        if (item.product === selectedProduct && (selectedWarehouse === 'All' || warehouse === selectedWarehouse)) {
                             const key = `${item.product}-${item.caliber}`;
-                            const currentStock = stockMap.get(key) || 0;
-                            stockMap.set(key, currentStock + (isPurchase ? item.quantity : -item.quantity));
+                            const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
+                            const quantityKg = item.unit === 'Kilos' ? item.quantity : 0;
+                            const factor = isPurchase ? 1 : -1;
+                            
+                            currentStock.kg += quantityKg * factor;
+                            currentStock.packages += (item.packagingQuantity || 0) * factor;
+
+                            stockMap.set(key, currentStock);
                         }
                     });
                 };
@@ -83,96 +102,108 @@ export default function InventoryPage() {
                 relevantAdjs.forEach(adj => {
                     if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
                         const key = `${adj.product}-${adj.caliber}`;
-                        const currentStock = stockMap.get(key) || 0;
+                        const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
                         const adjustment = adj.type === 'increase' ? adj.quantity : -adj.quantity;
-                        stockMap.set(key, currentStock + adjustment);
+                        currentStock.kg += adjustment;
+                        stockMap.set(key, currentStock);
                     }
                 });
 
                 return stockMap;
             };
 
-            const initialStockMap = getStockAsOf(new Date(dateRange.from.getTime() - 86400000)); // Day before 'from'
+            const initialStockMap = getStockAsOf(new Date(dateRange.from.getTime() - 86400000));
 
-            const inflowsMap = new Map<string, number>();
-            const outflowsMap = new Map<string, number>();
-            const adjustmentsMap = new Map<string, number>();
-            const allItems = new Set<string>();
+            const inflowsMap = new Map<string, { kg: number, packages: number }>();
+            const outflowsMap = new Map<string, { kg: number, packages: number }>();
+            const adjustmentsMap = new Map<string, { kg: number, packages: number }>();
+            const allCalibers = new Set<string>();
 
             const filterByDate = (dateStr: string) => {
                 const date = parseISO(dateStr);
                 return !isBefore(date, dateRange.from) && !isAfter(date, dateRange.to);
             };
 
-            purchaseOrders.filter(po => po.status === 'completed' && filterByDate(po.date)).forEach(po => {
+            purchaseOrders.filter(po => po.product === selectedProduct && po.status === 'completed' && filterByDate(po.date)).forEach(po => {
                 po.items.forEach(item => {
-                    if (item.unit === 'Kilos' && (selectedWarehouse === 'All' || po.warehouse === selectedWarehouse)) {
+                    if (item.product === selectedProduct && (selectedWarehouse === 'All' || po.warehouse === selectedWarehouse)) {
                         const key = `${item.product}-${item.caliber}`;
-                        inflowsMap.set(key, (inflowsMap.get(key) || 0) + item.quantity);
-                        allItems.add(key);
+                        const current = inflowsMap.get(key) || { kg: 0, packages: 0 };
+                        current.kg += item.unit === 'Kilos' ? item.quantity : 0;
+                        current.packages += item.packagingQuantity || 0;
+                        inflowsMap.set(key, current);
+                        allCalibers.add(item.caliber);
                     }
                 });
             });
 
-            salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && filterByDate(so.date)).forEach(so => {
+            salesOrders.filter(so => so.items.some(i => i.product === selectedProduct) && (so.status === 'completed' || so.status === 'pending') && filterByDate(so.date)).forEach(so => {
                 so.items.forEach(item => {
-                    if (item.unit === 'Kilos' && (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse)) {
+                    if (item.product === selectedProduct && (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse)) {
                         const key = `${item.product}-${item.caliber}`;
-                        outflowsMap.set(key, (outflowsMap.get(key) || 0) + item.quantity);
-                        allItems.add(key);
+                        const current = outflowsMap.get(key) || { kg: 0, packages: 0 };
+                        current.kg += item.unit === 'Kilos' ? item.quantity : 0;
+                        current.packages += item.packagingQuantity || 0;
+                        outflowsMap.set(key, current);
+                        allCalibers.add(item.caliber);
                     }
                 });
             });
 
-            inventoryAdjustments.filter(adj => filterByDate(adj.date)).forEach(adj => {
+            inventoryAdjustments.filter(adj => adj.product === selectedProduct && filterByDate(adj.date)).forEach(adj => {
                 if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
                     const key = `${adj.product}-${adj.caliber}`;
-                    const adjustment = adj.type === 'increase' ? adj.quantity : -adj.quantity;
-                    adjustmentsMap.set(key, (adjustmentsMap.get(key) || 0) + adjustment);
-                    allItems.add(key);
+                    const current = adjustmentsMap.get(key) || { kg: 0, packages: 0 };
+                    const adjustmentKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
+                    current.kg += adjustmentKg;
+                    adjustmentsMap.set(key, current);
+                    allCalibers.add(adj.caliber);
                 }
             });
             
-            initialStockMap.forEach((_, key) => allItems.add(key));
+            initialStockMap.forEach((_, key) => {
+                const caliber = key.split('-')[1];
+                allCalibers.add(caliber);
+            });
 
-            const reportData: InventoryReportItem[] = Array.from(allItems).map(key => {
-                const [product, caliber] = key.split('-');
-                const initialStock = initialStockMap.get(key) || 0;
-                const inflows = inflowsMap.get(key) || 0;
-                const outflows = outflowsMap.get(key) || 0;
-                const adjustments = adjustmentsMap.get(key) || 0;
-                const finalStock = initialStock + inflows - outflows + adjustments;
+            const reportData: InventoryReportItem[] = Array.from(allCalibers).map(caliber => {
+                const key = `${selectedProduct}-${caliber}`;
+                const initialStock = initialStockMap.get(key) || { kg: 0, packages: 0 };
+                const inflows = inflowsMap.get(key) || { kg: 0, packages: 0 };
+                const outflows = outflowsMap.get(key) || { kg: 0, packages: 0 };
+                const adjustments = adjustmentsMap.get(key) || { kg: 0, packages: 0 };
+                
+                const finalStockKg = initialStock.kg + inflows.kg - outflows.kg + adjustments.kg;
+                const finalStockPackages = initialStock.packages + inflows.packages - outflows.packages + adjustments.packages;
 
                 return {
                     key,
-                    product,
+                    product: selectedProduct,
                     caliber,
                     caliberCode: masterCalibers.find(c => c.name === caliber)?.code || 'N/A',
-                    initialStock,
-                    inflows,
-                    outflows,
-                    adjustments,
-                    finalStock,
+                    initialStockKg: initialStock.kg,
+                    inflowKg: inflows.kg,
+                    outflowKg: outflows.kg,
+                    adjustmentsKg: adjustments.kg,
+                    finalStockKg: finalStockKg,
+                    initialStockPackages: initialStock.packages,
+                    inflowPackages: inflows.packages,
+                    outflowPackages: outflows.packages,
+                    adjustmentsPackages: adjustments.packages,
+                    finalStockPackages: finalStockPackages,
                 };
             }).sort((a, b) => {
-                const productComparison = a.product.localeCompare(b.product);
-                if (productComparison !== 0) {
-                    return productComparison;
-                }
                 const caliberAIndex = masterCalibers.findIndex(c => c.code === a.caliberCode);
                 const caliberBIndex = masterCalibers.findIndex(c => c.code === b.caliberCode);
-                
-                // Handle cases where a caliber might not be in the master list
                 if (caliberAIndex === -1 && caliberBIndex === -1) return a.caliber.localeCompare(b.caliber);
                 if (caliberAIndex === -1) return 1;
                 if (caliberBIndex === -1) return -1;
-                
                 return caliberAIndex - caliberBIndex;
             });
             
             setInventoryData(reportData);
         }
-    }, [isClient, dateRange, selectedWarehouse, purchaseOrders, salesOrders, inventoryAdjustments, masterCalibers]);
+    }, [isClient, dateRange, selectedWarehouse, selectedProduct, purchaseOrders, salesOrders, inventoryAdjustments, masterCalibers, masterProducts]);
     
     const handleExport = () => {
       if (!inventoryData.length) {
@@ -185,15 +216,21 @@ export default function InventoryPage() {
         'Calibre': item.caliber,
         'Cód. Calibre': item.caliberCode,
         'Bodega': selectedWarehouse,
-        'Stock Inicial (kg)': item.initialStock,
-        'Entradas (kg)': item.inflows,
-        'Salidas (kg)': item.outflows,
-        'Ajustes (kg)': item.adjustments,
-        'Stock Final (kg)': item.finalStock,
+        'Stock Inicial (kg)': item.initialStockKg,
+        'Entradas (kg)': item.inflowKg,
+        'Salidas (kg)': item.outflowKg,
+        'Ajustes (kg)': item.adjustmentsKg,
+        'Stock Final (kg)': item.finalStockKg,
+        'Stock Inicial (envases)': item.initialStockPackages,
+        'Entradas (envases)': item.inflowPackages,
+        'Salidas (envases)': item.outflowPackages,
+        'Ajustes (envases)': item.adjustmentsPackages,
+        'Stock Final (envases)': item.finalStockPackages,
       }));
 
       const summary = [
         ["Reporte de Inventario"],
+        ["Producto", selectedProduct],
         ["Periodo", `${format(dateRange.from, 'dd-MM-yyyy')} al ${format(dateRange.to, 'dd-MM-yyyy')}`],
         ["Bodega", selectedWarehouse],
         []
@@ -203,19 +240,24 @@ export default function InventoryPage() {
       XLSX.utils.sheet_add_aoa(worksheet, summary, { origin: "A1" });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario');
-      XLSX.writeFile(workbook, `Reporte_Inventario_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      XLSX.writeFile(workbook, `Reporte_Inventario_${selectedProduct}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
       toast({ title: 'Exportación Exitosa'});
     };
     
     const totals = useMemo(() => {
         return inventoryData.reduce((acc, item) => {
-            acc.initialStock += item.initialStock;
-            acc.inflows += item.inflows;
-            acc.outflows += item.outflows;
-            acc.adjustments += item.adjustments;
-            acc.finalStock += item.finalStock;
+            acc.initialStockKg += item.initialStockKg;
+            acc.inflowKg += item.inflowKg;
+            acc.outflowKg += item.outflowKg;
+            acc.adjustmentsKg += item.adjustmentsKg;
+            acc.finalStockKg += item.finalStockKg;
+            acc.initialStockPackages += item.initialStockPackages;
+            acc.inflowPackages += item.inflowPackages;
+            acc.outflowPackages += item.outflowPackages;
+            acc.adjustmentsPackages += item.adjustmentsPackages;
+            acc.finalStockPackages += item.finalStockPackages;
             return acc;
-        }, { initialStock: 0, inflows: 0, outflows: 0, adjustments: 0, finalStock: 0 });
+        }, { initialStockKg: 0, inflowKg: 0, outflowKg: 0, adjustmentsKg: 0, finalStockKg: 0, initialStockPackages: 0, inflowPackages: 0, outflowPackages: 0, adjustmentsPackages: 0, finalStockPackages: 0 });
     }, [inventoryData]);
 
     const renderContent = () => {
@@ -228,48 +270,68 @@ export default function InventoryPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Producto</TableHead>
-                            <TableHead>Calibre</TableHead>
-                            <TableHead>Cód.</TableHead>
-                            <TableHead className="text-right">Stock Inicial</TableHead>
-                            <TableHead className="text-right">Entradas</TableHead>
-                            <TableHead className="text-right">Salidas</TableHead>
-                            <TableHead className="text-right">Ajustes</TableHead>
-                            <TableHead className="text-right font-bold">Stock Final</TableHead>
-                            <TableHead className="w-[50px]">Acciones</TableHead>
+                            <TableHead rowSpan={2} className="align-bottom">Calibre</TableHead>
+                            <TableHead rowSpan={2} className="align-bottom">Cód.</TableHead>
+                            <TableHead colSpan={2} className="text-center border-b border-l">Stock Inicial</TableHead>
+                            <TableHead colSpan={2} className="text-center border-b border-l">Entradas</TableHead>
+                            <TableHead colSpan={2} className="text-center border-b border-l">Salidas</TableHead>
+                            <TableHead colSpan={2} className="text-center border-b border-l">Ajustes</TableHead>
+                            <TableHead colSpan={2} className="text-center border-b border-l font-bold">Stock Final</TableHead>
+                            <TableHead rowSpan={2} className="align-bottom w-[50px] border-l">Acciones</TableHead>
+                        </TableRow>
+                         <TableRow>
+                            <TableHead className="text-right border-l">Envases</TableHead>
+                            <TableHead className="text-right">Kg</TableHead>
+                            <TableHead className="text-right border-l">Envases</TableHead>
+                            <TableHead className="text-right">Kg</TableHead>
+                            <TableHead className="text-right border-l">Envases</TableHead>
+                            <TableHead className="text-right">Kg</TableHead>
+                            <TableHead className="text-right border-l">Envases</TableHead>
+                            <TableHead className="text-right">Kg</TableHead>
+                            <TableHead className="text-right border-l font-bold">Envases</TableHead>
+                            <TableHead className="text-right font-bold">Kg</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {inventoryData.length > 0 ? inventoryData.map(item => (
                              <TableRow key={item.key}>
-                                <TableCell className="font-medium">{item.product}</TableCell>
-                                <TableCell>{item.caliber}</TableCell>
+                                <TableCell className="font-medium">{item.caliber}</TableCell>
                                 <TableCell>{item.caliberCode}</TableCell>
-                                <TableCell className="text-right">{formatKilos(item.initialStock)}</TableCell>
-                                <TableCell className="text-right text-green-500">{item.inflows > 0 ? `+${formatKilos(item.inflows)}` : '-'}</TableCell>
-                                <TableCell className="text-right text-red-500">{item.outflows > 0 ? `-${formatKilos(item.outflows)}` : '-'}</TableCell>
-                                <TableCell className="text-right text-blue-500">{item.adjustments !== 0 ? formatKilos(item.adjustments) : '-'}</TableCell>
-                                <TableCell className="text-right font-bold text-primary">{formatKilos(item.finalStock)}</TableCell>
-                                <TableCell>
-                                    <Button variant="ghost" size="icon" onClick={() => setViewingHistory(item as any)}>
+                                <TableCell className="text-right border-l">{formatPackages(item.initialStockPackages)}</TableCell>
+                                <TableCell className="text-right">{formatKilos(item.initialStockKg)}</TableCell>
+                                <TableCell className="text-right text-green-500 border-l">{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
+                                <TableCell className="text-right text-green-500">{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
+                                <TableCell className="text-right text-red-500 border-l">{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
+                                <TableCell className="text-right text-red-500">{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
+                                <TableCell className="text-right text-blue-500 border-l">{item.adjustmentsPackages !== 0 ? formatPackages(item.adjustmentsPackages) : '-'}</TableCell>
+                                <TableCell className="text-right text-blue-500">{item.adjustmentsKg !== 0 ? formatKilos(item.adjustmentsKg) : '-'}</TableCell>
+                                <TableCell className="text-right font-bold text-primary border-l">{formatPackages(item.finalStockPackages)}</TableCell>
+                                <TableCell className="text-right font-bold text-primary">{formatKilos(item.finalStockKg)}</TableCell>
+                                <TableCell className="border-l">
+                                    <Button variant="ghost" size="icon" onClick={() => setViewingHistory({ ...item, warehouse: selectedWarehouse })}>
                                         <Eye className="h-4 w-4" />
                                     </Button>
                                 </TableCell>
                             </TableRow>
                         )) : (
                             <TableRow>
-                                <TableCell colSpan={9} className="text-center h-24">No hay datos de inventario para el período y bodega seleccionados.</TableCell>
+                                <TableCell colSpan={13} className="text-center h-24">No hay datos de inventario para el período y filtros seleccionados.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
                      <TableFooter>
                         <TableRow>
-                            <TableHead colSpan={3} className="text-right font-bold text-lg">Totales</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.initialStock)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.inflows)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.outflows)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.adjustments)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.finalStock)}</TableHead>
+                            <TableHead colSpan={2} className="text-right font-bold text-lg">Totales</TableHead>
+                            <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.initialStockPackages)}</TableHead>
+                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.initialStockKg)}</TableHead>
+                            <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.inflowPackages)}</TableHead>
+                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.inflowKg)}</TableHead>
+                            <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.outflowPackages)}</TableHead>
+                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.outflowKg)}</TableHead>
+                            <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.adjustmentsPackages)}</TableHead>
+                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.adjustmentsKg)}</TableHead>
+                            <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.finalStockPackages)}</TableHead>
+                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.finalStockKg)}</TableHead>
                              <TableHead></TableHead>
                         </TableRow>
                     </TableFooter>
@@ -297,6 +359,19 @@ export default function InventoryPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="flex flex-col md:flex-row gap-4 items-end p-4 mb-4 border rounded-lg bg-muted/20">
+                        <div className="flex-1 w-full">
+                            <Label>Producto</Label>
+                            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {masterProducts.map(p => (
+                                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <div className="flex-1 w-full">
                             <Label>Bodega</Label>
                             <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
@@ -351,7 +426,7 @@ export default function InventoryPage() {
             </Card>
              {viewingHistory && (
                 <InventoryHistoryDialog
-                    item={viewingHistory as any}
+                    item={viewingHistory}
                     isOpen={!!viewingHistory}
                     onOpenChange={() => setViewingHistory(null)}
                 />
@@ -359,3 +434,5 @@ export default function InventoryPage() {
         </>
     );
 }
+
+    
