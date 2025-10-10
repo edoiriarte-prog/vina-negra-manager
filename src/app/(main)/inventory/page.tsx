@@ -22,6 +22,7 @@ import { es } from 'date-fns/locale';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import { useReactToPrint } from 'react-to-print';
 
 type InventoryReportItem = {
     key: string;
@@ -61,6 +62,17 @@ export default function InventoryPage() {
     const [viewingHistory, setViewingHistory] = useState<any | null>(null);
 
     const { toast } = useToast();
+    const printRef = useRef<HTMLDivElement>(null);
+    
+    const handlePrint = useReactToPrint({
+        content: () => printRef.current,
+    });
+    
+    const onPrintRequest = () => {
+        setTimeout(() => {
+            handlePrint();
+        }, 100);
+    }
 
 
     useEffect(() => {
@@ -79,12 +91,21 @@ export default function InventoryPage() {
             const getStockAsOf = (date: Date) => {
                 const stockMap = new Map<string, { kg: number, packages: number }>();
 
-                const relevantPOs = purchaseOrders.filter(po => po.status === 'completed' && !isAfter(parseISO(po.date), date));
-                const relevantSOs = salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date));
-                const relevantAdjs = inventoryAdjustments.filter(adj => !isAfter(parseISO(adj.date), date));
+                const relevantPOs = purchaseOrders
+                    .filter(po => po.status === 'completed' && !isAfter(parseISO(po.date), date))
+                    .filter(po => po.items.some(item => item.product === selectedProduct));
+                
+                const relevantSOs = salesOrders
+                    .filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date))
+                    .filter(so => so.items.some(item => item.product === selectedProduct));
+                
+                const relevantAdjs = inventoryAdjustments
+                    .filter(adj => !isAfter(parseISO(adj.date), date))
+                    .filter(adj => adj.product === selectedProduct);
+
 
                 relevantPOs.forEach(po => {
-                    if (po.product === selectedProduct && (selectedWarehouse === 'All' || po.warehouse === selectedWarehouse)) {
+                    if (selectedWarehouse === 'All' || po.warehouse === selectedWarehouse) {
                         po.items.forEach(item => {
                             if (item.product === selectedProduct) {
                                 const key = `${item.product}-${item.caliber}`;
@@ -100,7 +121,7 @@ export default function InventoryPage() {
                 });
                 
                 relevantSOs.forEach(so => {
-                    if (so.items.some(item => item.product === selectedProduct) && (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse)) {
+                     if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
                         so.items.forEach(item => {
                             if (item.product === selectedProduct) {
                                 const key = `${item.product}-${item.caliber}`;
@@ -116,7 +137,7 @@ export default function InventoryPage() {
                 });
 
                 relevantAdjs.forEach(adj => {
-                    if (adj.product === selectedProduct && (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse)) {
+                    if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
                         const key = `${adj.product}-${adj.caliber}`;
                         const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
                         const adjustmentKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
@@ -359,6 +380,18 @@ export default function InventoryPage() {
             </div>
         );
     }
+    
+    const PrintableReport = () => (
+        <div ref={printRef} className="p-8">
+            <div className="mb-8">
+                <h1 className="font-headline text-2xl">Reporte de Inventario</h1>
+                <p>Producto: {selectedProduct}</p>
+                <p>Bodega: {selectedWarehouse}</p>
+                <p>Período: {format(dateRange.from, 'dd-MM-yyyy')} al {format(dateRange.to, 'dd-MM-yyyy')}</p>
+            </div>
+            {renderContent()}
+        </div>
+    );
 
     return (
         <>
@@ -369,14 +402,14 @@ export default function InventoryPage() {
                             <h1 className="font-headline text-3xl">Inventario en Tiempo Real</h1>
                             <p className="text-muted-foreground">Consulta el stock por producto y calibre en un rango de fechas.</p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 no-print">
                           <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" />Exportar a Excel</Button>
-                          <Button variant="outline" disabled><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
+                          <Button variant="outline" onClick={onPrintRequest}><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex flex-col md:flex-row gap-4 items-end p-4 mb-4 border rounded-lg bg-muted/20">
+                    <div className="flex flex-col md:flex-row gap-4 items-end p-4 mb-4 border rounded-lg bg-muted/20 no-print">
                         <div className="flex-1 w-full">
                             <Label>Producto</Label>
                             <Select value={selectedProduct} onValueChange={setSelectedProduct}>
@@ -449,6 +482,10 @@ export default function InventoryPage() {
                     onOpenChange={() => setViewingHistory(null)}
                 />
             )}
+             <div className="hidden print:block">
+                <PrintableReport />
+            </div>
         </>
     );
 }
+
