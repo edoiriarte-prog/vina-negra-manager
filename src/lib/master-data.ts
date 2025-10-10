@@ -4,8 +4,8 @@ export const initialProducts = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MA
 
 // Updated to an array of objects to include code and name for proper sorting and display.
 export const initialCalibers = [
-    { code: "50", name: "EXTRA" },
-    { code: "60", name: "PRIMERA" },
+    { code: "50", name: "PRIMERA" },
+    { code: "60", name: "EXTRA" },
     { code: "70", name: "SEGUNDA" },
     { code: "84", name: "TERCERA" },
     { code: "96", name: "CUARTA" },
@@ -52,6 +52,7 @@ export const productCaliberMatrix: ProductMatrix = {
     "CLEMENTINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
     "MANDARINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
 };
+
 
 
 
