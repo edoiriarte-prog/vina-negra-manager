@@ -243,7 +243,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
-                                     {calibers.map(c => <SelectItem key={c.name} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
+                                     {calibers.map(c => <SelectItem key={`${item.id}-${c.name}`} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
                                  </SelectContent>
                              </Select>
                         </div>
@@ -370,3 +370,5 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     </>
   );
 }
+
+    
