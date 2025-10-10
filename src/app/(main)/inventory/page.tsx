@@ -21,7 +21,6 @@ import { es } from 'date-fns/locale';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
-import { useReactToPrint } from 'react-to-print';
 
 type InventoryReportItem = {
     key: string;
@@ -61,10 +60,6 @@ export default function InventoryPage() {
     const [viewingHistory, setViewingHistory] = useState<any | null>(null);
 
     const { toast } = useToast();
-    const printComponentRef = useRef<HTMLDivElement>(null);
-    const handlePrint = useReactToPrint({
-        content: () => printComponentRef.current,
-    });
 
 
     useEffect(() => {
@@ -363,24 +358,10 @@ export default function InventoryPage() {
             </div>
         );
     }
-    
-    const PrintableReport = React.forwardRef<HTMLDivElement>((props, ref) => (
-        <div ref={ref} className="p-4">
-            <div className="text-center mb-4">
-                <h1 className="font-headline text-2xl">Informe de Inventario</h1>
-                <p className="text-muted-foreground">
-                    Producto: {selectedProduct} | Bodega: {selectedWarehouse} | Período: {format(dateRange.from, 'dd/MM/yy')} - {format(dateRange.to, 'dd/MM/yy')}
-                </p>
-            </div>
-            {renderContent()}
-        </div>
-    ));
-    PrintableReport.displayName = 'PrintableReport';
-
 
     return (
         <>
-            <Card className="no-print">
+            <Card>
                 <CardHeader>
                     <div className="flex justify-between items-start">
                          <div>
@@ -389,9 +370,7 @@ export default function InventoryPage() {
                         </div>
                         <div className="flex gap-2">
                           <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" />Exportar a Excel</Button>
-                          <Button variant="outline" onClick={() => setTimeout(() => handlePrint(), 0)}>
-                            <Printer className="mr-2 h-4 w-4" /> Imprimir
-                          </Button>
+                          <Button variant="outline" disabled><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
                         </div>
                     </div>
                 </CardHeader>
@@ -469,9 +448,6 @@ export default function InventoryPage() {
                     onOpenChange={() => setViewingHistory(null)}
                 />
             )}
-            <div className="hidden print:block">
-                <PrintableReport ref={printComponentRef} />
-            </div>
         </>
     );
 }
