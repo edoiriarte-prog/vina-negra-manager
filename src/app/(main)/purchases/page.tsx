@@ -18,11 +18,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download } from 'lucide-react';
+import { PlusCircle, Download, ChevronDown, MoreHorizontal, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
@@ -49,6 +49,14 @@ export default function PurchasesPage() {
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
   });
+
+  const handlePrintRequest = useCallback((order: PurchaseOrder) => {
+    setOrderToPrint(order);
+    setTimeout(() => {
+        handlePrint();
+        setOrderToPrint(null);
+    }, 100);
+  }, [handlePrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -155,14 +163,6 @@ export default function PurchasesPage() {
     setPreviewingOrder(order);
   };
 
-  const handlePrintRequest = (order: PurchaseOrder) => {
-    setOrderToPrint(order);
-    setTimeout(() => {
-        handlePrint();
-        setOrderToPrint(null);
-    }, 100);
-  };
-  
   const handleExportAll = () => {
     if (purchaseOrders.length === 0) {
         toast({
