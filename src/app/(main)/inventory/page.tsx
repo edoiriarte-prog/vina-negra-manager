@@ -154,7 +154,21 @@ export default function InventoryPage() {
                     adjustments,
                     finalStock,
                 };
-            }).sort((a, b) => a.key.localeCompare(b.key));
+            }).sort((a, b) => {
+                const productComparison = a.product.localeCompare(b.product);
+                if (productComparison !== 0) {
+                    return productComparison;
+                }
+                const caliberAIndex = masterCalibers.findIndex(c => c.code === a.caliberCode);
+                const caliberBIndex = masterCalibers.findIndex(c => c.code === b.caliberCode);
+                
+                // Handle cases where a caliber might not be in the master list
+                if (caliberAIndex === -1 && caliberBIndex === -1) return a.caliber.localeCompare(b.caliber);
+                if (caliberAIndex === -1) return 1;
+                if (caliberBIndex === -1) return -1;
+                
+                return caliberAIndex - caliberBIndex;
+            });
             
             setInventoryData(reportData);
         }
