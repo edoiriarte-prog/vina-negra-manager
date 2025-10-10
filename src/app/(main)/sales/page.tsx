@@ -62,7 +62,7 @@ export default function SalesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
-  const [isPrinting, setIsPrinting] = useState(false);
+  const [orderToPrint, setOrderToPrint] = useState<SalesOrder | null>(null);
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
@@ -78,16 +78,14 @@ export default function SalesPage() {
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
+      onAfterPrint: () => setOrderToPrint(null), // Clean up after printing
   });
   
   useEffect(() => {
-    if (isPrinting && previewingOrder && printComponentRef.current) {
-        handlePrint();
-        setIsPrinting(false); // Reset printing state
-        setPreviewingOrder(null); // Clean up after printing
+    if (orderToPrint) {
+      handlePrint();
     }
-  }, [isPrinting, previewingOrder, handlePrint]);
-  
+  }, [orderToPrint, handlePrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -429,7 +427,7 @@ export default function SalesPage() {
                                                                     </DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end">
                                                                       <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                                      <DropdownMenuItem onClick={() => { setPreviewingOrder(order); }}>
+                                                                      <DropdownMenuItem onClick={() => handlePreview(order)}>
                                                                         <Eye className='mr-2 h-4 w-4' />
                                                                         Visualizar
                                                                       </DropdownMenuItem>
@@ -556,6 +554,7 @@ export default function SalesPage() {
           carrier={carriers.find(s => s.id === previewingOrder.carrierId) || null}
           isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
+          onPrintRequest={() => setOrderToPrint(previewingOrder)}
         />
       )}
       
@@ -577,8 +576,7 @@ export default function SalesPage() {
                     Exportar a Excel
                   </Button>
                   <Button variant="default" onClick={() => {
-                    setPreviewingOrder(postSaveOrderOptions);
-                    setIsPrinting(true);
+                    setOrderToPrint(postSaveOrderOptions);
                     setPostSaveOrderOptions(null);
                   }}>
                     <Printer className="mr-2 h-4 w-4" />
@@ -595,7 +593,7 @@ export default function SalesPage() {
 
       {/* Hidden component for printing */}
       <div className="hidden">
-         {isPrinting && previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} client={clients.find(c => c.id === previewingOrder.clientId) || null} carrier={carriers.find(c => c.id === previewingOrder.carrierId) || null} />}
+         {orderToPrint && <PreviewContent ref={printComponentRef} order={orderToPrint} client={clients.find(c => c.id === orderToPrint.clientId) || null} carrier={carriers.find(c => c.id === orderToPrint.carrierId) || null} />}
       </div>
     </>
   );
