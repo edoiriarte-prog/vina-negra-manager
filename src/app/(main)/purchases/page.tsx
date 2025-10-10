@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, MoreHorizontal, ChevronDown, Edit, Trash2, FileDown } from 'lucide-react';
+import { PlusCircle, Download, MoreHorizontal, ChevronDown, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -118,15 +118,6 @@ export default function PurchasesPage() {
     }, { subtotal: 0, totalKilos: 0, totalPackages: 0 });
   }, [groupedOrders]);
 
-  const totalPaidForPurchases = useMemo(() => {
-    const purchaseOrderIds = new Set(purchaseOrders.map(po => po.id));
-    return financialMovements
-      .filter(fm => fm.type === 'expense' && fm.relatedDocument?.type === 'OC' && purchaseOrderIds.has(fm.relatedDocument.id))
-      .reduce((sum, fm) => sum + fm.amount, 0);
-  }, [financialMovements, purchaseOrders]);
-
-  const pendingBalance = useMemo(() => grandTotals.subtotal - totalPaidForPurchases, [grandTotals.subtotal, totalPaidForPurchases]);
-  
   const filteredGroupedOrders = useMemo(() => {
       if (!filter) return groupedOrders;
       return groupedOrders.filter(group => 
@@ -355,14 +346,6 @@ export default function PurchasesPage() {
                         <TableHead className='text-right font-bold text-lg' colSpan={3}>Total General</TableHead>
                         <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotals.subtotal)}</TableHead>
                     </TableRow>
-                    <TableRow className="bg-muted/50">
-                        <TableHead className='text-right font-bold' colSpan={3}>Total Pagado a la Fecha</TableHead>
-                        <TableHead className='text-right font-bold text-green-600'>{formatCurrency(totalPaidForPurchases)}</TableHead>
-                    </TableRow>
-                    <TableRow className="bg-muted/50">
-                        <TableHead className='text-right font-bold' colSpan={3}>Saldo por Pagar</TableHead>
-                        <TableHead className='text-right font-bold text-destructive'>{formatCurrency(pendingBalance)}</TableHead>
-                    </TableRow>
                 </TableFooter>
             </Table>
         </div>
@@ -459,9 +442,9 @@ export default function PurchasesPage() {
               }
             }}
             onPrintRequest={() => {
-              if (previewingOrder) {
-                handlePrintRequest(previewingOrder);
-              }
+                if (previewingOrder) {
+                    handlePrintRequest(previewingOrder);
+                }
             }}
         />
       )}
