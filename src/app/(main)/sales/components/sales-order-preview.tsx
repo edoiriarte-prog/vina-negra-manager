@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import {
   Dialog,
@@ -64,7 +64,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
               </div>
             </div>
   
-          <div className="grid grid-cols-2 gap-8 mb-8">
+          <div className="grid grid-cols-3 gap-8 mb-8">
             <div>
               <h3 className="font-semibold mb-2">Cliente</h3>
               <div className="text-sm text-muted-foreground">
@@ -73,6 +73,14 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
                 <p>{client?.address}</p>
                 <p>{client?.commune}</p>
                 <p>{client?.email}</p>
+              </div>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Transporte</h3>
+              <div className="text-sm text-muted-foreground">
+                <p><span className="font-medium text-foreground">Transportista:</span> {carrier?.name || 'N/A'}</p>
+                <p><span className="font-medium text-foreground">Chofer:</span> {order.driverName || 'N/A'}</p>
+                <p><span className="font-medium text-foreground">Patente:</span> {order.licensePlate || 'N/A'}</p>
               </div>
             </div>
             <div className='text-right'>
@@ -198,11 +206,11 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
               </div>
               </div>
                <div className='text-right'>
-                  <h3 className="font-semibold mb-2">VIÑA NEGRA SpA</h3>
+                  <h3 className="font-semibold mb-2">Transporte</h3>
                   <div className="text-sm text-muted-foreground">
-                      <p>RUT: 78.261.683-8</p>
-                      <p>TULAHUEN S/N</p>
-                      <p>MONTE PATRIA CHILE</p>
+                      <p className="font-bold text-foreground">{carrier?.name || 'N/A'}</p>
+                      <p>Chofer: {order.driverName || 'N/A'}</p>
+                      <p>Patente: {order.licensePlate || 'N/A'}</p>
                   </div>
               </div>
           </div>
@@ -240,6 +248,11 @@ PreviewContent.displayName = "PreviewContent";
 
 export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange }: SalesOrderPreviewProps) {
   
+  const componentRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+      content: () => componentRef.current,
+  });
+
   if (!order) return null;
   
   return (
@@ -249,15 +262,15 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
            <DialogTitle>Previsualización de Orden de Venta: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto" id="print-area">
-            {/* The ref is now passed from the parent component */}
-            <PreviewContent order={order} client={client} carrier={carrier} />
+            <PreviewContent ref={componentRef} order={order} client={client} carrier={carrier} />
         </div>
         <DialogFooter className="p-6 pt-4 flex-row justify-end gap-2">
-           <Button
-              onClick={() => onOpenChange(false)}
-              variant="outline"
-            >
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cerrar
+            </Button>
+            <Button onClick={handlePrint}>
+                <Printer className="mr-2 h-4 w-4" />
+                Exportar a PDF
             </Button>
         </DialogFooter>
       </DialogContent>

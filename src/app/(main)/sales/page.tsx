@@ -553,7 +553,7 @@ export default function SalesPage() {
         <SalesOrderPreview
           order={previewingOrder}
           client={clients.find(s => s.id === previewingOrder.clientId) || null}
-          carrier={carriers.find(s => s.id === (previewingOrder as any).carrierId) || null}
+          carrier={carriers.find(s => s.id === previewingOrder.carrierId) || null}
           isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
         />
@@ -561,41 +561,41 @@ export default function SalesPage() {
       
       {postSaveOrderOptions && (
         <AlertDialog open={!!postSaveOrderOptions} onOpenChange={() => setPostSaveOrderOptions(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Orden "{postSaveOrderOptions.id}" Guardada</AlertDialogTitle>
-              <AlertDialogDescription>
-                La orden de venta ha sido guardada exitosamente. ¿Qué deseas hacer a continuación?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="sm:justify-center gap-2">
-                <Button variant="outline" onClick={() => {
-                  handleExport(postSaveOrderOptions);
-                  setPostSaveOrderOptions(null);
-                }}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Exportar a Excel
-                </Button>
-                <Button variant="default" onClick={() => {
-                  setPreviewingOrder(postSaveOrderOptions);
-                  setIsPrinting(true);
-                  setPostSaveOrderOptions(null);
-                }}>
-                  <Printer className="mr-2 h-4 w-4" />
-                  Exportar a PDF
-                </Button>
-                 <Button variant="secondary" onClick={() => setPostSaveOrderOptions(null)}>
-                      <X className="mr-2 h-4 w-4" />
-                      Salir
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Orden "{postSaveOrderOptions.id}" Guardada</AlertDialogTitle>
+                <AlertDialogDescription>
+                  La orden de venta ha sido guardada exitosamente. ¿Qué deseas hacer a continuación?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="sm:justify-center gap-2">
+                  <Button variant="outline" onClick={() => {
+                    handleExport(postSaveOrderOptions);
+                    setPostSaveOrderOptions(null);
+                  }}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar a Excel
                   </Button>
-              </AlertDialogFooter>
-          </AlertDialogContent>
+                  <Button variant="default" onClick={() => {
+                    setPreviewingOrder(postSaveOrderOptions);
+                    setIsPrinting(true);
+                    setPostSaveOrderOptions(null);
+                  }}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Exportar a PDF
+                  </Button>
+                  <Button variant="secondary" onClick={() => setPostSaveOrderOptions(null)}>
+                        <X className="mr-2 h-4 w-4" />
+                        Salir
+                    </Button>
+                </AlertDialogFooter>
+            </AlertDialogContent>
         </AlertDialog>
       )}
 
       {/* Hidden component for printing */}
       <div className="hidden">
-         {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} client={clients.find(c => c.id === previewingOrder.clientId) || null} carrier={null} />}
+         {isPrinting && previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} client={clients.find(c => c.id === previewingOrder.clientId) || null} carrier={carriers.find(c => c.id === previewingOrder.carrierId) || null} />}
       </div>
     </>
   );

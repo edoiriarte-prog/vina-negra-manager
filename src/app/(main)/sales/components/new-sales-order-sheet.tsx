@@ -79,6 +79,9 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
         saleType: 'Venta Firme',
         movementType: 'Venta Directa',
         destinationWarehouse: '',
+        carrierId: '',
+        driverName: '',
+        licensePlate: '',
     };
 };
 
@@ -295,6 +298,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   
   const previewOrderData = getPreviewOrder();
   const previewClient = clients.find(c => c.id === previewOrderData.clientId) || null;
+  const previewCarrier = carriers.find(c => c.id === previewOrderData.carrierId) || null;
 
   const totalAmount = useMemo(() => {
     return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0)
@@ -493,6 +497,29 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                 </div>
               </div>
               
+                <Card>
+                    <CardHeader><CardTitle className="text-lg font-headline">Transporte</CardTitle></CardHeader>
+                    <CardContent className="grid md:grid-cols-3 gap-4">
+                        <div>
+                            <Label htmlFor="carrierId">Transportista</Label>
+                             <Select onValueChange={(value) => handleSelectChange('carrierId', value)} value={formData.carrierId}>
+                                <SelectTrigger><SelectValue placeholder="Seleccione transportista" /></SelectTrigger>
+                                <SelectContent>
+                                    {carriers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label htmlFor="driverName">Nombre Chofer</Label>
+                            <Input id="driverName" name="driverName" value={formData.driverName || ''} onChange={handleInputChange} />
+                        </div>
+                         <div>
+                            <Label htmlFor="licensePlate">Patente</Label>
+                            <Input id="licensePlate" name="licensePlate" value={formData.licensePlate || ''} onChange={handleInputChange} />
+                        </div>
+                    </CardContent>
+                </Card>
+
               <Card>
                 <CardHeader>
                     <div className="flex justify-between items-center">
@@ -762,7 +789,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         <SalesOrderPreview 
             order={previewOrderData}
             client={previewClient}
-            carrier={null}
+            carrier={previewCarrier}
             isOpen={isPreviewing}
             onOpenChange={setIsPreviewing}
         />

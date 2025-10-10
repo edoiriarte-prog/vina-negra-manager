@@ -69,6 +69,9 @@ export type SalesOrder = {
   saleType?: 'Venta Firme' | 'Consignación' | 'Mínimo Garantizado';
   movementType?: 'Venta Directa' | 'Traslado a Bodega Externa';
   destinationWarehouse?: string;
+  carrierId?: string;
+  driverName?: string;
+  licensePlate?: string;
 };
 
 export type PurchaseOrder = {
