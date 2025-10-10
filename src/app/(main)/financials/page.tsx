@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX, MoreHorizontal, ChevronDown, Eye, ArrowRightCircle, Wallet, Download } from 'lucide-react';
+import { PlusCircle, ArrowUpCircle, ArrowDownCircle, FilterX, MoreHorizontal, ChevronDown, Eye, ArrowRightCircle, Wallet, Download, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -189,6 +189,8 @@ export default function FinancialsPage() {
       setFinancialMovements((prev) => prev.filter((m) => m.id !== deletingMovement.id));
       toast({ variant: "destructive", title: "Movimiento Eliminado" });
       setDeletingMovement(null);
+      setIsSheetOpen(false);
+      setEditingMovement(null);
     }
   }
 
@@ -576,6 +578,7 @@ export default function FinancialsPage() {
         salesOrders={salesOrders}
         serviceOrders={serviceOrders}
         contacts={contacts}
+        onDelete={handleDelete}
       />
 
       <AlertDialog open={!!deletingMovement} onOpenChange={(open) => !open && setDeletingMovement(null)}>

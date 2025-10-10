@@ -40,6 +40,7 @@ type NewFinancialMovementSheetProps = {
   onOpenChange: (isOpen: boolean) => void;
   onSave: (movement: FinancialMovement | Omit<FinancialMovement, 'id'> | Omit<FinancialMovement, 'id'>[]) => void;
   movement: FinancialMovement | null;
+  onDelete?: (movement: FinancialMovement) => void;
   allMovements: FinancialMovement[];
   purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
@@ -66,7 +67,7 @@ const getInitialFormData = (): Omit<FinancialMovement, 'id'> => ({
 
 
 export function NewFinancialMovementSheet({ 
-    isOpen, onOpenChange, onSave, movement, allMovements, 
+    isOpen, onOpenChange, onSave, movement, onDelete, allMovements, 
     purchaseOrders, salesOrders, serviceOrders, contacts 
 }: NewFinancialMovementSheetProps) {
   const [formData, setFormData] = useState<Omit<FinancialMovement, 'id'>>(getInitialFormData());
@@ -321,6 +322,12 @@ export function NewFinancialMovementSheet({
           date: prev.date,
           type: value,
       }));
+  }
+  
+  const handleDeleteClick = () => {
+    if (movement && onDelete) {
+        onDelete(movement);
+    }
   }
 
   return (
@@ -673,13 +680,23 @@ export function NewFinancialMovementSheet({
             </div>
             )}
           </div>
-          <SheetFooter className="mt-4">
-            <SheetClose asChild>
-              <Button type="button" variant="outline">
-                Cancelar
-              </Button>
-            </SheetClose>
-            <Button type="submit">Guardar</Button>
+          <SheetFooter className="mt-4 flex justify-between">
+            <div>
+              {movement && onDelete && (
+                 <Button type="button" variant="destructive" onClick={handleDeleteClick}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Eliminar
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <SheetClose asChild>
+                <Button type="button" variant="outline">
+                  Cancelar
+                </Button>
+              </SheetClose>
+              <Button type="submit">Guardar</Button>
+            </div>
           </SheetFooter>
         </form>
       </SheetContent>
