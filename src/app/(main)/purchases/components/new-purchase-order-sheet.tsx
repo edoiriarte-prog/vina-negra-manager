@@ -182,6 +182,11 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     const caliber = calibers.find(c => c.name === caliberName);
     return caliber ? `${caliber.name} (${caliber.code})` : caliberName;
   }
+  
+  const getCaliberCode = (caliberName: string) => {
+    const caliber = calibers.find(c => c.name === caliberName);
+    return caliber ? caliber.code : 'N/A';
+  }
 
   return (
     <>
@@ -255,7 +260,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber} disabled={!item.product}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
-                                     {sortedAvailableCalibers.map(c => <SelectItem key={`${item.id}-${c.name}`} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
+                                     {sortedAvailableCalibers.map(c => <SelectItem key={`${item.id}-${c.name}-${c.code}`} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
                                  </SelectContent>
                              </Select>
                         </div>
@@ -382,3 +387,5 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     </>
   );
 }
+
+    
