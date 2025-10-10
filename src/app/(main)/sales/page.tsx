@@ -72,8 +72,8 @@ export default function SalesPage() {
 
   const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
   
-  const clients = contacts.filter(c => c.type === 'client' || c.type === 'both');
-  const carriers = contacts.filter(c => c.type === 'supplier' || c.type === 'both');
+  const clients = contacts.filter(c => c.type.includes('client'));
+  const carriers = contacts.filter(c => c.type.includes('supplier'));
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
@@ -552,37 +552,39 @@ export default function SalesPage() {
       
       {postSaveOrderOptions && (
         <AlertDialog open={!!postSaveOrderOptions} onOpenChange={() => setPostSaveOrderOptions(null)}>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Orden "{postSaveOrderOptions.id}" Guardada</AlertDialogTitle>
-            <AlertDialogDescription>
-              La orden de venta ha sido guardada exitosamente. ¿Qué deseas hacer a continuación?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="sm:justify-center gap-2">
-              <Button variant="outline" onClick={() => {
-                handleExport(postSaveOrderOptions);
-                setPostSaveOrderOptions(null);
-              }}>
-                <Download className="mr-2 h-4 w-4" />
-                Exportar a Excel
-              </Button>
-              <Button variant="default" onClick={() => {
-                setPreviewingOrder(postSaveOrderOptions);
-                setTimeout(() => {
-                  handlePrint();
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Orden "{postSaveOrderOptions.id}" Guardada</AlertDialogTitle>
+              <AlertDialogDescription>
+                La orden de venta ha sido guardada exitosamente. ¿Qué deseas hacer a continuación?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="sm:justify-center gap-2">
+                <Button variant="outline" onClick={() => {
+                  handleExport(postSaveOrderOptions);
                   setPostSaveOrderOptions(null);
-                }, 100);
-              }}>
-                <Printer className="mr-2 h-4 w-4" />
-                Imprimir O/V
-              </Button>
-               <AlertDialogCancel asChild>
-                <Button variant="secondary">
-                    <X className="mr-2 h-4 w-4" />
-                    Salir
+                }}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar a Excel
                 </Button>
-               </AlertDialogCancel>
-            </AlertDialogFooter>
+                <Button variant="default" onClick={() => {
+                  setPreviewingOrder(postSaveOrderOptions);
+                  setTimeout(() => {
+                    handlePrint();
+                    setPostSaveOrderOptions(null);
+                  }, 100);
+                }}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir O/V
+                </Button>
+                 <AlertDialogCancel asChild>
+                  <Button variant="secondary">
+                      <X className="mr-2 h-4 w-4" />
+                      Salir
+                  </Button>
+                 </AlertDialogCancel>
+              </AlertDialogFooter>
+          </AlertDialogContent>
         </AlertDialog>
       )}
 
@@ -593,5 +595,3 @@ export default function SalesPage() {
     </>
   );
 }
-
-    
