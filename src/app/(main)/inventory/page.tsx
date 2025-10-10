@@ -55,7 +55,7 @@ export default function InventoryPage() {
         to: endOfMonth(new Date()),
     });
     const [selectedWarehouse, setSelectedWarehouse] = useState<string>('All');
-    const [selectedProduct, setSelectedProduct] = useState<string>(masterProducts[0] || '');
+    const [selectedProduct, setSelectedProduct] = useState<string>('');
     const [inventoryData, setInventoryData] = useState<InventoryReportItem[]>([]);
     const [viewingHistory, setViewingHistory] = useState<any | null>(null);
 
@@ -64,45 +64,56 @@ export default function InventoryPage() {
     useEffect(() => {
         setIsClient(true);
     }, []);
-
+    
     useEffect(() => {
-        if (!selectedProduct && masterProducts.length > 0) {
+        if (isClient && masterProducts.length > 0 && !selectedProduct) {
             setSelectedProduct(masterProducts[0]);
         }
-    }, [masterProducts, selectedProduct]);
+    }, [isClient, masterProducts, selectedProduct]);
+
 
     useEffect(() => {
         if (isClient && selectedProduct) {
             const getStockAsOf = (date: Date) => {
                 const stockMap = new Map<string, { kg: number, packages: number }>();
 
-                // Correctly filter by product from the beginning
                 const relevantPOs = purchaseOrders.filter(po => po.status === 'completed' && !isAfter(parseISO(po.date), date));
                 const relevantSOs = salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date));
                 const relevantAdjs = inventoryAdjustments.filter(adj => !isAfter(parseISO(adj.date), date));
 
-                const processItems = (items: any[], warehouse: string, isPurchase: boolean) => {
-                    items.forEach(item => {
-                        // Ensure we only process the selected product
-                        if (item.product === selectedProduct && (selectedWarehouse === 'All' || warehouse === selectedWarehouse)) {
-                            const key = `${item.product}-${item.caliber}`;
-                            const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
-                            const quantityKg = item.unit === 'Kilos' ? item.quantity : 0;
-                            const factor = isPurchase ? 1 : -1;
-                            
-                            currentStock.kg += quantityKg * factor;
-                            currentStock.packages += (item.packagingQuantity || 0) * factor;
-
-                            stockMap.set(key, currentStock);
-                        }
-                    });
-                };
+                relevantPOs.forEach(po => {
+                    if (selectedWarehouse === 'All' || po.warehouse === selectedWarehouse) {
+                        po.items.forEach(item => {
+                             if (item.product === selectedProduct) {
+                                const key = `${item.product}-${item.caliber}`;
+                                const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
+                                if (item.unit === 'Kilos') {
+                                    currentStock.kg += item.quantity;
+                                }
+                                currentStock.packages += (item.packagingQuantity || 0);
+                                stockMap.set(key, currentStock);
+                            }
+                        });
+                    }
+                });
                 
-                relevantPOs.forEach(po => processItems(po.items, po.warehouse, true));
-                relevantSOs.forEach(so => processItems(so.items, so.warehouse, false));
+                relevantSOs.forEach(so => {
+                    if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
+                        so.items.forEach(item => {
+                            if (item.product === selectedProduct) {
+                                const key = `${item.product}-${item.caliber}`;
+                                const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
+                                 if (item.unit === 'Kilos') {
+                                    currentStock.kg -= item.quantity;
+                                }
+                                currentStock.packages -= (item.packagingQuantity || 0);
+                                stockMap.set(key, currentStock);
+                            }
+                        });
+                    }
+                });
 
                 relevantAdjs.forEach(adj => {
-                    // Also filter adjustments by product here
                     if (adj.product === selectedProduct && (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse)) {
                         const key = `${adj.product}-${adj.caliber}`;
                         const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
@@ -398,7 +409,7 @@ export default function InventoryPage() {
                                     className={cn("w-full justify-start text-left font-normal", !dateRange.from && "text-muted-foreground")}
                                 >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {format(dateRange.from, "PPP", { locale: es })}
+                                    {dateRange.from ? format(dateRange.from, "PPP", { locale: es }) : <span>Seleccione fecha</span>}
                                 </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
@@ -415,7 +426,7 @@ export default function InventoryPage() {
                                     className={cn("w-full justify-start text-left font-normal", !dateRange.to && "text-muted-foreground")}
                                 >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {format(dateRange.to, "PPP", { locale: es })}
+                                    {dateRange.to ? format(dateRange.to, "PPP", { locale: es }) : <span>Seleccione fecha</span>}
                                 </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
