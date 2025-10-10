@@ -552,14 +552,13 @@ export default function SalesPage() {
       
       {postSaveOrderOptions && (
         <AlertDialog open={!!postSaveOrderOptions} onOpenChange={() => setPostSaveOrderOptions(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Orden "{postSaveOrderOptions.id}" Guardada</AlertDialogTitle>
-              <AlertDialogDescription>
-                La orden de venta ha sido guardada exitosamente. ¿Qué deseas hacer a continuación?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="sm:justify-center gap-2">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Orden "{postSaveOrderOptions.id}" Guardada</AlertDialogTitle>
+            <AlertDialogDescription>
+              La orden de venta ha sido guardada exitosamente. ¿Qué deseas hacer a continuación?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center gap-2">
               <Button variant="outline" onClick={() => {
                 handleExport(postSaveOrderOptions);
                 setPostSaveOrderOptions(null);
@@ -568,9 +567,11 @@ export default function SalesPage() {
                 Exportar a Excel
               </Button>
               <Button variant="default" onClick={() => {
-                 setPreviewingOrder(postSaveOrderOptions);
-                 handlePrint();
-                 setPostSaveOrderOptions(null);
+                setPreviewingOrder(postSaveOrderOptions);
+                setTimeout(() => {
+                  handlePrint();
+                  setPostSaveOrderOptions(null);
+                }, 100);
               }}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir O/V
@@ -582,14 +583,15 @@ export default function SalesPage() {
                 </Button>
                </AlertDialogCancel>
             </AlertDialogFooter>
-          </AlertDialogContent>
         </AlertDialog>
       )}
 
       {/* Hidden component for printing */}
       <div className="hidden">
-         {postSaveOrderOptions && <PreviewContent ref={printComponentRef} order={postSaveOrderOptions} client={clients.find(c => c.id === postSaveOrderOptions.clientId) || null} carrier={null} />}
+         {previewingOrder && <PreviewContent ref={printComponentRef} order={previewingOrder} client={clients.find(c => c.id === previewingOrder.clientId) || null} carrier={null} />}
       </div>
     </>
   );
 }
+
+    
