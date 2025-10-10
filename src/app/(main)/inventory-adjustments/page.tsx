@@ -37,22 +37,36 @@ export default function InventoryAdjustmentsPage() {
     setIsClient(true);
   }, []);
 
-  const handleSaveAdjustment = (adjustment: InventoryAdjustment | Omit<InventoryAdjustment, 'id'>) => {
-    if ('id' in adjustment) {
-      setAdjustments(prev => prev.map(a => a.id === adjustment.id ? adjustment : a));
-      toast({ title: "Ajuste Actualizado" });
-    } else {
-      const lastId = adjustments.reduce((max, a) => {
+  const handleSaveAdjustment = (data: (InventoryAdjustment | Omit<InventoryAdjustment, 'id'>)[] | InventoryAdjustment | Omit<InventoryAdjustment, 'id'>) => {
+    let lastId = adjustments.reduce((max, a) => {
         const num = parseInt(a.id.split('-')[1]);
         return num > max ? num : max;
       }, 0);
+
+    if (Array.isArray(data)) {
+        // Batch creation
+        const newAdjustments = data.map((adj, index) => ({
+            ...(adj as Omit<InventoryAdjustment, 'id'>),
+            id: `ADJ-${lastId + 1 + index}`,
+        }));
+        setAdjustments(prev => [...prev, ...newAdjustments]);
+        toast({ title: `${newAdjustments.length} Ajustes Creados` });
+
+    } else if ('id' in data) {
+      // Single update
+      setAdjustments(prev => prev.map(a => a.id === data.id ? data : a));
+      toast({ title: "Ajuste Actualizado" });
+    } else {
+       // Should not happen with new UI, but kept for safety.
+       // Single creation
       const newAdjustment = {
-        ...adjustment,
+        ...data,
         id: `ADJ-${lastId + 1}`,
       };
       setAdjustments(prev => [...prev, newAdjustment]);
       toast({ title: "Ajuste Creado" });
     }
+    
     setIsSheetOpen(false);
     setEditingAdjustment(null);
   };
