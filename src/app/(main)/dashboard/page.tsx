@@ -11,13 +11,13 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu';
 import {
   purchaseOrders as initialPurchaseOrders,
   salesOrders as initialSalesOrders,
@@ -34,7 +34,7 @@ import AiSummary from './components/ai-summary';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
 export default function DashboardPage() {
@@ -46,7 +46,7 @@ export default function DashboardPage() {
   const [inventory, setInventory] = useLocalStorage<InventoryItem[]>('inventory', []);
   const { bankAccounts } = useMasterData();
   const [isClient, setIsClient] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState('all');
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
 
   useEffect(() => {
     setIsClient(true);
@@ -121,11 +121,11 @@ export default function DashboardPage() {
 
   // --- Sales KPIs based on filter ---
   const filteredSalesOrders = useMemo(() => {
-    if (selectedClientId === 'all') {
+    if (selectedClientIds.length === 0) {
       return salesOrders;
     }
-    return salesOrders.filter(order => order.clientId === selectedClientId);
-  }, [salesOrders, selectedClientId]);
+    return salesOrders.filter(order => selectedClientIds.includes(order.clientId));
+  }, [salesOrders, selectedClientIds]);
 
   const filteredTotalSalesAmount = useMemo(() =>
     filteredSalesOrders
@@ -137,16 +137,16 @@ export default function DashboardPage() {
   const filteredTotalCollected = useMemo(() => {
     const clientIds = new Set(contacts.filter(c => c.type.includes('client')).map(c => c.id));
     return financialMovements
-      .filter(fm => fm.type === 'income' && fm.contactId && clientIds.has(fm.contactId) && (selectedClientId === 'all' || fm.contactId === selectedClientId))
+      .filter(fm => fm.type === 'income' && fm.contactId && clientIds.has(fm.contactId) && (selectedClientIds.length === 0 || selectedClientIds.includes(fm.contactId)))
       .reduce((sum, fm) => sum + fm.amount, 0);
-  }, [financialMovements, contacts, selectedClientId]);
+  }, [financialMovements, contacts, selectedClientIds]);
 
   const filteredClientBalance = filteredTotalSalesAmount - filteredTotalCollected;
 
   const clientCount = useMemo(() => {
-    if (selectedClientId !== 'all') return 1;
+    if (selectedClientIds.length > 0) return selectedClientIds.length;
     return new Set(contacts.filter(c => c.type.includes('client')).map(c => c.id)).size;
-  }, [contacts, selectedClientId]);
+  }, [contacts, selectedClientIds]);
   
   const clientOptions = useMemo(() => 
     contacts.filter(c => c.type.includes('client')),
@@ -333,19 +333,49 @@ export default function DashboardPage() {
         </TabsContent>
         
         <TabsContent value="sales" className="mt-6">
-            <div className="mb-4">
+             <div className="mb-4">
                 <Label htmlFor="client-filter">Filtrar por Cliente</Label>
-                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                    <SelectTrigger id="client-filter" className="max-w-sm">
-                        <SelectValue placeholder="Seleccionar cliente..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todos los Clientes</SelectItem>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full max-w-sm justify-between">
+                            <span>
+                                {selectedClientIds.length === 0
+                                ? 'Todos los Clientes'
+                                : selectedClientIds.length === 1
+                                ? contacts.find(c => c.id === selectedClientIds[0])?.name
+                                : `${selectedClientIds.length} clientes seleccionados`}
+                            </span>
+                             <Users className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-full max-w-sm">
+                        <DropdownMenuLabel>Seleccionar Clientes</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                            checked={selectedClientIds.length === 0}
+                            onCheckedChange={(checked) => {
+                                if (checked) setSelectedClientIds([]);
+                            }}
+                        >
+                            Todos los Clientes
+                        </DropdownMenuCheckboxItem>
                         {clientOptions.map(client => (
-                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                            <DropdownMenuCheckboxItem
+                                key={client.id}
+                                checked={selectedClientIds.includes(client.id)}
+                                onCheckedChange={(checked) => {
+                                    setSelectedClientIds(prev => 
+                                        checked 
+                                            ? [...prev, client.id] 
+                                            : prev.filter(id => id !== client.id)
+                                    );
+                                }}
+                            >
+                                {client.name}
+                            </DropdownMenuCheckboxItem>
                         ))}
-                    </SelectContent>
-                </Select>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {isClient ? (
@@ -372,7 +402,7 @@ export default function DashboardPage() {
                     title="Nº de Clientes"
                     value={clientCount.toString()}
                     icon={<Users className="h-5 w-5 text-lime-500" />}
-                    description={selectedClientId === 'all' ? "Total de clientes activos" : "Cliente seleccionado"}
+                    description={selectedClientIds.length === 0 ? "Total de clientes activos" : selectedClientIds.length === 1 ? "Cliente seleccionado" : "Clientes seleccionados"}
                   />
                 </>
               ) : (
