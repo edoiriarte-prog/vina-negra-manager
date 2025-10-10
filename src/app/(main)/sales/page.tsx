@@ -78,13 +78,13 @@ export default function SalesPage() {
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
-      onAfterPrint: () => setPreviewingOrder(null), // Clean up after printing
   });
   
   useEffect(() => {
     if (isPrinting && previewingOrder && printComponentRef.current) {
         handlePrint();
         setIsPrinting(false); // Reset printing state
+        setPreviewingOrder(null); // Clean up after printing
     }
   }, [isPrinting, previewingOrder, handlePrint]);
   
@@ -106,7 +106,7 @@ export default function SalesPage() {
         return max;
     }, 0);
     setNextLotCorrelative(maxLotNumber + 1);
-  }, []);
+  }, [salesOrders]);
 
   const groupedOrders = useMemo(() => {
     const groups: Record<string, { clientName: string; orders: SalesOrder[]; subtotal: number; }> = {};
@@ -549,12 +549,12 @@ export default function SalesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {previewingOrder && !isPrinting && (
+      {previewingOrder && (
         <SalesOrderPreview
           order={previewingOrder}
           client={clients.find(s => s.id === previewingOrder.clientId) || null}
           carrier={carriers.find(s => s.id === (previewingOrder as any).carrierId) || null}
-          isOpen={!!previewingOrder && !isPrinting}
+          isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
         />
       )}
@@ -578,13 +578,11 @@ export default function SalesPage() {
                 </Button>
                 <Button variant="default" onClick={() => {
                   setPreviewingOrder(postSaveOrderOptions);
-                  setTimeout(() => {
-                    handlePrint();
-                    setPostSaveOrderOptions(null);
-                  }, 100);
+                  setIsPrinting(true);
+                  setPostSaveOrderOptions(null);
                 }}>
                   <Printer className="mr-2 h-4 w-4" />
-                  Imprimir O/V
+                  Exportar a PDF
                 </Button>
                  <Button variant="secondary" onClick={() => setPostSaveOrderOptions(null)}>
                       <X className="mr-2 h-4 w-4" />
