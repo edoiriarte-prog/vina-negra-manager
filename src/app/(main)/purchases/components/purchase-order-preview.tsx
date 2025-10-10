@@ -43,11 +43,11 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
                 supplier={supplier}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                onPrintRequest={onPrintRequest}
             />
         </div>
 
         <DialogFooter className="mt-8 p-6 pt-0 border-t gap-2 no-print">
+            <Button onClick={onPrintRequest}>Imprimir PDF</Button>
             <DialogClose asChild>
                 <Button type="button">Cerrar</Button>
             </DialogClose>

@@ -18,33 +18,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, MoreHorizontal, ChevronDown, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
+import { getColumns } from './components/columns';
+import { DataTable } from './components/data-table';
 import { useReactToPrint } from 'react-to-print';
 import { PreviewContent } from './components/purchase-order-preview-content';
-
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value);
 
 
 export default function PurchasesPage() {
@@ -58,76 +41,39 @@ export default function PurchasesPage() {
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
-  const [filter, setFilter] = useState('');
   const [orderToPrint, setOrderToPrint] = useState<PurchaseOrder | null>(null);
-  const { toast } = useToast();
 
   const printComponentRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
   });
 
-  const handlePrintRequest = (order: PurchaseOrder) => {
-    setOrderToPrint(order);
-    setTimeout(() => {
-        handlePrint();
-        setOrderToPrint(null);
-    }, 100);
-  };
-
-
   useEffect(() => {
     setIsClient(true);
   }, []);
-  
-  const suppliers = contacts.filter(c => c.type.includes('supplier'));
 
-  const groupedOrders = useMemo(() => {
-    const groups: Record<string, { supplierName: string; orders: PurchaseOrder[]; subtotal: number; totalKilos: number; totalPackages: number; }> = {};
-    
-    purchaseOrders.forEach(order => {
-        const supplier = suppliers.find(s => s.id === order.supplierId);
-        if (!supplier) return;
+  const suppliers = useMemo(() => contacts.filter(c => c.type.includes('supplier')), [contacts]);
 
-        if (!groups[supplier.id]) {
-            groups[supplier.id] = {
-                supplierName: supplier.name,
-                orders: [],
-                subtotal: 0,
-                totalKilos: 0,
-                totalPackages: 0,
-            };
+  const ordersWithPaymentStatus = useMemo(() => {
+    return purchaseOrders.map(order => {
+        const payments = financialMovements.filter(m => m.relatedDocument?.id === order.id && m.type === 'expense');
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+
+        let paymentStatus: PurchaseOrder['paymentStatus'] = 'Pendiente';
+        if (order.status === 'cancelled') {
+            paymentStatus = undefined;
+        } else if (totalPaid >= order.totalAmount) {
+            paymentStatus = 'Pagado';
+        } else if (totalPaid > 0) {
+            paymentStatus = 'Abonado';
         }
-        groups[supplier.id].orders.push(order);
-        groups[supplier.id].subtotal += order.totalAmount;
-        groups[supplier.id].totalKilos += order.totalKilos;
-        groups[supplier.id].totalPackages += order.totalPackages || 0;
+        return { ...order, paymentStatus };
     });
-
-    return Object.values(groups).sort((a,b) => a.supplierName.localeCompare(b.supplierName));
-  }, [purchaseOrders, suppliers]);
-
-  const grandTotals = useMemo(() => {
-    return groupedOrders.reduce((acc, group) => {
-        acc.subtotal += group.subtotal;
-        acc.totalKilos += group.totalKilos;
-        acc.totalPackages += group.totalPackages;
-        return acc;
-    }, { subtotal: 0, totalKilos: 0, totalPackages: 0 });
-  }, [groupedOrders]);
-
-  const filteredGroupedOrders = useMemo(() => {
-      if (!filter) return groupedOrders;
-      return groupedOrders.filter(group => 
-        group.supplierName.toLowerCase().includes(filter.toLowerCase())
-      );
-  }, [groupedOrders, filter]);
-
+  }, [purchaseOrders, financialMovements]);
 
   const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
-    // Combine existing items with new items
     const allItems = 'id' in order
       ? [...order.items, ...newItems]
       : [...(order.items || []), ...newItems];
@@ -141,28 +87,13 @@ export default function PurchasesPage() {
     }, 0);
     const totalPackages = allItems.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
-
     let finalOrderData: PurchaseOrder | Omit<PurchaseOrder, 'id'> = { ...(order as any), items: allItems, totalAmount, totalKilos, totalPackages };
 
     if ('id' in finalOrderData) {
-      // Update
       const updatedOrder = finalOrderData as PurchaseOrder;
-      const totalPaid = financialMovements
-        .filter(m => m.relatedDocument?.id === updatedOrder.id && m.type === 'expense')
-        .reduce((sum, m) => sum + m.amount, 0);
-
-      let paymentStatus: 'Pendiente' | 'Abonado' | 'Pagado' = 'Pendiente';
-      if (totalPaid >= updatedOrder.totalAmount) {
-        paymentStatus = 'Pagado';
-      } else if (totalPaid > 0) {
-        paymentStatus = 'Abonado';
-      }
-      updatedOrder.paymentStatus = paymentStatus;
-
       setPurchaseOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
       toast({ title: 'Orden Actualizada', description: `La orden ${updatedOrder.id} ha sido actualizada.` });
     } else {
-      // Add
       const sortedOrders = [...purchaseOrders].sort((a,b) => {
         const idA = a.id ? parseInt(a.id.split('-')[1]) : 0;
         const idB = b.id ? parseInt(b.id.split('-')[1]) : 0;
@@ -223,11 +154,15 @@ export default function PurchasesPage() {
   const handlePreview = (order: PurchaseOrder) => {
     setPreviewingOrder(order);
   };
-  
-  const toggleCollapsible = (supplierId: string) => {
-    setOpenCollapsibles(prev => ({...prev, [supplierId]: !prev[supplierId]}));
-  }
 
+  const handlePrintRequest = (order: PurchaseOrder) => {
+    setOrderToPrint(order);
+    setTimeout(() => {
+        handlePrint();
+        setOrderToPrint(null);
+    }, 100);
+  };
+  
   const handleExportAll = () => {
     if (purchaseOrders.length === 0) {
         toast({
@@ -270,6 +205,13 @@ export default function PurchasesPage() {
     toast({ title: 'Exportación Exitosa', description: 'Se han exportado todas las órdenes de compra.' });
   }
 
+  const columns = getColumns({
+    onEdit: handleEdit,
+    onDelete: handleDelete,
+    onPreview: handlePreview,
+    suppliers
+  });
+
   const renderContent = () => {
     if (!isClient) {
       return (
@@ -279,77 +221,7 @@ export default function PurchasesPage() {
         </div>
       )
     }
-    
-    return (
-        <div className="rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className='w-[400px]'>Proveedor</TableHead>
-                        <TableHead className='text-right'>Monto Total</TableHead>
-                        <TableHead className='text-right'>Kilos Totales</TableHead>
-                        <TableHead className='text-right'>Envases Totales</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {filteredGroupedOrders.map(group => {
-                        const supplierId = suppliers.find(s => s.name === group.supplierName)?.id || '';
-                        return (
-                            <React.Fragment key={supplierId}>
-                                <TableRow className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggleCollapsible(supplierId)}>
-                                    <TableCell className='font-bold'>
-                                         <div className="flex items-center gap-2">
-                                            <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[supplierId] && "rotate-180")} />
-                                            {group.supplierName}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className='text-right font-bold'>{formatCurrency(group.subtotal)}</TableCell>
-                                    <TableCell className='text-right font-bold'>{group.totalKilos.toLocaleString('es-CL')} kg</TableCell>
-                                    <TableCell className='text-right font-bold'>{(group.totalPackages || 0).toLocaleString('es-CL')}</TableCell>
-                                </TableRow>
-                                {openCollapsibles[supplierId] && (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="p-0">
-                                            <div className='p-4 bg-background'>
-                                                <Table>
-                                                    <TableHeader>
-                                                        <TableRow>
-                                                            <TableHead>O/C</TableHead>
-                                                            <TableHead>Fecha</TableHead>
-                                                            <TableHead className="text-right">Monto</TableHead>
-                                                            <TableHead className="text-right">Kilos</TableHead>
-                                                            <TableHead className="text-right">Envases</TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                        {group.orders.map(order => (
-                                                            <TableRow key={order.id} className="cursor-pointer" onClick={() => handlePreview(order)}>
-                                                                <TableCell className="font-medium">{order.id}</TableCell>
-                                                                <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy')}</TableCell>
-                                                                <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
-                                                                <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')} kg</TableCell>
-                                                                <TableCell className="text-right">{(order.totalPackages || 0).toLocaleString('es-CL')}</TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </React.Fragment>
-                        );
-                    })}
-                </TableBody>
-                <TableFooter>
-                    <TableRow className="bg-muted/50">
-                        <TableHead className='text-right font-bold text-lg' colSpan={3}>Total General</TableHead>
-                        <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotals.subtotal)}</TableHead>
-                    </TableRow>
-                </TableFooter>
-            </Table>
-        </div>
-    );
+    return <DataTable columns={columns} data={ordersWithPaymentStatus} />;
   }
 
   return (
@@ -359,7 +231,7 @@ export default function PurchasesPage() {
           <div className="flex items-center justify-between">
             <div>
                 <CardTitle className="font-headline text-2xl">Gestión de Compras (O/C)</CardTitle>
-                <CardDescription>Registra todas las adquisiciones de productos, agrupadas por proveedor.</CardDescription>
+                <CardDescription>Registra y administra todas las adquisiciones de productos.</CardDescription>
             </div>
             <div className="flex gap-2">
                 <Button variant="outline" onClick={handleExportAll}>
@@ -372,14 +244,6 @@ export default function PurchasesPage() {
                 </Button>
             </div>
           </div>
-           <div className="py-4">
-              <Input
-                placeholder="Filtrar por proveedor..."
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                className="max-w-sm"
-              />
-            </div>
         </CardHeader>
         <CardContent>
           {renderContent()}
@@ -414,8 +278,7 @@ export default function PurchasesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro de que quieres eliminar esta orden?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente la orden
-               "{deletingOrder?.id}".
+              Esta acción no se puede deshacer. Se eliminará permanentemente la orden "{deletingOrder?.id}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -448,9 +311,7 @@ export default function PurchasesPage() {
             }}
         />
       )}
-
-      {/* Hidden component for printing */}
-      <div className="hidden">
+       <div className="hidden">
         {orderToPrint && (
             <PreviewContent
                 ref={printComponentRef}
@@ -458,7 +319,6 @@ export default function PurchasesPage() {
                 supplier={suppliers.find(s => s.id === orderToPrint.supplierId) || null}
                 onEdit={() => {}}
                 onDelete={() => {}}
-                onPrintRequest={() => {}}
             />
         )}
       </div>

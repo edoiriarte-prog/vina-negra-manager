@@ -7,7 +7,7 @@ import { PurchaseOrder, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, FileDown } from 'lucide-react';
+import { Edit, Trash2 } from 'lucide-react';
 import {
     Table,
     TableBody,
@@ -15,7 +15,6 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-    TableFooter,
   } from '@/components/ui/table';
 import { ViñaNegraLogo } from '@/components/viña-negra-logo';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -26,7 +25,6 @@ interface PreviewContentProps {
   supplier: Contact | null;
   onEdit: () => void;
   onDelete: () => void;
-  onPrintRequest: () => void;
 }
 
 const formatCurrency = (value: number) =>
@@ -37,7 +35,7 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 
-export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier, onEdit, onDelete, onPrintRequest }, ref) => {
+export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, supplier, onEdit, onDelete }, ref) => {
     const localPrintRef = useRef<HTMLDivElement>(null);
     const { calibers } = useMasterData();
 
@@ -149,10 +147,6 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentPro
                 <Button variant="outline" onClick={onEdit}>
                     <Edit className="mr-2 h-4 w-4" />
                     Editar
-                </Button>
-                <Button variant="outline" onClick={onPrintRequest}>
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Generar PDF
                 </Button>
                 <Button variant="destructive" onClick={onDelete}>
                     <Trash2 className="mr-2 h-4 w-4" />
