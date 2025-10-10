@@ -66,6 +66,9 @@ export type SalesOrder = {
   warehouse?: string;
   paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
   purchaseOrder?: string;
+  saleType?: 'Venta Firme' | 'Consignación' | 'Mínimo Garantizado';
+  movementType?: 'Venta Directa' | 'Traslado a Bodega Externa';
+  destinationWarehouse?: string;
 };
 
 export type PurchaseOrder = {

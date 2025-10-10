@@ -36,7 +36,7 @@ import { useMasterData } from '@/hooks/use-master-data';
 import { SalesOrderPreview } from './sales-order-preview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ItemMatrixDialog } from './item-matrix-dialog';
+import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
@@ -76,6 +76,9 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
         advanceDueDate: undefined,
         balanceDueDate: undefined,
         warehouse: '',
+        saleType: 'Venta Firme',
+        movementType: 'Venta Directa',
+        destinationWarehouse: '',
     };
 };
 
@@ -392,6 +395,24 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                       </SelectContent>
                     </Select>
                   </div>
+                   <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="saleType" className="text-right">
+                        Tipo de Venta
+                      </Label>
+                      <Select
+                        onValueChange={(value: 'Venta Firme' | 'Consignación' | 'Mínimo Garantizado') => handleSelectChange('saleType', value)}
+                        value={formData.saleType}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Seleccione un tipo de venta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Venta Firme">Venta Firme</SelectItem>
+                          <SelectItem value="Consignación">Consignación</SelectItem>
+                          <SelectItem value="Mínimo Garantizado">Mínimo Garantizado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                 </div>
                 <div className="space-y-4">
                     <div className="grid grid-cols-4 items-center gap-4">
@@ -415,7 +436,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="warehouse" className="text-right">
-                            Bodega
+                            Bodega Origen
                         </Label>
                         <Select
                             required
@@ -423,7 +444,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             value={formData.warehouse}
                         >
                             <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Seleccione bodega" />
+                                <SelectValue placeholder="Seleccione bodega de origen" />
                             </SelectTrigger>
                             <SelectContent>
                                 {warehouses.map(w => (
@@ -432,6 +453,43 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             </SelectContent>
                         </Select>
                     </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="movementType" className="text-right">
+                          Tipo Movimiento
+                        </Label>
+                        <Select
+                          onValueChange={(value: 'Venta Directa' | 'Traslado a Bodega Externa') => handleSelectChange('movementType', value)}
+                          value={formData.movementType}
+                        >
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Venta Directa">Venta Directa</SelectItem>
+                            <SelectItem value="Traslado a Bodega Externa">Traslado a Bodega Externa</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {formData.movementType === 'Traslado a Bodega Externa' && (
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="destinationWarehouse" className="text-right">
+                            Bodega Destino
+                          </Label>
+                          <Select
+                            onValueChange={(value) => handleSelectChange('destinationWarehouse', value)}
+                            value={formData.destinationWarehouse}
+                          >
+                            <SelectTrigger className="col-span-3">
+                              <SelectValue placeholder="Seleccione bodega de destino" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {warehouses.filter(w => w !== formData.warehouse).map(w => (
+                                <SelectItem key={w} value={w}>{w}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                 </div>
               </div>
               
