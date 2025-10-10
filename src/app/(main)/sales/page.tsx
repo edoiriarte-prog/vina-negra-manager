@@ -578,8 +578,10 @@ export default function SalesPage() {
                 </Button>
                 <Button variant="default" onClick={() => {
                   setPreviewingOrder(postSaveOrderOptions);
-                  setIsPrinting(true);
-                  setPostSaveOrderOptions(null);
+                  setTimeout(() => {
+                    handlePrint();
+                    setPostSaveOrderOptions(null);
+                  }, 100);
                 }}>
                   <Printer className="mr-2 h-4 w-4" />
                   Imprimir O/V

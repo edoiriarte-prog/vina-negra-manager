@@ -2,6 +2,7 @@
 "use client";
 
 import React from 'react';
+import { useReactToPrint } from 'react-to-print';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,7 @@ import {
     TableRow,
     TableFooter,
   } from '@/components/ui/table';
+import { Printer } from 'lucide-react';
 
 type SalesOrderPreviewProps = {
   order: SalesOrder;
@@ -241,6 +243,9 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
   if (!order) return null;
   
   const contentRef = React.useRef(null);
+  const handlePrint = useReactToPrint({
+    content: () => contentRef.current,
+  });
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -251,12 +256,16 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
         <div className="max-h-[70vh] overflow-y-auto" id="print-area">
             <PreviewContent order={order} client={client} carrier={carrier} ref={contentRef}/>
         </div>
-        <DialogFooter className="p-6 pt-4">
-          <Button
+        <DialogFooter className="p-6 pt-4 flex-row justify-end gap-2">
+           <Button
               onClick={() => onOpenChange(false)}
               variant="outline"
             >
               Cerrar
+            </Button>
+            <Button onClick={handlePrint}>
+              <Printer className="mr-2 h-4 w-4" />
+              Exportar a PDF
             </Button>
         </DialogFooter>
       </DialogContent>
@@ -264,5 +273,3 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
   );
 };
 SalesOrderPreview.displayName = "SalesOrderPreview";
-
-    
