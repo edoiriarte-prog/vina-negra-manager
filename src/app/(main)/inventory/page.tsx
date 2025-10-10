@@ -88,9 +88,9 @@ export default function InventoryPage() {
                 const relevantAdjs = inventoryAdjustments.filter(adj => !isAfter(parseISO(adj.date), date));
 
                 relevantPOs.forEach(po => {
-                    if (selectedWarehouse === 'All' || po.warehouse === selectedWarehouse) {
+                    if (po.product === selectedProduct && (selectedWarehouse === 'All' || po.warehouse === selectedWarehouse)) {
                         po.items.forEach(item => {
-                             if (item.product === selectedProduct) {
+                            if (item.product === selectedProduct) {
                                 const key = `${item.product}-${item.caliber}`;
                                 const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
                                 if (item.unit === 'Kilos') {
@@ -104,7 +104,7 @@ export default function InventoryPage() {
                 });
                 
                 relevantSOs.forEach(so => {
-                    if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
+                    if (so.items.some(item => item.product === selectedProduct) && (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse)) {
                         so.items.forEach(item => {
                             if (item.product === selectedProduct) {
                                 const key = `${item.product}-${item.caliber}`;
@@ -389,7 +389,7 @@ export default function InventoryPage() {
                         </div>
                         <div className="flex gap-2">
                           <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" />Exportar a Excel</Button>
-                          <Button variant="outline" onClick={handlePrint}>
+                          <Button variant="outline" onClick={() => setTimeout(() => handlePrint(), 0)}>
                             <Printer className="mr-2 h-4 w-4" /> Imprimir
                           </Button>
                         </div>
