@@ -232,8 +232,10 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                 
                 {formData.items.map((item, index) => {
                   const subtotal = (item.quantity || 0) * (item.price || 0);
-                  const availableCalibers = productCaliberMatrix[item.product] || [];
-                  const sortedAvailableCalibers = calibers.filter(c => availableCalibers.includes(c.name));
+                  const availableCaliberNames = productCaliberMatrix[item.product] || [];
+                  const sortedAvailableCalibers = calibers
+                    .filter(c => availableCaliberNames.includes(c.name))
+                    .sort((a,b) => calibers.findIndex(cal => cal.name === a.name) - calibers.findIndex(cal => cal.name === b.name));
 
                   return (
                     <div key={item.id} className="grid grid-cols-12 gap-2 items-end mb-2 p-3 border rounded-md">
