@@ -120,8 +120,8 @@ export default function PurchasesPage() {
         groups[monthKey].subtotal += order.totalAmount;
     });
 
-    // Sort groups by year and month descending
-    return Object.values(groups).sort((a,b) => b.monthName.localeCompare(a.monthName));
+    const sortedMonthKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+    return sortedMonthKeys.map(key => groups[key]);
   }, [ordersWithPaymentStatus]);
 
   const grandTotal = useMemo(() => {
