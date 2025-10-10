@@ -76,12 +76,14 @@ export default function InventoryPage() {
             const getStockAsOf = (date: Date) => {
                 const stockMap = new Map<string, { kg: number, packages: number }>();
 
-                const relevantPOs = purchaseOrders.filter(po => po.product === selectedProduct && po.status === 'completed' && !isAfter(parseISO(po.date), date));
-                const relevantSOs = salesOrders.filter(so => so.items.some(i => i.product === selectedProduct) && (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date));
-                const relevantAdjs = inventoryAdjustments.filter(adj => adj.product === selectedProduct && !isAfter(parseISO(adj.date), date));
+                // Correctly filter by product from the beginning
+                const relevantPOs = purchaseOrders.filter(po => po.status === 'completed' && !isAfter(parseISO(po.date), date));
+                const relevantSOs = salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date));
+                const relevantAdjs = inventoryAdjustments.filter(adj => !isAfter(parseISO(adj.date), date));
 
                 const processItems = (items: any[], warehouse: string, isPurchase: boolean) => {
                     items.forEach(item => {
+                        // Ensure we only process the selected product
                         if (item.product === selectedProduct && (selectedWarehouse === 'All' || warehouse === selectedWarehouse)) {
                             const key = `${item.product}-${item.caliber}`;
                             const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
@@ -100,7 +102,8 @@ export default function InventoryPage() {
                 relevantSOs.forEach(so => processItems(so.items, so.warehouse, false));
 
                 relevantAdjs.forEach(adj => {
-                    if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
+                    // Also filter adjustments by product here
+                    if (adj.product === selectedProduct && (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse)) {
                         const key = `${adj.product}-${adj.caliber}`;
                         const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
                         const adjustment = adj.type === 'increase' ? adj.quantity : -adj.quantity;
@@ -124,7 +127,7 @@ export default function InventoryPage() {
                 return !isBefore(date, dateRange.from) && !isAfter(date, dateRange.to);
             };
 
-            purchaseOrders.filter(po => po.product === selectedProduct && po.status === 'completed' && filterByDate(po.date)).forEach(po => {
+            purchaseOrders.filter(po => po.status === 'completed' && filterByDate(po.date)).forEach(po => {
                 po.items.forEach(item => {
                     if (item.product === selectedProduct && (selectedWarehouse === 'All' || po.warehouse === selectedWarehouse)) {
                         const key = `${item.product}-${item.caliber}`;
@@ -137,7 +140,7 @@ export default function InventoryPage() {
                 });
             });
 
-            salesOrders.filter(so => so.items.some(i => i.product === selectedProduct) && (so.status === 'completed' || so.status === 'pending') && filterByDate(so.date)).forEach(so => {
+            salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && filterByDate(so.date)).forEach(so => {
                 so.items.forEach(item => {
                     if (item.product === selectedProduct && (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse)) {
                         const key = `${item.product}-${item.caliber}`;
@@ -150,8 +153,8 @@ export default function InventoryPage() {
                 });
             });
 
-            inventoryAdjustments.filter(adj => adj.product === selectedProduct && filterByDate(adj.date)).forEach(adj => {
-                if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
+            inventoryAdjustments.filter(adj => filterByDate(adj.date)).forEach(adj => {
+                if (adj.product === selectedProduct && (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse)) {
                     const key = `${adj.product}-${adj.caliber}`;
                     const current = adjustmentsMap.get(key) || { kg: 0, packages: 0 };
                     const adjustmentKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
@@ -434,5 +437,3 @@ export default function InventoryPage() {
         </>
     );
 }
-
-    
