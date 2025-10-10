@@ -83,35 +83,18 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
                 <p><span className="font-medium text-foreground">Patente:</span> {order.licensePlate || 'N/A'}</p>
               </div>
             </div>
-            <div className='text-right'>
-                <h3 className="font-semibold mb-2">VIÑA NEGRA SpA</h3>
+             <div className='text-right'>
+                <h3 className="font-semibold mb-2">Datos de la Venta</h3>
                 <div className="text-sm text-muted-foreground">
-                    <p>RUT: 78.261.683-8</p>
-                    <p>TULAHUEN S/N</p>
-                    <p>MONTE PATRIA CHILE</p>
+                    <p><span className="font-medium text-foreground">Tipo de Venta:</span> {order.saleType || 'Venta Firme'}</p>
+                    <p><span className="font-medium text-foreground">Movimiento:</span> {order.movementType || 'Venta Directa'}</p>
+                    {order.movementType === 'Traslado a Bodega Externa' && (
+                         <p><span className="font-medium text-foreground">Bodega Destino:</span> {order.destinationWarehouse}</p>
+                    )}
                 </div>
             </div>
           </div>
           
-          <div className="border p-4 rounded-lg mb-8">
-              <h3 className="font-semibold mb-2">Detalles de la Operación</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                      <span className="text-muted-foreground">Tipo de Venta: </span>
-                      <span className="font-medium">{order.saleType || 'Venta Firme'}</span>
-                  </div>
-                   <div>
-                      <span className="text-muted-foreground">Tipo de Movimiento: </span>
-                      <span className="font-medium">{order.movementType || 'Venta Directa'}</span>
-                  </div>
-                  {order.movementType === 'Traslado a Bodega Externa' && (
-                     <div>
-                        <span className="text-muted-foreground">Bodega Destino: </span>
-                        <span className="font-medium">{order.destinationWarehouse}</span>
-                    </div>
-                  )}
-              </div>
-          </div>
   
           <Separator className="my-4" />
   
@@ -247,20 +230,19 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
 PreviewContent.displayName = "PreviewContent";
 
 export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange, onPrintRequest }: SalesOrderPreviewProps) {
-  const componentRef = useRef<HTMLDivElement>(null);
-
   if (!order) return null;
   
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl p-0">
-        <DialogHeader className="p-6 pb-0">
+        <DialogHeader className="p-6 pb-0 no-print">
            <DialogTitle>Previsualización de Orden de Venta: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto" id="print-area">
-            {/* The actual content is passed to the hidden div on the main page for printing */}
+            {/* The content is rendered here for viewing, but the actual printable content is handled by the parent */}
+            <PreviewContent order={order} client={client} carrier={carrier} />
         </div>
-        <DialogFooter className="p-6 pt-4 flex-row justify-end gap-2">
+        <DialogFooter className="p-6 pt-4 flex-row justify-end gap-2 no-print">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cerrar
             </Button>

@@ -76,16 +76,9 @@ export default function SalesPage() {
   const clients = contacts.filter(c => c.type.includes('client'));
   const carriers = contacts.filter(c => c.type.includes('supplier'));
 
-  const handlePrint = useReactToPrint({
-      content: () => printComponentRef.current,
-      onAfterPrint: () => setOrderToPrint(null), // Clean up after printing
+   const handlePrint = useReactToPrint({
+    content: () => printComponentRef.current,
   });
-  
-  useEffect(() => {
-    if (orderToPrint) {
-      handlePrint();
-    }
-  }, [orderToPrint, handlePrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -554,7 +547,10 @@ export default function SalesPage() {
           carrier={carriers.find(s => s.id === previewingOrder.carrierId) || null}
           isOpen={!!previewingOrder}
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
-          onPrintRequest={() => setOrderToPrint(previewingOrder)}
+          onPrintRequest={() => {
+            setOrderToPrint(previewingOrder);
+            setTimeout(() => handlePrint(), 0);
+          }}
         />
       )}
       
@@ -577,6 +573,7 @@ export default function SalesPage() {
                   </Button>
                   <Button variant="default" onClick={() => {
                     setOrderToPrint(postSaveOrderOptions);
+                    setTimeout(() => handlePrint(), 0);
                     setPostSaveOrderOptions(null);
                   }}>
                     <Printer className="mr-2 h-4 w-4" />
