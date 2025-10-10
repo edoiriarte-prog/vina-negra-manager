@@ -82,6 +82,26 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
                 </div>
             </div>
           </div>
+          
+          <div className="border p-4 rounded-lg mb-8">
+              <h3 className="font-semibold mb-2">Detalles de la Operación</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                      <span className="text-muted-foreground">Tipo de Venta: </span>
+                      <span className="font-medium">{order.saleType || 'Venta Firme'}</span>
+                  </div>
+                   <div>
+                      <span className="text-muted-foreground">Tipo de Movimiento: </span>
+                      <span className="font-medium">{order.movementType || 'Venta Directa'}</span>
+                  </div>
+                  {order.movementType === 'Traslado a Bodega Externa' && (
+                     <div>
+                        <span className="text-muted-foreground">Bodega Destino: </span>
+                        <span className="font-medium">{order.destinationWarehouse}</span>
+                    </div>
+                  )}
+              </div>
+          </div>
   
           <Separator className="my-4" />
   
@@ -244,3 +264,5 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
   );
 };
 SalesOrderPreview.displayName = "SalesOrderPreview";
+
+    
