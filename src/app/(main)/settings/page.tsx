@@ -128,8 +128,8 @@ function CaliberMasterEditor() {
                     </Button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {isClient && calibers.map(item => (
-                        <div key={`${item.name}-${item.code}`} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                    {isClient && calibers.map((item, index) => (
+                        <div key={`caliber-${item.name}-${item.code}-${index}`} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                             <span>{`${item.name} (${item.code})`}</span>
                             <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
