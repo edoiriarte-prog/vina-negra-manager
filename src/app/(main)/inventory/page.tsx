@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { PurchaseOrder, SalesOrder, InventoryAdjustment, Contact } from '@/lib/types';
 import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, inventoryAdjustments as initialInventoryAdjustments, contacts as initialContacts } from '@/lib/data';
@@ -21,6 +21,7 @@ import { es } from 'date-fns/locale';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import { useReactToPrint } from 'react-to-print';
 
 type InventoryReportItem = {
     key: string;
@@ -60,6 +61,11 @@ export default function InventoryPage() {
     const [viewingHistory, setViewingHistory] = useState<any | null>(null);
 
     const { toast } = useToast();
+    const printComponentRef = useRef<HTMLDivElement>(null);
+    const handlePrint = useReactToPrint({
+        content: () => printComponentRef.current,
+    });
+
 
     useEffect(() => {
         setIsClient(true);
@@ -357,10 +363,24 @@ export default function InventoryPage() {
             </div>
         );
     }
+    
+    const PrintableReport = React.forwardRef<HTMLDivElement>((props, ref) => (
+        <div ref={ref} className="p-4">
+            <div className="text-center mb-4">
+                <h1 className="font-headline text-2xl">Informe de Inventario</h1>
+                <p className="text-muted-foreground">
+                    Producto: {selectedProduct} | Bodega: {selectedWarehouse} | Período: {format(dateRange.from, 'dd/MM/yy')} - {format(dateRange.to, 'dd/MM/yy')}
+                </p>
+            </div>
+            {renderContent()}
+        </div>
+    ));
+    PrintableReport.displayName = 'PrintableReport';
+
 
     return (
         <>
-            <Card>
+            <Card className="no-print">
                 <CardHeader>
                     <div className="flex justify-between items-start">
                          <div>
@@ -369,7 +389,7 @@ export default function InventoryPage() {
                         </div>
                         <div className="flex gap-2">
                           <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" />Exportar a Excel</Button>
-                          <Button variant="outline" disabled>
+                          <Button variant="outline" onClick={handlePrint}>
                             <Printer className="mr-2 h-4 w-4" /> Imprimir
                           </Button>
                         </div>
@@ -449,6 +469,9 @@ export default function InventoryPage() {
                     onOpenChange={() => setViewingHistory(null)}
                 />
             )}
+            <div className="hidden print:block">
+                <PrintableReport ref={printComponentRef} />
+            </div>
         </>
     );
 }
