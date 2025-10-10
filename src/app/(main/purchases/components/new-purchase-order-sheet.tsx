@@ -41,8 +41,9 @@ type NewPurchaseOrderSheetProps = {
 const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
     if (order) {
         const { totalAmount, totalKilos, totalPackages, ...rest } = order;
-        // The date from the order is already a 'yyyy-MM-dd' string from local storage.
-        // To avoid timezone issues, parse it as UTC.
+        // The date from the order is already a 'yyyy-MM-dd' string.
+        // To prevent off-by-one day errors due to timezone conversion by `new Date()`,
+        // parse it as if it's UTC.
         const date = parseISO(order.date);
 
         return {
@@ -244,7 +245,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                              <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
-                                     {calibers.map(c => <SelectItem key={c.name} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
+                                     {calibers.map(c => <SelectItem key={`${item.id}-${c.name}`} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
                                  </SelectContent>
                              </Select>
                         </div>
