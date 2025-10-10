@@ -40,6 +40,7 @@ const getInitialFormData = (): Omit<InventoryAdjustment, 'id'> => ({
     warehouse: '',
     type: 'decrease',
     quantity: 0,
+    packagingQuantity: 0,
     reason: '',
 });
 
@@ -60,7 +61,7 @@ export function NewAdjustmentSheet({ isOpen, onOpenChange, onSave, adjustment }:
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: name === 'quantity' ? Number(value) : value }));
+    setFormData((prev) => ({ ...prev, [name]: name === 'quantity' || name === 'packagingQuantity' ? Number(value) : value }));
   };
 
   const handleSelectChange = (name: keyof typeof formData, value: any) => {
@@ -152,6 +153,12 @@ export function NewAdjustmentSheet({ isOpen, onOpenChange, onSave, adjustment }:
                 Cantidad (kg)
               </Label>
               <Input id="quantity" name="quantity" type="number" value={formData.quantity} onChange={handleInputChange} className="col-span-3" required min="0" />
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="packagingQuantity" className="text-right">
+                Cant. Envases
+              </Label>
+              <Input id="packagingQuantity" name="packagingQuantity" type="number" value={formData.packagingQuantity || ''} onChange={handleInputChange} className="col-span-3" placeholder="Opcional" min="0" />
             </div>
              <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="reason" className="text-right pt-2">

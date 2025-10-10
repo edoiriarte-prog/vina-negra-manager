@@ -22,6 +22,7 @@ type GetColumnsProps = {
 }
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
+const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
 
 export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<InventoryAdjustment>[] => [
   {
@@ -64,11 +65,19 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Inv
     header: ({ column }) => (
       <div className="text-right">
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-          Cantidad <ArrowUpDown className="ml-2 h-4 w-4" />
+          Cantidad (kg) <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       </div>
     ),
     cell: ({ row }) => <div className='text-right font-medium'>{formatKilos(row.getValue('quantity'))}</div>,
+  },
+  {
+    accessorKey: 'packagingQuantity',
+    header: 'Cant. Envases',
+    cell: ({ row }) => {
+        const packagingQuantity = row.getValue('packagingQuantity') as number | undefined;
+        return <div className="text-right">{packagingQuantity ? formatPackages(packagingQuantity) : '-'}</div>;
+    }
   },
   {
     accessorKey: 'reason',

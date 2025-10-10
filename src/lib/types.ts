@@ -133,7 +133,8 @@ export type InventoryAdjustment = {
   caliber: string;
   warehouse: string;
   type: 'increase' | 'decrease';
-  quantity: number;
+  quantity: number; // Kilos
+  packagingQuantity?: number; // Packages
   reason: string;
 };
 

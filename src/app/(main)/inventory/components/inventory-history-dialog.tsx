@@ -29,12 +29,16 @@ type Transaction = {
   contact: string;
   inflow: number;
   outflow: number;
+  inflowPackages: number;
+  outflowPackages: number;
 };
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
+const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
+
 
 type PrintableContentProps = {
-  history: (Transaction & { balance: number })[];
+  history: (Transaction & { balance: number, balancePackages: number })[];
   item: InventoryItem;
 }
 
@@ -50,13 +54,14 @@ const PrintableContent = forwardRef<HTMLDivElement, PrintableContentProps>(({ hi
                             <TableHead>Tipo</TableHead>
                             <TableHead>Documento/Motivo</TableHead>
                             <TableHead>Contacto/Origen</TableHead>
-                            <TableHead className="text-right">Ingresos</TableHead>
-                            <TableHead className="text-right">Egresos</TableHead>
-                            <TableHead className="text-right">Saldo</TableHead>
+                            <TableHead className="text-right">Mov. Envase</TableHead>
+                            <TableHead className="text-right">Mov. Kilos</TableHead>
+                            <TableHead className="text-right">Saldo Envase</TableHead>
+                            <TableHead className="text-right">Saldo Kilos</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {history.length === 0 && <TableRow><TableCell colSpan={7} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
+                        {history.length === 0 && <TableRow><TableCell colSpan={8} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
                         {history.map((tx, index) => (
                             <TableRow key={index}>
                                 <TableCell className="font-medium">{format(parseISO(tx.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
@@ -73,11 +78,14 @@ const PrintableContent = forwardRef<HTMLDivElement, PrintableContentProps>(({ hi
                                 </TableCell>
                                 <TableCell>{tx.orderId}</TableCell>
                                 <TableCell>{tx.contact}</TableCell>
-                                <TableCell className="text-right text-green-600">
-                                    {tx.inflow > 0 ? `+${formatKilos(tx.inflow)}` : '-'}
+                                <TableCell className="text-right text-muted-foreground">
+                                    {tx.inflowPackages > 0 ? `+${formatPackages(tx.inflowPackages)}` : tx.outflowPackages > 0 ? `-${formatPackages(tx.outflowPackages)}` : '-'}
                                 </TableCell>
-                                <TableCell className="text-right text-red-600">
-                                    {tx.outflow > 0 ? `-${formatKilos(tx.outflow)}` : '-'}
+                                <TableCell className="text-right text-muted-foreground">
+                                    {tx.inflow > 0 ? `+${formatKilos(tx.inflow)}` : tx.outflow > 0 ? `-${formatKilos(tx.outflow)}` : '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-bold text-primary">
+                                    {formatPackages(tx.balancePackages)}
                                 </TableCell>
                                 <TableCell className="text-right font-bold text-primary">
                                     {formatKilos(tx.balance)}
@@ -122,8 +130,10 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
               orderId: po.id,
               type: 'Entrada',
               contact: supplier?.name || 'N/A',
-              inflow: i.quantity,
+              inflow: i.unit === 'Kilos' ? i.quantity : 0,
               outflow: 0,
+              inflowPackages: i.packagingQuantity || 0,
+              outflowPackages: 0,
             });
           });
       });
@@ -142,7 +152,9 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
               type: 'Salida',
               contact: client?.name || 'N/A',
               inflow: 0,
-              outflow: i.quantity,
+              outflow: i.unit === 'Kilos' ? i.quantity : 0,
+              inflowPackages: 0,
+              outflowPackages: i.packagingQuantity || 0,
             });
           });
       });
@@ -158,6 +170,8 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
               contact: 'Ajuste Interno',
               inflow: adj.type === 'increase' ? adj.quantity : 0,
               outflow: adj.type === 'decrease' ? adj.quantity : 0,
+              inflowPackages: adj.type === 'increase' ? (adj.packagingQuantity || 0) : 0,
+              outflowPackages: adj.type === 'decrease' ? (adj.packagingQuantity || 0) : 0,
           });
       });
 
@@ -177,9 +191,11 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
     });
 
     let runningBalance = 0;
+    let runningBalancePackages = 0;
     return allTransactions.map(tx => {
         runningBalance += tx.inflow - tx.outflow;
-        return { ...tx, balance: runningBalance };
+        runningBalancePackages += tx.inflowPackages - tx.outflowPackages;
+        return { ...tx, balance: runningBalance, balancePackages: runningBalancePackages };
     });
 
   }, [item, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
@@ -194,9 +210,12 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
       'Tipo': tx.type,
       'Documento/Motivo': tx.orderId,
       'Contacto/Origen': tx.contact,
-      'Ingresos (kg)': tx.inflow,
-      'Egresos (kg)': tx.outflow,
+      'Entradas (kg)': tx.inflow,
+      'Salidas (kg)': tx.outflow,
       'Saldo (kg)': tx.balance,
+      'Entradas (envases)': tx.inflowPackages,
+      'Salidas (envases)': tx.outflowPackages,
+      'Saldo (envases)': tx.balancePackages,
     }));
     const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
     const workbook = XLSX.utils.book_new();
@@ -209,7 +228,7 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>Seguimiento Histórico: {item.product} - {item.caliber}</DialogTitle>
           <DialogDescription>

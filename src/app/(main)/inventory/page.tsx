@@ -117,8 +117,10 @@ export default function InventoryPage() {
                     if (adj.product === selectedProduct && (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse)) {
                         const key = `${adj.product}-${adj.caliber}`;
                         const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
-                        const adjustment = adj.type === 'increase' ? adj.quantity : -adj.quantity;
-                        currentStock.kg += adjustment;
+                        const adjustmentKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
+                        const adjustmentPkg = adj.type === 'increase' ? (adj.packagingQuantity || 0) : -(adj.packagingQuantity || 0);
+                        currentStock.kg += adjustmentKg;
+                        currentStock.packages += adjustmentPkg;
                         stockMap.set(key, currentStock);
                     }
                 });
@@ -169,7 +171,9 @@ export default function InventoryPage() {
                     const key = `${adj.product}-${adj.caliber}`;
                     const current = adjustmentsMap.get(key) || { kg: 0, packages: 0 };
                     const adjustmentKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
+                    const adjustmentPkg = adj.type === 'increase' ? (adj.packagingQuantity || 0) : -(adj.packagingQuantity || 0);
                     current.kg += adjustmentKg;
+                    current.packages += adjustmentPkg;
                     adjustmentsMap.set(key, current);
                     allCalibers.add(adj.caliber);
                 }

@@ -42,7 +42,7 @@ export const financialMovements: FinancialMovement[] = [
 ];
 
 export const inventoryAdjustments: InventoryAdjustment[] = [
-  { id: 'ADJ-1', date: '2023-10-10', product: 'UVAS', caliber: 'PRIMERA', warehouse: 'Bodega Principal', type: 'decrease', quantity: 50, reason: 'Merma por manipulación' },
+  { id: 'ADJ-1', date: '2023-10-10', product: 'UVAS', caliber: 'PRIMERA', warehouse: 'Bodega Principal', type: 'decrease', quantity: 50, packagingQuantity: 2, reason: 'Merma por manipulación' },
 ];
 
 
