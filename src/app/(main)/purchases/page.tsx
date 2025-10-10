@@ -23,11 +23,29 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getColumns } from './components/columns';
-import { DataTable } from './components/data-table';
 import { useReactToPrint } from 'react-to-print';
 import { PreviewContent } from './components/purchase-order-preview-content';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(value);
 
 
 export default function PurchasesPage() {
@@ -42,6 +60,9 @@ export default function PurchasesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [orderToPrint, setOrderToPrint] = useState<PurchaseOrder | null>(null);
+  
+  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
+  const [filter, setFilter] = useState('');
 
   const printComponentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -80,6 +101,55 @@ export default function PurchasesPage() {
         return { ...order, paymentStatus };
     });
   }, [purchaseOrders, financialMovements]);
+
+  const groupedOrders = useMemo(() => {
+    const groups: Record<string, { monthName: string; orders: PurchaseOrder[]; subtotal: number; }> = {};
+    
+    ordersWithPaymentStatus.forEach(order => {
+        const monthKey = format(parseISO(order.date), 'yyyy-MM');
+        const monthName = format(parseISO(order.date), 'MMMM yyyy', { locale: es });
+
+        if (!groups[monthKey]) {
+            groups[monthKey] = {
+                monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+                orders: [],
+                subtotal: 0,
+            };
+        }
+        groups[monthKey].orders.push(order);
+        groups[monthKey].subtotal += order.totalAmount;
+    });
+
+    // Sort groups by year and month descending
+    return Object.values(groups).sort((a,b) => b.monthName.localeCompare(a.monthName));
+  }, [ordersWithPaymentStatus]);
+
+  const grandTotal = useMemo(() => {
+    return groupedOrders.reduce((sum, group) => sum + group.subtotal, 0);
+  }, [groupedOrders]);
+
+  const filteredGroupedOrders = useMemo(() => {
+      if (!filter) return groupedOrders;
+      
+      const lowercasedFilter = filter.toLowerCase();
+      
+      return groupedOrders.map(group => {
+          const filteredOrders = group.orders.filter(order => {
+              const supplier = suppliers.find(s => s.id === order.supplierId);
+              return supplier?.name.toLowerCase().includes(lowercasedFilter);
+          });
+
+          if (filteredOrders.length > 0) {
+              return {
+                  ...group,
+                  orders: filteredOrders,
+                  subtotal: filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0)
+              };
+          }
+          return null;
+      }).filter((g): g is { monthName: string; orders: PurchaseOrder[]; subtotal: number; } => g !== null);
+  }, [groupedOrders, filter, suppliers]);
+
 
   const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
     const allItems = 'id' in order
@@ -205,12 +275,9 @@ export default function PurchasesPage() {
     toast({ title: 'Exportación Exitosa', description: 'Se han exportado todas las órdenes de compra.' });
   }
 
-  const columns = getColumns({
-    onEdit: handleEdit,
-    onDelete: handleDelete,
-    onPreview: handlePreview,
-    suppliers
-  });
+  const toggleCollapsible = (monthKey: string) => {
+    setOpenCollapsibles(prev => ({...prev, [monthKey]: !prev[monthKey]}));
+  }
 
   const renderContent = () => {
     if (!isClient) {
@@ -221,7 +288,113 @@ export default function PurchasesPage() {
         </div>
       )
     }
-    return <DataTable columns={columns} data={ordersWithPaymentStatus} />;
+    return (
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className='w-[400px]'>Mes</TableHead>
+              <TableHead className='text-right'>Monto Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredGroupedOrders.map(group => {
+              const monthKey = group.monthName.replace(' ', '-');
+              return (
+                <React.Fragment key={monthKey}>
+                  <TableRow className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggleCollapsible(monthKey)}>
+                    <TableCell className='font-bold'>
+                      <div className="flex items-center gap-2">
+                        <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[monthKey] && "rotate-180")} />
+                        {group.monthName}
+                      </div>
+                    </TableCell>
+                    <TableCell className='text-right font-bold'>{formatCurrency(group.subtotal)}</TableCell>
+                  </TableRow>
+                  {openCollapsibles[monthKey] && (
+                    <TableRow>
+                      <TableCell colSpan={2} className="p-0">
+                        <div className='p-4 bg-background'>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>O/C</TableHead>
+                                <TableHead>Fecha</TableHead>
+                                <TableHead>Proveedor</TableHead>
+                                <TableHead className="text-right">Monto</TableHead>
+                                <TableHead>Estado Pago</TableHead>
+                                <TableHead>Estado Orden</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {group.orders.map(order => {
+                                const supplier = suppliers.find(s => s.id === order.supplierId);
+                                return (
+                                  <TableRow key={order.id}>
+                                    <TableCell className="font-medium">{order.id}</TableCell>
+                                    <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy')}</TableCell>
+                                    <TableCell>{supplier?.name}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
+                                    <TableCell>
+                                       <Badge variant={order.paymentStatus === 'Pagado' ? 'default' : order.paymentStatus === 'Abonado' ? 'secondary' : 'destructive'}>
+                                        {order.paymentStatus || 'Pendiente'}
+                                      </Badge>
+                                    </TableCell>
+                                     <TableCell>
+                                        <Badge variant={order.status === 'completed' ? 'default' : order.status === 'pending' ? 'secondary' : 'destructive'}>
+                                          {order.status === 'completed' ? 'Completada' : order.status === 'pending' ? 'Pendiente' : 'Cancelada'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" className="h-8 w-8 p-0">
+                                            <span className="sr-only">Abrir menú</span>
+                                            <MoreHorizontal className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                           <DropdownMenuItem onClick={() => handlePreview(order)}>
+                                              <Eye className='mr-2 h-4 w-4' />
+                                              Visualizar
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handleEdit(order)}>
+                                            Editar
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            className="text-destructive focus:text-destructive"
+                                            onClick={() => handleDelete(order)}
+                                          >
+                                            Eliminar
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableHead className='text-right font-bold text-lg'>Total General</TableHead>
+              <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotal)}</TableHead>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </div>
+    );
   }
 
   return (
@@ -244,6 +417,14 @@ export default function PurchasesPage() {
                 </Button>
             </div>
           </div>
+            <div className="py-4">
+              <Input
+                placeholder="Filtrar por proveedor..."
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                className="max-w-sm"
+              />
+            </div>
         </CardHeader>
         <CardContent>
           {renderContent()}
@@ -325,3 +506,5 @@ export default function PurchasesPage() {
     </>
   );
 }
+
+    
