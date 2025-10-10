@@ -330,7 +330,7 @@ export default function InventoryPage() {
                           <div className="print-only hidden print:block p-4">
                             <h2 className="text-2xl font-bold mb-1">Reporte de Inventario</h2>
                             <p className="text-sm text-muted-foreground">
-                                Al {filterDate ? format(filterDate, "PPP", { locale: es }) : format(new Date(), "PPP", { locale: es })}
+                                Al {filterDate ? format(filterDate, "PPP", { locale: es }) : ''}
                             </p>
                             <p className="text-sm text-muted-foreground">
                                 Bodega: {selectedWarehouse}
