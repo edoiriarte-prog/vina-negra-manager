@@ -208,11 +208,10 @@ export default function DashboardPage() {
       <h1 className="font-headline text-3xl">Dashboard</h1>
       
       <Tabs defaultValue="general">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="purchases">Compras</TabsTrigger>
           <TabsTrigger value="sales">Ventas</TabsTrigger>
-          <TabsTrigger value="inventory">Inventario</TabsTrigger>
         </TabsList>
         
         <TabsContent value="general" className="mt-6">
@@ -397,62 +396,6 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   {isClient ? <SalesByOrderChart data={filteredSalesOrders} /> : <Skeleton className="h-[300px] w-full" />}
-                </CardContent>
-              </Card>
-           </div>
-        </TabsContent>
-        
-        <TabsContent value="inventory" className="mt-6">
-           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {isClient ? (
-                <>
-                  <KpiCard
-                    title="Kilos Totales en Stock"
-                    value={formatKilos(totalStockKilos)}
-                    icon={<Boxes className="h-5 w-5 text-amber-500" />}
-                    description="Stock actual sumando todas las bodegas"
-                  />
-                </>
-              ) : (
-                 <Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
-              )}
-           </div>
-           <div className="grid gap-6 mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className='font-headline text-xl'>Distribución de Stock por Calibre</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isClient ? <CaliberDistributionChart data={inventory} /> : <Skeleton className="h-[300px] w-full" />}
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                    <CardTitle className="font-headline text-xl">Resumen de Stock</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="rounded-md border max-h-[300px] overflow-y-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Producto</TableHead>
-                                    <TableHead>Calibre</TableHead>
-                                    <TableHead className="text-right">Stock (kg)</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {isClient ? inventory.filter(i => i.stock > 0).map(item => (
-                                    <TableRow key={item.key}>
-                                        <TableCell>{item.product}</TableCell>
-                                        <TableCell>{item.caliber}</TableCell>
-                                        <TableCell className="text-right font-medium">{item.stock.toLocaleString('es-CL')}</TableCell>
-                                    </TableRow>
-                                )) : Array.from({length: 5}).map((_, i) => (
-                                    <TableRow key={`sk-inv-${i}`}><TableCell colSpan={3}><Skeleton className="h-6 w-full"/></TableCell></TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
                 </CardContent>
               </Card>
            </div>
