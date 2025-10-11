@@ -24,6 +24,7 @@ import {
     TableFooter,
   } from '@/components/ui/table';
 import { Printer } from 'lucide-react';
+import { useReactToPrint } from 'react-to-print';
 
 type SalesOrderPreviewProps = {
   order: SalesOrder;
@@ -230,6 +231,19 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
 PreviewContent.displayName = "PreviewContent";
 
 export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange, onPrintRequest }: SalesOrderPreviewProps) {
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+      content: () => printRef.current,
+  });
+
+  const handlePrintClick = () => {
+    if(onPrintRequest) {
+      onPrintRequest();
+    } else {
+      handlePrint();
+    }
+  }
+
   if (!order) return null;
   
   return (
@@ -239,14 +253,13 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
            <DialogTitle>Previsualización de Orden de Venta: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto" id="print-area">
-            {/* The content is rendered here for viewing, but the actual printable content is handled by the parent */}
-            <PreviewContent order={order} client={client} carrier={carrier} />
+            <PreviewContent ref={printRef} order={order} client={client} carrier={carrier} />
         </div>
         <DialogFooter className="p-6 pt-4 flex-row justify-end gap-2 no-print">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cerrar
             </Button>
-            <Button onClick={onPrintRequest}>
+            <Button onClick={handlePrintClick}>
                 <Printer className="mr-2 h-4 w-4" />
                 Exportar a PDF
             </Button>

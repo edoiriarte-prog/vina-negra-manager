@@ -63,6 +63,7 @@ export default function SalesPage() {
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
   const [orderToPrint, setOrderToPrint] = useState<SalesOrder | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
@@ -79,6 +80,14 @@ export default function SalesPage() {
    const handlePrint = useReactToPrint({
     content: () => printComponentRef.current,
   });
+
+  useEffect(() => {
+    if (isPrinting && orderToPrint && printComponentRef.current) {
+        handlePrint();
+        setIsPrinting(false); // Reset printing state
+        setOrderToPrint(null); // Optional: clear the order after printing
+    }
+  }, [isPrinting, orderToPrint, handlePrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -549,7 +558,7 @@ export default function SalesPage() {
           onOpenChange={(open) => !open && setPreviewingOrder(null)}
           onPrintRequest={() => {
             setOrderToPrint(previewingOrder);
-            setTimeout(() => handlePrint(), 0);
+            setIsPrinting(true);
           }}
         />
       )}
@@ -573,7 +582,7 @@ export default function SalesPage() {
                   </Button>
                   <Button variant="default" onClick={() => {
                     setOrderToPrint(postSaveOrderOptions);
-                    setTimeout(() => handlePrint(), 0);
+                    setIsPrinting(true);
                     setPostSaveOrderOptions(null);
                   }}>
                     <Printer className="mr-2 h-4 w-4" />
@@ -595,3 +604,4 @@ export default function SalesPage() {
     </>
   );
 }
+
