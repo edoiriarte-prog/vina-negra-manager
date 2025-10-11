@@ -63,7 +63,6 @@ export default function SalesPage() {
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
   const [orderToPrint, setOrderToPrint] = useState<SalesOrder | null>(null);
-  const [isPrinting, setIsPrinting] = useState(false);
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
@@ -72,22 +71,15 @@ export default function SalesPage() {
   
   const { toast } = useToast();
 
+  const handlePrint = useReactToPrint({
+      content: () => printComponentRef.current,
+      onAfterPrint: () => setOrderToPrint(null), // Clean up after printing
+  });
+
   const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
   
   const clients = contacts.filter(c => c.type.includes('client'));
   const carriers = contacts.filter(c => c.type.includes('supplier'));
-
-   const handlePrint = useReactToPrint({
-    content: () => printComponentRef.current,
-  });
-
-  useEffect(() => {
-    if (isPrinting && orderToPrint && printComponentRef.current) {
-        handlePrint();
-        setIsPrinting(false); // Reset printing state
-        setOrderToPrint(null); // Optional: clear the order after printing
-    }
-  }, [isPrinting, orderToPrint, handlePrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -257,6 +249,7 @@ export default function SalesPage() {
   };
 
   const handlePreview = (order: SalesOrder) => {
+    setOrderToPrint(order);
     setPreviewingOrder(order);
   }
   
@@ -555,10 +548,14 @@ export default function SalesPage() {
           client={clients.find(s => s.id === previewingOrder.clientId) || null}
           carrier={carriers.find(s => s.id === previewingOrder.carrierId) || null}
           isOpen={!!previewingOrder}
-          onOpenChange={(open) => !open && setPreviewingOrder(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+                setPreviewingOrder(null);
+                setOrderToPrint(null);
+            }
+          }}
           onPrintRequest={() => {
-            setOrderToPrint(previewingOrder);
-            setIsPrinting(true);
+              if (orderToPrint) handlePrint();
           }}
         />
       )}
@@ -582,7 +579,7 @@ export default function SalesPage() {
                   </Button>
                   <Button variant="default" onClick={() => {
                     setOrderToPrint(postSaveOrderOptions);
-                    setIsPrinting(true);
+                    handlePrint();
                     setPostSaveOrderOptions(null);
                   }}>
                     <Printer className="mr-2 h-4 w-4" />
@@ -604,4 +601,3 @@ export default function SalesPage() {
     </>
   );
 }
-
