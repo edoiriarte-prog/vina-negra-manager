@@ -20,7 +20,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { SalesOrderPreview } from './components/sales-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Printer, Download, X, MoreHorizontal, Eye, ChevronDown } from 'lucide-react';
+import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
@@ -62,19 +62,11 @@ export default function SalesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
-  const [orderToPrint, setOrderToPrint] = useState<SalesOrder | null>(null);
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
 
-  const printComponentRef = React.useRef<HTMLDivElement>(null);
-  
   const { toast } = useToast();
-
-  const handlePrint = useReactToPrint({
-      content: () => printComponentRef.current,
-      onAfterPrint: () => setOrderToPrint(null), // Clean up after printing
-  });
 
   const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
   
@@ -249,7 +241,6 @@ export default function SalesPage() {
   };
 
   const handlePreview = (order: SalesOrder) => {
-    setOrderToPrint(order);
     setPreviewingOrder(order);
   }
   
@@ -551,11 +542,7 @@ export default function SalesPage() {
           onOpenChange={(open) => {
             if (!open) {
                 setPreviewingOrder(null);
-                setOrderToPrint(null);
             }
-          }}
-          onPrintRequest={() => {
-              if (orderToPrint) handlePrint();
           }}
         />
       )}
@@ -577,14 +564,6 @@ export default function SalesPage() {
                     <Download className="mr-2 h-4 w-4" />
                     Exportar a Excel
                   </Button>
-                  <Button variant="default" onClick={() => {
-                    setOrderToPrint(postSaveOrderOptions);
-                    handlePrint();
-                    setPostSaveOrderOptions(null);
-                  }}>
-                    <Printer className="mr-2 h-4 w-4" />
-                    Exportar a PDF
-                  </Button>
                   <Button variant="secondary" onClick={() => setPostSaveOrderOptions(null)}>
                         <X className="mr-2 h-4 w-4" />
                         Salir
@@ -593,11 +572,6 @@ export default function SalesPage() {
             </AlertDialogContent>
         </AlertDialog>
       )}
-
-      {/* Hidden component for printing */}
-      <div className="hidden">
-         {orderToPrint && <PreviewContent ref={printComponentRef} order={orderToPrint} client={clients.find(c => c.id === orderToPrint.clientId) || null} carrier={carriers.find(c => c.id === orderToPrint.carrierId) || null} />}
-      </div>
     </>
   );
 }

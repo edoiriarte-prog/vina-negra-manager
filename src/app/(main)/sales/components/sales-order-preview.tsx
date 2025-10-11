@@ -23,7 +23,6 @@ import {
     TableRow,
     TableFooter,
   } from '@/components/ui/table';
-import { Printer } from 'lucide-react';
 
 type SalesOrderPreviewProps = {
   order: SalesOrder;
@@ -31,7 +30,6 @@ type SalesOrderPreviewProps = {
   carrier: Contact | null;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onPrintRequest: () => void;
 };
 
 
@@ -229,7 +227,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
 });
 PreviewContent.displayName = "PreviewContent";
 
-export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange, onPrintRequest }: SalesOrderPreviewProps) {
+export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange }: SalesOrderPreviewProps) {
 
   if (!order) return null;
   
@@ -240,16 +238,11 @@ export function SalesOrderPreview({ order, client, carrier, isOpen, onOpenChange
            <DialogTitle>Previsualización de Orden de Venta: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto" id="print-area">
-            {/* The content is rendered on the main page for printing, this is just for view */}
              <PreviewContent order={order} client={client} carrier={carrier} />
         </div>
         <DialogFooter className="p-6 pt-4 flex-row justify-end gap-2 no-print">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cerrar
-            </Button>
-            <Button onClick={onPrintRequest}>
-                <Printer className="mr-2 h-4 w-4" />
-                Exportar a PDF
             </Button>
         </DialogFooter>
       </DialogContent>
