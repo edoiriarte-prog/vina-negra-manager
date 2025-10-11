@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory, serviceOrders as initialServiceOrders, financialMovements as initialFinancialMovements, inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
 import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem, ServiceOrder, FinancialMovement, InventoryAdjustment } from '@/lib/types';
@@ -20,7 +20,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { SalesOrderPreview } from './components/sales-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown } from 'lucide-react';
+import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown, Printer } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
@@ -62,11 +62,30 @@ export default function SalesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
-  
+  const [orderToPrint, setOrderToPrint] = useState<SalesOrder | null>(null);
+
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
 
+  const printComponentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  
+  const handlePrint = useReactToPrint({
+    content: () => printComponentRef.current,
+  });
+
+  const handlePrintRequest = useCallback((order: SalesOrder) => {
+    setOrderToPrint(order);
+  }, []);
+  
+  useEffect(() => {
+    if (orderToPrint) {
+      setTimeout(() => {
+        handlePrint();
+        setOrderToPrint(null);
+      }, 100);
+    }
+  }, [orderToPrint, handlePrint]);
 
   const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
   
@@ -417,6 +436,10 @@ export default function SalesPage() {
                                                                         <Eye className='mr-2 h-4 w-4' />
                                                                         Visualizar
                                                                       </DropdownMenuItem>
+                                                                      <DropdownMenuItem onClick={() => handlePrintRequest(order)}>
+                                                                        <Printer className='mr-2 h-4 w-4' />
+                                                                        Imprimir PDF
+                                                                      </DropdownMenuItem>
                                                                       <DropdownMenuItem onClick={() => handleEdit(order)}>
                                                                         Editar
                                                                       </DropdownMenuItem>
@@ -572,6 +595,20 @@ export default function SalesPage() {
             </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Hidden component for printing */}
+      <div className="hidden">
+        {orderToPrint && (
+          <PreviewContent
+            ref={printComponentRef}
+            order={orderToPrint}
+            client={clients.find(s => s.id === orderToPrint.clientId) || null}
+            carrier={carriers.find(s => s.id === orderToPrint.carrierId) || null}
+          />
+        )}
+      </div>
     </>
   );
 }
+
+    
