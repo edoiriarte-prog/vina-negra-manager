@@ -63,7 +63,6 @@ export default function SalesPage() {
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
   const [orderToPrint, setOrderToPrint] = useState<SalesOrder | null>(null);
-  const [isPrinting, setIsPrinting] = useState(false);
 
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
@@ -76,12 +75,11 @@ export default function SalesPage() {
   });
 
   useEffect(() => {
-    if (isPrinting && orderToPrint) {
+    if (orderToPrint) {
       handlePrint();
-      setIsPrinting(false); // Reset printing state
-      setOrderToPrint(null); // Clear order data after printing
+      setOrderToPrint(null);
     }
-  }, [isPrinting, orderToPrint, handlePrint]);
+  }, [orderToPrint, handlePrint]);
 
   const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
   
@@ -365,10 +363,9 @@ export default function SalesPage() {
     toast({ title: 'Exportación Exitosa', description: 'Se ha generado el packing list con todas las órdenes completadas.' });
   }
 
-  const handlePrintRequest = useCallback((order: SalesOrder) => {
+  const handlePrintRequest = (order: SalesOrder) => {
     setOrderToPrint(order);
-    setIsPrinting(true);
-  }, []);
+  };
 
   const renderContent = () => {
     if (!isClient) {
@@ -589,8 +586,8 @@ export default function SalesPage() {
                     Exportar a Excel
                   </Button>
                   <Button variant="default" onClick={() => {
-                    handlePrintRequest(postSaveOrderOptions);
-                    setPostSaveOrderOptions(null);
+                    handlePrintRequest(postSaveOrderOptions)
+                    setPostSaveOrderOptions(null)
                   }}>
                     <Printer className="mr-2 h-4 w-4" />
                     Imprimir PDF
@@ -618,5 +615,7 @@ export default function SalesPage() {
     </>
   );
 }
+
+    
 
     
