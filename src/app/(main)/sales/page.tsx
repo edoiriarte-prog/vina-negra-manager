@@ -20,11 +20,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { SalesOrderPreview } from './components/sales-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown, Printer } from 'lucide-react';
+import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
-import { PreviewContent } from './components/sales-order-preview';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import {
   DropdownMenu,
@@ -34,10 +33,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { useReactToPrint } from 'react-to-print';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -51,7 +48,6 @@ export default function SalesPage() {
   const [salesOrders, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
-  const [serviceOrders, setServiceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
   const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   
@@ -62,48 +58,18 @@ export default function SalesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
-  const [orderToPrint, setOrderToPrint] = useState<SalesOrder | null>(null);
 
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
 
-  const printComponentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  
-  const handlePrint = useReactToPrint({
-    content: () => printComponentRef.current,
-    onAfterPrint: () => setOrderToPrint(null),
-  });
-
-  const printTriggerRef = useCallback((node: HTMLDivElement) => {
-    if (node !== null && orderToPrint !== null) {
-      handlePrint();
-    }
-  }, [orderToPrint, handlePrint]);
-
-  const [nextLotCorrelative, setNextLotCorrelative] = useState(1);
   
   const clients = contacts.filter(c => c.type.includes('client'));
   const carriers = contacts.filter(c => c.type.includes('supplier'));
 
   useEffect(() => {
     setIsClient(true);
-    // Calculate the initial next lot correlative
-    const maxLotNumber = salesOrders.reduce((max, order) => {
-        order.items.forEach(item => {
-            if (item.lotNumber && item.lotNumber.startsWith('L')) {
-                try {
-                    const numberPart = parseInt(item.lotNumber.substring(1));
-                    if (!isNaN(numberPart) && numberPart > max) {
-                        max = numberPart;
-                    }
-                } catch(e) { /* ignore parse errors */ }
-            }
-        });
-        return max;
-    }, 0);
-    setNextLotCorrelative(maxLotNumber + 1);
-  }, [salesOrders]);
+  }, []);
 
   const groupedOrders = useMemo(() => {
     const groups: Record<string, { clientName: string; orders: SalesOrder[]; subtotal: number; }> = {};
@@ -137,7 +103,6 @@ export default function SalesPage() {
       );
   }, [groupedOrders, filter]);
 
-
   
   const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, inventoryAdjustments, editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
 
@@ -150,31 +115,27 @@ export default function SalesPage() {
   }, [salesOrders]);
 
   const getNextLotNumber = useCallback(() => {
-    const lotNumber = `L${nextLotCorrelative.toString().padStart(5, '0')}`;
-    setNextLotCorrelative(prev => prev + 1); // Increment for the next call
+    // This is a simplified lot number generator.
+    const lotNumber = `L${Date.now().toString().slice(-6)}`;
     return lotNumber;
-  }, [nextLotCorrelative]);
+  }, []);
 
 
   const handleSaveOrder = (orderData: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
     let orderToSave: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>;
 
-    // Combine existing items with new items from matrix dialog
     const allItems = [...orderData.items, ...newItems];
     
-    // For existing orders, just update items. For new orders, use the combined list.
     if ('id' in orderData) {
         orderToSave = { ...orderData, items: allItems };
     } else {
         orderToSave = { ...orderData, items: allItems };
     }
 
-     // Stock validation
     for (const item of orderToSave.items) {
         const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === orderData.warehouse);
         const currentStock = inventoryItem ? inventoryItem.stock : 0;
         
-        // When editing, the item's original quantity is already excluded from inventory calculation
         if (item.quantity > currentStock) {
             toast({
                 variant: "destructive",
@@ -197,12 +158,10 @@ export default function SalesPage() {
     let finalOrder: SalesOrder;
 
     if ('id' in orderToSave) {
-      // Update
       finalOrder = { ...orderToSave, totalAmount, totalKilos, totalPackages, paymentStatus: orderToSave.paymentStatus || 'Pendiente' } as SalesOrder;
       setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
       toast({ title: 'Orden Actualizada', description: `La orden ${finalOrder.id} ha sido actualizada.` });
     } else {
-      // Add
       finalOrder = {
         ...orderToSave,
         id: nextOrderId,
@@ -215,7 +174,6 @@ export default function SalesPage() {
       toast({ title: 'Orden Creada', description: `La orden ${finalOrder.id} ha sido creada.` });
     }
 
-    // Update payment status of related orders
     const movementsForOrder = financialMovements.filter(m => m.relatedDocument?.id === finalOrder.id);
     const totalPaid = movementsForOrder.reduce((sum, m) => sum + m.amount, 0);
     
@@ -231,10 +189,9 @@ export default function SalesPage() {
         setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
     }
 
-
     setIsSheetOpen(false);
     setEditingOrder(null);
-    setPostSaveOrderOptions(finalOrder); // Open post-save dialog
+    setPostSaveOrderOptions(finalOrder);
   };
 
   const handleEdit = (order: SalesOrder) => {
@@ -363,10 +320,6 @@ export default function SalesPage() {
     toast({ title: 'Exportación Exitosa', description: 'Se ha generado el packing list con todas las órdenes completadas.' });
   }
 
-  const handlePrintRequest = (order: SalesOrder) => {
-    setOrderToPrint(order);
-  };
-
   const renderContent = () => {
     if (!isClient) {
       return (
@@ -433,10 +386,6 @@ export default function SalesPage() {
                                                                       <DropdownMenuItem onClick={() => handlePreview(order)}>
                                                                         <Eye className='mr-2 h-4 w-4' />
                                                                         Visualizar
-                                                                      </DropdownMenuItem>
-                                                                      <DropdownMenuItem onClick={() => handlePrintRequest(order)}>
-                                                                        <Printer className='mr-2 h-4 w-4' />
-                                                                        Imprimir PDF
                                                                       </DropdownMenuItem>
                                                                       <DropdownMenuItem onClick={() => handleEdit(order)}>
                                                                         Editar
@@ -585,13 +534,6 @@ export default function SalesPage() {
                     <Download className="mr-2 h-4 w-4" />
                     Exportar a Excel
                   </Button>
-                  <Button variant="default" onClick={() => {
-                    handlePrintRequest(postSaveOrderOptions)
-                    setPostSaveOrderOptions(null)
-                  }}>
-                    <Printer className="mr-2 h-4 w-4" />
-                    Imprimir PDF
-                  </Button>
                   <Button variant="secondary" onClick={() => setPostSaveOrderOptions(null)}>
                         <X className="mr-2 h-4 w-4" />
                         Salir
@@ -600,23 +542,6 @@ export default function SalesPage() {
             </AlertDialogContent>
         </AlertDialog>
       )}
-
-      {/* Hidden component for printing */}
-      <div className="hidden">
-        {orderToPrint && (
-          <div ref={printTriggerRef}>
-            <PreviewContent
-                ref={printComponentRef}
-                order={orderToPrint}
-                client={clients.find(s => s.id === orderToPrint.clientId) || null}
-                carrier={carriers.find(s => s.id === orderToPrint.carrierId) || null}
-            />
-          </div>
-        )}
-      </div>
     </>
   );
 }
-
-
-    
