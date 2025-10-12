@@ -38,6 +38,12 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
+const formatKilos = (value: number) =>
+    `${new Intl.NumberFormat('es-CL').format(value)} kg`;
+    
+const formatPackages = (value: number) =>
+    `${new Intl.NumberFormat('es-CL').format(value)}`;
+
 
 export default function PurchasesPage() {
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
@@ -95,7 +101,7 @@ export default function PurchasesPage() {
   }, [purchaseOrders, financialMovements]);
 
   const groupedOrders = useMemo(() => {
-    const groups: Record<string, { monthName: string; orders: PurchaseOrder[]; subtotal: number; }> = {};
+    const groups: Record<string, { monthName: string; orders: PurchaseOrder[]; subtotalAmount: number; subtotalKilos: number; subtotalPackages: number; }> = {};
     
     ordersWithPaymentStatus.forEach(order => {
         const monthKey = format(parseISO(order.date), 'yyyy-MM');
@@ -105,11 +111,15 @@ export default function PurchasesPage() {
             groups[monthKey] = {
                 monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
                 orders: [],
-                subtotal: 0,
+                subtotalAmount: 0,
+                subtotalKilos: 0,
+                subtotalPackages: 0,
             };
         }
         groups[monthKey].orders.push(order);
-        groups[monthKey].subtotal += order.totalAmount;
+        groups[monthKey].subtotalAmount += order.totalAmount;
+        groups[monthKey].subtotalKilos += order.totalKilos;
+        groups[monthKey].subtotalPackages += order.totalPackages;
     });
 
     const sortedMonthKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
@@ -117,7 +127,7 @@ export default function PurchasesPage() {
   }, [ordersWithPaymentStatus]);
 
   const grandTotal = useMemo(() => {
-    return groupedOrders.reduce((sum, group) => sum + group.subtotal, 0);
+    return groupedOrders.reduce((sum, group) => sum + group.subtotalAmount, 0);
   }, [groupedOrders]);
 
   const filteredGroupedOrders = useMemo(() => {
@@ -135,11 +145,13 @@ export default function PurchasesPage() {
               return {
                   ...group,
                   orders: filteredOrders,
-                  subtotal: filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0)
+                  subtotalAmount: filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0),
+                  subtotalKilos: filteredOrders.reduce((sum, o) => sum + o.totalKilos, 0),
+                  subtotalPackages: filteredOrders.reduce((sum, o) => sum + o.totalPackages, 0),
               };
           }
           return null;
-      }).filter((g): g is { monthName: string; orders: PurchaseOrder[]; subtotal: number; } => g !== null);
+      }).filter((g): g is { monthName: string; orders: PurchaseOrder[]; subtotalAmount: number; subtotalKilos: number; subtotalPackages: number; } => g !== null);
   }, [groupedOrders, filter, suppliers]);
 
 
@@ -285,6 +297,8 @@ export default function PurchasesPage() {
           <TableHeader>
             <TableRow>
               <TableHead className='w-[400px]'>Mes</TableHead>
+              <TableHead className='text-right'>Total Envases</TableHead>
+              <TableHead className='text-right'>Total Kilos</TableHead>
               <TableHead className='text-right'>Monto Total</TableHead>
             </TableRow>
           </TableHeader>
@@ -300,11 +314,13 @@ export default function PurchasesPage() {
                         {group.monthName}
                       </div>
                     </TableCell>
-                    <TableCell className='text-right font-bold'>{formatCurrency(group.subtotal)}</TableCell>
+                    <TableCell className='text-right font-bold'>{formatPackages(group.subtotalPackages)}</TableCell>
+                    <TableCell className='text-right font-bold'>{formatKilos(group.subtotalKilos)}</TableCell>
+                    <TableCell className='text-right font-bold'>{formatCurrency(group.subtotalAmount)}</TableCell>
                   </TableRow>
                   {openCollapsibles[monthKey] && (
                     <TableRow>
-                      <TableCell colSpan={2} className="p-0">
+                      <TableCell colSpan={4} className="p-0">
                         <div className='p-4 bg-background'>
                           <Table>
                             <TableHeader>
@@ -343,7 +359,7 @@ export default function PurchasesPage() {
           </TableBody>
           <TableFooter>
             <TableRow>
-              <TableHead className='text-right font-bold text-lg'>Total General</TableHead>
+              <TableHead colSpan={3} className='text-right font-bold text-lg'>Total General</TableHead>
               <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotal)}</TableHead>
             </TableRow>
           </TableFooter>
