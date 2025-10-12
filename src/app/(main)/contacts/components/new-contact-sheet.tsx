@@ -94,15 +94,15 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
       setNewInteraction(initialNewInteraction);
     }
   }, [contact, isOpen]);
-
+  
   useEffect(() => {
-    // Update local interactions state when the prop changes
-    if (contact?.interactions) {
-      setInteractions(contact.interactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    }
+    // This effect ensures the local interactions state is updated
+    // when the contact prop changes (e.g., after a deletion).
+    setInteractions(contact?.interactions?.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) || []);
   }, [contact?.interactions]);
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -126,20 +126,16 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
     if (newInteraction.notes.trim() === '' || !contact) return;
     
     onSave(contact, newInteraction);
-    // Optimistically add to local state
-    const newInteractionsList = [...interactions, { ...newInteraction, id: `temp-${Date.now()}` }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setInteractions(newInteractionsList);
     setNewInteraction(initialNewInteraction);
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (contact) {
-        onSave({ ...contact, ...formData });
+        onSave({ ...contact, ...formData, interactions: interactions });
     } else {
         onSave(formData);
     }
-    // Don't close sheet automatically, page will handle it.
   };
 
   const handleTypeChange = (typeId: ContactType) => {
@@ -202,19 +198,19 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                   <Label htmlFor="contactPerson" className="text-right">
                     Persona
                   </Label>
-                  <Input id="contactPerson" name="contactPerson" value={formData.contactPerson} onChange={handleInputChange} className="col-span-3" />
+                  <Input id="contactPerson" name="contactPerson" value={formData.contactPerson || ''} onChange={handleInputChange} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="address" className="text-right">
                     Dirección
                   </Label>
-                  <Input id="address" name="address" value={formData.address} onChange={handleInputChange} className="col-span-3" />
+                  <Input id="address" name="address" value={formData.address || ''} onChange={handleInputChange} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="commune" className="text-right">
                     Comuna
                   </Label>
-                  <Input id="commune" name="commune" value={formData.commune} onChange={handleInputChange} className="col-span-3" />
+                  <Input id="commune" name="commune" value={formData.commune || ''} onChange={handleInputChange} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-start gap-4">
                     <Label className="text-right pt-2">Tipo</Label>

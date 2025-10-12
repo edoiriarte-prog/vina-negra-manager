@@ -71,16 +71,31 @@ export default function ContactsPage() {
     if (!('id' in contact)) {
       setIsSheetOpen(false); 
       setEditingContact(null);
+    } else {
+      // If editing, find the updated contact and set it to refresh the sheet's state
+      const updatedContact = contacts.find(c => c.id === contact.id);
+      if (updatedContact) {
+        const contactWithNewInteraction = { ...updatedContact };
+         if (newInteraction) {
+            const interaction: Interaction = { ...newInteraction, id: `int-${Date.now()}` };
+            contactWithNewInteraction.interactions = [...(contactWithNewInteraction.interactions || []), interaction].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+         }
+        setEditingContact(contactWithNewInteraction);
+      }
     }
   };
-
+  
   const handleDeleteInteraction = (contactId: string, interactionId: string) => {
     setContacts(prev => prev.map(c => {
         if (c.id === contactId) {
-            return {
-                ...c,
-                interactions: c.interactions?.filter(i => i.id !== interactionId)
-            };
+            const updatedInteractions = c.interactions?.filter(i => i.id !== interactionId);
+            const updatedContact = { ...c, interactions: updatedInteractions };
+            
+            // If we are currently editing this contact, update the editingContact state
+            if (editingContact?.id === contactId) {
+                setEditingContact(updatedContact);
+            }
+            return updatedContact;
         }
         return c;
     }));
