@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -73,6 +74,19 @@ export default function ContactsPage() {
     }
   };
 
+  const handleDeleteInteraction = (contactId: string, interactionId: string) => {
+    setContacts(prev => prev.map(c => {
+        if (c.id === contactId) {
+            return {
+                ...c,
+                interactions: c.interactions?.filter(i => i.id !== interactionId)
+            };
+        }
+        return c;
+    }));
+    toast({ variant: "destructive", title: "Interacción Eliminada" });
+  };
+
 
   const handleEdit = (contact: Contact) => {
     setEditingContact(contact);
@@ -82,7 +96,7 @@ export default function ContactsPage() {
   
   const handleRowClick = (contact: Contact) => {
     setEditingContact(contact);
-    setActiveTab('history');
+    setActiveTab('details');
     setIsSheetOpen(true);
   }
 
@@ -150,6 +164,7 @@ export default function ContactsPage() {
         onSave={handleSaveContact}
         contact={editingContact}
         defaultTab={activeTab}
+        onDeleteInteraction={handleDeleteInteraction}
       />
       <AlertDialog open={!!deletingContact} onOpenChange={(open) => !open && setDeletingContact(null)}>
         <AlertDialogContent>

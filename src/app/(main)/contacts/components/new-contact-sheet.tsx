@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, KeyboardEvent } from 'react';
@@ -17,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Contact, Interaction, ContactType } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { X, PlusCircle, Calendar, Users, Mail, Phone, Handshake } from 'lucide-react';
+import { X, PlusCircle, Calendar, Users, Mail, Phone, Handshake, FileText, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format, parseISO } from 'date-fns';
@@ -32,6 +33,7 @@ type NewContactSheetProps = {
   onSave: (contact: Contact | Omit<Contact, 'id' | 'interactions'>, newInteraction?: Omit<Interaction, 'id'>) => void;
   contact: Contact | null;
   defaultTab?: string;
+  onDeleteInteraction: (contactId: string, interactionId: string) => void;
 };
 
 const contactTypes: { id: ContactType, label: string }[] = [
@@ -77,7 +79,7 @@ const initialNewInteraction: Omit<Interaction, 'id'> = {
   notes: '',
 };
 
-export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, defaultTab = 'details' }: NewContactSheetProps) {
+export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, defaultTab = 'details', onDeleteInteraction }: NewContactSheetProps) {
   const [formData, setFormData] = useState<Omit<Contact, 'id' | 'interactions'>>(getInitialFormData(contact));
   const [tagInput, setTagInput] = useState('');
   const [interactions, setInteractions] = useState<Interaction[]>([]);
@@ -92,6 +94,13 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
       setNewInteraction(initialNewInteraction);
     }
   }, [contact, isOpen]);
+
+  useEffect(() => {
+    // Update local interactions state when the prop changes
+    if (contact?.interactions) {
+      setInteractions(contact.interactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    }
+  }, [contact?.interactions]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -153,6 +162,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
       'Reunión': <Users className="h-4 w-4" />,
       'Email': <Mail className="h-4 w-4" />,
       'Acuerdo': <Handshake className="h-4 w-4" />,
+      'Cotizacion': <FileText className="h-4 w-4" />,
   }
 
   return (
@@ -284,6 +294,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                                     <SelectItem value="Reunión">Reunión</SelectItem>
                                     <SelectItem value="Email">Email</SelectItem>
                                     <SelectItem value="Acuerdo">Acuerdo</SelectItem>
+                                    <SelectItem value="Cotizacion">Cotización</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -291,7 +302,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                             placeholder="Añada notas sobre la interacción... Puede pegar cuadros desde Excel."
                             value={newInteraction.notes}
                             onChange={(e) => setNewInteraction(p => ({...p, notes: e.target.value}))}
-                            className="min-h-[120px] whitespace-pre font-mono"
+                            className="min-h-[120px] whitespace-pre-wrap font-mono"
                         />
                         <Button onClick={handleAddInteraction} disabled={!newInteraction.notes}>
                             <PlusCircle className="mr-2 h-4 w-4"/>
@@ -305,7 +316,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                     {interactions.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay interacciones registradas.</p>}
                     <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
                         {interactions.map(int => (
-                            <div key={int.id} className="flex items-start gap-4">
+                            <div key={int.id} className="flex items-start gap-4 group">
                                 <div className="flex flex-col items-center">
                                     <span className="p-2 bg-muted rounded-full">
                                         {interactionIcons[int.type]}
@@ -315,7 +326,17 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                                 <div className="flex-1 pb-4 border-b">
                                     <div className="flex justify-between items-center">
                                         <p className="font-semibold">{int.type}</p>
-                                        <p className="text-xs text-muted-foreground">{format(parseISO(int.date), 'dd-MM-yyyy', { locale: es })}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-xs text-muted-foreground">{format(parseISO(int.date), 'dd-MM-yyyy', { locale: es })}</p>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => contact && onDeleteInteraction(contact.id, int.id)}
+                                            >
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </div>
                                     </div>
                                     <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap font-mono">{int.notes}</p>
                                 </div>

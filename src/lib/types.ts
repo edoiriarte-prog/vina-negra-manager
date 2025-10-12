@@ -3,7 +3,7 @@
 export type Interaction = {
   id: string;
   date: string;
-  type: 'Llamada' | 'Reunión' | 'Email' | 'Acuerdo';
+  type: 'Llamada' | 'Reunión' | 'Email' | 'Acuerdo' | 'Cotizacion';
   notes: string;
 };
 
