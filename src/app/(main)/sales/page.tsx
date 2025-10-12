@@ -75,8 +75,8 @@ export default function SalesPage() {
     onAfterPrint: () => setOrderToPrint(null),
   });
 
-  useEffect(() => {
-    if (orderToPrint) {
+  const printTriggerRef = useCallback((node: HTMLDivElement) => {
+    if (node !== null && orderToPrint !== null) {
       handlePrint();
     }
   }, [orderToPrint, handlePrint]);
@@ -604,16 +604,19 @@ export default function SalesPage() {
       {/* Hidden component for printing */}
       <div className="hidden">
         {orderToPrint && (
-          <PreviewContent
-            ref={printComponentRef}
-            order={orderToPrint}
-            client={clients.find(s => s.id === orderToPrint.clientId) || null}
-            carrier={carriers.find(s => s.id === orderToPrint.carrierId) || null}
-          />
+          <div ref={printTriggerRef}>
+            <PreviewContent
+                ref={printComponentRef}
+                order={orderToPrint}
+                client={clients.find(s => s.id === orderToPrint.clientId) || null}
+                carrier={carriers.find(s => s.id === orderToPrint.carrierId) || null}
+            />
+          </div>
         )}
       </div>
     </>
   );
 }
+
 
     
