@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, ChevronDown, MoreHorizontal, Eye } from 'lucide-react';
+import { PlusCircle, Download, ChevronDown, MoreHorizontal, Eye, Printer, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -28,15 +28,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useReactToPrint } from 'react-to-print';
 import { PreviewContent } from './components/purchase-order-preview-content';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -54,12 +45,12 @@ export default function PurchasesPage() {
   const [financialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
   
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
-  const [confirmingEditOrder, setConfirmingEditOrder] = useState<PurchaseOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<PurchaseOrder | null>(null);
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [orderToPrint, setOrderToPrint] = useState<PurchaseOrder | null>(null);
+  const [selectedOrderForActions, setSelectedOrderForActions] = useState<PurchaseOrder | null>(null);
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
@@ -71,13 +62,14 @@ export default function PurchasesPage() {
       content: () => printComponentRef.current,
   });
 
-  const handlePrintRequest = useCallback((order: PurchaseOrder) => {
-    setOrderToPrint(order);
-    setTimeout(() => {
+  useEffect(() => {
+    if (orderToPrint) {
+       setTimeout(() => {
         handlePrint();
         setOrderToPrint(null);
-    }, 100);
-  }, [handlePrint]);
+      }, 100);
+    }
+  }, [orderToPrint, handlePrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -192,21 +184,14 @@ export default function PurchasesPage() {
   };
 
   const handleEdit = (order: PurchaseOrder) => {
-    setPreviewingOrder(null);
-    setConfirmingEditOrder(order);
+    setEditingOrder(order);
+    setIsSheetOpen(true);
+    setSelectedOrderForActions(null);
   };
 
-  const confirmEdit = () => {
-    if (confirmingEditOrder) {
-      setEditingOrder(confirmingEditOrder);
-      setIsSheetOpen(true);
-      setConfirmingEditOrder(null);
-    }
-  }
-
   const handleDelete = (order: PurchaseOrder) => {
-    setPreviewingOrder(null);
     setDeletingOrder(order);
+    setSelectedOrderForActions(null);
   };
   
   const confirmDelete = () => {
@@ -231,7 +216,13 @@ export default function PurchasesPage() {
 
   const handlePreview = (order: PurchaseOrder) => {
     setPreviewingOrder(order);
+    setSelectedOrderForActions(null);
   };
+
+  const handlePrintRequest = (order: PurchaseOrder) => {
+    setOrderToPrint(order);
+    setSelectedOrderForActions(null);
+  }
 
   const handleExportAll = () => {
     if (purchaseOrders.length === 0) {
@@ -322,57 +313,21 @@ export default function PurchasesPage() {
                                 <TableHead>Fecha</TableHead>
                                 <TableHead>Proveedor</TableHead>
                                 <TableHead className="text-right">Monto</TableHead>
-                                <TableHead>Estado Pago</TableHead>
-                                <TableHead>Estado Orden</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
+                                <TableHead className="text-right">Kilos</TableHead>
+                                <TableHead className="text-right">Envases</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {group.orders.map(order => {
                                 const supplier = suppliers.find(s => s.id === order.supplierId);
                                 return (
-                                  <TableRow key={order.id}>
+                                  <TableRow key={order.id} className="cursor-pointer" onClick={() => setSelectedOrderForActions(order)}>
                                     <TableCell className="font-medium">{order.id}</TableCell>
                                     <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy')}</TableCell>
                                     <TableCell>{supplier?.name}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
-                                    <TableCell>
-                                       <Badge variant={order.paymentStatus === 'Pagado' ? 'default' : order.paymentStatus === 'Abonado' ? 'secondary' : 'destructive'}>
-                                        {order.paymentStatus || 'Pendiente'}
-                                      </Badge>
-                                    </TableCell>
-                                     <TableCell>
-                                        <Badge variant={order.status === 'completed' ? 'default' : order.status === 'pending' ? 'secondary' : 'destructive'}>
-                                          {order.status === 'completed' ? 'Completada' : order.status === 'pending' ? 'Pendiente' : 'Cancelada'}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" className="h-8 w-8 p-0">
-                                            <span className="sr-only">Abrir menú</span>
-                                            <MoreHorizontal className="h-4 w-4" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                           <DropdownMenuItem onClick={() => handlePreview(order)}>
-                                              <Eye className='mr-2 h-4 w-4' />
-                                              Visualizar
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => handleEdit(order)}>
-                                            Editar
-                                          </DropdownMenuItem>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem
-                                            className="text-destructive focus:text-destructive"
-                                            onClick={() => handleDelete(order)}
-                                          >
-                                            Eliminar
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </TableCell>
+                                    <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')}</TableCell>
+                                    <TableCell className="text-right">{order.totalPackages.toLocaleString('es-CL')}</TableCell>
                                   </TableRow>
                                 )
                               })}
@@ -439,17 +394,34 @@ export default function PurchasesPage() {
         suppliers={suppliers}
       />
 
-       <AlertDialog open={!!confirmingEditOrder} onOpenChange={(open) => !open && setConfirmingEditOrder(null)}>
+       <AlertDialog open={!!selectedOrderForActions} onOpenChange={() => setSelectedOrderForActions(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro de que quieres editar esta orden?</AlertDialogTitle>
+            <AlertDialogTitle>Acciones para la Orden {selectedOrderForActions?.id}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se abrirá el formulario para editar la orden "{confirmingEditOrder?.id}".
+              Seleccione una acción para ejecutar en la orden de compra.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <Button variant="outline" onClick={() => selectedOrderForActions && handlePrintRequest(selectedOrderForActions)}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir PDF
+            </Button>
+            <Button variant="outline" onClick={() => selectedOrderForActions && handlePreview(selectedOrderForActions)}>
+                <Eye className="mr-2 h-4 w-4" />
+                Visualizar
+            </Button>
+             <Button variant="outline" onClick={() => selectedOrderForActions && handleEdit(selectedOrderForActions)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Editar
+            </Button>
+            <Button variant="destructive" onClick={() => selectedOrderForActions && handleDelete(selectedOrderForActions)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar
+            </Button>
+          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConfirmingEditOrder(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmEdit}>Editar</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setSelectedOrderForActions(null)}>Cancelar</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -487,12 +459,12 @@ export default function PurchasesPage() {
             }}
             onPrintRequest={() => {
                 if (previewingOrder) {
-                    handlePrintRequest(previewingOrder);
+                    setOrderToPrint(previewingOrder);
                 }
             }}
         />
       )}
-       <div className="hidden">
+       <div className="hidden print:block">
         {orderToPrint && (
             <PreviewContent
                 ref={printComponentRef}
@@ -506,5 +478,3 @@ export default function PurchasesPage() {
     </>
   );
 }
-
-    
