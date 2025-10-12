@@ -72,12 +72,12 @@ export default function SalesPage() {
   
   const handlePrint = useReactToPrint({
     content: () => printComponentRef.current,
+    onAfterPrint: () => setOrderToPrint(null),
   });
 
   useEffect(() => {
     if (orderToPrint) {
       handlePrint();
-      setOrderToPrint(null);
     }
   }, [orderToPrint, handlePrint]);
 
@@ -615,7 +615,5 @@ export default function SalesPage() {
     </>
   );
 }
-
-    
 
     
