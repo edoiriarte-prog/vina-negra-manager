@@ -288,9 +288,10 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                             </Select>
                         </div>
                         <Textarea
-                            placeholder="Añada notas sobre la interacción..."
+                            placeholder="Añada notas sobre la interacción... Puede pegar cuadros desde Excel."
                             value={newInteraction.notes}
                             onChange={(e) => setNewInteraction(p => ({...p, notes: e.target.value}))}
+                            className="min-h-[120px] whitespace-pre font-mono"
                         />
                         <Button onClick={handleAddInteraction} disabled={!newInteraction.notes}>
                             <PlusCircle className="mr-2 h-4 w-4"/>
@@ -316,7 +317,7 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
                                         <p className="font-semibold">{int.type}</p>
                                         <p className="text-xs text-muted-foreground">{format(parseISO(int.date), 'dd-MM-yyyy', { locale: es })}</p>
                                     </div>
-                                    <p className="text-sm text-muted-foreground mt-1">{int.notes}</p>
+                                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap font-mono">{int.notes}</p>
                                 </div>
                             </div>
                         ))}
@@ -329,3 +330,5 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
     </Sheet>
   );
 }
+
+    
