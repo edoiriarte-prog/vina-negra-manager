@@ -85,6 +85,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, { order: SalesOrd
                 <h3 className="font-semibold mb-2">Datos de la Venta</h3>
                 <div className="text-sm text-muted-foreground">
                     <p><span className="font-medium text-foreground">Tipo de Venta:</span> {order.saleType || 'Venta Firme'}</p>
+                    <p><span className="font-medium text-foreground">Condición de Pago:</span> {order.paymentMethod}</p>
                     <p><span className="font-medium text-foreground">Movimiento:</span> {order.movementType || 'Venta Directa'}</p>
                     {order.movementType === 'Traslado a Bodega Externa' && (
                          <p><span className="font-medium text-foreground">Bodega Destino:</span> {order.destinationWarehouse}</p>
