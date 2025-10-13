@@ -335,10 +335,10 @@ export default function InventoryPage() {
                                 <TableCell>{item.caliberCode}</TableCell>
                                 <TableCell className={cn("text-right border-l", isPrint && "text-black")}>{formatPackages(item.initialStockPackages)}</TableCell>
                                 <TableCell className={cn("text-right", isPrint && "text-black")}>{formatKilos(item.initialStockKg)}</TableCell>
-                                <TableCell className={cn("text-right border-l", !isPrint && item.inflowPackages > 0 && "text-green-500", isPrint && "text-black")}>{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
-                                <TableCell className={cn("text-right", !isPrint && item.inflowKg > 0 && "text-green-500", isPrint && "text-black")}>{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
-                                <TableCell className={cn("text-right border-l", !isPrint && item.outflowPackages > 0 && "text-red-500", isPrint && "text-black")}>{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
-                                <TableCell className={cn("text-right", !isPrint && item.outflowKg > 0 && "text-red-500", isPrint && "text-black")}>{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right border-l text-green-500", isPrint && "text-black")}>{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right text-green-500", isPrint && "text-black")}>{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right border-l text-red-500", isPrint && "text-black")}>{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right text-red-500", isPrint && "text-black")}>{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
                                 <TableCell className={cn("text-right border-l", !isPrint && item.adjustmentsPackages !== 0 && (item.adjustmentsPackages > 0 ? "text-blue-500" : "text-orange-500"), isPrint && "text-black")}>{item.adjustmentsPackages !== 0 ? formatPackages(item.adjustmentsPackages) : '-'}</TableCell>
                                 <TableCell className={cn("text-right", !isPrint && item.adjustmentsKg !== 0 && (item.adjustmentsKg > 0 ? "text-blue-500" : "text-orange-500"), isPrint && "text-black")}>{item.adjustmentsKg !== 0 ? formatKilos(item.adjustmentsKg) : '-'}</TableCell>
                                 <TableCell className={cn("text-right font-bold border-l", isPrint && "text-black")}>{formatPackages(item.finalStockPackages)}</TableCell>
@@ -356,18 +356,18 @@ export default function InventoryPage() {
                         )}
                     </TableBody>
                      <TableFooter>
-                        <TableRow>
+                        <TableRow className={cn(isPrint && "bg-gray-100")}>
                             <TableHead colSpan={2} className="text-right font-bold text-lg">Totales</TableHead>
-                            <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.initialStockPackages)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.initialStockKg)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.inflowPackages)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.inflowKg)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.outflowPackages)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.outflowKg)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.adjustmentsPackages)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.adjustmentsKg)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.finalStockPackages)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.finalStockKg)}</TableHead>
+                            <TableHead className={cn("text-right font-bold text-lg border-l", isPrint && "text-base")}>{formatPackages(totals.initialStockPackages)}</TableHead>
+                            <TableHead className={cn("text-right font-bold text-lg", isPrint && "text-base")}>{formatKilos(totals.initialStockKg)}</TableHead>
+                            <TableHead className={cn("text-right font-bold text-lg border-l", isPrint && "text-base")}>{formatPackages(totals.inflowPackages)}</TableHead>
+                            <TableHead className={cn("text-right font-bold text-lg", isPrint && "text-base")}>{formatKilos(totals.inflowKg)}</TableHead>
+                            <TableHead className={cn("text-right font-bold text-lg border-l", isPrint && "text-base")}>{formatPackages(totals.outflowPackages)}</TableHead>
+                            <TableHead className={cn("text-right font-bold text-lg", isPrint && "text-base")}>{formatKilos(totals.outflowKg)}</TableHead>
+                            <TableHead className={cn("text-right font-bold text-lg border-l", isPrint && "text-base")}>{formatPackages(totals.adjustmentsPackages)}</TableHead>
+                            <TableHead className={cn("text-right font-bold text-lg", isPrint && "text-base")}>{formatKilos(totals.adjustmentsKg)}</TableHead>
+                            <TableHead className={cn("text-right font-bold text-lg border-l", isPrint && "text-base")}>{formatPackages(totals.finalStockPackages)}</TableHead>
+                            <TableHead className={cn("text-right font-bold text-lg", isPrint && "text-base")}>{formatKilos(totals.finalStockKg)}</TableHead>
                              <TableHead className="no-print"></TableHead>
                         </TableRow>
                     </TableFooter>
