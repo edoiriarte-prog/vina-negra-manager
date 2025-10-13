@@ -75,15 +75,34 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <span className="col-span-2">{client?.contactPerson || 'N/A'}</span>
                     </div>
                 </div>
-                 <div className='space-y-1 bg-gray-50 p-4 rounded-lg border'>
-                    <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">TRANSPORTE Y CONDICIONES</h3>
+                <div className='space-y-4'>
+                    <div className='space-y-1 bg-gray-50 p-4 rounded-lg border'>
+                        <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">TRANSPORTE</h3>
+                        <div className="grid grid-cols-3 gap-x-4">
+                            <span className="font-semibold text-gray-600 col-span-1">Transportista:</span>
+                            <span className="col-span-2">{carrier?.name || 'N/A'}</span>
+                            <span className="font-semibold text-gray-600 col-span-1">Chofer:</span>
+                            <span className="col-span-2">{order.driverName || 'N/A'}</span>
+                            <span className="font-semibold text-gray-600 col-span-1">Patente:</span>
+                            <span className="col-span-2">{order.licensePlate || 'N/A'}</span>
+                        </div>
+                    </div>
+                     <div className='space-y-1 bg-gray-50 p-4 rounded-lg border'>
+                        <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">BODEGAS</h3>
+                        <div className="grid grid-cols-3 gap-x-4">
+                            <span className="font-semibold text-gray-600 col-span-1">Bodega Origen:</span>
+                            <span className="col-span-2">{order.warehouse || 'N/A'}</span>
+                            <span className="font-semibold text-gray-600 col-span-1">Bodega Destino:</span>
+                            <span className="col-span-2">{order.destinationWarehouse || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+             <div className="mb-8 text-xs">
+                <div className='space-y-1 bg-gray-50 p-4 rounded-lg border'>
+                    <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">CONDICIONES COMERCIALES</h3>
                      <div className="grid grid-cols-3 gap-x-4">
-                        <span className="font-semibold text-gray-600 col-span-1">Transportista:</span>
-                        <span className="col-span-2">{carrier?.name || 'N/A'}</span>
-                        <span className="font-semibold text-gray-600 col-span-1">Chofer:</span>
-                        <span className="col-span-2">{order.driverName || 'N/A'}</span>
-                        <span className="font-semibold text-gray-600 col-span-1">Patente:</span>
-                        <span className="col-span-2">{order.licensePlate || 'N/A'}</span>
                         <span className="font-semibold text-gray-600 col-span-1">Tipo Venta:</span>
                         <span className="col-span-2">{order.saleType || 'N/A'}</span>
                         <span className="font-semibold text-gray-600 col-span-1">Modalidad Pago:</span>
@@ -91,6 +110,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                     </div>
                 </div>
             </div>
+
 
             {/* Items Table */}
             <Table className="text-black text-base">
@@ -114,11 +134,11 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                                 </div>
                             )}
                         </TableCell>
-                        <TableCell className="align-middle">{item.product} - {item.caliber}</TableCell>
-                        <TableCell className="text-right align-middle">{formatPackages(item.packagingQuantity || 0)}</TableCell>
-                        <TableCell className="text-right align-middle">{item.quantity.toLocaleString('es-CL')} kg</TableCell>
-                        <TableCell className="text-right align-middle">{formatCurrency(item.price)}</TableCell>
-                        <TableCell className="text-right align-middle font-semibold">{formatCurrency(item.quantity * item.price)}</TableCell>
+                        <TableCell className="align-middle text-sm+">{item.product} - {item.caliber}</TableCell>
+                        <TableCell className="text-right align-middle text-sm+">{formatPackages(item.packagingQuantity || 0)}</TableCell>
+                        <TableCell className="text-right align-middle text-sm+">{item.quantity.toLocaleString('es-CL')} kg</TableCell>
+                        <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.price)}</TableCell>
+                        <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.quantity * item.price)}</TableCell>
                     </TableRow>
                 ))}
                 </TableBody>
@@ -141,7 +161,5 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
 });
 
 SalesOrderPreviewContent.displayName = 'SalesOrderPreviewContent';
-
-    
 
     
