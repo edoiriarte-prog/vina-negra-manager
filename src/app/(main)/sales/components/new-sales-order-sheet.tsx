@@ -33,7 +33,6 @@ import { SalesOrder, OrderItem, Contact, InventoryItem, PurchaseOrder } from '@/
 import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useMasterData } from '@/hooks/use-master-data';
-import { SalesOrderPreview } from './sales-order-preview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
@@ -88,7 +87,6 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
 export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId, getNextLotNumber, purchaseOrders }: NewSalesOrderSheetProps) {
   const [formData, setFormData] = useState(() => getInitialFormData(order));
   const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
-  const [isPreviewing, setIsPreviewing] = useState(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const { products, calibers, units, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
@@ -99,25 +97,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
       setNewItem({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
     }
   }, [order, isOpen]);
-
-  const getPreviewOrder = (): SalesOrder => {
-    const totalAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    const totalKilos = formData.items.reduce((sum, item) => {
-      if (item.unit === 'Kilos') {
-        return sum + Number(item.quantity || 0);
-      }
-      return sum;
-    }, 0);
-    const totalPackages = formData.items.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
-
-    return {
-        id: order?.id || nextOrderId,
-        ...formData,
-        totalAmount,
-        totalKilos,
-        totalPackages,
-    };
-  };
 
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
     const newItems = [...formData.items];
@@ -295,10 +274,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   const description = order 
     ? 'Actualice la información de la orden.'
     : 'Complete la información para registrar una nueva orden de venta.';
-  
-  const previewOrderData = getPreviewOrder();
-  const previewClient = clients.find(c => c.id === previewOrderData.clientId) || null;
-  const previewCarrier = carriers.find(c => c.id === previewOrderData.carrierId) || null;
 
   const totalAmount = useMemo(() => {
     return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0)
@@ -776,24 +751,12 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                   Cancelar
                 </Button>
               </SheetClose>
-              <Button type="button" variant="secondary" onClick={() => setIsPreviewing(true)}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Previsualizar
-              </Button>
               <Button type="submit">Guardar</Button>
             </SheetFooter>
           </form>
         </SheetContent>
       </Sheet>
-      {isPreviewing && (
-        <SalesOrderPreview 
-            order={previewOrderData}
-            client={previewClient}
-            carrier={previewCarrier}
-            isOpen={isPreviewing}
-            onOpenChange={setIsPreviewing}
-        />
-      )}
+
       <ItemMatrixDialog 
         isOpen={isMatrixOpen}
         onOpenChange={setIsMatrixOpen}

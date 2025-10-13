@@ -18,9 +18,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { SalesOrderPreview } from './components/sales-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown } from 'lucide-react';
+import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown, Edit, Trash2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
@@ -35,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { es } from 'date-fns/locale';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -54,7 +54,6 @@ export default function SalesPage() {
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [confirmingEditOrder, setConfirmingEditOrder] = useState<SalesOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
-  const [previewingOrder, setPreviewingOrder] = useState<SalesOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
@@ -209,10 +208,6 @@ export default function SalesPage() {
   const handleDelete = (order: SalesOrder) => {
     setDeletingOrder(order);
   };
-
-  const handlePreview = (order: SalesOrder) => {
-    setPreviewingOrder(order);
-  }
   
   const confirmDelete = () => {
     if (deletingOrder) {
@@ -370,7 +365,7 @@ export default function SalesPage() {
                                                       {group.orders.map(order => (
                                                           <TableRow key={order.id}>
                                                               <TableCell className="font-medium">{order.id}</TableCell>
-                                                              <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy')}</TableCell>
+                                                              <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
                                                               <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')} kg</TableCell>
                                                               <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
                                                               <TableCell>
@@ -383,11 +378,8 @@ export default function SalesPage() {
                                                                     </DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end">
                                                                       <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                                      <DropdownMenuItem onClick={() => handlePreview(order)}>
-                                                                        <Eye className='mr-2 h-4 w-4' />
-                                                                        Visualizar
-                                                                      </DropdownMenuItem>
                                                                       <DropdownMenuItem onClick={() => handleEdit(order)}>
+                                                                        <Edit className='mr-2 h-4 w-4' />
                                                                         Editar
                                                                       </DropdownMenuItem>
                                                                       <DropdownMenuSeparator />
@@ -395,6 +387,7 @@ export default function SalesPage() {
                                                                         className="text-destructive focus:text-destructive"
                                                                         onClick={() => handleDelete(order)}
                                                                       >
+                                                                        <Trash2 className='mr-2 h-4 w-4' />
                                                                         Eliminar
                                                                       </DropdownMenuItem>
                                                                     </DropdownMenuContent>
@@ -502,20 +495,6 @@ export default function SalesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {previewingOrder && (
-        <SalesOrderPreview
-          order={previewingOrder}
-          client={clients.find(s => s.id === previewingOrder.clientId) || null}
-          carrier={carriers.find(s => s.id === previewingOrder.carrierId) || null}
-          isOpen={!!previewingOrder}
-          onOpenChange={(open) => {
-            if (!open) {
-                setPreviewingOrder(null);
-            }
-          }}
-        />
-      )}
       
       {postSaveOrderOptions && (
         <AlertDialog open={!!postSaveOrderOptions} onOpenChange={() => setPostSaveOrderOptions(null)}>
