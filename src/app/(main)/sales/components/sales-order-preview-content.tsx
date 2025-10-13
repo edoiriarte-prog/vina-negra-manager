@@ -42,7 +42,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             {/* Header */}
             <div className="flex justify-between items-start pb-4 border-b-2 border-neutral-800">
                 <div className="w-48">
-                   <ViñaNegraLogo className="w-full h-auto" />
+                   <ViñaNegraLogo avnColor="text-black" vianaColor="text-black" />
                 </div>
                 <div className='text-right'>
                     <h1 className="text-3xl font-bold text-neutral-900">ORDEN DE VENTA</h1>
@@ -137,5 +137,3 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
 });
 
 SalesOrderPreviewContent.displayName = 'SalesOrderPreviewContent';
-
-    
