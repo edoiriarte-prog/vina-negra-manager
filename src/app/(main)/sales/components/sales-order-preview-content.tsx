@@ -7,7 +7,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { contacts as initialContacts } from '@/lib/data';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useMasterData } from '@/hooks/use-master-data';
 import Barcode from 'react-barcode';
 
@@ -41,8 +41,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             {/* Header */}
             <div className="flex justify-between items-start pb-4 border-b-2 border-neutral-800">
                 <div>
-                  <h2 className="text-xl font-bold">Viña Negra SpA</h2>
-                  <p className="text-xs text-neutral-600" style={{color: 'rgb(34 197 94)'}}>AGROCOMERCIAL</p>
+                  {/* Logo removed as per user request */}
                 </div>
                 <div className='text-right'>
                     <h1 className="text-3xl font-bold text-neutral-900">ORDEN DE VENTA</h1>
