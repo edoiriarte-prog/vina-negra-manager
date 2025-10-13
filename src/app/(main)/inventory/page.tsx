@@ -335,12 +335,12 @@ export default function InventoryPage() {
                                 <TableCell>{item.caliberCode}</TableCell>
                                 <TableCell className="text-right border-l">{formatPackages(item.initialStockPackages)}</TableCell>
                                 <TableCell className="text-right">{formatKilos(item.initialStockKg)}</TableCell>
-                                <TableCell className="text-right border-l">{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
-                                <TableCell className="text-right">{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
-                                <TableCell className="text-right border-l">{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
-                                <TableCell className="text-right">{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
-                                <TableCell className="text-right border-l">{item.adjustmentsPackages !== 0 ? formatPackages(item.adjustmentsPackages) : '-'}</TableCell>
-                                <TableCell className="text-right">{item.adjustmentsKg !== 0 ? formatKilos(item.adjustmentsKg) : '-'}</TableCell>
+                                <TableCell className={cn("text-right border-l", item.inflowPackages > 0 && "text-green-500")}>{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right", item.inflowKg > 0 && "text-green-500")}>{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right border-l", item.outflowPackages > 0 && "text-red-500")}>{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right", item.outflowKg > 0 && "text-red-500")}>{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right border-l", item.adjustmentsPackages !== 0 && (item.adjustmentsPackages > 0 ? "text-blue-500" : "text-orange-500"))}>{item.adjustmentsPackages !== 0 ? formatPackages(item.adjustmentsPackages) : '-'}</TableCell>
+                                <TableCell className={cn("text-right", item.adjustmentsKg !== 0 && (item.adjustmentsKg > 0 ? "text-blue-500" : "text-orange-500"))}>{item.adjustmentsKg !== 0 ? formatKilos(item.adjustmentsKg) : '-'}</TableCell>
                                 <TableCell className="text-right font-bold border-l">{formatPackages(item.finalStockPackages)}</TableCell>
                                 <TableCell className="text-right font-bold">{formatKilos(item.finalStockKg)}</TableCell>
                                 <TableCell className="border-l">
