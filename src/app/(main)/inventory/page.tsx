@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, parseISO, isBefore, isAfter } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
+import { InventoryReportPreview } from './components/inventory-report-preview';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { useReactToPrint } from 'react-to-print';
@@ -60,6 +61,7 @@ export default function InventoryPage() {
     const [selectedProduct, setSelectedProduct] = useState<string>('');
     const [inventoryData, setInventoryData] = useState<InventoryReportItem[]>([]);
     const [viewingHistory, setViewingHistory] = useState<any | null>(null);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
     const { toast } = useToast();
     const printRef = useRef<HTMLDivElement>(null);
@@ -68,13 +70,6 @@ export default function InventoryPage() {
         content: () => printRef.current,
     });
     
-    const onPrintRequest = () => {
-        setTimeout(() => {
-            handlePrint();
-        }, 100);
-    }
-
-
     useEffect(() => {
         setIsClient(true);
     }, []);
@@ -380,30 +375,6 @@ export default function InventoryPage() {
             </div>
         );
     }
-    
-    const PrintableReport = () => (
-        <div ref={printRef} className="p-8 bg-white text-black font-sans">
-             {/* Header */}
-            <div className="flex justify-between items-start pb-6 mb-8 border-b-2 border-gray-900">
-                <div className='text-left'>
-                    <h2 className="text-2xl font-bold text-gray-800">Viña Negra SpA</h2>
-                    <p className="text-xs text-gray-600">AGROCOMERCIAL</p>
-                </div>
-                <div className='text-right'>
-                    <h1 className="text-4xl font-bold text-gray-900 tracking-tight">REPORTE DE INVENTARIO</h1>
-                     <p className='text-sm mt-2'>Período: {format(dateRange.from, 'dd-MM-yyyy')} al {format(dateRange.to, 'dd-MM-yyyy')}</p>
-                </div>
-            </div>
-            <div className="mb-8 text-sm">
-                <p><span className="font-semibold">Producto:</span> {selectedProduct}</p>
-                <p><span className="font-semibold">Bodega:</span> {selectedWarehouse}</p>
-            </div>
-            {renderContent()}
-             <div className="text-center text-xs text-gray-500 pt-8 mt-8 border-t border-dashed">
-                <p>Documento generado por Viña Negra Manager</p>
-            </div>
-        </div>
-    );
 
     return (
         <>
@@ -415,8 +386,7 @@ export default function InventoryPage() {
                             <p className="text-muted-foreground">Consulta el stock por producto y calibre en un rango de fechas.</p>
                         </div>
                         <div className="flex gap-2 no-print">
-                          <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" />Exportar a Excel</Button>
-                          <Button variant="outline" onClick={onPrintRequest}><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
+                          <Button variant="outline" onClick={() => setIsPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Vista Previa</Button>
                         </div>
                     </div>
                 </CardHeader>
@@ -494,9 +464,35 @@ export default function InventoryPage() {
                     onOpenChange={() => setViewingHistory(null)}
                 />
             )}
-             <div className="hidden print:block">
-                <PrintableReport />
-            </div>
+            {isPreviewOpen && (
+                <InventoryReportPreview
+                    isOpen={isPreviewOpen}
+                    onOpenChange={setIsPreviewOpen}
+                    onPrintRequest={handlePrint}
+                    onExportRequest={handleExport}
+                >
+                    <div ref={printRef} className="p-8 bg-white text-black font-sans">
+                        <div className="flex justify-between items-start pb-6 mb-8 border-b-2 border-gray-900">
+                            <div className='text-left'>
+                                <h2 className="text-2xl font-bold text-gray-800">Viña Negra SpA</h2>
+                                <p className="text-xs text-gray-600">AGROCOMERCIAL</p>
+                            </div>
+                            <div className='text-right'>
+                                <h1 className="text-4xl font-bold text-gray-900 tracking-tight">REPORTE DE INVENTARIO</h1>
+                                <p className='text-sm mt-2'>Período: {format(dateRange.from, 'dd-MM-yyyy')} al {format(dateRange.to, 'dd-MM-yyyy')}</p>
+                            </div>
+                        </div>
+                        <div className="mb-8 text-sm">
+                            <p><span className="font-semibold">Producto:</span> {selectedProduct}</p>
+                            <p><span className="font-semibold">Bodega:</span> {selectedWarehouse}</p>
+                        </div>
+                        {renderContent()}
+                        <div className="text-center text-xs text-gray-500 pt-8 mt-8 border-t border-dashed">
+                            <p>Documento generado por Viña Negra Manager</p>
+                        </div>
+                    </div>
+                </InventoryReportPreview>
+            )}
         </>
     );
 }
