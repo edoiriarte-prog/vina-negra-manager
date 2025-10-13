@@ -134,7 +134,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                                 </div>
                             )}
                         </TableCell>
-                        <TableCell className="align-middle text-sm+">{item.product} - {item.caliber}</TableCell>
+                        <TableCell className="align-middle text-sm+">{item.product} - {item.caliber} ({getCaliberCode(item.caliber)})</TableCell>
                         <TableCell className="text-right align-middle text-sm+">{formatPackages(item.packagingQuantity || 0)}</TableCell>
                         <TableCell className="text-right align-middle text-sm+">{item.quantity.toLocaleString('es-CL')} kg</TableCell>
                         <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.price)}</TableCell>
