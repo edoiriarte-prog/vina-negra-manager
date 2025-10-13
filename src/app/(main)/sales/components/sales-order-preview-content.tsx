@@ -39,7 +39,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
     const totalKilos = order.items.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0);
 
     return (
-        <div ref={ref} className="p-10 bg-white text-black font-sans text-sm">
+        <div ref={ref} className="p-10 bg-white text-black font-sans text-base">
             {/* Header */}
             <div className="flex justify-between items-start pb-6 mb-8 border-b-2 border-gray-900">
                 <div className='text-left'>
@@ -93,7 +93,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             </div>
 
             {/* Items Table */}
-            <Table className="text-black text-xs">
+            <Table className="text-black text-base">
                 <TableHeader>
                     <TableRow className="bg-gray-100 hover:bg-gray-100 border-b-2 border-gray-300">
                         <TableHead className="text-black font-bold">Lote / Código de Barras</TableHead>
@@ -101,7 +101,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
                         <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
                         <TableHead className="text-right text-black font-bold">Precio Unit.</TableHead>
-                        <TableHead className="text-right text-black font-bold">Total Línea</TableHead>
+                        <TableHead className="text-right text-black font-bold">SUB TOTAL</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -141,5 +141,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
 });
 
 SalesOrderPreviewContent.displayName = 'SalesOrderPreviewContent';
+
+    
 
     
