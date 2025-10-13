@@ -296,14 +296,14 @@ export default function InventoryPage() {
         }, { initialStockKg: 0, inflowKg: 0, outflowKg: 0, adjustmentsKg: 0, finalStockKg: 0, initialStockPackages: 0, inflowPackages: 0, outflowPackages: 0, adjustmentsPackages: 0, finalStockPackages: 0 });
     }, [inventoryData]);
 
-    const renderContent = () => {
+    const renderContent = (isPrint = false) => {
         if (!isClient) {
             return <Skeleton className="h-96 w-full" />;
         }
 
         return (
-            <div className="rounded-md border">
-                <Table>
+            <div className={cn("rounded-md border", isPrint && "border-none")}>
+                <Table className={cn(isPrint && "text-base")}>
                     <TableHeader>
                         <TableRow>
                             <TableHead rowSpan={2} className="align-bottom">Calibre</TableHead>
@@ -313,7 +313,7 @@ export default function InventoryPage() {
                             <TableHead colSpan={2} className="text-center border-b border-l">Salidas</TableHead>
                             <TableHead colSpan={2} className="text-center border-b border-l">Ajustes</TableHead>
                             <TableHead colSpan={2} className="text-center border-b border-l font-bold">Stock Final</TableHead>
-                            <TableHead rowSpan={2} className="align-bottom w-[50px] border-l">Acciones</TableHead>
+                            <TableHead rowSpan={2} className="align-bottom w-[50px] border-l no-print">Acciones</TableHead>
                         </TableRow>
                          <TableRow>
                             <TableHead className="text-right border-l">Envases</TableHead>
@@ -333,17 +333,17 @@ export default function InventoryPage() {
                              <TableRow key={item.key}>
                                 <TableCell className="font-medium">{item.caliber}</TableCell>
                                 <TableCell>{item.caliberCode}</TableCell>
-                                <TableCell className="text-right border-l">{formatPackages(item.initialStockPackages)}</TableCell>
-                                <TableCell className="text-right">{formatKilos(item.initialStockKg)}</TableCell>
-                                <TableCell className={cn("text-right border-l", item.inflowPackages > 0 && "text-green-500")}>{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
-                                <TableCell className={cn("text-right", item.inflowKg > 0 && "text-green-500")}>{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
-                                <TableCell className={cn("text-right border-l", item.outflowPackages > 0 && "text-red-500")}>{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
-                                <TableCell className={cn("text-right", item.outflowKg > 0 && "text-red-500")}>{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
-                                <TableCell className={cn("text-right border-l", item.adjustmentsPackages !== 0 && (item.adjustmentsPackages > 0 ? "text-blue-500" : "text-orange-500"))}>{item.adjustmentsPackages !== 0 ? formatPackages(item.adjustmentsPackages) : '-'}</TableCell>
-                                <TableCell className={cn("text-right", item.adjustmentsKg !== 0 && (item.adjustmentsKg > 0 ? "text-blue-500" : "text-orange-500"))}>{item.adjustmentsKg !== 0 ? formatKilos(item.adjustmentsKg) : '-'}</TableCell>
-                                <TableCell className="text-right font-bold border-l">{formatPackages(item.finalStockPackages)}</TableCell>
-                                <TableCell className="text-right font-bold">{formatKilos(item.finalStockKg)}</TableCell>
-                                <TableCell className="border-l">
+                                <TableCell className={cn("text-right border-l", isPrint && "text-black")}>{formatPackages(item.initialStockPackages)}</TableCell>
+                                <TableCell className={cn("text-right", isPrint && "text-black")}>{formatKilos(item.initialStockKg)}</TableCell>
+                                <TableCell className={cn("text-right border-l", !isPrint && item.inflowPackages > 0 && "text-green-500", isPrint && "text-black")}>{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right", !isPrint && item.inflowKg > 0 && "text-green-500", isPrint && "text-black")}>{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right border-l", !isPrint && item.outflowPackages > 0 && "text-red-500", isPrint && "text-black")}>{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right", !isPrint && item.outflowKg > 0 && "text-red-500", isPrint && "text-black")}>{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
+                                <TableCell className={cn("text-right border-l", !isPrint && item.adjustmentsPackages !== 0 && (item.adjustmentsPackages > 0 ? "text-blue-500" : "text-orange-500"), isPrint && "text-black")}>{item.adjustmentsPackages !== 0 ? formatPackages(item.adjustmentsPackages) : '-'}</TableCell>
+                                <TableCell className={cn("text-right", !isPrint && item.adjustmentsKg !== 0 && (item.adjustmentsKg > 0 ? "text-blue-500" : "text-orange-500"), isPrint && "text-black")}>{item.adjustmentsKg !== 0 ? formatKilos(item.adjustmentsKg) : '-'}</TableCell>
+                                <TableCell className={cn("text-right font-bold border-l", isPrint && "text-black")}>{formatPackages(item.finalStockPackages)}</TableCell>
+                                <TableCell className={cn("text-right font-bold", isPrint && "text-black")}>{formatKilos(item.finalStockKg)}</TableCell>
+                                <TableCell className="border-l no-print">
                                     <Button variant="ghost" size="icon" onClick={() => setViewingHistory({ ...item, warehouse: selectedWarehouse })}>
                                         <Eye className="h-4 w-4" />
                                     </Button>
@@ -368,7 +368,7 @@ export default function InventoryPage() {
                             <TableHead className="text-right font-bold text-lg">{formatKilos(totals.adjustmentsKg)}</TableHead>
                             <TableHead className="text-right font-bold text-lg border-l">{formatPackages(totals.finalStockPackages)}</TableHead>
                             <TableHead className="text-right font-bold text-lg">{formatKilos(totals.finalStockKg)}</TableHead>
-                             <TableHead></TableHead>
+                             <TableHead className="no-print"></TableHead>
                         </TableRow>
                     </TableFooter>
                 </Table>
@@ -486,7 +486,7 @@ export default function InventoryPage() {
                             <p><span className="font-semibold">Producto:</span> {selectedProduct}</p>
                             <p><span className="font-semibold">Bodega:</span> {selectedWarehouse}</p>
                         </div>
-                        {renderContent()}
+                        {renderContent(true)}
                         <div className="text-center text-xs pt-8 mt-8 border-t border-dashed">
                             <p>Documento generado por Viña Negra Manager</p>
                         </div>
