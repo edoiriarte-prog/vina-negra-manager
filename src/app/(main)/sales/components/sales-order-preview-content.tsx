@@ -39,87 +39,107 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
     const totalKilos = order.items.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0);
 
     return (
-        <div ref={ref} className="p-8 bg-white text-black font-sans">
+        <div ref={ref} className="p-10 bg-white text-black font-sans text-sm">
             {/* Header */}
-            <div className="flex justify-between items-start pb-4 border-b-2 border-neutral-800">
+            <div className="flex justify-between items-start pb-6 mb-8 border-b-2 border-gray-900">
                 <div className='text-left'>
-                     <h1 className="text-3xl font-bold text-neutral-900">ORDEN DE VENTA</h1>
-                     <div className="mt-2 space-y-1 text-sm">
-                        <p><span className="font-bold">Nº de OV:</span> {order.id}</p>
-                        <p><span className="font-bold">Fecha de Emisión:</span> {format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</p>
+                    <h2 className="text-2xl font-bold text-gray-800">Viña Negra SpA</h2>
+                    <p className="text-xs text-gray-600">AGROCOMERCIAL</p>
+                    <div className="mt-4 text-xs space-y-px text-gray-600">
+                        <p>RUT: 78.261.683-8</p>
+                        <p>Tulahuen S/N, Monte Patria, Chile</p>
+                        <p>comercial@vinanegra.cl</p>
                     </div>
                 </div>
-                <div className='text-right space-y-1 text-sm'>
-                    <p><span className="font-bold">Tipo de Venta:</span> {order.saleType || 'N/A'}</p>
-                    <p><span className="font-bold">Modalidad de Pago:</span> {order.paymentMethod}</p>
-                    <p><span className="font-bold">Transportista:</span> {carrier?.name || 'N/A'}</p>
+                <div className='text-right'>
+                    <h1 className="text-4xl font-bold text-gray-900 tracking-tight">ORDEN DE VENTA</h1>
+                    <div className="mt-2 space-y-1 text-sm">
+                        <p><span className="font-semibold text-gray-600">Nº de OV:</span> <span className="font-mono">{order.id}</span></p>
+                        <p><span className="font-semibold text-gray-600">Fecha Emisión:</span> {format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</p>
+                    </div>
                 </div>
             </div>
 
-            {/* Company & Client Info */}
-            <div className="grid grid-cols-2 gap-8 my-8 text-sm">
-                <div className='space-y-1'>
-                    <h2 className="text-base font-bold text-neutral-800 border-b border-neutral-300 pb-1 mb-2">Vendedor</h2>
-                    <p className='font-bold'>Viña Negra SpA</p>
-                    <p>RUT: 78.261.683-8</p>
-                    <p>Tulahuen S/N, Monte Patria, Chile</p>
-                    <p>comercial@vinanegra.cl</p>
+            {/* Client & Shipping Info */}
+            <div className="grid grid-cols-2 gap-8 mb-8 text-xs">
+                 <div className='space-y-1 bg-gray-50 p-4 rounded-lg border'>
+                    <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">CLIENTE</h3>
+                    <div className="grid grid-cols-3 gap-x-4">
+                        <span className="font-semibold text-gray-600 col-span-1">Nombre:</span>
+                        <span className="col-span-2">{client?.name}</span>
+                        <span className="font-semibold text-gray-600 col-span-1">RUT:</span>
+                        <span className="col-span-2">{client?.rut}</span>
+                         <span className="font-semibold text-gray-600 col-span-1">Dirección:</span>
+                        <span className="col-span-2">{client?.address}, {client?.commune}</span>
+                         <span className="font-semibold text-gray-600 col-span-1">Atención:</span>
+                        <span className="col-span-2">{client?.contactPerson || 'N/A'}</span>
+                    </div>
                 </div>
-                 <div className='space-y-1'>
-                    <h2 className="text-base font-bold text-neutral-800 border-b border-neutral-300 pb-1 mb-2">Cliente</h2>
-                    <p className="font-bold">{client?.name}</p>
-                    <p>RUT: {client?.rut}</p>
-                    <p>{client?.address}, {client?.commune}</p>
-                    <p>Atención: {client?.contactPerson || 'N/A'}</p>
+                 <div className='space-y-1 bg-gray-50 p-4 rounded-lg border'>
+                    <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">TRANSPORTE Y CONDICIONES</h3>
+                     <div className="grid grid-cols-3 gap-x-4">
+                        <span className="font-semibold text-gray-600 col-span-1">Transportista:</span>
+                        <span className="col-span-2">{carrier?.name || 'N/A'}</span>
+                        <span className="font-semibold text-gray-600 col-span-1">Chofer:</span>
+                        <span className="col-span-2">{order.driverName || 'N/A'}</span>
+                        <span className="font-semibold text-gray-600 col-span-1">Patente:</span>
+                        <span className="col-span-2">{order.licensePlate || 'N/A'}</span>
+                        <span className="font-semibold text-gray-600 col-span-1">Tipo Venta:</span>
+                        <span className="col-span-2">{order.saleType || 'N/A'}</span>
+                        <span className="font-semibold text-gray-600 col-span-1">Modalidad Pago:</span>
+                        <span className="col-span-2">{order.paymentMethod}</span>
+                    </div>
                 </div>
             </div>
 
             {/* Items Table */}
-            <Table className="text-black">
+            <Table className="text-black text-xs">
                 <TableHeader>
-                    <TableRow className="bg-neutral-100 hover:bg-neutral-100 border-b-2 border-neutral-300">
-                        <TableHead className="text-black font-bold">Lote / Barcode</TableHead>
-                        <TableHead className="text-black font-bold">DESCRIPCIÓN</TableHead>
+                    <TableRow className="bg-gray-100 hover:bg-gray-100 border-b-2 border-gray-300">
+                        <TableHead className="text-black font-bold">Lote / Código de Barras</TableHead>
+                        <TableHead className="text-black font-bold">Descripción</TableHead>
                         <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
-                        <TableHead className="text-right text-black font-bold">CANTIDAD (KG)</TableHead>
-                        <TableHead className="text-right text-black font-bold">PRECIO UNIT.</TableHead>
-                        <TableHead className="text-right text-black font-bold">TOTAL LÍNEA</TableHead>
+                        <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
+                        <TableHead className="text-right text-black font-bold">Precio Unit.</TableHead>
+                        <TableHead className="text-right text-black font-bold">Total Línea</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                 {order.items.map((item, index) => (
-                    <TableRow key={item.id || index} className="border-neutral-200">
-                        <TableCell className="font-medium">
+                    <TableRow key={item.id || index} className="border-gray-200">
+                        <TableCell className="font-medium align-middle">
                             {item.lotNumber && (
-                                <div className="flex flex-col items-center">
-                                    <Barcode value={item.lotNumber} height={30} width={1.5} fontSize={10} />
+                                <div className="flex flex-col items-center justify-center py-1">
+                                    <Barcode value={item.lotNumber} height={30} width={1.5} fontSize={10} margin={0} />
                                 </div>
                             )}
                         </TableCell>
-                        <TableCell>{item.product} - {item.caliber}</TableCell>
-                        <TableCell className="text-right">{formatPackages(item.packagingQuantity || 0)}</TableCell>
-                        <TableCell className="text-right">{item.quantity.toLocaleString('es-CL')} {item.unit}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
+                        <TableCell className="align-middle">{item.product} - {item.caliber}</TableCell>
+                        <TableCell className="text-right align-middle">{formatPackages(item.packagingQuantity || 0)}</TableCell>
+                        <TableCell className="text-right align-middle">{item.quantity.toLocaleString('es-CL')} kg</TableCell>
+                        <TableCell className="text-right align-middle">{formatCurrency(item.price)}</TableCell>
+                        <TableCell className="text-right align-middle font-semibold">{formatCurrency(item.quantity * item.price)}</TableCell>
                     </TableRow>
                 ))}
                 </TableBody>
                 <TableFooter>
-                    <TableRow className="bg-neutral-100 hover:bg-neutral-100 border-t-2 border-neutral-300">
+                    <TableRow className="bg-gray-100 hover:bg-gray-100 border-t-2 border-gray-300">
                         <TableHead colSpan={2} className="text-right text-black font-bold text-base">TOTALES</TableHead>
                         <TableHead className="text-right text-black font-bold text-base">{formatPackages(totalPackages)}</TableHead>
                         <TableHead className="text-right text-black font-bold text-base">{totalKilos.toLocaleString('es-CL')} kg</TableHead>
-                        <TableHead className="text-right text-black font-bold text-base" />
+                        <TableHead colSpan={1} />
                         <TableHead className="text-right text-black font-bold text-base">{formatCurrency(order.totalAmount)}</TableHead>
                     </TableRow>
                 </TableFooter>
             </Table>
             
-            <div className="text-center text-xs text-neutral-500 pt-8 mt-8 border-t border-dashed">
-                <p>Viña Negra SpA | www.vinanegra.cl</p>
+            <div className="text-center text-xs text-gray-500 pt-8 mt-8 border-t border-dashed">
+                <p>Documento generado por Viña Negra Manager</p>
             </div>
         </div>
     );
 });
 
 SalesOrderPreviewContent.displayName = 'SalesOrderPreviewContent';
+
+    
