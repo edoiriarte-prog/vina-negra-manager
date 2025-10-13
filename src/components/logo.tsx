@@ -1,15 +1,17 @@
 import { cn } from '@/lib/utils';
-import { ViñaNegraLogo } from '@/components/viña-negra-logo';
 
 export function Logo({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-center py-2 px-4',
+        'flex items-center justify-center py-2 px-4 h-24',
         className
       )}
     >
-      <ViñaNegraLogo className="w-auto h-24" />
+      <div className="flex flex-col items-center">
+        <span className="font-bold text-lg tracking-tight">Viña Negra</span>
+        <span className="text-xs text-muted-foreground">Manager</span>
+      </div>
     </div>
   );
 }

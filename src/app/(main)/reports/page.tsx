@@ -33,7 +33,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ViñaNegraLogo } from '@/components/viña-negra-logo';
 
 type DocumentDetail = {
   id: string;
@@ -661,7 +660,8 @@ export default function ReportsPage() {
                         </div>
                          <div className='text-right'>
                              <div className="w-48 ml-auto">
-                                <ViñaNegraLogo avnColor="text-black" vianaColor="text-black" />
+                               <h2 className="text-xl font-bold">Viña Negra SpA</h2>
+                               <p className="text-xs text-neutral-600">AGROCOMERCIAL</p>
                             </div>
                             <h1 className="text-2xl font-bold font-headline">ESTADO DE CUENTA</h1>
                             <p className='text-sm'>Al {format(new Date(), "PPP", { locale: es })}</p>
