@@ -35,6 +35,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
+import { SalesOrderPreview } from './components/sales-order-preview';
+import { useReactToPrint } from 'react-to-print';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -56,12 +58,17 @@ export default function SalesPage() {
   const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [postSaveOrderOptions, setPostSaveOrderOptions] = useState<SalesOrder | null>(null);
+  const [previewingOrder, setPreviewingOrder] = useState<SalesOrder | null>(null);
 
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
 
   const { toast } = useToast();
+  const printComponentRef = useRef<HTMLDivElement>(null);
+  
+  const handlePrint = useReactToPrint({
+    content: () => printComponentRef.current,
+  });
   
   const clients = contacts.filter(c => c.type.includes('client'));
   const carriers = contacts.filter(c => c.type.includes('supplier'));
@@ -190,7 +197,7 @@ export default function SalesPage() {
 
     setIsSheetOpen(false);
     setEditingOrder(null);
-    setPostSaveOrderOptions(finalOrder);
+    setPreviewingOrder(finalOrder);
   };
 
   const handleEdit = (order: SalesOrder) => {
@@ -496,31 +503,18 @@ export default function SalesPage() {
         </AlertDialogContent>
       </AlertDialog>
       
-      {postSaveOrderOptions && (
-        <AlertDialog open={!!postSaveOrderOptions} onOpenChange={() => setPostSaveOrderOptions(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Orden "{postSaveOrderOptions.id}" Guardada</AlertDialogTitle>
-                <AlertDialogDescription>
-                  La orden de venta ha sido guardada exitosamente. ¿Qué deseas hacer a continuación?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="sm:justify-center gap-2">
-                  <Button variant="outline" onClick={() => {
-                    handleExport(postSaveOrderOptions);
-                    setPostSaveOrderOptions(null);
-                  }}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Exportar a Excel
-                  </Button>
-                  <Button variant="secondary" onClick={() => setPostSaveOrderOptions(null)}>
-                        <X className="mr-2 h-4 w-4" />
-                        Salir
-                    </Button>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+      {previewingOrder && (
+          <SalesOrderPreview
+            ref={printComponentRef}
+            order={previewingOrder}
+            isOpen={!!previewingOrder}
+            onOpenChange={setPreviewingOrder}
+            onPrintRequest={handlePrint}
+            onExportRequest={() => handleExport(previewingOrder)}
+        />
       )}
     </>
   );
 }
+
+    
