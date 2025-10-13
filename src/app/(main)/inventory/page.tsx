@@ -382,14 +382,26 @@ export default function InventoryPage() {
     }
     
     const PrintableReport = () => (
-        <div ref={printRef} className="p-8">
-            <div className="mb-8">
-                <h1 className="font-headline text-2xl">Reporte de Inventario</h1>
-                <p>Producto: {selectedProduct}</p>
-                <p>Bodega: {selectedWarehouse}</p>
-                <p>Período: {format(dateRange.from, 'dd-MM-yyyy')} al {format(dateRange.to, 'dd-MM-yyyy')}</p>
+        <div ref={printRef} className="p-8 bg-white text-black font-sans">
+             {/* Header */}
+            <div className="flex justify-between items-start pb-6 mb-8 border-b-2 border-gray-900">
+                <div className='text-left'>
+                    <h2 className="text-2xl font-bold text-gray-800">Viña Negra SpA</h2>
+                    <p className="text-xs text-gray-600">AGROCOMERCIAL</p>
+                </div>
+                <div className='text-right'>
+                    <h1 className="text-4xl font-bold text-gray-900 tracking-tight">REPORTE DE INVENTARIO</h1>
+                     <p className='text-sm mt-2'>Período: {format(dateRange.from, 'dd-MM-yyyy')} al {format(dateRange.to, 'dd-MM-yyyy')}</p>
+                </div>
+            </div>
+            <div className="mb-8 text-sm">
+                <p><span className="font-semibold">Producto:</span> {selectedProduct}</p>
+                <p><span className="font-semibold">Bodega:</span> {selectedWarehouse}</p>
             </div>
             {renderContent()}
+             <div className="text-center text-xs text-gray-500 pt-8 mt-8 border-t border-dashed">
+                <p>Documento generado por Viña Negra Manager</p>
+            </div>
         </div>
     );
 
@@ -488,4 +500,3 @@ export default function InventoryPage() {
         </>
     );
 }
-
