@@ -335,14 +335,14 @@ export default function InventoryPage() {
                                 <TableCell>{item.caliberCode}</TableCell>
                                 <TableCell className="text-right border-l">{formatPackages(item.initialStockPackages)}</TableCell>
                                 <TableCell className="text-right">{formatKilos(item.initialStockKg)}</TableCell>
-                                <TableCell className="text-right text-green-500 border-l">{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
-                                <TableCell className="text-right text-green-500">{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
-                                <TableCell className="text-right text-red-500 border-l">{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
-                                <TableCell className="text-right text-red-500">{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
-                                <TableCell className="text-right text-blue-500 border-l">{item.adjustmentsPackages !== 0 ? formatPackages(item.adjustmentsPackages) : '-'}</TableCell>
-                                <TableCell className="text-right text-blue-500">{item.adjustmentsKg !== 0 ? formatKilos(item.adjustmentsKg) : '-'}</TableCell>
-                                <TableCell className="text-right font-bold text-primary border-l">{formatPackages(item.finalStockPackages)}</TableCell>
-                                <TableCell className="text-right font-bold text-primary">{formatKilos(item.finalStockKg)}</TableCell>
+                                <TableCell className="text-right border-l">{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
+                                <TableCell className="text-right">{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
+                                <TableCell className="text-right border-l">{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
+                                <TableCell className="text-right">{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
+                                <TableCell className="text-right border-l">{item.adjustmentsPackages !== 0 ? formatPackages(item.adjustmentsPackages) : '-'}</TableCell>
+                                <TableCell className="text-right">{item.adjustmentsKg !== 0 ? formatKilos(item.adjustmentsKg) : '-'}</TableCell>
+                                <TableCell className="text-right font-bold border-l">{formatPackages(item.finalStockPackages)}</TableCell>
+                                <TableCell className="text-right font-bold">{formatKilos(item.finalStockKg)}</TableCell>
                                 <TableCell className="border-l">
                                     <Button variant="ghost" size="icon" onClick={() => setViewingHistory({ ...item, warehouse: selectedWarehouse })}>
                                         <Eye className="h-4 w-4" />
@@ -474,11 +474,11 @@ export default function InventoryPage() {
                     <div ref={printRef} className="p-8 bg-white text-black font-sans">
                         <div className="flex justify-between items-start pb-6 mb-8 border-b-2 border-gray-900">
                             <div className='text-left'>
-                                <h2 className="text-2xl font-bold text-gray-800">Viña Negra SpA</h2>
-                                <p className="text-xs text-gray-600">AGROCOMERCIAL</p>
+                                <h2 className="text-2xl font-bold">Viña Negra SpA</h2>
+                                <p className="text-xs">AGROCOMERCIAL</p>
                             </div>
                             <div className='text-right'>
-                                <h1 className="text-4xl font-bold text-gray-900 tracking-tight">REPORTE DE INVENTARIO</h1>
+                                <h1 className="text-4xl font-bold tracking-tight">REPORTE DE INVENTARIO</h1>
                                 <p className='text-sm mt-2'>Período: {format(dateRange.from, 'dd-MM-yyyy')} al {format(dateRange.to, 'dd-MM-yyyy')}</p>
                             </div>
                         </div>
@@ -487,7 +487,7 @@ export default function InventoryPage() {
                             <p><span className="font-semibold">Bodega:</span> {selectedWarehouse}</p>
                         </div>
                         {renderContent()}
-                        <div className="text-center text-xs text-gray-500 pt-8 mt-8 border-t border-dashed">
+                        <div className="text-center text-xs pt-8 mt-8 border-t border-dashed">
                             <p>Documento generado por Viña Negra Manager</p>
                         </div>
                     </div>
