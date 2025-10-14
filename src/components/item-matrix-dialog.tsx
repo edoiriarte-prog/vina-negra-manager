@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { useMasterData } from '@/hooks/use-master-data';
 import { OrderItem, InventoryItem } from '@/lib/types';
 import { productCaliberMatrix } from '@/lib/master-data';
@@ -45,6 +45,16 @@ type MatrixRow = {
   packagingQuantity: number;
   stock: number;
 };
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
+const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
 
 export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inventory = [] }: ItemMatrixDialogProps) {
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -115,10 +125,19 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
     const caliber = calibers.find(c => c.name === caliberName);
     return caliber ? `${caliber.name} (${caliber.code})` : caliberName;
   }
+  
+  const totals = useMemo(() => {
+    return matrixData.reduce((acc, row) => {
+        acc.totalKilos += row.unit === 'Kilos' ? Number(row.quantity || 0) : 0;
+        acc.totalPackages += Number(row.packagingQuantity || 0);
+        acc.totalAmount += (Number(row.quantity || 0) * Number(row.price || 0));
+        return acc;
+    }, { totalKilos: 0, totalPackages: 0, totalAmount: 0});
+  }, [matrixData]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>Agregar Ítems por Matriz de Calibres</DialogTitle>
           <DialogDescription>
@@ -217,6 +236,17 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                   </TableRow>
                 ))}
               </TableBody>
+              <TableFooter>
+                  <TableRow>
+                      <TableCell colSpan={orderType === 'sale' ? 5 : 4} className="text-right font-bold">Subtotales:</TableCell>
+                      <TableCell className="text-right font-bold">{formatPackages(totals.totalPackages)}</TableCell>
+                      <TableCell colSpan={1} className="text-right font-bold">{formatKilos(totals.totalKilos)}</TableCell>
+                  </TableRow>
+                   <TableRow>
+                      <TableCell colSpan={orderType === 'sale' ? 6 : 5} className="text-right font-bold text-lg">Monto Total</TableCell>
+                      <TableCell colSpan={1} className="text-right font-bold text-lg">{formatCurrency(totals.totalAmount)}</TableCell>
+                  </TableRow>
+              </TableFooter>
             </Table>
           </div>
         )}
