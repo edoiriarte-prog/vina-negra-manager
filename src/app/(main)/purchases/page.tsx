@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, ChevronDown, MoreHorizontal, Eye, Printer, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Download, ChevronDown, MoreHorizontal, Eye, Printer, Edit, Trash2, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -30,6 +30,15 @@ import { LotLabelPreview } from './components/lot-label-preview';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -45,6 +54,124 @@ const formatPackages = (value: number) =>
     `${new Intl.NumberFormat('es-CL').format(value)}`;
 
 
+function LotGenerationTab({ purchaseOrders, suppliers, handleSaveOrder }: { purchaseOrders: PurchaseOrder[], suppliers: Contact[], handleSaveOrder: (order: PurchaseOrder, newItems?: OrderItem[]) => void }) {
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [orderForLot, setOrderForLot] = useState<PurchaseOrder | null>(null);
+  const [itemForLot, setItemForLot] = useState<OrderItem | null>(null);
+  const [isPreviewingLot, setIsPreviewingLot] = useState(false);
+  const { toast } = useToast();
+
+  const selectedOrder = useMemo(() => {
+    return purchaseOrders.find(po => po.id === selectedOrderId);
+  }, [selectedOrderId, purchaseOrders]);
+
+  const handleGenerateAndPreviewLot = (item: OrderItem) => {
+    if (!selectedOrder) return;
+    
+    let updatedItem = { ...item };
+    let orderToUpdate = { ...selectedOrder };
+
+    if (!item.lotNumber) {
+        const itemIndex = selectedOrder.items.findIndex(i => i.id === item.id);
+        const datePart = selectedOrder.date.replace(/-/g, '');
+        const newLotNumber = `LOTE-${datePart}-${selectedOrder.supplierId}-${itemIndex}`;
+        updatedItem.lotNumber = newLotNumber;
+        
+        // Update the item in the order
+        const updatedItems = selectedOrder.items.map(i => i.id === item.id ? updatedItem : i);
+        orderToUpdate.items = updatedItems;
+        handleSaveOrder(orderToUpdate);
+        
+        toast({
+            title: "Lote Generado",
+            description: `Se ha asignado el lote: ${newLotNumber}`,
+        });
+    }
+
+    setOrderForLot(orderToUpdate);
+    setItemForLot(updatedItem);
+    setIsPreviewingLot(true);
+  };
+
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline text-2xl">Generación de Lotes</CardTitle>
+          <CardDescription>Seleccione una orden de compra completada para generar sus lotes.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="max-w-md space-y-2">
+            <Label htmlFor="oc-select">Seleccionar Orden de Compra</Label>
+            <Select onValueChange={setSelectedOrderId} value={selectedOrderId || ''}>
+              <SelectTrigger id="oc-select">
+                <SelectValue placeholder="Elija una O/C..." />
+              </SelectTrigger>
+              <SelectContent>
+                {purchaseOrders
+                  .filter(po => po.status === 'completed')
+                  .sort((a,b) => b.id.localeCompare(a.id))
+                  .map(po => (
+                    <SelectItem key={po.id} value={po.id}>{po.id} - {suppliers.find(s => s.id === po.supplierId)?.name}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedOrder && (
+            <div className="border rounded-lg">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Producto</TableHead>
+                            <TableHead>Calibre</TableHead>
+                            <TableHead className="text-right">Kilos</TableHead>
+                            <TableHead>Lote Asignado</TableHead>
+                            <TableHead className="w-[180px] text-center">Acción</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {selectedOrder.items.map(item => (
+                            <TableRow key={item.id}>
+                                <TableCell>{item.product}</TableCell>
+                                <TableCell>{item.caliber}</TableCell>
+                                <TableCell className="text-right">{formatKilos(item.quantity)}</TableCell>
+                                <TableCell>
+                                    {item.lotNumber 
+                                        ? <span className="font-mono bg-muted px-2 py-1 rounded-md text-xs">{item.lotNumber}</span> 
+                                        : <span className="text-muted-foreground text-xs">No generado</span>
+                                    }
+                                </TableCell>
+                                <TableCell className="text-center">
+                                    <Button onClick={() => handleGenerateAndPreviewLot(item)}>
+                                        <Wand2 className="mr-2 h-4 w-4"/>
+                                        Generar y Ver Lote
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {isPreviewingLot && orderForLot && itemForLot && (
+        <LotLabelPreview 
+          isOpen={isPreviewingLot}
+          onOpenChange={setIsPreviewingLot}
+          order={orderForLot}
+          supplier={suppliers.find(s => s.id === orderForLot.supplierId) || null}
+          specificItem={itemForLot}
+        />
+      )}
+    </>
+  );
+}
+
+
 export default function PurchasesPage() {
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
@@ -55,7 +182,6 @@ export default function PurchasesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
-  const [lotsToPrint, setLotsToPrint] = useState<PurchaseOrder | null>(null);
   const [selectedOrderForActions, setSelectedOrderForActions] = useState<PurchaseOrder | null>(null);
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
@@ -148,7 +274,7 @@ export default function PurchasesPage() {
 
   const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
     const allItems = 'id' in order
-      ? [...order.items, ...newItems]
+      ? [...order.items.map(i => newItems.find(ni => ni.id === i.id) || i), ...newItems.filter(ni => !order.items.find(oi => oi.id === ni.id))]
       : [...(order.items || []), ...newItems];
     
     const totalAmount = allItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
@@ -219,11 +345,6 @@ export default function PurchasesPage() {
 
   const handlePreviewRequest = (order: PurchaseOrder) => {
     setPreviewingOrder(order);
-    setSelectedOrderForActions(null);
-  }
-
-  const handleLotsPrintRequest = (order: PurchaseOrder) => {
-    setLotsToPrint(order);
     setSelectedOrderForActions(null);
   }
 
@@ -361,80 +482,87 @@ export default function PurchasesPage() {
 
   return (
     <>
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-            <Card>
-                <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle className="font-headline text-2xl">Gestión de Compras (O/C)</CardTitle>
-                        <CardDescription>Registra y administra todas las adquisiciones de productos.</CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={handleExportAll}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Exportar Todo
-                        </Button>
-                        <Button onClick={openNewOrderSheet}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Nueva Compra
-                        </Button>
-                    </div>
+      <Tabs defaultValue="orders">
+        <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="orders">Gestión de Compras</TabsTrigger>
+            <TabsTrigger value="lots">Generar Lotes</TabsTrigger>
+        </TabsList>
+        <TabsContent value="orders" className="mt-6">
+            <div className="grid lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                    <Card>
+                        <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="font-headline text-2xl">Listado de Órdenes de Compra (O/C)</CardTitle>
+                                <CardDescription>Registra y administra todas las adquisiciones de productos.</CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={handleExportAll}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Exportar Todo
+                                </Button>
+                                <Button onClick={openNewOrderSheet}>
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Nueva Compra
+                                </Button>
+                            </div>
+                        </div>
+                            <div className="py-4">
+                            <Input
+                                placeholder="Filtrar por proveedor..."
+                                value={filter}
+                                onChange={(event) => setFilter(event.target.value)}
+                                className="max-w-sm"
+                            />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                        {renderContent()}
+                        </CardContent>
+                    </Card>
                 </div>
-                    <div className="py-4">
-                    <Input
-                        placeholder="Filtrar por proveedor..."
-                        value={filter}
-                        onChange={(event) => setFilter(event.target.value)}
-                        className="max-w-sm"
-                    />
-                    </div>
-                </CardHeader>
-                <CardContent>
-                {renderContent()}
-                </CardContent>
-            </Card>
-        </div>
-        <div className="lg:col-span-1">
-            <Card className="sticky top-20">
-                <CardHeader>
-                    <CardTitle className="font-headline text-2xl">Acciones de Orden</CardTitle>
-                    <CardDescription>
-                        {selectedOrderForActions 
-                            ? `Acciones disponibles para la orden ${selectedOrderForActions.id}`
-                            : "Seleccione una orden de la lista para ver las acciones disponibles."
-                        }
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {selectedOrderForActions ? (
-                        <div className="grid grid-cols-1 gap-4 py-4">
-                            <Button variant="outline" onClick={() => handlePreviewRequest(selectedOrderForActions)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                Visualizar O/C
-                            </Button>
-                            <Button variant="outline" onClick={() => handleLotsPrintRequest(selectedOrderForActions)}>
-                                <Printer className="mr-2 h-4 w-4" />
-                                Imprimir Lotes
-                            </Button>
-                            <Button variant="outline" onClick={() => handleEdit(selectedOrderForActions)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                            </Button>
-                            <Button variant="destructive" onClick={() => handleDelete(selectedOrderForActions)}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Eliminar
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-md">
-                            <p className="text-sm text-muted-foreground">No hay orden seleccionada</p>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-      </div>
+                <div className="lg:col-span-1">
+                    <Card className="sticky top-20">
+                        <CardHeader>
+                            <CardTitle className="font-headline text-2xl">Acciones de Orden</CardTitle>
+                            <CardDescription>
+                                {selectedOrderForActions 
+                                    ? `Acciones disponibles para la orden ${selectedOrderForActions.id}`
+                                    : "Seleccione una orden de la lista para ver las acciones disponibles."
+                                }
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {selectedOrderForActions ? (
+                                <div className="grid grid-cols-1 gap-4 py-4">
+                                    <Button variant="outline" onClick={() => handlePreviewRequest(selectedOrderForActions)}>
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        Visualizar O/C
+                                    </Button>
+                                    <Button variant="outline" onClick={() => handleEdit(selectedOrderForActions)}>
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        Editar
+                                    </Button>
+                                    <Button variant="destructive" onClick={() => handleDelete(selectedOrderForActions)}>
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Eliminar
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-md">
+                                    <p className="text-sm text-muted-foreground">No hay orden seleccionada</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </TabsContent>
+        <TabsContent value="lots" className="mt-6">
+            <LotGenerationTab purchaseOrders={purchaseOrders} suppliers={suppliers} handleSaveOrder={handleSaveOrder} />
+        </TabsContent>
+      </Tabs>
       
       <NewPurchaseOrderSheet 
         isOpen={isSheetOpen}
@@ -468,15 +596,6 @@ export default function PurchasesPage() {
           onPrintRequest={handlePrint}
         />
       )}
-      {lotsToPrint && (
-        <LotLabelPreview
-            isOpen={!!lotsToPrint}
-            onOpenChange={() => setLotsToPrint(null)}
-            order={lotsToPrint}
-            supplier={suppliers.find(s => s.id === lotsToPrint.supplierId) || null}
-        />
-      )}
     </>
   );
 }
-
