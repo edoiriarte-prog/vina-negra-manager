@@ -732,7 +732,7 @@ export default function PurchasesPage() {
                                             <TableCell className="text-right">{formatKilos(lot.totalKilos)}</TableCell>
                                             <TableCell className="text-right">{formatPackages(lot.totalPackages)}</TableCell>
                                             <TableCell className="text-center">
-                                                <Button variant="ghost" size="icon" onClick={() => handlePreviewLot(lot)}>
+                                                <Button variant="ghost" size="icon" title="Previsualizar e Imprimir Lote" onClick={() => handlePreviewLot(lot)}>
                                                     <Printer className="h-4 w-4" />
                                                 </Button>
                                             </TableCell>
