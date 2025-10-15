@@ -33,7 +33,6 @@ import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LotGenerationContent } from './components/lot-generation-content';
 import { useMasterData } from '@/hooks/use-master-data';
 
@@ -54,7 +53,7 @@ const formatPackages = (value: number) =>
 
 function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { allOrders: PurchaseOrder[], suppliers: Contact[], calibers: any[], setAllOrders: (orders: PurchaseOrder[]) => void }) {
     const [selectedOCs, setSelectedOCs] = useState<Record<string, boolean>>({});
-    const [selectedCalibers, setSelectedCalibers] = useState<Record<string, string>>({});
+    const [selectedCalibers, setSelectedCalibers] = useState<Record<string, string[]>>({});
     const [previewData, setPreviewData] = useState<any>(null);
     const printRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
@@ -73,29 +72,39 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                 const newCalibers = { ...selectedCalibers };
                 delete newCalibers[ocId];
                 setSelectedCalibers(newCalibers);
+            } else {
+                 setSelectedCalibers(prevCalibers => ({...prevCalibers, [ocId]: []}));
             }
             return newSelection;
         });
     };
 
     const handleCaliberChange = (ocId: string, caliber: string) => {
-        setSelectedCalibers(prev => ({ ...prev, [ocId]: caliber }));
+        setSelectedCalibers(prev => {
+            const currentCalibers = prev[ocId] || [];
+            const newCalibers = currentCalibers.includes(caliber)
+                ? currentCalibers.filter(c => c !== caliber)
+                : [...currentCalibers, caliber];
+            return { ...prev, [ocId]: newCalibers };
+        });
     };
 
     const handleGeneratePreview = () => {
-        const selectedEntries = Object.keys(selectedOCs).filter(id => selectedOCs[id]);
-        if (selectedEntries.length === 0 || selectedEntries.some(id => !selectedCalibers[id])) {
+        const selectedEntries = Object.entries(selectedCalibers)
+            .filter(([ocId]) => selectedOCs[ocId])
+            .flatMap(([ocId, calibers]) => calibers.map(caliber => ({ ocId, caliber })));
+
+        if (selectedEntries.length === 0) {
              toast({
                 variant: 'destructive',
                 title: 'Error',
-                description: 'Seleccione al menos una OC y especifique su calibre.',
+                description: 'Seleccione al menos una OC y un calibre.',
             });
             return;
         }
 
-        const lotItems = selectedEntries.map(ocId => {
+        const lotItems = selectedEntries.map(({ ocId, caliber: caliberName }) => {
             const order = completedOrders.find(o => o.id === ocId);
-            const caliberName = selectedCalibers[ocId];
             if (!order || !caliberName) return null;
 
             const supplier = suppliers.find(s => s.id === order.supplierId);
@@ -116,7 +125,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                 totalPackages,
                 avgWeight,
             };
-        }).filter(Boolean);
+        }).filter((item): item is NonNullable<typeof item> => item !== null);
 
         if (lotItems.length === 0) {
             toast({
@@ -128,7 +137,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
         }
 
         const date = new Date();
-        const lotId = `LT-${format(date, 'yyyyMMdd')}-${String(date.getTime()).slice(-3)}`;
+        const lotId = `LT-${format(date, 'yyyyMMdd')}-${String(date.getTime()).slice(-4)}`;
         
         // --- Save Lot Number to Purchase Order ---
         const updatedOrders = allOrders.map(order => {
@@ -177,11 +186,11 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                             {completedOrders.map(order => (
                                 <div key={order.id} className="flex items-center space-x-2">
                                     <Checkbox
-                                        id={order.id}
+                                        id={`oc-${order.id}`}
                                         checked={!!selectedOCs[order.id]}
                                         onCheckedChange={() => handleSelectOC(order.id)}
                                     />
-                                    <label htmlFor={order.id} className="text-sm font-medium leading-none">
+                                    <label htmlFor={`oc-${order.id}`} className="text-sm font-medium leading-none">
                                         {order.id} - {suppliers.find(s => s.id === order.supplierId)?.name}
                                     </label>
                                 </div>
@@ -191,24 +200,28 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
 
                     <div>
                         <Label className="font-semibold text-lg">Paso 2: Especifique el Calibre por OC</Label>
-                        <div className="mt-2 space-y-3">
+                        <div className="mt-2 space-y-4">
                             {Object.keys(selectedOCs).filter(id => selectedOCs[id]).map(ocId => {
                                 const order = completedOrders.find(o => o.id === ocId);
                                 if (!order) return null;
                                 const availableCalibers = [...new Set(order.items.map(item => item.caliber))];
                                 return (
-                                    <div key={ocId} className="grid grid-cols-3 items-center gap-4">
-                                        <Label htmlFor={`caliber-${ocId}`} className="text-right">{ocId}</Label>
-                                        <Select onValueChange={(value) => handleCaliberChange(ocId, value)}>
-                                            <SelectTrigger className="col-span-2">
-                                                <SelectValue placeholder="Seleccione un calibre" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {availableCalibers.map(caliber => (
-                                                    <SelectItem key={caliber} value={caliber}>{caliber}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                    <div key={ocId} className='p-3 border rounded-md'>
+                                        <p className="font-medium text-sm mb-2">{ocId}</p>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {availableCalibers.map(caliber => (
+                                                <div key={`${ocId}-${caliber}`} className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`${ocId}-${caliber}`}
+                                                        checked={selectedCalibers[ocId]?.includes(caliber)}
+                                                        onCheckedChange={() => handleCaliberChange(ocId, caliber)}
+                                                    />
+                                                    <label htmlFor={`${ocId}-${caliber}`} className="text-sm font-normal">
+                                                        {caliber}
+                                                    </label>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -216,7 +229,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                     </div>
                 </CardContent>
                  <CardFooter className="flex-col items-stretch gap-4 pt-6 mt-auto">
-                    <Button onClick={handleGeneratePreview}>
+                    <Button onClick={handleGeneratePreview} disabled={Object.values(selectedCalibers).every(c => c.length === 0)}>
                         Generar Previsualización y Guardar Lote
                     </Button>
                     <Button onClick={handlePrint} disabled={!previewData} variant="outline">
@@ -665,6 +678,7 @@ export default function PurchasesPage() {
     </Tabs>
   );
 }
+
 
 
 

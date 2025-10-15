@@ -4,7 +4,6 @@
 
 import React from 'react';
 import { format } from 'date-fns';
-import Barcode from 'react-barcode';
 
 type LotSelection = {
   orderId: string;
