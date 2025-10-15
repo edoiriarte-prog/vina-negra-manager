@@ -37,6 +37,9 @@ type AvailableLot = {
   supplierId: string;
   originalQuantity: number;
   availableQuantity: number;
+  originalPackagingQuantity: number;
+  availablePackagingQuantity: number;
+  avgWeight: number;
 };
 
 export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrders, salesOrders, warehouse, contacts }: LotSelectionDialogProps) {
@@ -60,7 +63,10 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
               caliber: item.caliber,
               supplierId: po.supplierId,
               originalQuantity: item.quantity,
-              availableQuantity: item.quantity, // Will be reduced in the next step
+              availableQuantity: item.quantity,
+              originalPackagingQuantity: item.packagingQuantity || 0,
+              availablePackagingQuantity: item.packagingQuantity || 0,
+              avgWeight: (item.packagingQuantity || 0) > 0 ? item.quantity / (item.packagingQuantity || 1) : 0,
             });
           }
         });
@@ -77,12 +83,13 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
           );
           if (lot) {
             lot.availableQuantity -= item.quantity;
+            lot.availablePackagingQuantity -= (item.packagingQuantity || 0);
           }
         }
       });
     });
 
-    return lots.filter(l => l.availableQuantity > 0);
+    return lots.filter(l => l.availableQuantity > 0 && l.availablePackagingQuantity > 0);
   }, [purchaseOrders, salesOrders, warehouse]);
   
   const filteredLots = useMemo(() => {
@@ -95,21 +102,24 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
   }, [availableLots, filter])
 
   const handleAddLot = (lot: AvailableLot) => {
-    const quantityToLoad = quantitiesToLoad[lot.lotNumber] || 0;
-    if (quantityToLoad <= 0) {
-      toast({ variant: 'destructive', title: 'Error', description: 'La cantidad debe ser mayor a 0.'});
+    const packagesToLoad = quantitiesToLoad[lot.lotNumber] || 0;
+    if (packagesToLoad <= 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'La cantidad de envases debe ser mayor a 0.'});
       return;
     }
-    if (quantityToLoad > lot.availableQuantity) {
-      toast({ variant: 'destructive', title: 'Error de Stock', description: 'La cantidad a cargar supera el stock disponible del lote.'});
+    if (packagesToLoad > lot.availablePackagingQuantity) {
+      toast({ variant: 'destructive', title: 'Error de Stock', description: 'La cantidad de envases supera el stock disponible del lote.'});
       return;
     }
+
+    const calculatedKilos = packagesToLoad * lot.avgWeight;
 
     const item: OrderItem = {
       id: `lot-item-${lot.lotNumber}`, // temporary id
       product: lot.product,
       caliber: lot.caliber,
-      quantity: quantityToLoad,
+      quantity: calculatedKilos,
+      packagingQuantity: packagesToLoad,
       unit: 'Kilos',
       price: 0, // Price should be set in the sales order form
       lotNumber: lot.lotNumber,
@@ -121,7 +131,7 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
     onSave(item);
     // Reset quantity for this lot after adding
     setQuantitiesToLoad(prev => ({ ...prev, [lot.lotNumber]: 0 }));
-    toast({ title: 'Lote Agregado', description: `${quantityToLoad} kg del lote ${lot.lotNumber} agregados a la orden.`});
+    toast({ title: 'Lote Agregado', description: `${packagesToLoad} envases del lote ${lot.lotNumber} agregados a la orden.`});
   };
 
   const getSupplierName = (id: string) => {
@@ -130,7 +140,7 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>Seleccionar Lote de Inventario</DialogTitle>
           <DialogDescription>
@@ -155,7 +165,7 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
                   <TableHead>Calibre</TableHead>
                   <TableHead>Proveedor</TableHead>
                   <TableHead className="text-right">Stock Disp.</TableHead>
-                  <TableHead className="w-[120px]">Cant. a Cargar</TableHead>
+                  <TableHead className="w-[150px]">Envases a Cargar</TableHead>
                   <TableHead className="w-[100px]">Acción</TableHead>
                 </TableRow>
               </TableHeader>
@@ -171,14 +181,18 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
                     <TableCell>{lot.product}</TableCell>
                     <TableCell>{lot.caliber}</TableCell>
                     <TableCell className="text-xs">{getSupplierName(lot.supplierId)}</TableCell>
-                    <TableCell className="text-right font-medium">{lot.availableQuantity.toLocaleString('es-CL')} kg</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {lot.availablePackagingQuantity.toLocaleString('es-CL')} env.
+                      <br/>
+                      <span className="text-xs text-muted-foreground">({lot.availableQuantity.toFixed(2)} kg)</span>
+                    </TableCell>
                     <TableCell>
                       <Input
                         type="number"
                         placeholder="0"
                         value={quantitiesToLoad[lot.lotNumber] || ''}
                         onChange={e => setQuantitiesToLoad(prev => ({ ...prev, [lot.lotNumber]: Number(e.target.value)}))}
-                        max={lot.availableQuantity}
+                        max={lot.availablePackagingQuantity}
                       />
                     </TableCell>
                     <TableCell>
