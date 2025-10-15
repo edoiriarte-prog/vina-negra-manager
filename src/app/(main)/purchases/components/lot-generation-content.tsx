@@ -81,7 +81,7 @@ export const LotGenerationContent = React.forwardRef<HTMLDivElement, LotGenerati
       {/* Page 2: Individual Label Sample */}
        <div className="w-full h-full flex flex-col items-center justify-center pt-10">
         {firstItem && (
-            <div className="border-2 border-black p-5 w-[350px]">
+            <div className="border-2 border-black p-5 w-[350px] font-sans">
                 <p className="text-base font-bold m-0">PRODUCTO: {firstItem.productName.toUpperCase()}</p>
                 <p className="text-2xl font-bold my-2 text-center">CALIBRE: {firstItem.caliberName} ({firstItem.caliberCode})</p>
                 <p className="text-sm mt-4">LOTE: {lotId}</p>

@@ -135,7 +135,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers }: { allOrders: Purch
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div>
-                        <Label className="font-semibold text-lg">Paso 1: Seleccione Órdenes de Compra (OC)</Label>
+                        <Label className="font-semibold text-lg">Paso 1: Seleccione las Órdenes de Compra (OC)</Label>
                         <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border p-3 rounded-md">
                             {completedOrders.map(order => (
                                 <div key={order.id} className="flex items-center space-x-2">
@@ -194,7 +194,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers }: { allOrders: Purch
                 </CardHeader>
                 <CardContent className="bg-gray-200 p-4 rounded-md h-[600px] overflow-y-auto">
                     {previewData ? (
-                         <div className="w-[21cm] min-h-[29.7cm] bg-white shadow-lg mx-auto transform scale-50 -translate-y-1/4 origin-top">
+                         <div className="w-[21.59cm] min-h-[27.94cm] bg-white shadow-lg mx-auto p-4 transform scale-[0.4] sm:scale-50 md:scale-75 origin-top">
                             <LotGenerationContent ref={printRef} lotData={previewData} />
                         </div>
                     ) : (
@@ -628,4 +628,5 @@ export default function PurchasesPage() {
     </Tabs>
   );
 }
+
 
