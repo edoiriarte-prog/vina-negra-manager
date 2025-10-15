@@ -31,7 +31,6 @@ type LotSelectionDialogProps = {
 
 type AvailableLot = {
   purchaseOrderId: string;
-  purchaseOrderItemId: string;
   lotNumber: string;
   product: string;
   caliber: string;
@@ -50,40 +49,54 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
   const { toast } = useToast();
 
   const availableLots = useMemo(() => {
-    const lots: AvailableLot[] = [];
+    const lotMap = new Map<string, AvailableLot>();
 
     // 1. Get all items from completed purchase orders that have a lot number and match the warehouse
     purchaseOrders.forEach(po => {
       if (po.status === 'completed' && po.warehouse === warehouse) {
         po.items.forEach(item => {
           if (item.lotNumber && item.unit === 'Kilos') {
-            lots.push({
-              purchaseOrderId: po.id,
-              purchaseOrderItemId: item.id,
-              lotNumber: item.lotNumber,
-              product: item.product,
-              caliber: item.caliber,
-              supplierId: po.supplierId,
-              purchaseDate: po.date,
-              originalQuantity: item.quantity,
-              availableQuantity: item.quantity,
-              originalPackagingQuantity: item.packagingQuantity || 0,
-              availablePackagingQuantity: item.packagingQuantity || 0,
-              avgWeight: (item.packagingQuantity || 0) > 0 ? item.quantity / (item.packagingQuantity || 1) : 0,
-            });
+            const key = item.lotNumber;
+            let lot = lotMap.get(key);
+
+            if (!lot) {
+              lot = {
+                purchaseOrderId: po.id,
+                lotNumber: item.lotNumber,
+                product: item.product,
+                caliber: item.caliber,
+                supplierId: po.supplierId,
+                purchaseDate: po.date,
+                originalQuantity: 0,
+                availableQuantity: 0,
+                originalPackagingQuantity: 0,
+                availablePackagingQuantity: 0,
+                avgWeight: 0,
+              };
+            }
+
+            lot.originalQuantity += item.quantity;
+            lot.availableQuantity += item.quantity;
+            lot.originalPackagingQuantity += item.packagingQuantity || 0;
+            lot.availablePackagingQuantity += item.packagingQuantity || 0;
+            lotMap.set(key, lot);
           }
         });
       }
     });
+    
+    lotMap.forEach(lot => {
+       if (lot.originalPackagingQuantity > 0) {
+         lot.avgWeight = lot.originalQuantity / lot.originalPackagingQuantity;
+       }
+    });
+
 
     // 2. Subtract quantities from existing sales orders
     salesOrders.forEach(so => {
       so.items.forEach(item => {
-        if (item.sourceLot) {
-          const lot = lots.find(l => 
-            l.purchaseOrderId === item.sourceLot.purchaseOrderId && 
-            l.purchaseOrderItemId === item.sourceLot.purchaseOrderItemId
-          );
+        if (item.lotNumber) {
+          const lot = lotMap.get(item.lotNumber);
           if (lot) {
             lot.availableQuantity -= item.quantity;
             lot.availablePackagingQuantity -= (item.packagingQuantity || 0);
@@ -92,10 +105,13 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
       });
     });
     
-    // 3. Sort by date (oldest first)
-    lots.sort((a,b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
+    // 3. Convert map to array, filter, and sort
+    const lotsArray = Array.from(lotMap.values());
+    
+    lotsArray.sort((a,b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
 
-    return lots.filter(l => l.availableQuantity > 0 && l.availablePackagingQuantity > 0);
+    return lotsArray.filter(l => l.availableQuantity > 0 && l.availablePackagingQuantity > 0);
+
   }, [purchaseOrders, salesOrders, warehouse]);
   
   const filteredLots = useMemo(() => {
@@ -129,10 +145,6 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
       unit: 'Kilos',
       price: 0, // Price should be set in the sales order form
       lotNumber: lot.lotNumber,
-      sourceLot: {
-        purchaseOrderId: lot.purchaseOrderId,
-        purchaseOrderItemId: lot.purchaseOrderItemId,
-      }
     };
     onSave(item);
     // Reset quantity for this lot after adding
@@ -187,7 +199,7 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
                   </TableRow>
                 )}
                 {filteredLots.map(lot => (
-                  <TableRow key={lot.lotNumber}>
+                  <TableRow key={lot.purchaseOrderId + '-' + lot.lotNumber}>
                     <TableCell><Badge variant="outline">{lot.lotNumber}</Badge></TableCell>
                     <TableCell>{lot.product}</TableCell>
                     <TableCell>{lot.caliber}</TableCell>
