@@ -139,7 +139,12 @@ function LotGenerationTab({ purchaseOrders, suppliers }: { purchaseOrders: Purch
                         {Object.keys(selectedOCs).filter(id => selectedOCs[id]).length === 0 && (
                             <p className="text-sm text-muted-foreground text-center">Seleccione una OC para especificar su calibre.</p>
                         )}
-                        {Object.keys(selectedOCs).filter(id => selectedOCs[id]).map(id => (
+                        {Object.keys(selectedOCs).filter(id => selectedOCs[id]).map(id => {
+                            const order = purchaseOrders.find(o => o.id === id);
+                            const orderCalibers = order ? [...new Set(order.items.map(item => item.caliber))] : [];
+                            const availableCalibers = calibers.filter(c => orderCalibers.includes(c.name));
+
+                            return (
                              <div key={`sel-${id}`} className="grid grid-cols-3 items-center gap-4">
                                 <Label htmlFor={`cal-${id}`} className="font-mono text-sm">{id}</Label>
                                 <Select
@@ -150,13 +155,14 @@ function LotGenerationTab({ purchaseOrders, suppliers }: { purchaseOrders: Purch
                                         <SelectValue placeholder="Seleccionar calibre..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {calibers.map(c => (
+                                        {availableCalibers.map(c => (
                                             <SelectItem key={c.name} value={c.name}>{c.name} ({c.code})</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                              </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </div>
             </CardContent>
