@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, ChevronDown, MoreHorizontal, Eye, Printer, Edit, Trash2, Tag } from 'lucide-react';
+import { PlusCircle, Download, ChevronDown, MoreHorizontal, Eye, Printer, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -25,8 +25,6 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useReactToPrint } from 'react-to-print';
-import { PreviewContent } from './components/purchase-order-preview-content';
-import { LotLabelPreview } from './components/lot-label-preview';
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -56,7 +54,6 @@ export default function PurchasesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
-  const [lotsToPrint, setLotsToPrint] = useState<PurchaseOrder | null>(null);
   const [selectedOrderForActions, setSelectedOrderForActions] = useState<PurchaseOrder | null>(null);
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
@@ -222,12 +219,6 @@ export default function PurchasesPage() {
     setPreviewingOrder(order);
     setSelectedOrderForActions(null);
   }
-
-  const handlePrintLotsRequest = (order: PurchaseOrder) => {
-    setLotsToPrint(order);
-    setSelectedOrderForActions(null);
-  };
-
 
   const handleExportAll = () => {
     if (purchaseOrders.length === 0) {
@@ -416,11 +407,7 @@ export default function PurchasesPage() {
                 <Eye className="mr-2 h-4 w-4" />
                 Visualizar O/C
             </Button>
-            <Button variant="outline" onClick={() => selectedOrderForActions && handlePrintLotsRequest(selectedOrderForActions)}>
-                <Tag className="mr-2 h-4 w-4" />
-                Imprimir Lotes
-            </Button>
-             <Button variant="outline" onClick={() => selectedOrderForActions && handleEdit(selectedOrderForActions)}>
+            <Button variant="outline" onClick={() => selectedOrderForActions && handleEdit(selectedOrderForActions)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
             </Button>
@@ -449,19 +436,7 @@ export default function PurchasesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
-      {/* Hidden container for printing */}
-      <div className="hidden">
-        <div ref={printComponentRef}>
-            {previewingOrder && (
-                <PreviewContent
-                    order={previewingOrder}
-                    supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
-                />
-            )}
-        </div>
-      </div>
-      
+
       {previewingOrder && (
         <PurchaseOrderPreview
           isOpen={!!previewingOrder}
@@ -469,15 +444,6 @@ export default function PurchasesPage() {
           order={previewingOrder}
           supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
           onPrintRequest={handlePrint}
-        />
-      )}
-      
-      {lotsToPrint && (
-        <LotLabelPreview
-            isOpen={!!lotsToPrint}
-            onOpenChange={() => setLotsToPrint(null)}
-            order={lotsToPrint}
-            supplier={suppliers.find(s => s.id === lotsToPrint.supplierId) || null}
         />
       )}
     </>
