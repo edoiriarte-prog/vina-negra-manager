@@ -111,8 +111,6 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             return;
         }
 
-        const generationTimestamp = Date.now().toString().slice(-6);
-
         const lotItems = selectedEntries.map(({ ocId, caliber: caliberName }, index) => {
             const order = allOrders.find(o => o.id === ocId);
             if (!order || !caliberName) return null;
@@ -126,7 +124,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             const avgWeight = totalPackages > 0 ? totalKilos / totalPackages : 0;
             
             const datePart = format(parseISO(order.date), 'yyyyMMdd');
-            const uniqueLotId = `LT-${datePart}-${generationTimestamp}${index}`;
+            const uniqueLotId = `LT-${datePart}-${100 + index}`;
 
 
             return {
@@ -321,16 +319,35 @@ export default function PurchasesPage() {
       content: () => printComponentRef.current,
   });
 
-  const printLotRef = useCallback((node: any) => {
-    if (node !== null && isPrintingLot) {
-      handleLotPrint();
-    }
-  }, [isPrintingLot]);
+  const printLotRef = useRef<HTMLDivElement>(null);
 
   const handleLotPrint = useReactToPrint({
     content: () => printLotRef.current,
-    onAfterPrint: () => setIsPrintingLot(false)
   });
+  
+  const handlePreviewLot = (lot: any) => {
+    const lotItem = {
+      lotId: lot.lotNumber,
+      orderId: lot.orderId,
+      productName: lot.product,
+      supplierName: lot.supplierName,
+      caliberName: lot.caliber,
+      caliberCode: lot.caliberCode,
+      totalKilos: lot.totalKilos,
+      totalPackages: lot.totalPackages,
+      avgWeight: lot.totalPackages > 0 ? lot.totalKilos / lot.totalPackages : 0,
+    };
+  
+    setPreviewLotData({
+      creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
+      items: [lotItem],
+    });
+    
+    // Use a timeout to ensure state is updated before printing
+    setTimeout(() => {
+        handleLotPrint();
+    }, 100);
+  }
 
   useEffect(() => {
     setIsClient(true);
@@ -521,26 +538,6 @@ export default function PurchasesPage() {
   const handlePreviewRequest = (order: PurchaseOrder) => {
     setPreviewingOrder(order);
   }
-
-  const handlePreviewLot = (lot: any) => {
-    const lotItem = {
-      lotId: lot.lotNumber,
-      orderId: lot.orderId,
-      productName: lot.product,
-      supplierName: lot.supplierName,
-      caliberName: lot.caliber,
-      caliberCode: lot.caliberCode,
-      totalKilos: lot.totalKilos,
-      totalPackages: lot.totalPackages,
-      avgWeight: lot.totalPackages > 0 ? lot.totalKilos / lot.totalPackages : 0,
-    };
-
-    setPreviewLotData({
-      creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-      items: [lotItem],
-    });
-    setIsPrintingLot(true);
-  };
 
   const handleExportAll = () => {
     if (purchaseOrders.length === 0) {
@@ -814,7 +811,7 @@ export default function PurchasesPage() {
                 onPrintRequest={handlePrint}
                 />
             )}
-             {isPrintingLot && previewLotData && (
+             {previewLotData && (
                 <div className="hidden">
                     <div ref={printLotRef}>
                         <LotGenerationContent lotData={previewLotData} />
@@ -825,6 +822,7 @@ export default function PurchasesPage() {
     </>
   );
 }
+
 
 
 
