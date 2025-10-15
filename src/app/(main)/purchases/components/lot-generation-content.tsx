@@ -34,7 +34,7 @@ export const LotGenerationContent = React.forwardRef<HTMLDivElement, LotGenerati
       {/* Main Lot Sheets */}
       <div className="w-full h-full flex flex-col">
         {items.map((item, index) => (
-          <div key={index} className="lot-page">
+          <div key={index} className="lot-page" style={{ pageBreakAfter: 'always' }}>
             <div className="text-center mb-8">
               <h1 className="text-4xl font-bold tracking-tight">NUMERO DE LOTE</h1>
             </div>
