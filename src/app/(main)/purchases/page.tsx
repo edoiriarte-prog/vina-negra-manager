@@ -31,12 +31,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LotGenerationContent } from './components/lot-generation-content';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useMasterData } from '@/hooks/use-master-data';
-import { Label } from '@/components/ui/label';
-import { LotLabelPreview } from './components/lot-label-preview';
 
 
 const formatCurrency = (value: number) =>
@@ -52,151 +46,6 @@ const formatKilos = (value: number) =>
 const formatPackages = (value: number) =>
     `${new Intl.NumberFormat('es-CL').format(value)}`;
 
-
-type LotSelection = {
-  orderId: string;
-  caliberName: string;
-  caliberCode: string;
-  productName: string;
-  supplierName: string;
-  totalKilos: number;
-  totalPackages: number;
-  avgWeight: number;
-};
-
-function LotGenerationTab({ purchaseOrders, setPurchaseOrders, suppliers }: { purchaseOrders: PurchaseOrder[], setPurchaseOrders: React.Dispatch<React.SetStateAction<PurchaseOrder[]>>, suppliers: Contact[] }) {
-  const [selectedOC, setSelectedOC] = useState<PurchaseOrder | null>(null);
-  const [lotPreviewData, setLotPreviewData] = useState<{ id: string; date: string; items: LotSelection[] } | null>(null);
-  const { calibers } = useMasterData();
-  const { toast } = useToast();
-
-  const handleGenerateLot = (item: OrderItem, itemIndex: number) => {
-    if (!selectedOC) return;
-
-    // LOTE-[Date]-[SupplierID]-[ItemIndex]
-    const lotNumber = `LOTE-${format(new Date(selectedOC.date), 'ddMMyy')}-${selectedOC.supplierId}-${itemIndex}`;
-    
-    // Update the item with the new lot number
-    const updatedItems = selectedOC.items.map((i, idx) => 
-        idx === itemIndex ? { ...i, lotNumber } : i
-    );
-    
-    const updatedOrder = { ...selectedOC, items: updatedItems };
-
-    setPurchaseOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-    setSelectedOC(updatedOrder);
-
-    // Prepare data for preview
-    const supplierName = suppliers.find(s => s.id === selectedOC.supplierId)?.name || 'Desconocido';
-    const totalKilos = item.quantity;
-    const totalPackages = item.packagingQuantity || 0;
-    const avgWeight = totalPackages > 0 ? totalKilos / totalPackages : 0;
-    const caliberCode = calibers.find(c => c.name === item.caliber)?.code || 'N/A';
-
-    setLotPreviewData({
-        id: lotNumber,
-        date: format(new Date(), 'dd/MM/yyyy HH:mm'),
-        items: [{
-            orderId: selectedOC.id,
-            caliberName: item.caliber,
-            caliberCode: caliberCode,
-            productName: item.product,
-            supplierName: supplierName,
-            totalKilos: totalKilos,
-            totalPackages: totalPackages,
-            avgWeight: avgWeight,
-        }]
-    });
-    
-    toast({
-        title: "Lote Generado y Guardado",
-        description: `Se ha asignado el lote ${lotNumber} al ítem.`,
-    });
-  };
-  
-  const completedOrders = useMemo(() => 
-    purchaseOrders.filter(o => o.status === 'completed').sort((a,b) => b.id.localeCompare(a.id)),
-    [purchaseOrders]
-  );
-  
-  const handlePrint = (lotData: any) => {
-    // This is handled inside LotLabelPreview now
-  }
-
-  return (
-     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-        <Card className="flex flex-col">
-            <CardHeader>
-                <CardTitle className="font-headline text-2xl">Módulo de Creación de Lotes</CardTitle>
-                <CardDescription>Seleccione una OC para generar y guardar los lotes de sus ítems.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow flex flex-col gap-6">
-                <div className="space-y-2">
-                    <Label>PASO 1: Seleccione la Orden de Compra (OC)</Label>
-                    <Select onValueChange={(id) => setSelectedOC(completedOrders.find(o => o.id === id) || null)}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Seleccione una OC completada..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {completedOrders.map(oc => (
-                                <SelectItem key={oc.id} value={oc.id}>
-                                    {oc.id} - {suppliers.find(s => s.id === oc.supplierId)?.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                
-                <div className="space-y-2">
-                    <Label>PASO 2: Genere el Lote para cada Ítem</Label>
-                    <div className="h-96 overflow-y-auto border rounded-md">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Producto</TableHead>
-                                    <TableHead>Calibre</TableHead>
-                                    <TableHead>Lote Actual</TableHead>
-                                    <TableHead className="w-[150px]">Acción</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {!selectedOC && (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                            Seleccione una OC para ver sus ítems.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                {selectedOC?.items.map((item, index) => (
-                                    <TableRow key={item.id}>
-                                        <TableCell>{item.product}</TableCell>
-                                        <TableCell>{item.caliber}</TableCell>
-                                        <TableCell className="font-mono text-xs">{item.lotNumber || 'No generado'}</TableCell>
-                                        <TableCell>
-                                            <Button size="sm" onClick={() => handleGenerateLot(item, index)}>
-                                                <Wand2 className="mr-2 h-4 w-4" />
-                                                {item.lotNumber ? 'Ver/Imprimir' : 'Generar Lote'}
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-         
-        {lotPreviewData && (
-            <LotLabelPreview
-                isOpen={!!lotPreviewData}
-                onOpenChange={() => setLotPreviewData(null)}
-                lotData={lotPreviewData}
-            />
-        )}
-     </div>
-  );
-}
 
 export default function PurchasesPage() {
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
@@ -502,87 +351,76 @@ export default function PurchasesPage() {
 
   return (
     <>
-      <Tabs defaultValue="orders">
-        <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="orders">Gestión de Compras</TabsTrigger>
-            <TabsTrigger value="lots">Generar Lotes</TabsTrigger>
-        </TabsList>
-        <TabsContent value="orders" className="mt-6">
-            <div className="grid lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
-                    <Card>
-                        <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="font-headline text-2xl">Listado de Órdenes de Compra (O/C)</CardTitle>
-                                <CardDescription>Registra y administra todas las adquisiciones de productos.</CardDescription>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button variant="outline" onClick={handleExportAll}>
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Exportar Todo
-                                </Button>
-                                <Button onClick={openNewOrderSheet}>
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Nueva Compra
-                                </Button>
-                            </div>
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+            <Card>
+                <CardHeader>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle className="font-headline text-2xl">Listado de Órdenes de Compra (O/C)</CardTitle>
+                        <CardDescription>Registra y administra todas las adquisiciones de productos.</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleExportAll}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar Todo
+                        </Button>
+                        <Button onClick={openNewOrderSheet}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Nueva Compra
+                        </Button>
+                    </div>
+                </div>
+                    <div className="py-4">
+                    <Input
+                        placeholder="Filtrar por proveedor..."
+                        value={filter}
+                        onChange={(event) => setFilter(event.target.value)}
+                        className="max-w-sm"
+                    />
+                    </div>
+                </CardHeader>
+                <CardContent>
+                {renderContent()}
+                </CardContent>
+            </Card>
+        </div>
+        <div className="lg:col-span-1">
+            <Card className="sticky top-20">
+                <CardHeader>
+                    <CardTitle className="font-headline text-2xl">Acciones de Orden</CardTitle>
+                    <CardDescription>
+                        {selectedOrderForActions 
+                            ? `Acciones disponibles para la orden ${selectedOrderForActions.id}`
+                            : "Seleccione una orden de la lista para ver las acciones disponibles."
+                        }
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {selectedOrderForActions ? (
+                        <div className="grid grid-cols-1 gap-4 py-4">
+                            <Button variant="outline" onClick={() => handlePreviewRequest(selectedOrderForActions)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Visualizar O/C
+                            </Button>
+                            <Button variant="outline" onClick={() => handleEdit(selectedOrderForActions)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                            </Button>
+                            <Button variant="destructive" onClick={() => handleDelete(selectedOrderForActions)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Eliminar
+                            </Button>
                         </div>
-                            <div className="py-4">
-                            <Input
-                                placeholder="Filtrar por proveedor..."
-                                value={filter}
-                                onChange={(event) => setFilter(event.target.value)}
-                                className="max-w-sm"
-                            />
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                        {renderContent()}
-                        </CardContent>
-                    </Card>
-                </div>
-                <div className="lg:col-span-1">
-                    <Card className="sticky top-20">
-                        <CardHeader>
-                            <CardTitle className="font-headline text-2xl">Acciones de Orden</CardTitle>
-                            <CardDescription>
-                                {selectedOrderForActions 
-                                    ? `Acciones disponibles para la orden ${selectedOrderForActions.id}`
-                                    : "Seleccione una orden de la lista para ver las acciones disponibles."
-                                }
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {selectedOrderForActions ? (
-                                <div className="grid grid-cols-1 gap-4 py-4">
-                                    <Button variant="outline" onClick={() => handlePreviewRequest(selectedOrderForActions)}>
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        Visualizar O/C
-                                    </Button>
-                                    <Button variant="outline" onClick={() => handleEdit(selectedOrderForActions)}>
-                                        <Edit className="mr-2 h-4 w-4" />
-                                        Editar
-                                    </Button>
-                                    <Button variant="destructive" onClick={() => handleDelete(selectedOrderForActions)}>
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Eliminar
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-md">
-                                    <p className="text-sm text-muted-foreground">No hay orden seleccionada</p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-        </TabsContent>
-        <TabsContent value="lots" className="mt-6">
-            <LotGenerationTab purchaseOrders={purchaseOrders} setPurchaseOrders={setPurchaseOrders} suppliers={suppliers} />
-        </TabsContent>
-      </Tabs>
+                    ) : (
+                        <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-md">
+                            <p className="text-sm text-muted-foreground">No hay orden seleccionada</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+      </div>
       
       <NewPurchaseOrderSheet 
         isOpen={isSheetOpen}
@@ -619,4 +457,3 @@ export default function PurchasesPage() {
     </>
   );
 }
-

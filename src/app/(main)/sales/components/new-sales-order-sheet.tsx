@@ -35,7 +35,7 @@ import { Badge } from '@/components/ui/badge';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
+import { ItemMatrixDialog } from './item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
@@ -603,9 +603,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                <Label>Lote</Label>
                                <div className="flex gap-2">
                                 <Input name={`items.${index}.lotNumber`} value={item.lotNumber || ''} onChange={handleInputChange} placeholder="Número de lote" />
-                                <Button type="button" variant="outline" size="icon" onClick={() => generateLotNumber(index)} title="Generar Lote">
-                                    <Wand2 className="h-4 w-4" />
-                                </Button>
                                </div>
                              </div>
 
