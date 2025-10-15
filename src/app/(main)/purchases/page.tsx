@@ -26,7 +26,7 @@ import { es } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useReactToPrint } from 'react-to-print';
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -283,12 +283,20 @@ export default function PurchasesPage() {
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
+  const [lotFilter, setLotFilter] = useState('');
+  const [previewLotData, setPreviewLotData] = useState<any>(null);
 
   const printComponentRef = useRef<HTMLDivElement>(null);
+  const lotPrintRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
+  });
+
+  const handleLotPrint = useReactToPrint({
+    content: () => lotPrintRef.current,
+    documentTitle: `Etiqueta_Lote`,
   });
 
   useEffect(() => {
@@ -367,6 +375,45 @@ export default function PurchasesPage() {
           return null;
       }).filter((g): g is { monthName: string; orders: PurchaseOrder[]; subtotalAmount: number; subtotalKilos: number; subtotalPackages: number; } => g !== null);
   }, [groupedOrders, filter, suppliers]);
+
+
+  const createdLots = useMemo(() => {
+    const lotsMap = new Map<string, any>();
+    purchaseOrders.forEach(order => {
+        order.items.forEach(item => {
+            if (item.lotNumber) {
+                const existing = lotsMap.get(item.lotNumber) || {
+                    lotNumber: item.lotNumber,
+                    orderId: order.id,
+                    date: order.date,
+                    supplierId: order.supplierId,
+                    supplierName: suppliers.find(s => s.id === order.supplierId)?.name || 'N/A',
+                    product: item.product,
+                    caliber: item.caliber,
+                    caliberCode: calibers.find(c => c.name === item.caliber)?.code || 'N/A',
+                    totalKilos: 0,
+                    totalPackages: 0,
+                };
+                existing.totalKilos += item.quantity;
+                existing.totalPackages += (item.packagingQuantity || 0);
+                lotsMap.set(item.lotNumber, existing);
+            }
+        });
+    });
+    return Array.from(lotsMap.values()).sort((a,b) => b.lotNumber.localeCompare(a.lotNumber));
+  }, [purchaseOrders, suppliers, calibers]);
+
+  const filteredCreatedLots = useMemo(() => {
+      if (!lotFilter) return createdLots;
+      const lower = lotFilter.toLowerCase();
+      return createdLots.filter(lot => 
+        lot.lotNumber.toLowerCase().includes(lower) ||
+        lot.orderId.toLowerCase().includes(lower) ||
+        lot.product.toLowerCase().includes(lower) ||
+        lot.supplierName.toLowerCase().includes(lower) ||
+        lot.caliber.toLowerCase().includes(lower)
+      );
+  }, [createdLots, lotFilter]);
 
 
   const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
@@ -488,6 +535,27 @@ export default function PurchasesPage() {
     setOpenCollapsibles(prev => ({...prev, [monthKey]: !prev[monthKey]}));
   }
 
+  const handlePreviewLot = (lot: any) => {
+    setPreviewLotData({
+        creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
+        items: [{
+            lotId: lot.lotNumber,
+            orderId: lot.orderId,
+            productName: lot.product,
+            supplierName: lot.supplierName,
+            caliberName: lot.caliber,
+            caliberCode: lot.caliberCode,
+            totalKilos: lot.totalKilos,
+            totalPackages: lot.totalPackages,
+            avgWeight: lot.totalPackages > 0 ? lot.totalKilos / lot.totalPackages : 0,
+        }],
+    });
+    // Use a timeout to ensure state is updated before printing
+    setTimeout(() => {
+        handleLotPrint();
+    }, 100);
+  }
+
   const renderContent = () => {
     if (!isClient) {
       return (
@@ -583,80 +651,141 @@ export default function PurchasesPage() {
   }
 
   return (
-    <Tabs defaultValue="list">
-        <TabsList className="mb-4">
-            <TabsTrigger value="list">Listado de O/C</TabsTrigger>
-            <TabsTrigger value="lots">Generar Lotes</TabsTrigger>
-        </TabsList>
-        <TabsContent value="list">
-             <Card>
-                <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle className="font-headline text-2xl">Listado de Órdenes de Compra (O/C)</CardTitle>
-                        <CardDescription>Registra y administra todas las adquisiciones de productos.</CardDescription>
+    <>
+        <Tabs defaultValue="list">
+            <TabsList className="mb-4">
+                <TabsTrigger value="list">Listado de O/C</TabsTrigger>
+                <TabsTrigger value="lots">Generar Lotes</TabsTrigger>
+                <TabsTrigger value="created-lots">Lotes Creados</TabsTrigger>
+            </TabsList>
+            <TabsContent value="list">
+                <Card>
+                    <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="font-headline text-2xl">Listado de Órdenes de Compra (O/C)</CardTitle>
+                            <CardDescription>Registra y administra todas las adquisiciones de productos.</CardDescription>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={handleExportAll}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Exportar Todo
+                            </Button>
+                            <Button onClick={openNewOrderSheet}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Nueva Compra
+                            </Button>
+                        </div>
                     </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={handleExportAll}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Exportar Todo
-                        </Button>
-                        <Button onClick={openNewOrderSheet}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Nueva Compra
-                        </Button>
-                    </div>
-                </div>
-                    <div className="py-4">
-                    <Input
-                        placeholder="Filtrar por proveedor..."
-                        value={filter}
-                        onChange={(event) => setFilter(event.target.value)}
-                        className="max-w-sm"
-                    />
-                    </div>
-                </CardHeader>
-                <CardContent>
-                {renderContent()}
-                </CardContent>
-            </Card>
-        </TabsContent>
-        <TabsContent value="lots">
-            <LotGenerationTab allOrders={purchaseOrders} suppliers={suppliers} calibers={calibers} setAllOrders={setPurchaseOrders} />
-        </TabsContent>
-        
-        <NewPurchaseOrderSheet 
-            isOpen={isSheetOpen}
-            onOpenChange={handleSheetOpenChange}
-            onSave={handleSaveOrder}
-            order={editingOrder}
-            suppliers={suppliers}
-        />
-
-        <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
-            <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>¿Estás seguro de que quieres eliminar esta orden?</AlertDialogTitle>
-                <AlertDialogDescription>
-                Esta acción no se puede deshacer. Se eliminará permanentemente la orden "{deletingOrder?.id}".
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setDeletingOrder(null)}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={confirmDelete}>Eliminar</AlertDialogAction>
-            </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
-        {previewingOrder && (
-            <PurchaseOrderPreview
-            isOpen={!!previewingOrder}
-            onOpenChange={() => setPreviewingOrder(null)}
-            order={previewingOrder}
-            supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
-            onPrintRequest={handlePrint}
+                        <div className="py-4">
+                        <Input
+                            placeholder="Filtrar por proveedor..."
+                            value={filter}
+                            onChange={(event) => setFilter(event.target.value)}
+                            className="max-w-sm"
+                        />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                    {renderContent()}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="lots">
+                <LotGenerationTab allOrders={purchaseOrders} suppliers={suppliers} calibers={calibers} setAllOrders={setPurchaseOrders} />
+            </TabsContent>
+             <TabsContent value="created-lots">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="font-headline text-2xl">Lotes Creados</CardTitle>
+                        <CardDescription>Visualiza todos los lotes generados a partir de las órdenes de compra.</CardDescription>
+                        <Input
+                            placeholder="Filtrar lotes..."
+                            value={lotFilter}
+                            onChange={(e) => setLotFilter(e.target.value)}
+                            className="max-w-sm mt-4"
+                        />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Lote</TableHead>
+                                        <TableHead>O/C</TableHead>
+                                        <TableHead>Producto</TableHead>
+                                        <TableHead>Calibre</TableHead>
+                                        <TableHead>Proveedor</TableHead>
+                                        <TableHead className="text-right">Kilos</TableHead>
+                                        <TableHead className="text-right">Envases</TableHead>
+                                        <TableHead className="text-center">Acciones</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {isClient ? filteredCreatedLots.map(lot => (
+                                        <TableRow key={lot.lotNumber}>
+                                            <TableCell><Badge variant="secondary">{lot.lotNumber}</Badge></TableCell>
+                                            <TableCell>{lot.orderId}</TableCell>
+                                            <TableCell>{lot.product}</TableCell>
+                                            <TableCell>{lot.caliber}</TableCell>
+                                            <TableCell>{lot.supplierName}</TableCell>
+                                            <TableCell className="text-right">{formatKilos(lot.totalKilos)}</TableCell>
+                                            <TableCell className="text-right">{formatPackages(lot.totalPackages)}</TableCell>
+                                            <TableCell className="text-center">
+                                                <Button variant="ghost" size="icon" onClick={() => handlePreviewLot(lot)}>
+                                                    <Printer className="h-4 w-4" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    )) : <TableRow><TableCell colSpan={8}><Skeleton className="w-full h-24"/></TableCell></TableRow>}
+                                    {isClient && filteredCreatedLots.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={8} className="text-center h-24">No se encontraron lotes.</TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            
+            <NewPurchaseOrderSheet 
+                isOpen={isSheetOpen}
+                onOpenChange={handleSheetOpenChange}
+                onSave={handleSaveOrder}
+                order={editingOrder}
+                suppliers={suppliers}
             />
-        )}
-    </Tabs>
+
+            <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
+                <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>¿Estás seguro de que quieres eliminar esta orden?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                    Esta acción no se puede deshacer. Se eliminará permanentemente la orden "{deletingOrder?.id}".
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setDeletingOrder(null)}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={confirmDelete}>Eliminar</AlertDialogAction>
+                </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {previewingOrder && (
+                <PurchaseOrderPreview
+                isOpen={!!previewingOrder}
+                onOpenChange={() => setPreviewingOrder(null)}
+                order={previewingOrder}
+                supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
+                onPrintRequest={handlePrint}
+                />
+            )}
+        </Tabs>
+        <div className="hidden">
+            {previewLotData && <LotGenerationContent ref={lotPrintRef} lotData={previewLotData} />}
+        </div>
+    </>
   );
 }
