@@ -111,6 +111,8 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             return;
         }
 
+        const generationTimestamp = Date.now().toString().slice(-6);
+
         const lotItems = selectedEntries.map(({ ocId, caliber: caliberName }, index) => {
             const order = allOrders.find(o => o.id === ocId);
             if (!order || !caliberName) return null;
@@ -124,7 +126,8 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             const avgWeight = totalPackages > 0 ? totalKilos / totalPackages : 0;
             
             const datePart = format(parseISO(order.date), 'yyyyMMdd');
-            const uniqueLotId = `LT-${datePart}-${index + 100}`;
+            const uniqueLotId = `LT-${datePart}-${generationTimestamp}${index}`;
+
 
             return {
                 lotId: uniqueLotId,
@@ -318,18 +321,16 @@ export default function PurchasesPage() {
       content: () => printComponentRef.current,
   });
 
-  const printLotRef = useRef<HTMLDivElement>(null);
+  const printLotRef = useCallback((node: any) => {
+    if (node !== null && isPrintingLot) {
+      handleLotPrint();
+    }
+  }, [isPrintingLot]);
 
   const handleLotPrint = useReactToPrint({
     content: () => printLotRef.current,
     onAfterPrint: () => setIsPrintingLot(false)
   });
-
-  useEffect(() => {
-    if (isPrintingLot && previewLotData) {
-      handleLotPrint();
-    }
-  }, [isPrintingLot, previewLotData, handleLotPrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -824,5 +825,6 @@ export default function PurchasesPage() {
     </>
   );
 }
+
 
 
