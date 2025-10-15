@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
-import { InventoryAdjustment } from '@/lib/types';
+import { inventoryAdjustments as initialInventoryAdjustments, purchaseOrders as initialPurchaseOrders } from '@/lib/data';
+import { InventoryAdjustment, PurchaseOrder } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { NewAdjustmentSheet } from './components/new-adjustment-sheet';
 import {
   AlertDialog,
@@ -21,11 +21,109 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Trash2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { format } from 'date-fns';
+
+type LotAdjustment = Omit<InventoryAdjustment, 'id' | 'product' | 'caliber'>;
+
+function LotAdjustmentForm({ onSave }: { onSave: (adjustment: LotAdjustment) => void }) {
+    const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+    const [formData, setFormData] = useState<Omit<LotAdjustment, 'id'>>({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        warehouse: '',
+        type: 'decrease',
+        quantity: 0,
+        packagingQuantity: 0,
+        reason: '',
+        lotNumber: '',
+    });
+
+    const allLotNumbers = useMemo(() => {
+        const lots = new Set<string>();
+        purchaseOrders.forEach(po => po.items.forEach(item => {
+            if (item.lotNumber) lots.add(item.lotNumber);
+        }));
+        return Array.from(lots);
+    }, [purchaseOrders]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave(formData);
+        setFormData({
+            date: format(new Date(), 'yyyy-MM-dd'),
+            warehouse: '',
+            type: 'decrease',
+            quantity: 0,
+            packagingQuantity: 0,
+            reason: '',
+            lotNumber: '',
+        });
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Nuevo Ajuste por Lote</CardTitle>
+                    <CardDescription>Ajuste el stock de un lote específico.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                        <Label htmlFor="lot-date">Fecha</Label>
+                        <Input id="lot-date" type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} required />
+                    </div>
+                     <div>
+                        <Label htmlFor="lot-warehouse">Bodega</Label>
+                        <Input id="lot-warehouse" value={formData.warehouse} onChange={e => setFormData(p => ({ ...p, warehouse: e.target.value }))} placeholder="Ej: Bodega Principal" required />
+                    </div>
+                    <div>
+                        <Label htmlFor="lot-number">Número de Lote</Label>
+                        <Select onValueChange={val => setFormData(p => ({ ...p, lotNumber: val }))} value={formData.lotNumber} required>
+                            <SelectTrigger><SelectValue placeholder="Seleccione un lote" /></SelectTrigger>
+                            <SelectContent>
+                                {allLotNumbers.map(lot => <SelectItem key={lot} value={lot}>{lot}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div>
+                        <Label htmlFor="lot-type">Tipo de Ajuste</Label>
+                        <Select onValueChange={(val: 'increase' | 'decrease') => setFormData(p => ({ ...p, type: val }))} value={formData.type} required>
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="decrease">Disminución</SelectItem>
+                                <SelectItem value="increase">Aumento</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label htmlFor="lot-quantity">Ajuste Kilos</Label>
+                        <Input id="lot-quantity" type="number" value={formData.quantity || ''} onChange={e => setFormData(p => ({ ...p, quantity: Number(e.target.value) }))} placeholder="0" />
+                    </div>
+                    <div>
+                        <Label htmlFor="lot-packagingQuantity">Ajuste Envases</Label>
+                        <Input id="lot-packagingQuantity" type="number" value={formData.packagingQuantity || ''} onChange={e => setFormData(p => ({ ...p, packagingQuantity: Number(e.target.value) }))} placeholder="0" />
+                    </div>
+                    <div className="md:col-span-2">
+                        <Label htmlFor="lot-reason">Motivo / Referencia (OC/OV)</Label>
+                        <Input id="lot-reason" value={formData.reason} onChange={e => setFormData(p => ({ ...p, reason: e.target.value }))} required />
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Button type="submit">Guardar Ajuste de Lote</Button>
+                </CardFooter>
+            </Card>
+        </form>
+    );
+}
 
 export default function InventoryAdjustmentsPage() {
   const [adjustments, setAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
+  const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   
   const [editingAdjustment, setEditingAdjustment] = useState<InventoryAdjustment | null>(null);
   const [deletingAdjustment, setDeletingAdjustment] = useState<InventoryAdjustment | null>(null);
@@ -44,7 +142,7 @@ export default function InventoryAdjustmentsPage() {
       }, 0);
 
     if (Array.isArray(data)) {
-        // Batch creation
+        // Batch creation from matrix
         const newAdjustments = data.map((adj, index) => ({
             ...(adj as Omit<InventoryAdjustment, 'id'>),
             id: `ADJ-${lastId + 1 + index}`,
@@ -57,14 +155,23 @@ export default function InventoryAdjustmentsPage() {
       setAdjustments(prev => prev.map(a => a.id === data.id ? data : a));
       toast({ title: "Ajuste Actualizado" });
     } else {
-       // Should not happen with new UI, but kept for safety.
-       // Single creation
+      // Single creation (from lot form)
+      const lotAdjustmentData = data as Omit<InventoryAdjustment, 'id'>;
+      
+      const poItem = purchaseOrders.flatMap(po => po.items).find(item => item.lotNumber === lotAdjustmentData.lotNumber);
+      if (!poItem) {
+          toast({ variant: 'destructive', title: 'Error', description: 'No se pudo encontrar el lote seleccionado.' });
+          return;
+      }
+      
       const newAdjustment = {
-        ...data,
+        ...lotAdjustmentData,
+        product: poItem.product,
+        caliber: poItem.caliber,
         id: `ADJ-${lastId + 1}`,
       };
       setAdjustments(prev => [...prev, newAdjustment]);
-      toast({ title: "Ajuste Creado" });
+      toast({ title: "Ajuste de Lote Creado" });
     }
     
     setIsSheetOpen(false);
@@ -102,37 +209,65 @@ export default function InventoryAdjustmentsPage() {
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete });
 
-  const renderContent = () => {
-    if (!isClient) {
-      return (
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      )
-    }
-    return <DataTable columns={columns} data={adjustments} />;
-  }
+  const { lotAdjustments, generalAdjustments } = useMemo(() => {
+    return adjustments.reduce((acc, adj) => {
+      if (adj.lotNumber) {
+        acc.lotAdjustments.push(adj);
+      } else {
+        acc.generalAdjustments.push(adj);
+      }
+      return acc;
+    }, { lotAdjustments: [] as InventoryAdjustment[], generalAdjustments: [] as InventoryAdjustment[] });
+  }, [adjustments]);
+
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="font-headline text-2xl">Ajustes de Inventario</CardTitle>
-              <CardDescription>Registra mermas, correcciones y otros movimientos de stock.</CardDescription>
-            </div>
-            <Button onClick={openNewAdjustmentSheet}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Nuevo Ajuste
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {renderContent()}
-        </CardContent>
-      </Card>
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="font-headline text-3xl">Ajustes de Inventario</h1>
+          <p className="text-muted-foreground">Registra mermas, correcciones y otros movimientos de stock.</p>
+        </div>
+        
+        <Tabs defaultValue="matrix">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="matrix">Ajustes por Matriz</TabsTrigger>
+                <TabsTrigger value="lot">Ajustes por Lote</TabsTrigger>
+            </TabsList>
+            <TabsContent value="matrix">
+                <Card className="mt-6">
+                    <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                        <CardTitle className="font-headline text-2xl">Ajustes Generales por Matriz</CardTitle>
+                        <CardDescription>Crea múltiples ajustes de stock por producto y calibre.</CardDescription>
+                        </div>
+                        <Button onClick={openNewAdjustmentSheet}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Nuevo Ajuste por Matriz
+                        </Button>
+                    </div>
+                    </CardHeader>
+                    <CardContent>
+                      {isClient ? <DataTable columns={columns} data={generalAdjustments} /> : <Skeleton className="h-64 w-full" />}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="lot">
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                    <LotAdjustmentForm onSave={handleSaveAdjustment} />
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Historial de Ajustes de Lote</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                           {isClient ? <DataTable columns={columns} data={lotAdjustments} /> : <Skeleton className="h-64 w-full" />}
+                        </CardContent>
+                    </Card>
+                 </div>
+            </TabsContent>
+        </Tabs>
+      </div>
       
       <NewAdjustmentSheet 
         isOpen={isSheetOpen}

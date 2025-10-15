@@ -309,6 +309,18 @@ export default function InventoryPage() {
             }
         });
         
+        inventoryAdjustments.forEach(adj => {
+          if (adj.lotNumber) {
+            const lot = lotMap.get(adj.lotNumber);
+            if (lot) {
+                const quantityKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
+                const quantityPkg = adj.type === 'increase' ? (adj.packagingQuantity || 0) : -(adj.packagingQuantity || 0);
+                lot.availableKilos += quantityKg;
+                lot.availablePackages += quantityPkg;
+            }
+          }
+        });
+
         lotMap.forEach(lot => {
             if (lot.initialPackages > 0) {
                 lot.avgWeight = lot.initialKilos / lot.initialPackages;
@@ -318,7 +330,7 @@ export default function InventoryPage() {
 
         return Array.from(lotMap.values()).sort((a,b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
 
-    }, [isClient, purchaseOrders, salesOrders, contacts]);
+    }, [isClient, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
     
     const filteredLotInventory = useMemo(() => {
         if (!lotFilter) return lotInventory;

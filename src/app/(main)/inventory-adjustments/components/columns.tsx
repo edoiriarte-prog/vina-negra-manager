@@ -46,6 +46,14 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Inv
     accessorKey: 'warehouse',
     header: 'Bodega',
   },
+    {
+    accessorKey: 'lotNumber',
+    header: 'Lote',
+    cell: ({ row }) => {
+        const lotNumber = row.getValue('lotNumber') as string | undefined;
+        return lotNumber ? <Badge variant="secondary">{lotNumber}</Badge> : '-';
+    }
+  },
   {
     accessorKey: 'type',
     header: 'Tipo',
@@ -88,6 +96,7 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Inv
     id: 'actions',
     cell: ({ row }) => {
       const adjustment = row.original;
+      const isLotAdjustment = !!adjustment.lotNumber;
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -98,7 +107,7 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Inv
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onEdit(adjustment)}>Editar</DropdownMenuItem>
+            {!isLotAdjustment && <DropdownMenuItem onClick={() => onEdit(adjustment)}>Editar</DropdownMenuItem>}
             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(adjustment)}>
               Eliminar
             </DropdownMenuItem>

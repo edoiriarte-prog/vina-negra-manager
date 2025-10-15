@@ -146,6 +146,7 @@ export type InventoryAdjustment = {
   quantity: number; // Kilos
   packagingQuantity?: number; // Packages
   reason: string;
+  lotNumber?: string;
 };
 
 export type BankAccount = {
@@ -162,3 +163,4 @@ export type BankAccount = {
     
 
     
+
