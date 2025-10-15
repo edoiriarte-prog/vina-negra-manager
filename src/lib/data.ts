@@ -1,6 +1,7 @@
 
 import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem, Interaction, BankAccount, InventoryAdjustment } from './types';
 import { initialCalibers } from './master-data';
+import { format } from 'date-fns';
 
 export const contacts: Contact[] = [
   { id: '1', name: 'Agrícola Santa Cruz', rut: '76.123.456-7', address: 'Fundo El Sol, Parcela 4', commune: 'Santa Cruz', email: 'contacto@agrisc.cl', contactPerson: 'Juan Pérez', type: ['supplier'], tags: ['Proveedor Estratégico', 'Uva'], interactions: [
@@ -14,16 +15,28 @@ export const contacts: Contact[] = [
   { id: '6', name: 'Fruits & Co. SpA', rut: '81.222.333-4', address: 'Av. del Mar 4500', commune: 'La Serena', email: 'hello@fruits.co', contactPerson: 'Sofia Lopez', type: ['client'], tags: ['Exportación', 'Asia'] },
 ];
 
-export const purchaseOrders: PurchaseOrder[] = [
+const rawPurchaseOrders: Omit<PurchaseOrder, 'items'> & { items: Omit<PurchaseOrder['items'][0], 'lotNumber'>[] }[] = [
   { id: 'OC-1001', supplierId: '1', date: '2023-10-01', items: [{ id: 'p1', product: 'UVAS', caliber: 'PRIMERA', quantity: 5000, unit: 'Kilos', price: 3000, packagingQuantity: 250, packagingType: 'CAJAS' }, { id: 'p2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 3000, unit: 'Kilos', price: 2500, packagingQuantity: 150, packagingType: 'CAJAS' }], totalAmount: 22500000, totalKilos: 8000, totalPackages: 400, status: 'completed', warehouse: 'Bodega Principal', paymentStatus: 'Abonado' },
   { id: 'OC-1002', supplierId: '5', date: '2023-10-08', items: [{ id: 'p3', product: 'PALTAS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 4000, packagingQuantity: 300, packagingType: 'CAJAS' }, { id: 'p4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 3500, packagingQuantity: 200, packagingType: 'CAJAS' }], totalAmount: 38000000, totalKilos: 10000, totalPackages: 500, status: 'completed', warehouse: 'Bodega Principal', paymentStatus: 'Abonado' },
   { id: 'OC-1003', supplierId: '1', date: '2023-10-15', items: [{ id: 'p5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 7000, unit: 'Kilos', price: 2000, packagingQuantity: 350, packagingType: 'CAJAS' }, { id: 'p6', product: 'DURAZNOS', caliber: 'PRIMERA', quantity: 2000, unit: 'Kilos', price: 1500, packagingQuantity: 100, packagingType: 'CAJAS' }], totalAmount: 17000000, totalKilos: 9000, totalPackages: 450, status: 'completed', warehouse: 'Bodega Principal', paymentStatus: 'Pendiente' },
 ];
 
+export const purchaseOrders: PurchaseOrder[] = rawPurchaseOrders.map(order => ({
+  ...order,
+  items: order.items.map((item, index) => {
+    const datePart = format(new Date(order.date), 'ddMMyy');
+    return {
+      ...item,
+      lotNumber: `LOTE-${datePart}-${order.supplierId}-${index}`
+    };
+  })
+}));
+
+
 export const salesOrders: SalesOrder[] = [
-  { id: 'OV-2001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'UVAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 4500, packagingQuantity: 200 }, { id: 's2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 2000, unit: 'Kilos', price: 5000, packagingQuantity: 100 }], totalKilos: 6000, totalPackages: 300, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed', paymentMethod: 'Contado', warehouse: 'Bodega Principal', paymentStatus: 'Pagado' },
-  { id: 'OV-2002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'PALTAS', caliber: 'EXTRA', quantity: 5000, unit: 'Kilos', price: 4500, packagingQuantity: 250 }, { id: 's4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 3000, unit: 'Kilos', price: 5000, packagingQuantity: 150 }], totalKilos: 8000, totalPackages: 400, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed', paymentMethod: 'Pago con Anticipo y Saldo', advancePercentage: 50, advanceDueDate: '2023-10-20', balanceDueDate: '2023-11-20', warehouse: 'Cámara de Frío 1', paymentStatus: 'Pagado' },
-  { id: 'OV-2003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 5500, packagingQuantity: 300 }], totalKilos: 6000, totalPackages: 300, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending', paymentMethod: 'Crédito', warehouse: 'Bodega Principal', paymentStatus: 'Pendiente' },
+  { id: 'OV-2001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'UVAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 4500, packagingQuantity: 200, lotNumber: 'LOTE-011023-1-0' }, { id: 's2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 2000, unit: 'Kilos', price: 5000, packagingQuantity: 100, lotNumber: 'LOTE-011023-1-1' }], totalKilos: 6000, totalPackages: 300, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed', paymentMethod: 'Contado', warehouse: 'Bodega Principal', paymentStatus: 'Pagado' },
+  { id: 'OV-2002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'PALTAS', caliber: 'EXTRA', quantity: 5000, unit: 'Kilos', price: 4500, packagingQuantity: 250, lotNumber: 'LOTE-081023-5-0' }, { id: 's4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 3000, unit: 'Kilos', price: 5000, packagingQuantity: 150, lotNumber: 'LOTE-081023-5-1' }], totalKilos: 8000, totalPackages: 400, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed', paymentMethod: 'Pago con Anticipo y Saldo', advancePercentage: 50, advanceDueDate: '2023-10-20', balanceDueDate: '2023-11-20', warehouse: 'Cámara de Frío 1', paymentStatus: 'Pagado' },
+  { id: 'OV-2003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 5500, packagingQuantity: 300, lotNumber: 'LOTE-151023-1-0' }], totalKilos: 6000, totalPackages: 300, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending', paymentMethod: 'Crédito', warehouse: 'Bodega Principal', paymentStatus: 'Pendiente' },
 ];
 
 export const serviceOrders: ServiceOrder[] = [
