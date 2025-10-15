@@ -1,8 +1,10 @@
 
+
 "use client";
 
 import React from 'react';
 import { format } from 'date-fns';
+import Barcode from 'react-barcode';
 
 type LotSelection = {
   orderId: string;
@@ -42,19 +44,34 @@ export const LotGenerationContent = React.forwardRef<HTMLDivElement, LotGenerati
         </div>
         <div className="flex-grow space-y-6">
           {items.map((item, index) => (
-            <div key={index} style={{ border: '4px solid black', padding: '20px', margin: '10px' }}>
-                <div style={{textAlign: 'center', marginBottom: '15px', borderBottom: '2px solid black', paddingBottom: '10px'}}>
-                    <h2 style={{ fontSize: '28px', margin: '0', fontWeight: 'bold' }}>ORDEN DE COMPRA: {item.orderId}</h2>
-                    <h3 style={{ fontSize: '22px', margin: '5px 0' }}>PRODUCTO: {item.productName.toUpperCase()}</h3>
+            <div key={index} className="border-4 border-black p-5 m-2.5">
+                <div className="text-center mb-4 border-b-2 border-black pb-2.5">
+                    <h2 className="text-3xl font-bold m-0">ORDEN DE COMPRA: {item.orderId}</h2>
+                    <h3 className="text-2xl font-medium my-1.5">{item.productName.toUpperCase()}</h3>
                 </div>
-                <div style={{textAlign: 'center', marginBottom: '15px' }}>
-                    <h1 style={{ fontSize: '48px', margin: '0', fontWeight: 'bold' }}>CALIBRE: {item.caliberName.toUpperCase()} ({item.caliberCode})</h1>
+                 <div className="grid grid-cols-2 gap-4 text-xl mb-4">
+                    <div>
+                        <p><span className="font-bold">Proveedor:</span></p>
+                        <p>{item.supplierName}</p>
+                    </div>
+                    <div className="text-right">
+                       <p><span className="font-bold">Calibre:</span></p>
+                       <p className="text-4xl font-bold">{item.caliberName.toUpperCase()} ({item.caliberCode})</p>
+                    </div>
                 </div>
-                 <div className="grid grid-cols-2 gap-4 text-lg">
-                    <p><span className="font-bold">Proveedor:</span> {item.supplierName}</p>
-                    <p><span className="font-bold">Total Envases:</span> {item.totalPackages.toLocaleString('es-CL')}</p>
-                    <p><span className="font-bold">Total Kilos:</span> {item.totalKilos.toLocaleString('es-CL')} kg</p>
-                    <p><span className="font-bold">Peso Promedio:</span> {item.avgWeight.toFixed(2)} kg</p>
+                 <div className="grid grid-cols-3 gap-4 text-xl border-t-2 border-black pt-4">
+                    <div className="text-center">
+                        <p className="font-bold">Total Envases</p>
+                        <p className="text-3xl">{item.totalPackages.toLocaleString('es-CL')}</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="font-bold">Total Kilos</p>
+                        <p className="text-3xl">{item.totalKilos.toLocaleString('es-CL')} kg</p>
+                    </div>
+                     <div className="text-center">
+                        <p className="font-bold">Peso Promedio</p>
+                        <p className="text-3xl">{item.avgWeight.toFixed(2)} kg</p>
+                    </div>
                 </div>
             </div>
           ))}
@@ -62,12 +79,14 @@ export const LotGenerationContent = React.forwardRef<HTMLDivElement, LotGenerati
       </div>
 
       {/* Page 2: Individual Label Sample */}
-       <div className="w-full h-full flex flex-col items-center justify-center">
+       <div className="w-full h-full flex flex-col items-center justify-center pt-10">
         {firstItem && (
-            <div style={{ border: '2px solid black', padding: '20px', width: '400px', fontFamily: 'Arial, sans-serif' }}>
-                <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>PRODUCTO: {firstItem.productName.toUpperCase()}</p>
-                <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '10px 0', textAlign: 'center' }}>CALIBRE: {firstItem.caliberCode}</p>
-                <p style={{ fontSize: '16px', margin: '20px 0 0 0' }}>LOTE: {lotId}</p>
+            <div className="border-2 border-black p-5 w-[400px]">
+                <p className="text-lg font-bold m-0">PRODUCTO: {firstItem.productName.toUpperCase()}</p>
+                <p className="text-4xl font-bold my-2.5 text-center">CALIBRE: {firstItem.caliberCode}</p>
+                <div className="text-center mt-4">
+                  <Barcode value={lotId} height={40} width={2} fontSize={12} />
+                </div>
             </div>
         )}
       </div>
