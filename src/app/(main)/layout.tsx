@@ -9,7 +9,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
-import { MainNav } from '@/components/main-nav';
+import { MainNav } from './main-nav';
 import { UserNav } from '@/components/user-nav';
 import { Separator } from '@/components/ui/separator';
 

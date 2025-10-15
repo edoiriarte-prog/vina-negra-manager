@@ -34,8 +34,8 @@ const menuItems = [
   { href: "/inventory", label: "Inventario", icon: Boxes },
   { href: "/inventory-adjustments", label: "Ajustes de Inventario", icon: FileSliders },
   { href: "/financials", label: "Tesorería", icon: Landmark },
+  { href: "/current-account", label: "Gestión de Cuentas", icon: BookUser },
   { href: "/reports", label: "Informes", icon: BarChart },
-  { href: "/current-account", label: "Gestion Cta. Cte.", icon: BookUser },
   { href: "/settings", label: "Configuración", icon: Settings },
   { href: "/help", label: "Ayuda", icon: HelpCircle },
 ]
