@@ -31,40 +31,40 @@ export const LotLabelContent = React.forwardRef<HTMLDivElement, LotLabelContentP
     <div ref={ref}>
       <div className="lot-page p-8 w-[210mm] h-[297mm] bg-white text-black font-sans flex flex-col">
         {/* Main Lot Label */}
-        <div className="border-4 border-black p-6 h-full flex flex-col">
-          <div className="text-center mb-6 border-b-4 border-black pb-4">
-            <h1 className="text-4xl font-bold tracking-wider">LOTE DE PRODUCCIÓN</h1>
-            <h2 className="text-3xl font-semibold mt-2">{specificItem.product}</h2>
+        <div className="border-[10px] border-black p-6 h-full flex flex-col">
+          <div className="text-center mb-6 border-b-[8px] border-black pb-4">
+            <h1 className="text-5xl font-bold tracking-wider">LOTE DE PRODUCCIÓN</h1>
+            <h2 className="text-4xl font-semibold mt-4">{specificItem.product}</h2>
           </div>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-6 flex-grow text-xl">
+          <div className="grid grid-cols-2 gap-x-12 gap-y-8 flex-grow text-3xl">
             <div><span className="font-bold">O/C:</span> {order.id}</div>
-            <div><span className="font-bold">FECHA COSECHA:</span> {format(parseISO(order.date), 'dd/MM/yyyy')}</div>
+            <div><span className="font-bold">FECHA:</span> {format(parseISO(order.date), 'dd/MM/yyyy')}</div>
             <div className="col-span-2"><span className="font-bold">PRODUCTO:</span> {specificItem.product}</div>
             <div className="col-span-2"><span className="font-bold">CALIBRE:</span> {specificItem.caliber} ({getCaliberCode(specificItem.caliber)})</div>
             <div className="col-span-2"><span className="font-bold">PROVEEDOR:</span> {supplier?.name || 'N/A'}</div>
             
-            <div className="col-span-2 border-t-4 border-black pt-6 mt-4">
+            <div className="col-span-2 border-t-[8px] border-black pt-6 mt-6">
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <div className="font-bold text-2xl">Nº ENVASES</div>
-                  <div className="text-4xl font-mono font-extrabold mt-2">{specificItem.packagingQuantity?.toLocaleString('es-CL') || 0}</div>
+                  <div className="font-bold text-3xl">Nº ENVASES</div>
+                  <div className="text-6xl font-mono font-extrabold mt-2">{specificItem.packagingQuantity?.toLocaleString('es-CL') || 0}</div>
                 </div>
                 <div>
-                  <div className="font-bold text-2xl">KG TOTALES</div>
-                  <div className="text-4xl font-mono font-extrabold mt-2">{specificItem.quantity.toLocaleString('es-CL')}</div>
+                  <div className="font-bold text-3xl">KG TOTALES</div>
+                  <div className="text-6xl font-mono font-extrabold mt-2">{specificItem.quantity.toLocaleString('es-CL')}</div>
                 </div>
                  <div>
-                  <div className="font-bold text-2xl">PESO PROMEDIO</div>
-                  <div className="text-4xl font-mono font-extrabold mt-2">{avgWeight.toFixed(2)}</div>
+                  <div className="font-bold text-3xl">PESO PROMEDIO</div>
+                  <div className="text-6xl font-mono font-extrabold mt-2">{avgWeight.toFixed(2)}</div>
                 </div>
               </div>
             </div>
           </div>
-          <div className="mt-auto text-center border-t-4 border-black pt-6">
-            <h3 className="font-bold text-2xl mb-2">LOTE</h3>
+          <div className="mt-auto text-center border-t-[8px] border-black pt-6">
+            <h3 className="font-bold text-3xl mb-4">LOTE</h3>
             {specificItem.lotNumber && (
               <div className="flex justify-center">
-                <Barcode value={specificItem.lotNumber} width={2.5} height={100} />
+                <Barcode value={specificItem.lotNumber} width={3} height={120} fontSize={24} />
               </div>
             )}
           </div>
@@ -74,13 +74,13 @@ export const LotLabelContent = React.forwardRef<HTMLDivElement, LotLabelContentP
        <div className="lot-page-boxes p-4 w-[210mm] h-[297mm] bg-white text-black font-sans">
           <div className="grid grid-cols-4 grid-rows-6 gap-2 h-full">
               {Array.from({ length: specificItem.packagingQuantity || 0 }).map((_, i) => (
-                  <div key={i} className="border border-black p-1 text-center text-[8px] flex flex-col items-center justify-center">
-                      <p className="font-bold">{specificItem.product} - {specificItem.caliber}</p>
-                      <p>{supplier?.name}</p>
+                  <div key={i} className="border-2 border-black p-1 text-center text-[10px] flex flex-col items-center justify-center">
+                      <p className="font-bold text-xs">{specificItem.product} - {specificItem.caliber}</p>
+                      <p className="text-[9px]">{supplier?.name}</p>
                        <div className="my-1">
-                        <Barcode value={individualLabelCode} height={20} width={1} fontSize={8} margin={2} />
+                        <Barcode value={individualLabelCode} height={25} width={1.2} fontSize={10} margin={2} />
                       </div>
-                      <p>{order.id}</p>
+                      <p className="font-mono text-[9px]">{order.id}</p>
                   </div>
               ))}
           </div>
