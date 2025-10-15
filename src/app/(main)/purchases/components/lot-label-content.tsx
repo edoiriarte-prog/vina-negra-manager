@@ -12,7 +12,7 @@ interface LotLabelContentProps {
   supplier: Contact | null;
 }
 
-const LotLabelContent = React.forwardRef<HTMLDivElement, LotLabelContentProps>(({ order, supplier }, ref) => {
+export const LotLabelContent = React.forwardRef<HTMLDivElement, LotLabelContentProps>(({ order, supplier }, ref) => {
   const { calibers } = useMasterData();
   
   const getCaliberCode = (caliberName: string) => {
@@ -94,4 +94,3 @@ const LotLabelContent = React.forwardRef<HTMLDivElement, LotLabelContentProps>((
 });
 
 LotLabelContent.displayName = 'LotLabelContent';
-
