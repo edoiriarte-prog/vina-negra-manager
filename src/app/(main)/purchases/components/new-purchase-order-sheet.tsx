@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, Wand2 } from 'lucide-react';
+import { PlusCircle, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -138,24 +138,6 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     }
     setIsMatrixOpen(false);
   }
-
-  const generateLotNumber = (itemIndex: number) => {
-    if (!formData.supplierId) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Por favor, seleccione un proveedor antes de generar un lote.",
-      });
-      return;
-    }
-    const datePart = formData.date.replace(/-/g, '');
-    const lot = `LOTE-${datePart}-${formData.supplierId}-${itemIndex}`;
-    handleItemChange(itemIndex, 'lotNumber', lot);
-    toast({
-        title: "Lote Generado",
-        description: `Se ha asignado el lote: ${lot}`,
-    });
-  };
 
   const title = order ? 'Editar Orden de Compra' : 'Crear Orden de Compra';
   const description = order 
@@ -294,16 +276,6 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                         </div>
-                         {/* Lot */}
-                         <div className="col-span-12 mt-2">
-                           <Label>Lote</Label>
-                           <div className="flex gap-2">
-                              <Input name={`items.${index}.lotNumber`} value={item.lotNumber || ''} onChange={handleInputChange} placeholder="Número de lote" />
-                              <Button type="button" variant="outline" size="icon" onClick={() => generateLotNumber(index)} title="Generar Lote">
-                                  <Wand2 className="h-4 w-4" />
-                              </Button>
-                           </div>
-                         </div>
                     </div>
                 )})}
             </div>
