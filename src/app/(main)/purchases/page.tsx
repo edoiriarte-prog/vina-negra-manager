@@ -636,3 +636,5 @@ export default function PurchasesPage() {
     </>
   );
 }
+
+    
