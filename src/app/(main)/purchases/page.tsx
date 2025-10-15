@@ -290,8 +290,6 @@ export default function PurchasesPage() {
   const [lotFilter, setLotFilter] = useState('');
   
   const printComponentRef = useRef<HTMLDivElement>(null);
-  const printLotRef = useRef<HTMLDivElement>(null);
-
   const { toast } = useToast();
 
   const handlePrint = useReactToPrint({
@@ -303,18 +301,18 @@ export default function PurchasesPage() {
     onAfterPrint: () => {
       setIsPrintingLot(false);
       setPreviewLotData(null);
-    }
+    },
   });
+
+  const printLotRef = useCallback((node: HTMLDivElement) => {
+      if (node !== null && isPrintingLot) {
+          handleLotPrint();
+      }
+  }, [isPrintingLot, handleLotPrint]);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
-
-  useEffect(() => {
-    if (isPrintingLot && previewLotData) {
-      handleLotPrint();
-    }
-  }, [isPrintingLot, previewLotData, handleLotPrint]);
 
   const suppliers = useMemo(() => contacts.filter(c => c.type.includes('supplier')), [contacts]);
 
@@ -794,18 +792,8 @@ export default function PurchasesPage() {
                 onPrintRequest={handlePrint}
                 />
             )}
-             {previewLotData && (
+             {isPrintingLot && previewLotData && (
                 <div className="hidden">
-                    <LotLabelPreview
-                        isOpen={isPrintingLot}
-                        onOpenChange={(open) => {
-                            if (!open) {
-                                setIsPrintingLot(false);
-                                setPreviewLotData(null);
-                            }
-                        }}
-                        lotData={previewLotData}
-                    />
                     <div ref={printLotRef}>
                         <LotGenerationContent lotData={previewLotData} />
                     </div>
@@ -815,3 +803,4 @@ export default function PurchasesPage() {
     </>
   );
 }
+
