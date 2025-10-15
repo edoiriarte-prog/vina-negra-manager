@@ -147,12 +147,34 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             });
             return;
         }
+
+        setPreviewData({
+            creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
+            items: lotItems,
+        });
+
+        toast({
+            title: 'Previsualización Generada',
+            description: `Se ha generado una vista previa para ${lotItems.length} lotes.`,
+        });
+    };
+
+    const handleSaveLots = () => {
+        if (!previewData || !previewData.items || previewData.items.length === 0) {
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Genere una previsualización antes de guardar.',
+            });
+            return;
+        }
         
-        // --- Save Lot Number to Purchase Order ---
+        const { items: lotItems } = previewData;
+
         const updatedOrders = allOrders.map(order => {
             let orderWasUpdated = false;
             const updatedItems = order.items.map(item => {
-                const lotItemMatch = lotItems.find(li => li.orderId === order.id && li.caliberName === item.caliber);
+                const lotItemMatch = lotItems.find((li: any) => li.orderId === order.id && li.caliberName === item.caliber);
                 if (lotItemMatch) {
                     orderWasUpdated = true;
                     return { ...item, lotNumber: lotItemMatch.lotId };
@@ -167,18 +189,13 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
         });
         
         setAllOrders(updatedOrders);
-        // --- End Save Logic ---
-
-        setPreviewData({
-            creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-            items: lotItems,
-        });
-
+        
         toast({
-            title: 'Lote Generado y Guardado',
+            title: 'Lotes Guardados en O/C',
             description: `${lotItems.length} lotes han sido guardados en las OCs correspondientes.`,
         });
     };
+
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
@@ -242,9 +259,14 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                     </div>
                 </CardContent>
                  <CardFooter className="flex-col items-stretch gap-4 pt-6 mt-auto">
-                    <Button onClick={handleGeneratePreview} disabled={Object.values(selectedCalibers).every(c => c.length === 0)}>
-                        Generar Previsualización y Guardar Lotes
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                        <Button onClick={handleGeneratePreview} disabled={Object.values(selectedCalibers).every(c => c.length === 0)}>
+                            Previsualizar Lotes
+                        </Button>
+                         <Button onClick={handleSaveLots} disabled={!previewData}>
+                            Guardar Lotes en O/C
+                        </Button>
+                    </div>
                     <Button onClick={handlePrint} disabled={!previewData} variant="outline">
                         Exportar a PDF e Imprimir
                     </Button>
@@ -296,19 +318,18 @@ export default function PurchasesPage() {
       content: () => printComponentRef.current,
   });
 
+  const printLotRef = useRef<HTMLDivElement>(null);
+
   const handleLotPrint = useReactToPrint({
     content: () => printLotRef.current,
-    onAfterPrint: () => {
-      setIsPrintingLot(false);
-      setPreviewLotData(null);
-    },
+    onAfterPrint: () => setIsPrintingLot(false)
   });
 
-  const printLotRef = useCallback((node: HTMLDivElement) => {
-      if (node !== null && isPrintingLot) {
-          handleLotPrint();
-      }
-  }, [isPrintingLot, handleLotPrint]);
+  useEffect(() => {
+    if (isPrintingLot && previewLotData) {
+      handleLotPrint();
+    }
+  }, [isPrintingLot, previewLotData, handleLotPrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -803,4 +824,5 @@ export default function PurchasesPage() {
     </>
   );
 }
+
 
