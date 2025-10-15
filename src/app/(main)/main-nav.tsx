@@ -33,7 +33,7 @@ const menuItems = [
   { href: "/inventory", label: "Inventario", icon: Boxes },
   { href: "/inventory-adjustments", label: "Ajustes de Inventario", icon: FileSliders },
   { href: "/financials", label: "Tesorería", icon: Landmark },
-  { href: "/reports", label: "Informes", icon: BarChart },
+  { href: "/mercantile-account", label: "Cta. Corriente Mercantil", icon: BarChart },
   { href: "/settings", label: "Configuración", icon: Settings },
   { href: "/help", label: "Ayuda", icon: HelpCircle },
 ]
