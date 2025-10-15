@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import { PurchaseOrder, Contact, OrderItem } from '@/lib/types';
+import { PurchaseOrder, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import Barcode from 'react-barcode';
 import { useMasterData } from '@/hooks/use-master-data';

@@ -26,6 +26,7 @@ import { es } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useReactToPrint } from 'react-to-print';
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
+import { LotLabelPreview } from './components/lot-label-preview';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,7 @@ export default function PurchasesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
+  const [lotsToPrint, setLotsToPrint] = useState<PurchaseOrder | null>(null);
   const [selectedOrderForActions, setSelectedOrderForActions] = useState<PurchaseOrder | null>(null);
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
@@ -217,6 +219,11 @@ export default function PurchasesPage() {
 
   const handlePreviewRequest = (order: PurchaseOrder) => {
     setPreviewingOrder(order);
+    setSelectedOrderForActions(null);
+  }
+
+  const handleLotsPrintRequest = (order: PurchaseOrder) => {
+    setLotsToPrint(order);
     setSelectedOrderForActions(null);
   }
 
@@ -407,6 +414,10 @@ export default function PurchasesPage() {
                 <Eye className="mr-2 h-4 w-4" />
                 Visualizar O/C
             </Button>
+            <Button variant="outline" onClick={() => selectedOrderForActions && handleLotsPrintRequest(selectedOrderForActions)}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir Lotes
+            </Button>
             <Button variant="outline" onClick={() => selectedOrderForActions && handleEdit(selectedOrderForActions)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
@@ -444,6 +455,14 @@ export default function PurchasesPage() {
           order={previewingOrder}
           supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
           onPrintRequest={handlePrint}
+        />
+      )}
+      {lotsToPrint && (
+        <LotLabelPreview
+            isOpen={!!lotsToPrint}
+            onOpenChange={() => setLotsToPrint(null)}
+            order={lotsToPrint}
+            supplier={suppliers.find(s => s.id === lotsToPrint.supplierId) || null}
         />
       )}
     </>
