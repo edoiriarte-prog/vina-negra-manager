@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, Eye, CalendarIcon, Wand2 } from 'lucide-react';
+import { PlusCircle, Trash2, Eye, CalendarIcon, Layers } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -36,6 +36,7 @@ import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ItemMatrixDialog } from './item-matrix-dialog';
+import { LotSelectionDialog } from './lot-selection-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
@@ -50,8 +51,8 @@ type NewSalesOrderSheetProps = {
   carriers: Contact[];
   inventory: InventoryItem[];
   nextOrderId: string;
-  getNextLotNumber: () => string;
   purchaseOrders: PurchaseOrder[];
+  salesOrders: SalesOrder[];
 };
 
 
@@ -84,17 +85,16 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
     };
 };
 
-export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId, getNextLotNumber, purchaseOrders }: NewSalesOrderSheetProps) {
+export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId, purchaseOrders, salesOrders }: NewSalesOrderSheetProps) {
   const [formData, setFormData] = useState(() => getInitialFormData(order));
-  const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
+  const [isLotSelectionOpen, setIsLotSelectionOpen] = useState(false);
   const { products, calibers, units, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen) {
       setFormData(getInitialFormData(order));
-      setNewItem({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
     }
   }, [order, isOpen]);
 
@@ -106,43 +106,11 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const addItem = () => {
-    if (newItem.product && newItem.caliber && newItem.quantity > 0 && newItem.price > 0) {
-       // Stock validation
-        const inventoryItem = inventory.find(i => i.product === newItem.product && i.caliber === newItem.caliber && i.warehouse === formData.warehouse);
-        const currentStock = inventoryItem ? inventoryItem.stock : 0;
-        
-        if (newItem.quantity > currentStock) {
-            toast({
-                variant: "destructive",
-                title: "Error de Stock",
-                description: `No hay suficiente stock para ${newItem.product} - ${newItem.caliber}. Stock actual: ${currentStock} kg.`,
-            });
-            return;
-        }
-
-      if (order) {
-        // If editing an existing order, we pass the new item up to be added
-        onSave(formData, [{...newItem, id: `temp-${Date.now()}`}]);
-      } else {
-        // If creating a new order, we add it to local state
-        setFormData(prev => ({
-          ...prev,
-          items: [...prev.items, { ...newItem, id: `temp-${Date.now()}` }],
-        }));
-      }
-      setNewItem({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0, packagingType: '', packagingQuantity: 0 });
-    }
-  };
-
-  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalAmount' | 'totalKilos' | 'totalPackages' > | `items.${number}.${keyof OrderItem}` | `newItem.${keyof OrderItem}`, value: any) => {
+  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalAmount' | 'totalKilos' | 'totalPackages' > | `items.${number}.${keyof OrderItem}`, value: any) => {
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, value);
-    } else if (name.startsWith('newItem.')) {
-        const field = name.split('.')[1] as keyof OrderItem;
-        setNewItem(prev => ({ ...prev, [field]: value }));
     } else {
         setFormData(prev => ({ ...prev, [name as keyof typeof formData]: value }));
     }
@@ -238,10 +206,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
-        handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'advancePercentage', 'packagingQuantity', 'lotNumber'].includes(field) ? (field === 'lotNumber' ? value : Number(value)) : value);
-    } else if (name.startsWith('newItem.')) {
-        const field = name.split('.')[1] as keyof typeof newItem;
-        setNewItem(prev => ({ ...prev, [field]: ['quantity', 'price', 'packagingQuantity'].includes(field) ? Number(value) : value }));
+        handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'advancePercentage', 'packagingQuantity'].includes(field) ? Number(value) : value);
     } else {
         setFormData((prev) => ({ ...prev, [name]: ['advancePercentage'].includes(name) ? Number(value) : value }));
     }
@@ -260,15 +225,19 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     }
     setIsMatrixOpen(false);
   }
+  
+  const handleLotSave = (lotItem: OrderItem) => {
+    const newItem: OrderItem = {
+      ...lotItem,
+      id: `temp-lot-${Date.now()}`
+    };
 
-  const generateLotNumber = (itemIndex: number) => {
-    const lot = getNextLotNumber();
-    handleItemChange(itemIndex, 'lotNumber', lot);
-    toast({
-      title: 'Lote Generado',
-      description: `Se ha asignado el lote: ${lot}`,
-    });
-  };
+    if (order) {
+      onSave(formData, [newItem]);
+    } else {
+      setFormData(prev => ({ ...prev, items: [...prev.items, newItem]}));
+    }
+  }
 
   const title = order ? 'Editar Orden de Venta' : 'Crear Orden de Venta';
   const description = order 
@@ -289,26 +258,6 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
      return totalAmount - advanceAmount;
   }, [totalAmount, advanceAmount, formData.paymentMethod]);
 
-  const handlePurchaseOrderSelect = (purchaseOrderId: string) => {
-    const po = purchaseOrders.find(p => p.id === purchaseOrderId);
-    if (po) {
-      const newItems = po.items.map(item => ({
-        ...item,
-        price: 0, // Reset price to 0
-        id: `temp-po-${po.id}-${item.id}-${Date.now()}`
-      }));
-      setFormData(prev => ({
-        ...prev,
-        items: [...prev.items, ...newItems],
-        relatedPurchaseIds: [...(prev.relatedPurchaseIds || []), po.id],
-        purchaseOrder: purchaseOrderId
-      }));
-      toast({
-        title: "Ítems Agregados",
-        description: `Se agregaron ${newItems.length} ítems desde la O/C ${purchaseOrderId}.`,
-      })
-    }
-  }
 
   if (!formData) return null;
 
@@ -499,30 +448,20 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <CardTitle className="text-lg font-headline">Ítems de la Orden</CardTitle>
-                         <Button type="button" variant="outline" size="sm" onClick={() => setIsMatrixOpen(true)} disabled={!formData.warehouse}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Agregar Matriz de Items
-                        </Button>
+                         <div className="flex gap-2">
+                             <Button type="button" variant="outline" size="sm" onClick={() => setIsLotSelectionOpen(true)} disabled={!formData.warehouse}>
+                                <Layers className="mr-2 h-4 w-4" />
+                                Agregar desde Lote
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => setIsMatrixOpen(true)} disabled={!formData.warehouse}>
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Agregar por Matriz
+                            </Button>
+                         </div>
                     </div>
                      {!formData.warehouse && <p className="text-xs text-destructive">Seleccione una bodega para agregar items.</p>}
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-4 items-center gap-4 my-4">
-                      <Label htmlFor="purchaseOrder" className="text-right">
-                        Agregar desde O/C
-                      </Label>
-                      <Select onValueChange={handlePurchaseOrderSelect} value={formData.purchaseOrder || ''}>
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Seleccione una Orden de Compra para agregar sus ítems" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {purchaseOrders.filter(po => po.status === 'completed').map(po => (
-                            <SelectItem key={po.id} value={po.id}>{po.id}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
                     {formData.items.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay ítems en la orden.</p>}
 
                     {formData.items.map((item, index) => {
@@ -601,9 +540,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                              {/* Lot Number */}
                              <div className="col-span-10 mt-2">
                                <Label>Lote</Label>
-                               <div className="flex gap-2">
-                                <Input name={`items.${index}.lotNumber`} value={item.lotNumber || ''} onChange={handleInputChange} placeholder="Número de lote" />
-                               </div>
+                               <Input name={`items.${index}.lotNumber`} value={item.lotNumber || ''} onChange={handleInputChange} placeholder="Número de lote" />
                              </div>
 
                             {/* Remove button */}
@@ -760,6 +697,15 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         onSave={handleMatrixSave}
         orderType="sale"
         inventory={inventory.filter(i => i.warehouse === formData.warehouse)}
+      />
+      
+      <LotSelectionDialog 
+        isOpen={isLotSelectionOpen}
+        onOpenChange={setIsLotSelectionOpen}
+        purchaseOrders={purchaseOrders}
+        salesOrders={salesOrders}
+        onSave={handleLotSave}
+        warehouse={formData.warehouse}
       />
     </>
   );

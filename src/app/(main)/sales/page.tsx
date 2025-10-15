@@ -120,12 +120,6 @@ export default function SalesPage() {
     return `OV-${lastIdNumber + 1}`;
   }, [salesOrders]);
 
-  const getNextLotNumber = useCallback(() => {
-    // This is a simplified lot number generator.
-    const lotNumber = `L${Date.now().toString().slice(-6)}`;
-    return lotNumber;
-  }, []);
-
 
   const handleSaveOrder = (orderData: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
     let orderToSave: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>;
@@ -467,8 +461,8 @@ export default function SalesPage() {
             carriers={carriers}
             inventory={inventory}
             nextOrderId={nextOrderId}
-            getNextLotNumber={getNextLotNumber}
             purchaseOrders={purchaseOrders}
+            salesOrders={salesOrders}
         />
       )}
 

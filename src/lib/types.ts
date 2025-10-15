@@ -32,6 +32,10 @@ export type OrderItem = {
   packagingType?: string;
   packagingQuantity?: number;
   lotNumber?: string;
+  sourceLot?: {
+    purchaseOrderId: string;
+    purchaseOrderItemId: string;
+  }
 };
 
 export type PackagingItem = {
