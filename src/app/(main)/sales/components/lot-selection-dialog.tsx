@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { OrderItem, PurchaseOrder, SalesOrder, Contact } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { parseISO } from 'date-fns';
 
 type LotSelectionDialogProps = {
   isOpen: boolean;
@@ -35,6 +36,7 @@ type AvailableLot = {
   product: string;
   caliber: string;
   supplierId: string;
+  purchaseDate: string;
   originalQuantity: number;
   availableQuantity: number;
   originalPackagingQuantity: number;
@@ -62,6 +64,7 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
               product: item.product,
               caliber: item.caliber,
               supplierId: po.supplierId,
+              purchaseDate: po.date,
               originalQuantity: item.quantity,
               availableQuantity: item.quantity,
               originalPackagingQuantity: item.packagingQuantity || 0,
@@ -88,6 +91,9 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
         }
       });
     });
+    
+    // 3. Sort by date (oldest first)
+    lots.sort((a,b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
 
     return lots.filter(l => l.availableQuantity > 0 && l.availablePackagingQuantity > 0);
   }, [purchaseOrders, salesOrders, warehouse]);
@@ -138,13 +144,18 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
     return contacts.find(c => c.id === id)?.name || 'Desconocido';
   }
 
+  const handleQuantityChange = (lotNumber: string, value: string) => {
+      const numValue = Number(value);
+      setQuantitiesToLoad(prev => ({ ...prev, [lotNumber]: numValue }));
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>Seleccionar Lote de Inventario</DialogTitle>
           <DialogDescription>
-            Busque y agregue ítems desde lotes de compra existentes en la bodega '{warehouse}'.
+            Busque y agregue ítems desde lotes de compra existentes en la bodega '{warehouse}'. Los lotes se muestran del más antiguo al más nuevo.
           </DialogDescription>
         </DialogHeader>
 
@@ -191,7 +202,7 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
                         type="number"
                         placeholder="0"
                         value={quantitiesToLoad[lot.lotNumber] || ''}
-                        onChange={e => setQuantitiesToLoad(prev => ({ ...prev, [lot.lotNumber]: Number(e.target.value)}))}
+                        onChange={e => handleQuantityChange(lot.lotNumber, e.target.value)}
                         max={lot.availablePackagingQuantity}
                       />
                     </TableCell>
