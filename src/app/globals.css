@@ -81,6 +81,11 @@
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
   body {
     background: white !important;
     color: black !important;
@@ -98,6 +103,10 @@
     text-shadow: none !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .lot-page, .lot-page-boxes {
+    page-break-after: always;
   }
 
   .print-section {
@@ -150,4 +159,3 @@
     font-size: 10px;
   }
 }
-

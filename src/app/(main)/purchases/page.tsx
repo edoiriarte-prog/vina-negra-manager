@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, ChevronDown, MoreHorizontal, Eye, Printer, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Download, ChevronDown, MoreHorizontal, Eye, Printer, Edit, Trash2, Tag } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -27,6 +27,7 @@ import { es } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useReactToPrint } from 'react-to-print';
 import { PreviewContent } from './components/purchase-order-preview-content';
+import { LotLabelContent } from './components/lot-label-content';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -56,16 +57,22 @@ export default function PurchasesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [orderToPrint, setOrderToPrint] = useState<PurchaseOrder | null>(null);
+  const [lotsToPrint, setLotsToPrint] = useState<PurchaseOrder | null>(null);
   const [selectedOrderForActions, setSelectedOrderForActions] = useState<PurchaseOrder | null>(null);
   
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
 
   const printComponentRef = useRef<HTMLDivElement>(null);
+  const lotPrintRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
+  });
+  
+  const handlePrintLots = useReactToPrint({
+    content: () => lotPrintRef.current,
   });
 
   useEffect(() => {
@@ -76,6 +83,16 @@ export default function PurchasesPage() {
       }, 100);
     }
   }, [orderToPrint, handlePrint]);
+
+  useEffect(() => {
+    if (lotsToPrint) {
+        setTimeout(() => {
+            handlePrintLots();
+            setLotsToPrint(null);
+        }, 100);
+    }
+  }, [lotsToPrint, handlePrintLots]);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -235,6 +252,12 @@ export default function PurchasesPage() {
     setOrderToPrint(order);
     setSelectedOrderForActions(null);
   }
+
+  const handlePrintLotsRequest = (order: PurchaseOrder) => {
+    setLotsToPrint(order);
+    setSelectedOrderForActions(null);
+  };
+
 
   const handleExportAll = () => {
     if (purchaseOrders.length === 0) {
@@ -421,11 +444,11 @@ export default function PurchasesPage() {
           <div className="grid grid-cols-2 gap-4 py-4">
             <Button variant="outline" onClick={() => selectedOrderForActions && handlePrintRequest(selectedOrderForActions)}>
                 <Printer className="mr-2 h-4 w-4" />
-                Imprimir PDF
+                Imprimir O/C
             </Button>
-            <Button variant="outline" onClick={() => selectedOrderForActions && handlePreview(selectedOrderForActions)}>
-                <Eye className="mr-2 h-4 w-4" />
-                Visualizar
+            <Button variant="outline" onClick={() => selectedOrderForActions && handlePrintLotsRequest(selectedOrderForActions)}>
+                <Tag className="mr-2 h-4 w-4" />
+                Imprimir Lotes
             </Button>
              <Button variant="outline" onClick={() => selectedOrderForActions && handleEdit(selectedOrderForActions)}>
                 <Edit className="mr-2 h-4 w-4" />
@@ -488,6 +511,13 @@ export default function PurchasesPage() {
                 supplier={suppliers.find(s => s.id === orderToPrint.supplierId) || null}
                 onEdit={() => {}}
                 onDelete={() => {}}
+            />
+        )}
+        {lotsToPrint && (
+            <LotLabelContent 
+                ref={lotPrintRef}
+                order={lotsToPrint}
+                supplier={suppliers.find(s => s.id === lotsToPrint.supplierId) || null}
             />
         )}
       </div>
