@@ -17,13 +17,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Eye, Download, Printer } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth, parseISO, isBefore, isAfter } from 'date-fns';
+import { format, parseISO, isBefore, isAfter } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 import { InventoryReportPreview } from './components/inventory-report-preview';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { useReactToPrint } from 'react-to-print';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
 type InventoryReportItem = {
     key: string;
@@ -42,6 +45,20 @@ type InventoryReportItem = {
     finalStockPackages: number;
 };
 
+type LotInventoryItem = {
+    lotNumber: string;
+    product: string;
+    caliber: string;
+    supplierId: string;
+    supplierName: string;
+    purchaseDate: string;
+    initialPackages: number;
+    initialKilos: number;
+    availablePackages: number;
+    availableKilos: number;
+    avgWeight: number;
+};
+
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
 
@@ -50,6 +67,7 @@ export default function InventoryPage() {
     const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
     const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
     const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
+    const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
     const { calibers: masterCalibers, warehouses, products: masterProducts } = useMasterData();
 
     const [isClient, setIsClient] = useState(false);
@@ -62,6 +80,7 @@ export default function InventoryPage() {
     const [inventoryData, setInventoryData] = useState<InventoryReportItem[]>([]);
     const [viewingHistory, setViewingHistory] = useState<any | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [lotFilter, setLotFilter] = useState('');
 
     const { toast } = useToast();
     const printRef = useRef<HTMLDivElement>(null);
@@ -241,6 +260,77 @@ export default function InventoryPage() {
         }
     }, [isClient, dateRange, selectedWarehouse, selectedProduct, purchaseOrders, salesOrders, inventoryAdjustments, masterCalibers, masterProducts]);
     
+    const lotInventory = useMemo(() => {
+        if (!isClient) return [];
+
+        const lotMap = new Map<string, LotInventoryItem>();
+
+        purchaseOrders.forEach(po => {
+            if (po.status === 'completed') {
+                po.items.forEach(item => {
+                    if (item.lotNumber) {
+                        let lot = lotMap.get(item.lotNumber);
+                        if (!lot) {
+                             lot = {
+                                lotNumber: item.lotNumber,
+                                product: item.product,
+                                caliber: item.caliber,
+                                supplierId: po.supplierId,
+                                supplierName: contacts.find(c => c.id === po.supplierId)?.name || 'N/A',
+                                purchaseDate: po.date,
+                                initialKilos: 0,
+                                initialPackages: 0,
+                                availableKilos: 0,
+                                availablePackages: 0,
+                                avgWeight: 0,
+                            };
+                        }
+                        lot.initialKilos += item.quantity;
+                        lot.initialPackages += item.packagingQuantity || 0;
+                        lot.availableKilos += item.quantity;
+                        lot.availablePackages += item.packagingQuantity || 0;
+                        lotMap.set(item.lotNumber, lot);
+                    }
+                });
+            }
+        });
+
+        salesOrders.forEach(so => {
+            if (so.status === 'completed' || so.status === 'pending') {
+                so.items.forEach(item => {
+                    if (item.lotNumber) {
+                        const lot = lotMap.get(item.lotNumber);
+                        if (lot) {
+                            lot.availableKilos -= item.quantity;
+                            lot.availablePackages -= item.packagingQuantity || 0;
+                        }
+                    }
+                });
+            }
+        });
+        
+        lotMap.forEach(lot => {
+            if (lot.initialPackages > 0) {
+                lot.avgWeight = lot.initialKilos / lot.initialPackages;
+            }
+        });
+
+
+        return Array.from(lotMap.values()).sort((a,b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+
+    }, [isClient, purchaseOrders, salesOrders, contacts]);
+    
+    const filteredLotInventory = useMemo(() => {
+        if (!lotFilter) return lotInventory;
+        const lowercasedFilter = lotFilter.toLowerCase();
+        return lotInventory.filter(lot => 
+            lot.lotNumber.toLowerCase().includes(lowercasedFilter) ||
+            lot.product.toLowerCase().includes(lowercasedFilter) ||
+            lot.caliber.toLowerCase().includes(lowercasedFilter) ||
+            lot.supplierName.toLowerCase().includes(lowercasedFilter)
+        );
+    }, [lotInventory, lotFilter]);
+
     const handleExport = () => {
       if (!inventoryData.length) {
         toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay datos de inventario para exportar.'});
@@ -296,7 +386,7 @@ export default function InventoryPage() {
         }, { initialStockKg: 0, inflowKg: 0, outflowKg: 0, adjustmentsKg: 0, finalStockKg: 0, initialStockPackages: 0, inflowPackages: 0, outflowPackages: 0, adjustmentsPackages: 0, finalStockPackages: 0 });
     }, [inventoryData]);
 
-    const renderContent = (isPrint = false) => {
+    const renderReportContent = (isPrint = false) => {
         if (!isClient) {
             return <Skeleton className="h-96 w-full" />;
         }
@@ -375,88 +465,168 @@ export default function InventoryPage() {
             </div>
         );
     }
+    
+     const renderLotInventoryContent = () => {
+        if (!isClient) return <Skeleton className="h-96 w-full" />;
+
+        return (
+            <>
+                <div className="py-4">
+                    <Input
+                        placeholder="Filtrar por lote, producto, calibre o proveedor..."
+                        value={lotFilter}
+                        onChange={(e) => setLotFilter(e.target.value)}
+                        className="max-w-md"
+                    />
+                </div>
+                <div className="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Lote</TableHead>
+                                <TableHead>Producto</TableHead>
+                                <TableHead>Calibre</TableHead>
+                                <TableHead>Proveedor</TableHead>
+                                <TableHead>Fecha Compra</TableHead>
+                                <TableHead className="text-right">Stock Inicial</TableHead>
+                                <TableHead className="text-right">Stock Disponible</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredLotInventory.length > 0 ? filteredLotInventory.map(lot => (
+                                <TableRow key={lot.lotNumber}>
+                                    <TableCell><Badge variant="secondary">{lot.lotNumber}</Badge></TableCell>
+                                    <TableCell>{lot.product}</TableCell>
+                                    <TableCell>{lot.caliber}</TableCell>
+                                    <TableCell className="text-xs">{lot.supplierName}</TableCell>
+                                    <TableCell>{format(parseISO(lot.purchaseDate), 'dd-MM-yyyy')}</TableCell>
+                                    <TableCell className="text-right">
+                                        {formatPackages(lot.initialPackages)} / {formatKilos(lot.initialKilos)}
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold">
+                                        {formatPackages(lot.availablePackages)} / {formatKilos(lot.availableKilos)}
+                                    </TableCell>
+                                </TableRow>
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="text-center h-24">No hay lotes que coincidan con la búsqueda.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </>
+        );
+    }
+
 
     return (
         <>
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-start">
-                         <div>
-                            <h1 className="font-headline text-3xl">Inventario en Tiempo Real</h1>
-                            <p className="text-muted-foreground">Consulta el stock por producto y calibre en un rango de fechas.</p>
-                        </div>
-                        <div className="flex gap-2 no-print">
-                          <Button variant="outline" onClick={() => setIsPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Vista Previa</Button>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-col md:flex-row gap-4 items-end p-4 mb-4 border rounded-lg bg-muted/20 no-print">
-                        <div className="flex-1 w-full">
-                            <Label>Producto</Label>
-                            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {masterProducts.map(p => (
-                                        <SelectItem key={p} value={p}>{p}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex-1 w-full">
-                            <Label>Bodega</Label>
-                            <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="All">Todas las Bodegas</SelectItem>
-                                    {warehouses.map(w => (
-                                        <SelectItem key={w} value={w}>{w}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex-1 w-full">
-                             <Label>Desde</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn("w-full justify-start text-left font-normal", !dateRange.from && "text-muted-foreground")}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {dateRange.from ? format(dateRange.from, "PPP", { locale: es }) : <span>Seleccione fecha</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={dateRange.from} onSelect={(date) => date && setDateRange(prev => ({...prev, from: date}))} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        <div className="flex-1 w-full">
-                             <Label>Hasta</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn("w-full justify-start text-left font-normal", !dateRange.to && "text-muted-foreground")}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {dateRange.to ? format(dateRange.to, "PPP", { locale: es }) : <span>Seleccione fecha</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={dateRange.to} onSelect={(date) => date && setDateRange(prev => ({...prev, to: date}))} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    </div>
-                    {renderContent()}
-                </CardContent>
-            </Card>
+            <div className="flex justify-between items-start mb-6">
+                <div>
+                    <h1 className="font-headline text-3xl">Inventario</h1>
+                    <p className="text-muted-foreground">Consulta el stock por producto y calibre en un rango de fechas.</p>
+                </div>
+            </div>
+
+            <Tabs defaultValue="report">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="report">Reporte de Inventario</TabsTrigger>
+                    <TabsTrigger value="lots">Inventario por Lote</TabsTrigger>
+                </TabsList>
+                <TabsContent value="report">
+                    <Card className="mt-6">
+                        <CardHeader>
+                             <div className="flex justify-between items-start">
+                                <div>
+                                    <CardTitle className="font-headline text-2xl">Reporte de Inventario por Calibre</CardTitle>
+                                    <CardDescription>Consulta el movimiento de stock por producto en un rango de fechas.</CardDescription>
+                                </div>
+                                <div className="flex gap-2 no-print">
+                                <Button variant="outline" onClick={() => setIsPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Vista Previa</Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-col md:flex-row gap-4 items-end p-4 mb-4 border rounded-lg bg-muted/20 no-print">
+                                <div className="flex-1 w-full">
+                                    <Label>Producto</Label>
+                                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {masterProducts.map(p => (
+                                                <SelectItem key={p} value={p}>{p}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="flex-1 w-full">
+                                    <Label>Bodega</Label>
+                                    <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="All">Todas las Bodegas</SelectItem>
+                                            {warehouses.map(w => (
+                                                <SelectItem key={w} value={w}>{w}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="flex-1 w-full">
+                                    <Label>Desde</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn("w-full justify-start text-left font-normal", !dateRange.from && "text-muted-foreground")}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {dateRange.from ? format(dateRange.from, "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                                        </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                        <Calendar mode="single" selected={dateRange.from} onSelect={(date) => date && setDateRange(prev => ({...prev, from: date}))} initialFocus />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                                <div className="flex-1 w-full">
+                                    <Label>Hasta</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn("w-full justify-start text-left font-normal", !dateRange.to && "text-muted-foreground")}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {dateRange.to ? format(dateRange.to, "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                                        </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                        <Calendar mode="single" selected={dateRange.to} onSelect={(date) => date && setDateRange(prev => ({...prev, to: date}))} initialFocus />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                            </div>
+                            {renderReportContent()}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="lots">
+                     <Card className="mt-6">
+                        <CardHeader>
+                            <CardTitle className="font-headline text-2xl">Inventario por Lote</CardTitle>
+                            <CardDescription>Stock disponible para cada lote de compra recepcionado.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                           {renderLotInventoryContent()}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
              {viewingHistory && (
                 <InventoryHistoryDialog
                     item={viewingHistory}
@@ -486,7 +656,7 @@ export default function InventoryPage() {
                             <p><span className="font-semibold">Producto:</span> {selectedProduct}</p>
                             <p><span className="font-semibold">Bodega:</span> {selectedWarehouse}</p>
                         </div>
-                        {renderContent(true)}
+                        {renderReportContent(true)}
                         <div className="text-center text-xs pt-8 mt-8 border-t border-dashed">
                             <p>Documento generado por Viña Negra Manager</p>
                         </div>
@@ -496,3 +666,4 @@ export default function InventoryPage() {
         </>
     );
 }
+
