@@ -16,7 +16,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { PurchaseOrderPreview } from './components/purchase-order-preview';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Download, ChevronDown, MoreHorizontal, Eye, Printer, Edit, Trash2, Tag } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -31,6 +30,14 @@ import { LotLabelContent } from './components/lot-label-content';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent as PrintDialogContent,
+  DialogHeader as PrintDialogHeader,
+  DialogTitle as PrintDialogTitle,
+  DialogFooter as PrintDialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -53,7 +60,6 @@ export default function PurchasesPage() {
   
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<PurchaseOrder | null>(null);
-  const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [orderToPrint, setOrderToPrint] = useState<PurchaseOrder | null>(null);
@@ -83,16 +89,6 @@ export default function PurchasesPage() {
       }, 100);
     }
   }, [orderToPrint, handlePrint]);
-
-  useEffect(() => {
-    if (lotsToPrint) {
-        setTimeout(() => {
-            handlePrintLots();
-            setLotsToPrint(null);
-        }, 100);
-    }
-  }, [lotsToPrint, handlePrintLots]);
-
 
   useEffect(() => {
     setIsClient(true);
@@ -242,11 +238,6 @@ export default function PurchasesPage() {
     setEditingOrder(null);
     setIsSheetOpen(true);
   }
-
-  const handlePreview = (order: PurchaseOrder) => {
-    setPreviewingOrder(order);
-    setSelectedOrderForActions(null);
-  };
 
   const handlePrintRequest = (order: PurchaseOrder) => {
     setOrderToPrint(order);
@@ -480,47 +471,43 @@ export default function PurchasesPage() {
         </AlertDialogContent>
       </AlertDialog>
       
-      {previewingOrder && (
-          <PurchaseOrderPreview
-            order={previewingOrder}
-            supplier={suppliers.find(s => s.id === previewingOrder.supplierId) || null}
-            isOpen={!!previewingOrder}
-            onOpenChange={() => setPreviewingOrder(null)}
-            onEdit={() => {
-              if (previewingOrder) {
-                handleEdit(previewingOrder);
-              }
-            }}
-            onDelete={() => {
-              if (previewingOrder) {
-                handleDelete(previewingOrder);
-              }
-            }}
-            onPrintRequest={() => {
-                if (previewingOrder) {
-                    setOrderToPrint(previewingOrder);
-                }
-            }}
-        />
-      )}
-       <div className="hidden print:block">
-        {orderToPrint && (
-            <PreviewContent
-                ref={printComponentRef}
-                order={orderToPrint}
-                supplier={suppliers.find(s => s.id === orderToPrint.supplierId) || null}
-                onEdit={() => {}}
-                onDelete={() => {}}
-            />
-        )}
-        {lotsToPrint && (
-            <LotLabelContent 
-                ref={lotPrintRef}
-                order={lotsToPrint}
-                supplier={suppliers.find(s => s.id === lotsToPrint.supplierId) || null}
-            />
-        )}
+      {/* Hidden container for printing */}
+      <div className="hidden">
+        <div className="print:block">
+            {orderToPrint && (
+                <PreviewContent
+                    ref={printComponentRef}
+                    order={orderToPrint}
+                    supplier={suppliers.find(s => s.id === orderToPrint.supplierId) || null}
+                />
+            )}
+            {lotsToPrint && (
+                <LotLabelContent 
+                    ref={lotPrintRef}
+                    order={lotsToPrint}
+                    supplier={suppliers.find(s => s.id === lotsToPrint.supplierId) || null}
+                />
+            )}
+        </div>
       </div>
+      {/* Dialog to confirm printing lots */}
+      <Dialog open={!!lotsToPrint} onOpenChange={() => setLotsToPrint(null)}>
+        <PrintDialogContent>
+            <PrintDialogHeader>
+                <PrintDialogTitle>Imprimir Etiquetas de Lote</PrintDialogTitle>
+            </PrintDialogHeader>
+            <p>Se prepararán las etiquetas para la orden <strong>{lotsToPrint?.id}</strong>. Asegúrese de que su impresora esté lista.</p>
+            <PrintDialogFooter>
+                <DialogClose asChild>
+                    <Button variant="outline">Cancelar</Button>
+                </DialogClose>
+                <Button onClick={() => {
+                    handlePrintLots();
+                    setLotsToPrint(null);
+                }}>Confirmar Impresión</Button>
+            </PrintDialogFooter>
+        </PrintDialogContent>
+      </Dialog>
     </>
   );
 }
