@@ -90,3 +90,5 @@ export const LotLabelContent = React.forwardRef<HTMLDivElement, LotLabelContentP
 });
 
 LotLabelContent.displayName = 'LotLabelContent';
+
+    

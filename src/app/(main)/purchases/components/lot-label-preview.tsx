@@ -89,3 +89,5 @@ export function LotLabelPreview({ order, supplier, specificItem, isOpen, onOpenC
     </Dialog>
   );
 }
+
+    
