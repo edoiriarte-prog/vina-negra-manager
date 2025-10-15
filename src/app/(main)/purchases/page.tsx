@@ -103,9 +103,6 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             return;
         }
 
-        const date = new Date();
-        let lotCounter = Date.now().toString().slice(-4);
-
         const lotItems = selectedEntries.map(({ ocId, caliber: caliberName }, index) => {
             const order = completedOrders.find(o => o.id === ocId);
             if (!order || !caliberName) return null;
@@ -118,7 +115,8 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             const totalPackages = relevantItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
             const avgWeight = totalPackages > 0 ? totalKilos / totalPackages : 0;
             
-            const uniqueLotId = `LT-${format(date, 'yyyyMMdd')}-${parseInt(lotCounter) + index}`;
+            const datePart = format(parseISO(order.date), 'yyyyMMdd');
+            const uniqueLotId = `LT-${datePart}-${index + 1}`;
 
             return {
                 lotId: uniqueLotId,
@@ -164,7 +162,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
         // --- End Save Logic ---
 
         setPreviewData({
-            creationDate: format(date, 'dd/MM/yyyy HH:mm'),
+            creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
             items: lotItems,
         });
 
