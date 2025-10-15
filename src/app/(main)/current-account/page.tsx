@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -396,7 +395,7 @@ export default function CurrentAccountPage() {
         }
       `}</style>
       <div className="no-print">
-        <h1 className="font-headline text-3xl">Gestión de Cuentas Corrientes</h1>
+        <h1 className="font-headline text-3xl">Gestión de Cuentas</h1>
         <p className="text-muted-foreground">Analiza el estado de cuentas por pagar a proveedores y por cobrar a clientes.</p>
       </div>
       
@@ -782,9 +781,5 @@ export default function CurrentAccountPage() {
       </div>
     </div>
   );
-
-    
-
-
 
     
