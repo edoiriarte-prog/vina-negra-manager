@@ -285,7 +285,6 @@ export default function PurchasesPage() {
   const [filter, setFilter] = useState('');
   const [lotFilter, setLotFilter] = useState('');
   const [previewLotData, setPreviewLotData] = useState<any>(null);
-  const [isPrintingLot, setIsPrintingLot] = useState(false);
 
   const printComponentRef = useRef<HTMLDivElement>(null);
   const lotPrintRef = useRef<HTMLDivElement>(null);
@@ -298,7 +297,6 @@ export default function PurchasesPage() {
   const handleLotPrint = useReactToPrint({
     content: () => lotPrintRef.current,
     documentTitle: `Etiqueta_Lote`,
-    onAfterPrint: () => setIsPrintingLot(false),
   });
 
   useEffect(() => {
@@ -306,10 +304,15 @@ export default function PurchasesPage() {
   }, []);
 
   useEffect(() => {
-    if (isPrintingLot && previewLotData) {
-      handleLotPrint();
+    if (previewLotData) {
+      const timer = setTimeout(() => {
+        handleLotPrint();
+        setPreviewLotData(null); 
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [isPrintingLot, previewLotData, handleLotPrint]);
+  }, [previewLotData, handleLotPrint]);
+
 
   const suppliers = useMemo(() => contacts.filter(c => c.type.includes('supplier')), [contacts]);
 
@@ -558,7 +561,6 @@ export default function PurchasesPage() {
             avgWeight: lot.totalPackages > 0 ? lot.totalKilos / lot.totalPackages : 0,
         }],
     });
-    setIsPrintingLot(true);
   }
 
   const renderContent = () => {
@@ -794,5 +796,3 @@ export default function PurchasesPage() {
     </>
   );
 }
-
-    
