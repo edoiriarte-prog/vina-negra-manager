@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -14,7 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Wand2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -276,6 +277,13 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                         </div>
+                         {/* Lot */}
+                         <div className="col-span-12 mt-2">
+                           <Label>Lote</Label>
+                           <div className="flex gap-2">
+                              <Input name={`items.${index}.lotNumber`} value={item.lotNumber || ''} onChange={handleInputChange} placeholder="Número de lote (se genera en la pestaña 'Generar Lotes')" readOnly/>
+                           </div>
+                         </div>
                     </div>
                 )})}
             </div>
@@ -342,3 +350,5 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     </>
   );
 }
+
+    
