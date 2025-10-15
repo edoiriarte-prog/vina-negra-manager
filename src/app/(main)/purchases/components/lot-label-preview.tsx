@@ -31,8 +31,7 @@ type LotLabelPreviewProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   lotData: {
-    id: string;
-    date: string;
+    creationDate: string;
     items: LotSelection[];
   };
 };
