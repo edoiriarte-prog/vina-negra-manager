@@ -330,6 +330,17 @@ export default function InventoryPage() {
             lot.supplierName.toLowerCase().includes(lowercasedFilter)
         );
     }, [lotInventory, lotFilter]);
+    
+    const lotInventoryTotals = useMemo(() => {
+        return filteredLotInventory.reduce((acc, lot) => {
+            acc.initialPackages += lot.initialPackages;
+            acc.initialKilos += lot.initialKilos;
+            acc.availablePackages += lot.availablePackages;
+            acc.availableKilos += lot.availableKilos;
+            return acc;
+        }, { initialPackages: 0, initialKilos: 0, availablePackages: 0, availableKilos: 0 });
+    }, [filteredLotInventory]);
+
 
     const handleExport = () => {
       if (!inventoryData.length) {
@@ -513,6 +524,13 @@ export default function InventoryPage() {
                                 </TableRow>
                             )}
                         </TableBody>
+                        <TableFooter>
+                          <TableRow>
+                            <TableHead colSpan={5} className="text-right font-bold text-lg">Totales</TableHead>
+                            <TableHead className="text-right font-bold text-lg">{formatPackages(lotInventoryTotals.initialPackages)} / {formatKilos(lotInventoryTotals.initialKilos)}</TableHead>
+                            <TableHead className="text-right font-bold text-lg">{formatPackages(lotInventoryTotals.availablePackages)} / {formatKilos(lotInventoryTotals.availableKilos)}</TableHead>
+                          </TableRow>
+                        </TableFooter>
                     </Table>
                 </div>
             </>
@@ -666,4 +684,3 @@ export default function InventoryPage() {
         </>
     );
 }
-
