@@ -116,7 +116,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             const avgWeight = totalPackages > 0 ? totalKilos / totalPackages : 0;
             
             const datePart = format(parseISO(order.date), 'yyyyMMdd');
-            const uniqueLotId = `LT-${datePart}-${index + 1}`;
+            const uniqueLotId = `LT-${datePart}-${index + 100}`;
 
             return {
                 lotId: uniqueLotId,
@@ -649,6 +649,7 @@ export default function PurchasesPage() {
     </Tabs>
   );
 }
+
 
 
 
