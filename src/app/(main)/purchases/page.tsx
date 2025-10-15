@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -61,7 +60,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
 
     const handlePrint = useReactToPrint({
         content: () => printRef.current,
-        documentTitle: `Lote-${previewData?.id || ''}`,
+        documentTitle: `Etiquetas_Lote`,
     });
 
     const ordersWithLotInfo = allOrders
@@ -256,7 +255,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                 </CardHeader>
                 <CardContent className="bg-gray-200 p-4 rounded-md h-[600px] overflow-y-auto">
                     {previewData ? (
-                         <div className="w-[21.59cm] min-h-[27.94cm] bg-white shadow-lg mx-auto p-4 transform scale-[0.4] sm:scale-50 md:scale-75 origin-top">
+                         <div className="space-y-8">
                             <LotGenerationContent ref={printRef} lotData={previewData} />
                         </div>
                     ) : (
@@ -661,12 +660,3 @@ export default function PurchasesPage() {
     </Tabs>
   );
 }
-
-
-
-
-
-
-
-
-

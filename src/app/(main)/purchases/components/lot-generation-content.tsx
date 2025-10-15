@@ -27,14 +27,17 @@ export const LotGenerationContent = React.forwardRef<HTMLDivElement, LotGenerati
   if (!lotData) return null;
 
   const { creationDate, items } = lotData;
-  const firstItem = items[0];
 
   return (
-    <div ref={ref} className="p-8 bg-white text-black font-sans">
+    <div ref={ref} className="bg-white text-black font-sans print:bg-white print:text-black">
       {/* Main Lot Sheets */}
-      <div className="w-full h-full flex flex-col">
+      <div className="flex flex-col gap-8 print:gap-0">
         {items.map((item, index) => (
-          <div key={index} className="lot-page" style={{ pageBreakAfter: 'always' }}>
+          <div 
+            key={index} 
+            className="lot-page w-[21.59cm] h-[27.94cm] bg-white shadow-lg mx-auto p-8 print:shadow-none print:p-12 print:h-screen" 
+            style={{ pageBreakAfter: 'always' }}
+          >
             <div className="text-center mb-8">
               <h1 className="text-4xl font-bold tracking-tight">NUMERO DE LOTE</h1>
             </div>
@@ -79,18 +82,6 @@ export const LotGenerationContent = React.forwardRef<HTMLDivElement, LotGenerati
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Individual Label Sample Page */}
-       <div className="w-full flex-col items-center justify-center pt-10 lot-page-boxes hidden print:block">
-        <p className='text-center font-bold mb-4'>Muestra de Etiqueta Individual</p>
-        {firstItem && (
-            <div className="border-2 border-black p-5 w-[350px] font-sans">
-                <p className="text-base font-bold m-0">PRODUCTO: {firstItem.productName.toUpperCase()}</p>
-                <p className="text-2xl font-bold my-2 text-center">CALIBRE: {firstItem.caliberName} ({firstItem.caliberCode})</p>
-                <p className="text-sm mt-4">LOTE: {firstItem.lotId}</p>
-            </div>
-        )}
       </div>
     </div>
   );
