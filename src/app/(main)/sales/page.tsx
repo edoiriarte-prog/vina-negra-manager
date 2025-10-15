@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -463,6 +464,7 @@ export default function SalesPage() {
             nextOrderId={nextOrderId}
             purchaseOrders={purchaseOrders}
             salesOrders={salesOrders}
+            contacts={contacts}
         />
       )}
 

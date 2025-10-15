@@ -53,6 +53,7 @@ type NewSalesOrderSheetProps = {
   nextOrderId: string;
   purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
+  contacts: Contact[];
 };
 
 
@@ -85,7 +86,7 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
     };
 };
 
-export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId, purchaseOrders, salesOrders }: NewSalesOrderSheetProps) {
+export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId, purchaseOrders, salesOrders, contacts }: NewSalesOrderSheetProps) {
   const [formData, setFormData] = useState(() => getInitialFormData(order));
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [isLotSelectionOpen, setIsLotSelectionOpen] = useState(false);
@@ -706,6 +707,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         salesOrders={salesOrders}
         onSave={handleLotSave}
         warehouse={formData.warehouse}
+        contacts={contacts}
       />
     </>
   );

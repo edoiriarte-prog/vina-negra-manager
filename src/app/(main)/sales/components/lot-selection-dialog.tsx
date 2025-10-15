@@ -14,8 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { OrderItem, PurchaseOrder, SalesOrder } from '@/lib/types';
-import { useMasterData } from '@/hooks/use-master-data';
+import { OrderItem, PurchaseOrder, SalesOrder, Contact } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,6 +25,7 @@ type LotSelectionDialogProps = {
   purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
   warehouse: string;
+  contacts: Contact[];
 };
 
 type AvailableLot = {
@@ -39,10 +39,9 @@ type AvailableLot = {
   availableQuantity: number;
 };
 
-export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrders, salesOrders, warehouse }: LotSelectionDialogProps) {
+export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrders, salesOrders, warehouse, contacts }: LotSelectionDialogProps) {
   const [filter, setFilter] = useState('');
   const [quantitiesToLoad, setQuantitiesToLoad] = useState<Record<string, number>>({});
-  const { contacts } = useMasterData();
   const { toast } = useToast();
 
   const availableLots = useMemo(() => {
