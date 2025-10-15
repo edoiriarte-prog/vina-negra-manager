@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -284,35 +285,17 @@ export default function PurchasesPage() {
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
   const [lotFilter, setLotFilter] = useState('');
-  const [previewLotData, setPreviewLotData] = useState<any>(null);
-
+  
   const printComponentRef = useRef<HTMLDivElement>(null);
-  const lotPrintRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const handlePrint = useReactToPrint({
       content: () => printComponentRef.current,
   });
 
-  const handleLotPrint = useReactToPrint({
-    content: () => lotPrintRef.current,
-    documentTitle: `Etiqueta_Lote`,
-  });
-
   useEffect(() => {
     setIsClient(true);
   }, []);
-
-  useEffect(() => {
-    if (previewLotData) {
-      const timer = setTimeout(() => {
-        handleLotPrint();
-        setPreviewLotData(null); 
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [previewLotData, handleLotPrint]);
-
 
   const suppliers = useMemo(() => contacts.filter(c => c.type.includes('supplier')), [contacts]);
 
@@ -546,23 +529,6 @@ export default function PurchasesPage() {
     setOpenCollapsibles(prev => ({...prev, [monthKey]: !prev[monthKey]}));
   }
 
-  const handlePreviewLot = (lot: any) => {
-    setPreviewLotData({
-        creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-        items: [{
-            lotId: lot.lotNumber,
-            orderId: lot.orderId,
-            productName: lot.product,
-            supplierName: lot.supplierName,
-            caliberName: lot.caliber,
-            caliberCode: lot.caliberCode,
-            totalKilos: lot.totalKilos,
-            totalPackages: lot.totalPackages,
-            avgWeight: lot.totalPackages > 0 ? lot.totalKilos / lot.totalPackages : 0,
-        }],
-    });
-  }
-
   const renderContent = () => {
     if (!isClient) {
       return (
@@ -725,7 +691,6 @@ export default function PurchasesPage() {
                                         <TableHead>Proveedor</TableHead>
                                         <TableHead className="text-right">Kilos</TableHead>
                                         <TableHead className="text-right">Envases</TableHead>
-                                        <TableHead className="text-center">Acciones</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -738,16 +703,11 @@ export default function PurchasesPage() {
                                             <TableCell>{lot.supplierName}</TableCell>
                                             <TableCell className="text-right">{formatKilos(lot.totalKilos)}</TableCell>
                                             <TableCell className="text-right">{formatPackages(lot.totalPackages)}</TableCell>
-                                            <TableCell className="text-center">
-                                                <Button variant="ghost" size="icon" title="Previsualizar e Imprimir Lote" onClick={() => handlePreviewLot(lot)}>
-                                                    <Printer className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
                                         </TableRow>
-                                    )) : <TableRow><TableCell colSpan={8}><Skeleton className="w-full h-24"/></TableCell></TableRow>}
+                                    )) : <TableRow><TableCell colSpan={7}><Skeleton className="w-full h-24"/></TableCell></TableRow>}
                                     {isClient && filteredCreatedLots.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={8} className="text-center h-24">No se encontraron lotes.</TableCell>
+                                            <TableCell colSpan={7} className="text-center h-24">No se encontraron lotes.</TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>
@@ -790,9 +750,7 @@ export default function PurchasesPage() {
                 />
             )}
         </Tabs>
-        <div className="hidden">
-            {previewLotData && <LotGenerationContent ref={lotPrintRef} lotData={previewLotData} />}
-        </div>
     </>
   );
 }
+
