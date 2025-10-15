@@ -23,10 +23,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useReactToPrint } from 'react-to-print';
 import { PurchaseOrderPreview } from './components/purchase-order-preview';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -34,6 +34,7 @@ import { LotGenerationContent } from './components/lot-generation-content';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMasterData } from '@/hooks/use-master-data';
+import { Label } from '@/components/ui/label';
 
 
 const formatCurrency = (value: number) =>
@@ -63,6 +64,7 @@ function LotGenerationTab({ purchaseOrders, suppliers }: { purchaseOrders: Purch
   const [lotPreviewData, setLotPreviewData] = useState<{ id: string; date: string; items: LotSelection[] } | null>(null);
   const { calibers } = useMasterData();
   const printRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
@@ -72,13 +74,12 @@ function LotGenerationTab({ purchaseOrders, suppliers }: { purchaseOrders: Purch
     const selectedIds = Object.keys(selectedOCs).filter(id => selectedOCs[id]);
     
     if (selectedIds.length === 0) {
-      // toast({ variant: "destructive", title: "Error", description: "Debe seleccionar al menos una Orden de Compra." });
+      toast({ variant: "destructive", title: "Error", description: "Debe seleccionar al menos una Orden de Compra." });
       return;
     }
     
     const items: LotSelection[] = selectedIds.map(id => {
       const order = purchaseOrders.find(o => o.id === id);
-      // For simplicity, we assume the first item's product name. A more complex UI would be needed for multi-product OCs.
       const productName = order?.items[0]?.product || 'Producto Desconocido'; 
       const supplierName = suppliers.find(s => s.id === order?.supplierId)?.name || 'Proveedor Desconocido';
       return {
@@ -89,13 +90,12 @@ function LotGenerationTab({ purchaseOrders, suppliers }: { purchaseOrders: Purch
       };
     });
 
-    // Check if all selected OCs have a caliber
     if (items.some(item => !item.caliber)) {
-       // toast({ variant: "destructive", title: "Error", description: "Debe especificar un calibre para cada OC seleccionada." });
+       toast({ variant: "destructive", title: "Error", description: "Debe especificar un calibre para cada OC seleccionada." });
        return;
     }
 
-    const lotId = `LT-${format(new Date(), 'yyyyMMdd')}-001`; // Simplified lot ID generation
+    const lotId = `LT-${format(new Date(), 'yyyyMMdd')}-001`;
     const lotDate = format(new Date(), 'dd/MM/yyyy HH:mm');
 
     setLotPreviewData({ id: lotId, date: lotDate, items });
@@ -177,7 +177,7 @@ function LotGenerationTab({ purchaseOrders, suppliers }: { purchaseOrders: Purch
                 <CardDescription>Así se verá el documento impreso.</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow bg-gray-200 p-4 flex items-center justify-center">
-                 <div className="w-[210mm] h-[297mm] bg-white shadow-lg origin-center scale-[0.55] overflow-auto">
+                 <div className="w-[21cm] h-[29.7cm] bg-white shadow-lg origin-top-left scale-[0.55] overflow-auto">
                      {lotPreviewData ? (
                         <LotGenerationContent ref={printRef} lotData={lotPreviewData} />
                      ) : (
@@ -489,12 +489,6 @@ export default function PurchasesPage() {
               );
             })}
           </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableHead colSpan={3} className='text-right font-bold text-lg'>Total General</TableHead>
-              <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotal)}</TableHead>
-            </TableRow>
-          </TableFooter>
         </Table>
       </div>
     );
