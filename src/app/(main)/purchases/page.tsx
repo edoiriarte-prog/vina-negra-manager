@@ -52,7 +52,7 @@ const formatPackages = (value: number) =>
     `${new Intl.NumberFormat('es-CL').format(value)}`;
 
 
-function LotGenerationTab({ allOrders, suppliers, calibers }: { allOrders: PurchaseOrder[], suppliers: Contact[], calibers: any[] }) {
+function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { allOrders: PurchaseOrder[], suppliers: Contact[], calibers: any[], setAllOrders: (orders: PurchaseOrder[]) => void }) {
     const [selectedOCs, setSelectedOCs] = useState<Record<string, boolean>>({});
     const [selectedCalibers, setSelectedCalibers] = useState<Record<string, string>>({});
     const [previewData, setPreviewData] = useState<any>(null);
@@ -83,7 +83,17 @@ function LotGenerationTab({ allOrders, suppliers, calibers }: { allOrders: Purch
     };
 
     const handleGeneratePreview = () => {
-        const lotItems = Object.keys(selectedOCs).filter(id => selectedOCs[id]).map(ocId => {
+        const selectedEntries = Object.keys(selectedOCs).filter(id => selectedOCs[id]);
+        if (selectedEntries.length === 0 || selectedEntries.some(id => !selectedCalibers[id])) {
+             toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Seleccione al menos una OC y especifique su calibre.',
+            });
+            return;
+        }
+
+        const lotItems = selectedEntries.map(ocId => {
             const order = completedOrders.find(o => o.id === ocId);
             const caliberName = selectedCalibers[ocId];
             if (!order || !caliberName) return null;
@@ -112,17 +122,44 @@ function LotGenerationTab({ allOrders, suppliers, calibers }: { allOrders: Purch
             toast({
                 variant: 'destructive',
                 title: 'Error',
-                description: 'Seleccione al menos una OC y especifique su calibre.',
+                description: 'No se pudieron generar los items del lote. Verifique las selecciones.',
             });
             return;
         }
 
         const date = new Date();
         const lotId = `LT-${format(date, 'yyyyMMdd')}-${String(date.getTime()).slice(-3)}`;
+        
+        // --- Save Lot Number to Purchase Order ---
+        const updatedOrders = allOrders.map(order => {
+            const isOrderInLot = lotItems.some(li => li!.orderId === order.id);
+            if (!isOrderInLot) {
+                return order;
+            }
+
+            const updatedItems = order.items.map(item => {
+                const lotItemMatch = lotItems.find(li => li!.orderId === order.id && li!.caliberName === item.caliber);
+                if (lotItemMatch) {
+                    return { ...item, lotNumber: lotId };
+                }
+                return item;
+            });
+
+            return { ...order, items: updatedItems };
+        });
+        
+        setAllOrders(updatedOrders);
+        // --- End Save Logic ---
+
         setPreviewData({
             id: lotId,
             date: format(date, 'dd/MM/yyyy HH:mm'),
             items: lotItems,
+        });
+
+        toast({
+            title: 'Lote Generado y Guardado',
+            description: `El lote ${lotId} ha sido guardado en las OCs correspondientes.`,
         });
     };
 
@@ -179,8 +216,8 @@ function LotGenerationTab({ allOrders, suppliers, calibers }: { allOrders: Purch
                     </div>
                 </CardContent>
                  <CardFooter className="flex-col items-stretch gap-4 pt-6 mt-auto">
-                    <Button onClick={handleGeneratePreview} disabled={Object.keys(selectedOCs).filter(id => selectedOCs[id]).length === 0}>
-                        Generar Previsualización
+                    <Button onClick={handleGeneratePreview}>
+                        Generar Previsualización y Guardar Lote
                     </Button>
                     <Button onClick={handlePrint} disabled={!previewData} variant="outline">
                         Exportar a PDF e Imprimir
@@ -590,7 +627,7 @@ export default function PurchasesPage() {
             </div>
         </TabsContent>
         <TabsContent value="lots">
-            <LotGenerationTab allOrders={purchaseOrders} suppliers={suppliers} calibers={calibers} />
+            <LotGenerationTab allOrders={purchaseOrders} suppliers={suppliers} calibers={calibers} setAllOrders={setPurchaseOrders} />
         </TabsContent>
         
         <NewPurchaseOrderSheet 
@@ -628,5 +665,6 @@ export default function PurchasesPage() {
     </Tabs>
   );
 }
+
 
 
