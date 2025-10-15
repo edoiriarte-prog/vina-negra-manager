@@ -103,7 +103,10 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             return;
         }
 
-        const lotItems = selectedEntries.map(({ ocId, caliber: caliberName }) => {
+        const date = new Date();
+        let lotCounter = Date.now().toString().slice(-4);
+
+        const lotItems = selectedEntries.map(({ ocId, caliber: caliberName }, index) => {
             const order = completedOrders.find(o => o.id === ocId);
             if (!order || !caliberName) return null;
 
@@ -114,8 +117,11 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             const totalKilos = relevantItems.reduce((sum, item) => sum + item.quantity, 0);
             const totalPackages = relevantItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
             const avgWeight = totalPackages > 0 ? totalKilos / totalPackages : 0;
+            
+            const uniqueLotId = `LT-${format(date, 'yyyyMMdd')}-${parseInt(lotCounter) + index}`;
 
             return {
+                lotId: uniqueLotId,
                 orderId: order.id,
                 productName: relevantItems[0]?.product || 'N/A',
                 supplierName: supplier?.name || 'N/A',
@@ -135,40 +141,36 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             });
             return;
         }
-
-        const date = new Date();
-        const lotId = `LT-${format(date, 'yyyyMMdd')}-${String(date.getTime()).slice(-4)}`;
         
         // --- Save Lot Number to Purchase Order ---
         const updatedOrders = allOrders.map(order => {
-            const isOrderInLot = lotItems.some(li => li!.orderId === order.id);
-            if (!isOrderInLot) {
-                return order;
-            }
-
+            let orderWasUpdated = false;
             const updatedItems = order.items.map(item => {
-                const lotItemMatch = lotItems.find(li => li!.orderId === order.id && li!.caliberName === item.caliber);
+                const lotItemMatch = lotItems.find(li => li.orderId === order.id && li.caliberName === item.caliber);
                 if (lotItemMatch) {
-                    return { ...item, lotNumber: lotId };
+                    orderWasUpdated = true;
+                    return { ...item, lotNumber: lotItemMatch.lotId };
                 }
                 return item;
             });
 
-            return { ...order, items: updatedItems };
+            if (orderWasUpdated) {
+                return { ...order, items: updatedItems };
+            }
+            return order;
         });
         
         setAllOrders(updatedOrders);
         // --- End Save Logic ---
 
         setPreviewData({
-            id: lotId,
-            date: format(date, 'dd/MM/yyyy HH:mm'),
+            creationDate: format(date, 'dd/MM/yyyy HH:mm'),
             items: lotItems,
         });
 
         toast({
             title: 'Lote Generado y Guardado',
-            description: `El lote ${lotId} ha sido guardado en las OCs correspondientes.`,
+            description: `${lotItems.length} lotes han sido guardados en las OCs correspondientes.`,
         });
     };
 
@@ -200,7 +202,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
 
                     <div>
                         <Label className="font-semibold text-lg">Paso 2: Especifique el Calibre por OC</Label>
-                        <div className="mt-2 space-y-4">
+                        <div className="mt-2 space-y-4 max-h-60 overflow-y-auto pr-2">
                             {Object.keys(selectedOCs).filter(id => selectedOCs[id]).map(ocId => {
                                 const order = completedOrders.find(o => o.id === ocId);
                                 if (!order) return null;
@@ -230,7 +232,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                 </CardContent>
                  <CardFooter className="flex-col items-stretch gap-4 pt-6 mt-auto">
                     <Button onClick={handleGeneratePreview} disabled={Object.values(selectedCalibers).every(c => c.length === 0)}>
-                        Generar Previsualización y Guardar Lote
+                        Generar Previsualización y Guardar Lotes
                     </Button>
                     <Button onClick={handlePrint} disabled={!previewData} variant="outline">
                         Exportar a PDF e Imprimir
@@ -678,6 +680,7 @@ export default function PurchasesPage() {
     </Tabs>
   );
 }
+
 
 
 
