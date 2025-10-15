@@ -27,6 +27,7 @@ import { PurchaseOrder, OrderItem, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
+import { productCaliberMatrix } from '@/lib/master-data';
 import { useToast } from '@/hooks/use-toast';
 
 type NewPurchaseOrderSheetProps = {
@@ -41,9 +42,8 @@ type NewPurchaseOrderSheetProps = {
 const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
     if (order) {
         const { totalAmount, totalKilos, totalPackages, ...rest } = order;
-        // The date from the order is already a 'yyyy-MM-dd' string.
-        // To prevent off-by-one day errors due to timezone conversion by `new Date()`,
-        // parse it as if it's UTC.
+        // The date from the order is already a 'yyyy-MM-dd' string from local storage.
+        // To avoid timezone issues, parse it as UTC.
         const date = parseISO(order.date);
 
         return {
@@ -70,27 +70,17 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   useEffect(() => {
     setFormData(getInitialFormData(order));
   }, [order, isOpen]);
-
-  const addItem = () => {
-    if (newItem.product && newItem.caliber && newItem.quantity > 0 && newItem.price > 0) {
-      if (order) {
-        // If editing an existing order, we pass the new item up to be added
-        onSave(formData, [{...newItem, id: `temp-${Date.now()}`}]);
-      } else {
-        // If creating a new order, we add it to local state
-        setFormData(prev => ({
-          ...prev,
-          items: [...prev.items, { ...newItem, id: `temp-${Date.now()}` }],
-        }));
-      }
-      setNewItem({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 });
-    }
-  };
   
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
     const newItems = [...formData.items];
     const item = { ...newItems[index] };
     (item[field] as any) = value; // Type assertion
+
+    // If product changes, reset caliber
+    if (field === 'product') {
+        item.caliber = '';
+    }
+
     newItems[index] = item;
     setFormData(prev => ({ ...prev, items: newItems }));
   };
@@ -150,22 +140,22 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     setIsMatrixOpen(false);
   }
 
-  const generateLotNumber = (itemIndex: number) => {
-    if (!formData.supplierId) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Por favor, seleccione un proveedor antes de generar un lote.",
-      });
-      return;
-    }
-    const datePart = formData.date.replace(/-/g, '');
-    const lot = `LOTE-${datePart}-${formData.supplierId}-${itemIndex}`;
-    handleItemChange(itemIndex, 'lotNumber', lot);
-    toast({
-        title: "Lote Generado",
-        description: `Se ha asignado el lote: ${lot}`,
-    });
+    const generateLotNumber = (itemIndex: number) => {
+        if (!formData.date) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Por favor, seleccione una fecha para la orden de compra.",
+        });
+        return;
+        }
+        const datePart = format(new Date(formData.date), 'ddMMyy');
+        const lot = `LOTE-${datePart}-${itemIndex + 1}`;
+        handleItemChange(itemIndex, 'lotNumber', lot);
+        toast({
+            title: "Lote Generado",
+            description: `Se ha asignado el lote: ${lot}`,
+        });
   };
 
   const title = order ? 'Editar Orden de Compra' : 'Crear Orden de Compra';
@@ -176,6 +166,11 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   const getCaliberDisplayName = (caliberName: string) => {
     const caliber = calibers.find(c => c.name === caliberName);
     return caliber ? `${caliber.name} (${caliber.code})` : caliberName;
+  }
+  
+  const getCaliberCode = (caliberName: string) => {
+    const caliber = calibers.find(c => c.name === caliberName);
+    return caliber ? caliber.code : 'N/A';
   }
 
   return (
@@ -227,6 +222,11 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                 
                 {formData.items.map((item, index) => {
                   const subtotal = (item.quantity || 0) * (item.price || 0);
+                  const availableCaliberNames = productCaliberMatrix[item.product] || [];
+                  const sortedAvailableCalibers = calibers
+                    .filter(c => availableCaliberNames.includes(c.name))
+                    .sort((a,b) => calibers.findIndex(cal => cal.name === a.name) - calibers.findIndex(cal => cal.name === b.name));
+
                   return (
                     <div key={item.id} className="grid grid-cols-12 gap-2 items-end mb-2 p-3 border rounded-md">
                         {/* Product */}
@@ -242,10 +242,10 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                         {/* Caliber */}
                         <div className="col-span-6 md:col-span-2">
                              <Label>Calibre</Label>
-                             <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
+                             <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber} disabled={!item.product}>
                                  <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                  <SelectContent>
-                                     {calibers.map(c => <SelectItem key={`${item.id}-${c.name}`} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
+                                     {sortedAvailableCalibers.map(c => <SelectItem key={`${item.id}-${c.name}-${c.code}`} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
                                  </SelectContent>
                              </Select>
                         </div>
@@ -295,7 +295,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                         </div>
-                        {/* Lot */}
+                         {/* Lot */}
                          <div className="col-span-12 mt-2">
                            <Label>Lote</Label>
                            <div className="flex gap-2">
@@ -305,7 +305,6 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                               </Button>
                            </div>
                          </div>
-                        
                     </div>
                 )})}
             </div>
