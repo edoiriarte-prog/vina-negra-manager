@@ -278,7 +278,7 @@ export default function PurchasesPage() {
       return (
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-96 w-full" />
         </div>
       )
     }
@@ -361,37 +361,80 @@ export default function PurchasesPage() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-                <CardTitle className="font-headline text-2xl">Gestión de Compras (O/C)</CardTitle>
-                <CardDescription>Registra y administra todas las adquisiciones de productos.</CardDescription>
-            </div>
-            <div className="flex gap-2">
-                <Button variant="outline" onClick={handleExportAll}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Exportar a Excel
-                </Button>
-                <Button onClick={openNewOrderSheet}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Nueva Compra
-                </Button>
-            </div>
-          </div>
-            <div className="py-4">
-              <Input
-                placeholder="Filtrar por proveedor..."
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                className="max-w-sm"
-              />
-            </div>
-        </CardHeader>
-        <CardContent>
-          {renderContent()}
-        </CardContent>
-      </Card>
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+            <Card>
+                <CardHeader>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle className="font-headline text-2xl">Gestión de Compras (O/C)</CardTitle>
+                        <CardDescription>Registra y administra todas las adquisiciones de productos.</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleExportAll}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar Todo
+                        </Button>
+                        <Button onClick={openNewOrderSheet}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Nueva Compra
+                        </Button>
+                    </div>
+                </div>
+                    <div className="py-4">
+                    <Input
+                        placeholder="Filtrar por proveedor..."
+                        value={filter}
+                        onChange={(event) => setFilter(event.target.value)}
+                        className="max-w-sm"
+                    />
+                    </div>
+                </CardHeader>
+                <CardContent>
+                {renderContent()}
+                </CardContent>
+            </Card>
+        </div>
+        <div className="lg:col-span-1">
+            <Card className="sticky top-20">
+                <CardHeader>
+                    <CardTitle className="font-headline text-2xl">Acciones de Orden</CardTitle>
+                    <CardDescription>
+                        {selectedOrderForActions 
+                            ? `Acciones disponibles para la orden ${selectedOrderForActions.id}`
+                            : "Seleccione una orden de la lista para ver las acciones disponibles."
+                        }
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {selectedOrderForActions ? (
+                        <div className="grid grid-cols-1 gap-4 py-4">
+                            <Button variant="outline" onClick={() => handlePreviewRequest(selectedOrderForActions)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Visualizar O/C
+                            </Button>
+                            <Button variant="outline" onClick={() => handleLotsPrintRequest(selectedOrderForActions)}>
+                                <Printer className="mr-2 h-4 w-4" />
+                                Imprimir Lotes
+                            </Button>
+                            <Button variant="outline" onClick={() => handleEdit(selectedOrderForActions)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                            </Button>
+                            <Button variant="destructive" onClick={() => handleDelete(selectedOrderForActions)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Eliminar
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-md">
+                            <p className="text-sm text-muted-foreground">No hay orden seleccionada</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+      </div>
       
       <NewPurchaseOrderSheet 
         isOpen={isSheetOpen}
@@ -400,38 +443,6 @@ export default function PurchasesPage() {
         order={editingOrder}
         suppliers={suppliers}
       />
-
-       <AlertDialog open={!!selectedOrderForActions} onOpenChange={() => setSelectedOrderForActions(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Acciones para la Orden {selectedOrderForActions?.id}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Seleccione una acción para ejecutar en la orden de compra.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            <Button variant="outline" onClick={() => selectedOrderForActions && handlePreviewRequest(selectedOrderForActions)}>
-                <Eye className="mr-2 h-4 w-4" />
-                Visualizar O/C
-            </Button>
-            <Button variant="outline" onClick={() => selectedOrderForActions && handleLotsPrintRequest(selectedOrderForActions)}>
-                <Printer className="mr-2 h-4 w-4" />
-                Imprimir Lotes
-            </Button>
-            <Button variant="outline" onClick={() => selectedOrderForActions && handleEdit(selectedOrderForActions)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Editar
-            </Button>
-            <Button variant="destructive" onClick={() => selectedOrderForActions && handleDelete(selectedOrderForActions)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar
-            </Button>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setSelectedOrderForActions(null)}>Cancelar</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
         <AlertDialogContent>
@@ -468,3 +479,4 @@ export default function PurchasesPage() {
     </>
   );
 }
+
