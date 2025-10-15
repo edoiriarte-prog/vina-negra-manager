@@ -781,5 +781,3 @@ export default function CurrentAccountPage() {
       </div>
     </div>
   );
-
-    
