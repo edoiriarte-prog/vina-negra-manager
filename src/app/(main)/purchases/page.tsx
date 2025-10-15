@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown, Edit, Trash2, Printer, Wand2 } from 'lucide-react';
+import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown, Edit, Trash2, Printer, Wand2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -35,6 +35,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { LotGenerationContent } from './components/lot-generation-content';
 import { useMasterData } from '@/hooks/use-master-data';
+import { Badge } from '@/components/ui/badge';
 
 
 const formatCurrency = (value: number) =>
@@ -63,7 +64,13 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
         documentTitle: `Lote-${previewData?.id || ''}`,
     });
 
-    const completedOrders = allOrders.filter(o => o.status === 'completed');
+    const ordersWithLotInfo = allOrders
+      .filter(o => o.status === 'completed')
+      .map(order => ({
+        ...order,
+        hasLots: order.items.some(item => !!item.lotNumber),
+      }));
+
 
     const handleSelectOC = (ocId: string) => {
         setSelectedOCs(prev => {
@@ -104,7 +111,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
         }
 
         const lotItems = selectedEntries.map(({ ocId, caliber: caliberName }, index) => {
-            const order = completedOrders.find(o => o.id === ocId);
+            const order = allOrders.find(o => o.id === ocId);
             if (!order || !caliberName) return null;
 
             const supplier = suppliers.find(s => s.id === order.supplierId);
@@ -183,7 +190,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                     <div>
                         <Label className="font-semibold text-lg">Paso 1: Seleccione las Órdenes de Compra (OC)</Label>
                         <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border p-3 rounded-md">
-                            {completedOrders.map(order => (
+                            {ordersWithLotInfo.map(order => (
                                 <div key={order.id} className="flex items-center space-x-2">
                                     <Checkbox
                                         id={`oc-${order.id}`}
@@ -193,6 +200,11 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                                     <label htmlFor={`oc-${order.id}`} className="text-sm font-medium leading-none">
                                         {order.id} - {suppliers.find(s => s.id === order.supplierId)?.name}
                                     </label>
+                                    {order.hasLots && (
+                                        <Badge variant="destructive" className="flex items-center gap-1">
+                                            <AlertTriangle className="h-3 w-3" /> Con Lote
+                                        </Badge>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -202,7 +214,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                         <Label className="font-semibold text-lg">Paso 2: Especifique el Calibre por OC</Label>
                         <div className="mt-2 space-y-4 max-h-60 overflow-y-auto pr-2">
                             {Object.keys(selectedOCs).filter(id => selectedOCs[id]).map(ocId => {
-                                const order = completedOrders.find(o => o.id === ocId);
+                                const order = ordersWithLotInfo.find(o => o.id === ocId);
                                 if (!order) return null;
                                 const availableCalibers = [...new Set(order.items.map(item => item.caliber))];
                                 return (
@@ -578,7 +590,7 @@ export default function PurchasesPage() {
             <TabsTrigger value="lots">Generar Lotes</TabsTrigger>
         </TabsList>
         <TabsContent value="list">
-            <Card>
+             <Card>
                 <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
@@ -649,6 +661,7 @@ export default function PurchasesPage() {
     </Tabs>
   );
 }
+
 
 
 
