@@ -53,9 +53,13 @@ const formatPackages = (value: number) =>
 
 type LotSelection = {
   orderId: string;
-  caliber: string;
+  caliberName: string;
+  caliberCode: string;
   productName: string;
   supplierName: string;
+  totalKilos: number;
+  totalPackages: number;
+  avgWeight: number;
 };
 
 function LotGenerationTab({ purchaseOrders, suppliers }: { purchaseOrders: PurchaseOrder[], suppliers: Contact[] }) {
@@ -80,17 +84,30 @@ function LotGenerationTab({ purchaseOrders, suppliers }: { purchaseOrders: Purch
     
     const items: LotSelection[] = selectedIds.map(id => {
       const order = purchaseOrders.find(o => o.id === id);
-      const productName = order?.items[0]?.product || 'Producto Desconocido'; 
-      const supplierName = suppliers.find(s => s.id === order?.supplierId)?.name || 'Proveedor Desconocido';
+      const selectedCaliber = caliberSelections[id];
+      const itemsForCaliber = order?.items.filter(i => i.caliber === selectedCaliber) || [];
+      
+      const supplierName = suppliers.find(s => s.id === order?.supplierId)?.name || 'Desconocido';
+      const productName = itemsForCaliber[0]?.product || 'Desconocido';
+      const caliberCode = calibers.find(c => c.name === selectedCaliber)?.code || 'N/A';
+      
+      const totalKilos = itemsForCaliber.reduce((sum, item) => sum + (item.unit === 'Kilos' ? item.quantity : 0), 0);
+      const totalPackages = itemsForCaliber.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
+      const avgWeight = totalPackages > 0 ? totalKilos / totalPackages : 0;
+      
       return {
         orderId: id,
-        caliber: caliberSelections[id] || '',
+        caliberName: selectedCaliber || '',
+        caliberCode: caliberCode,
         productName,
         supplierName,
+        totalKilos,
+        totalPackages,
+        avgWeight,
       };
     });
 
-    if (items.some(item => !item.caliber)) {
+    if (items.some(item => !item.caliberName)) {
        toast({ variant: "destructive", title: "Error", description: "Debe especificar un calibre para cada OC seleccionada." });
        return;
     }
