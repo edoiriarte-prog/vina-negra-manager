@@ -16,6 +16,7 @@ import {
     TableFooter,
   } from '@/components/ui/table';
 import { useMasterData } from '@/hooks/use-master-data';
+import Barcode from 'react-barcode';
 
 
 interface PreviewContentProps {
@@ -86,6 +87,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentPro
                     <TableRow className="bg-neutral-100 hover:bg-neutral-100 border-b-2 border-neutral-300">
                         <TableHead className="text-black font-bold">CÓDIGO / SKU</TableHead>
                         <TableHead className="text-black font-bold">DESCRIPCIÓN</TableHead>
+                        <TableHead className="text-black font-bold">Lote / Código de Barras</TableHead>
                         <TableHead className="text-right text-black font-bold">CANTIDAD</TableHead>
                         <TableHead className="text-right text-black font-bold">PRECIO UNIT.</TableHead>
                         <TableHead className="text-right text-black font-bold">TOTAL LÍNEA</TableHead>
@@ -96,6 +98,15 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentPro
                     <TableRow key={item.id} className="border-neutral-200">
                         <TableCell className="font-medium">{getCaliberCode(item.caliber)}</TableCell>
                         <TableCell>{item.product} - {item.caliber}</TableCell>
+                        <TableCell>
+                            {item.lotNumber ? (
+                                <div className="flex flex-col items-center">
+                                    <Barcode value={item.lotNumber} height={30} width={1} fontSize={10} margin={0} />
+                                </div>
+                            ) : (
+                                'N/A'
+                            )}
+                        </TableCell>
                         <TableCell className="text-right">{item.quantity.toLocaleString('es-CL')} {item.unit}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
