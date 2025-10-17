@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -18,7 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from '@/components/ui/button';
-import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown, Edit, Trash2, Printer, Wand2, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown, Edit, Trash2, Printer, Wand2, AlertTriangle, Clipboard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
@@ -58,6 +56,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
     const [selectedCalibers, setSelectedCalibers] = useState<Record<string, string[]>>({});
     const [previewData, setPreviewData] = useState<any>(null);
     const [isDeleteLotsDialogOpen, setIsDeleteLotsDialogOpen] = useState(false);
+    const [newSingleLotId, setNewSingleLotId] = useState<string | null>(null);
 
     const printRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
@@ -99,6 +98,30 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
         });
     };
 
+    const getNextLotSuffix = () => {
+        let highestLotSuffix = 99;
+        allOrders.forEach(order => {
+            order.items.forEach(item => {
+                if (item.lotNumber && item.lotNumber.startsWith('LT-')) {
+                    const parts = item.lotNumber.split('-');
+                    const suffix = parseInt(parts[parts.length - 1], 10);
+                    if (!isNaN(suffix) && suffix > highestLotSuffix) {
+                        highestLotSuffix = suffix;
+                    }
+                }
+            });
+        });
+        return highestLotSuffix + 1;
+    }
+    
+    const handleGenerateSingleLot = () => {
+        const nextSuffix = getNextLotSuffix();
+        const datePart = format(new Date(), 'yyyyMMdd');
+        const newLotId = `LT-${datePart}-${nextSuffix}`;
+        setNewSingleLotId(newLotId);
+        toast({ title: 'Nuevo Lote Generado', description: `Se ha creado el ID: ${newLotId}` });
+    };
+
     const handleGeneratePreview = () => {
         const selectedEntries = Object.entries(selectedCalibers)
             .filter(([ocId]) => selectedOCs[ocId])
@@ -113,21 +136,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             return;
         }
 
-        let highestLotSuffix = 99;
-        allOrders.forEach(order => {
-            order.items.forEach(item => {
-                if (item.lotNumber && item.lotNumber.startsWith('LT-')) {
-                    const parts = item.lotNumber.split('-');
-                    const suffix = parseInt(parts[parts.length - 1], 10);
-                    if (!isNaN(suffix) && suffix > highestLotSuffix) {
-                        highestLotSuffix = suffix;
-                    }
-                }
-            });
-        });
-        
-        let nextLotSuffix = highestLotSuffix + 1;
-
+        let nextLotSuffix = getNextLotSuffix();
 
         const lotItems = selectedEntries.map(({ ocId, caliber: caliberName }) => {
             const order = allOrders.find(o => o.id === ocId);
@@ -143,7 +152,6 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             
             const datePart = format(parseISO(order.date), 'yyyyMMdd');
             const uniqueLotId = `LT-${datePart}-${nextLotSuffix++}`;
-
 
             return {
                 lotId: uniqueLotId,
@@ -290,6 +298,23 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                             })}
                         </div>
                     </div>
+                    <div className="pt-4 border-t">
+                        <Label className="font-semibold text-lg">Generación Individual</Label>
+                         <Button onClick={handleGenerateSingleLot} variant="outline" className="w-full mt-2">
+                            Crear Nuevo ID de Lote
+                        </Button>
+                        {newSingleLotId && (
+                            <div className="mt-2 flex items-center justify-between p-2 bg-muted rounded-md">
+                                <span className="font-mono text-sm">{newSingleLotId}</span>
+                                <Button size="icon" variant="ghost" onClick={() => {
+                                    navigator.clipboard.writeText(newSingleLotId);
+                                    toast({ title: 'Copiado', description: 'ID de Lote copiado al portapapeles.'});
+                                }}>
+                                    <Clipboard className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        )}
+                    </div>
                 </CardContent>
                  <CardFooter className="flex-col items-stretch gap-4 pt-6 mt-auto">
                     <div className="grid grid-cols-2 gap-2">
@@ -370,13 +395,12 @@ export default function PurchasesPage() {
   });
 
   const printLotRef = useRef<HTMLDivElement>(null);
+  const [isPrintingLot, setIsPrintingLot] = useState(false);
 
   const handleLotPrint = useReactToPrint({
     content: () => printLotRef.current,
   });
   
-  const [isPrintingLot, setIsPrintingLot] = useState(false);
-
   const handlePreviewLot = (lot: any) => {
     const lotItem = {
       lotId: lot.lotNumber,
@@ -400,7 +424,7 @@ export default function PurchasesPage() {
   const printLotCallbackRef = useCallback((node: HTMLDivElement) => {
     if (node !== null && isPrintingLot) {
       handleLotPrint();
-      setIsPrintingLot(false);
+      setIsPrintingLot(false); 
       setPreviewLotData(null);
     }
   }, [isPrintingLot, handleLotPrint]);
@@ -878,3 +902,4 @@ export default function PurchasesPage() {
     </>
   );
 }
+
