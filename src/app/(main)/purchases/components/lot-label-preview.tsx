@@ -35,10 +35,21 @@ type LotLabelPreviewProps = {
   };
 };
 
+const PrintableLotContent = React.forwardRef<HTMLDivElement, { lotData: any }>(({ lotData }, ref) => {
+    return (
+        <div ref={ref}>
+            <LotGenerationContent lotData={lotData} />
+        </div>
+    );
+});
+PrintableLotContent.displayName = 'PrintableLotContent';
+
+
 export function LotLabelPreview({ isOpen, onOpenChange, lotData }: LotLabelPreviewProps) {
-  const printRef = useRef<HTMLDivElement>(null);
+  const componentToPrintRef = useRef<HTMLDivElement>(null);
+  
   const handlePrint = useReactToPrint({
-    content: () => printRef.current,
+    content: () => componentToPrintRef.current,
   });
 
   return (
@@ -49,7 +60,7 @@ export function LotLabelPreview({ isOpen, onOpenChange, lotData }: LotLabelPrevi
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto bg-gray-200 p-8">
             <div className="w-full">
-                <LotGenerationContent ref={printRef} lotData={lotData} />
+                <PrintableLotContent ref={componentToPrintRef} lotData={lotData} />
             </div>
         </div>
         <DialogFooter className="p-6 pt-4 border-t gap-2 no-print">

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -399,6 +400,17 @@ export default function PurchasesPage() {
 
   const [isPrintingLot, setIsPrintingLot] = useState(false);
   const [isLotPreviewOpen, setIsLotPreviewOpen] = useState(false);
+
+  const printLotRef = useCallback((node: HTMLDivElement) => {
+    if (node !== null && isPrintingLot) {
+        handleLotPrint();
+        setIsPrintingLot(false); 
+    }
+  }, [isPrintingLot]);
+
+  const handleLotPrint = useReactToPrint({
+    content: () => printLotRef.current,
+  });
 
 
   const handlePreviewLot = (lot: any) => {
@@ -895,3 +907,4 @@ export default function PurchasesPage() {
     </>
   );
 }
+
