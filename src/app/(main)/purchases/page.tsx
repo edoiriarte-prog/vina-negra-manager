@@ -57,6 +57,8 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
     const [selectedOCs, setSelectedOCs] = useState<Record<string, boolean>>({});
     const [selectedCalibers, setSelectedCalibers] = useState<Record<string, string[]>>({});
     const [previewData, setPreviewData] = useState<any>(null);
+    const [isDeleteLotsDialogOpen, setIsDeleteLotsDialogOpen] = useState(false);
+
     const printRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
 
@@ -213,8 +215,22 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
         });
     };
 
+    const handleDeleteAllLots = () => {
+        const updatedOrders = allOrders.map(order => ({
+            ...order,
+            items: order.items.map(item => {
+                const { lotNumber, ...rest } = item;
+                return rest;
+            })
+        }));
+        setAllOrders(updatedOrders);
+        toast({ title: 'Lotes Eliminados', description: 'Todos los números de lote han sido borrados de las órdenes de compra.' });
+        setIsDeleteLotsDialogOpen(false);
+    };
+
 
     return (
+        <>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
             <Card className="flex flex-col">
                 <CardHeader>
@@ -287,6 +303,10 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                     <Button onClick={handlePrint} disabled={!previewData} variant="outline">
                         Exportar a PDF e Imprimir
                     </Button>
+                     <Button onClick={() => setIsDeleteLotsDialogOpen(true)} variant="destructive" className="mt-4">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Borrar Todos los Lotes
+                    </Button>
                 </CardFooter>
             </Card>
 
@@ -307,6 +327,21 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                 </CardContent>
             </Card>
         </div>
+         <AlertDialog open={isDeleteLotsDialogOpen} onOpenChange={setIsDeleteLotsDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>¿Está seguro que quiere borrar todos los lotes?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Esta acción no se puede deshacer. Se eliminarán todos los números de lote de todas las órdenes de compra.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteAllLots} className={cn(buttonVariants({ variant: "destructive" }))}>Borrar Todos</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>
     );
 }
 
@@ -322,7 +357,6 @@ export default function PurchasesPage() {
   const [isClient, setIsClient] = useState(false);
   const [previewingOrder, setPreviewingOrder] = useState<PurchaseOrder | null>(null);
   const [previewLotData, setPreviewLotData] = useState<any>(null);
-  const [isPrintingLot, setIsPrintingLot] = useState(false);
 
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
@@ -358,16 +392,17 @@ export default function PurchasesPage() {
       creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
       items: [lotItem],
     });
-    
-    setIsPrintingLot(true);
   }
   
-    const printLotCallbackRef = useCallback((node: HTMLDivElement) => {
-        if (node && isPrintingLot) {
+  useEffect(() => {
+    if (previewLotData) {
+        // We need to use a timeout to let React render the component before printing
+        setTimeout(() => {
             handleLotPrint();
-            setIsPrintingLot(false); 
-        }
-    }, [isPrintingLot, handleLotPrint]);
+            setPreviewLotData(null); // Reset after printing
+        }, 100);
+    }
+  }, [previewLotData, handleLotPrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -832,8 +867,8 @@ export default function PurchasesPage() {
                 />
             )}
              {previewLotData && (
-                <div className="hidden">
-                     <div ref={printLotCallbackRef}>
+                 <div className="hidden">
+                     <div ref={printLotRef}>
                         <LotGenerationContent lotData={previewLotData} />
                     </div>
                 </div>
@@ -842,6 +877,8 @@ export default function PurchasesPage() {
     </>
   );
 }
+
+
 
 
 
