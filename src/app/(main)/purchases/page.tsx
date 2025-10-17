@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown, Edit, Trash2, Printer, Wand2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -375,6 +375,8 @@ export default function PurchasesPage() {
     content: () => printLotRef.current,
   });
   
+  const [isPrintingLot, setIsPrintingLot] = useState(false);
+
   const handlePreviewLot = (lot: any) => {
     const lotItem = {
       lotId: lot.lotNumber,
@@ -392,17 +394,16 @@ export default function PurchasesPage() {
       creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
       items: [lotItem],
     });
+    setIsPrintingLot(true);
   }
   
-  useEffect(() => {
-    if (previewLotData) {
-        // We need to use a timeout to let React render the component before printing
-        setTimeout(() => {
-            handleLotPrint();
-            setPreviewLotData(null); // Reset after printing
-        }, 100);
+  const printLotCallbackRef = useCallback((node: HTMLDivElement) => {
+    if (node !== null && isPrintingLot) {
+      handleLotPrint();
+      setIsPrintingLot(false);
+      setPreviewLotData(null);
     }
-  }, [previewLotData, handleLotPrint]);
+  }, [isPrintingLot, handleLotPrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -868,7 +869,7 @@ export default function PurchasesPage() {
             )}
              {previewLotData && (
                  <div className="hidden">
-                     <div ref={printLotRef}>
+                    <div ref={printLotCallbackRef}>
                         <LotGenerationContent lotData={previewLotData} />
                     </div>
                 </div>
@@ -877,10 +878,3 @@ export default function PurchasesPage() {
     </>
   );
 }
-
-
-
-
-
-
-
