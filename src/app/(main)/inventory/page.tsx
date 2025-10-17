@@ -392,6 +392,32 @@ export default function InventoryPage() {
       XLSX.writeFile(workbook, `Reporte_Inventario_${selectedProduct}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
       toast({ title: 'Exportación Exitosa'});
     };
+
+    const handleExportLots = () => {
+        if (filteredLotInventory.length === 0) {
+            toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay lotes para exportar.'});
+            return;
+        }
+
+        const dataForSheet = filteredLotInventory.map(lot => ({
+            'Lote': lot.lotNumber,
+            'Producto': lot.product,
+            'Calibre': lot.caliber,
+            'Proveedor': lot.supplierName,
+            'Fecha Compra': format(parseISO(lot.purchaseDate), 'dd-MM-yyyy'),
+            'Envases Iniciales': lot.initialPackages,
+            'Kilos Iniciales': lot.initialKilos,
+            'Envases Disponibles': lot.availablePackages,
+            'Kilos Disponibles': lot.availableKilos,
+            'Peso Promedio x Envase': lot.avgWeight.toFixed(2),
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario Por Lote');
+        XLSX.writeFile(workbook, `Inventario_Por_Lote_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+        toast({ title: 'Exportación Exitosa'});
+    }
     
     const totals = useMemo(() => {
         return inventoryData.reduce((acc, item) => {
@@ -494,13 +520,17 @@ export default function InventoryPage() {
 
         return (
             <>
-                <div className="py-4">
+                <div className="py-4 flex justify-between items-center">
                     <Input
                         placeholder="Filtrar por lote, producto, calibre o proveedor..."
                         value={lotFilter}
                         onChange={(e) => setLotFilter(e.target.value)}
                         className="max-w-md"
                     />
+                    <Button onClick={handleExportLots} variant="outline">
+                        <Download className="mr-2 h-4 w-4" />
+                        Exportar a Excel
+                    </Button>
                 </div>
                 <div className="rounded-md border">
                     <Table>
