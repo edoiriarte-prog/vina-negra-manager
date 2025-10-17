@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -57,14 +58,9 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
     const [previewData, setPreviewData] = useState<any>(null);
     const [isDeleteLotsDialogOpen, setIsDeleteLotsDialogOpen] = useState(false);
     const [newSingleLotId, setNewSingleLotId] = useState<string | null>(null);
+    const [isLotPreviewOpen, setIsLotPreviewOpen] = useState(false);
 
-    const printRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
-
-    const handlePrint = useReactToPrint({
-        content: () => printRef.current,
-        documentTitle: `Etiquetas_Lote`,
-    });
 
     const ordersWithLotInfo = allOrders
       .filter(o => o.status === 'completed')
@@ -99,7 +95,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
     };
 
     const getNextLotSuffix = () => {
-        let highestLotSuffix = 99;
+        let highestLotSuffix = 99; // Start from 100 if no lots exist
         allOrders.forEach(order => {
             order.items.forEach(item => {
                 if (item.lotNumber && item.lotNumber.startsWith('LT-')) {
@@ -325,7 +321,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                             Guardar Lotes en O/C
                         </Button>
                     </div>
-                    <Button onClick={handlePrint} disabled={!previewData} variant="outline">
+                    <Button onClick={() => setIsLotPreviewOpen(true)} disabled={!previewData} variant="outline">
                         Exportar a PDF e Imprimir
                     </Button>
                      <Button onClick={() => setIsDeleteLotsDialogOpen(true)} variant="destructive" className="mt-4">
@@ -342,7 +338,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                 <CardContent className="bg-gray-200 p-4 rounded-md h-[600px] overflow-y-auto">
                     {previewData ? (
                          <div className="space-y-8">
-                            <LotGenerationContent ref={printRef} lotData={previewData} />
+                            <LotGenerationContent lotData={previewData} />
                         </div>
                     ) : (
                         <div className="flex items-center justify-center h-full border-2 border-dashed rounded-md">
@@ -366,6 +362,13 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+        {previewData && (
+             <LotLabelPreview
+                isOpen={isLotPreviewOpen}
+                onOpenChange={setIsLotPreviewOpen}
+                lotData={previewData}
+            />
+        )}
         </>
     );
 }
@@ -394,13 +397,10 @@ export default function PurchasesPage() {
       content: () => printComponentRef.current,
   });
 
-  const printLotRef = useRef<HTMLDivElement>(null);
   const [isPrintingLot, setIsPrintingLot] = useState(false);
+  const [isLotPreviewOpen, setIsLotPreviewOpen] = useState(false);
 
-  const handleLotPrint = useReactToPrint({
-    content: () => printLotRef.current,
-  });
-  
+
   const handlePreviewLot = (lot: any) => {
     const lotItem = {
       lotId: lot.lotNumber,
@@ -418,16 +418,9 @@ export default function PurchasesPage() {
       creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
       items: [lotItem],
     });
-    setIsPrintingLot(true);
+    setIsLotPreviewOpen(true);
   }
   
-  const printLotCallbackRef = useCallback((node: HTMLDivElement) => {
-    if (node !== null && isPrintingLot) {
-      handleLotPrint();
-      setIsPrintingLot(false); 
-      setPreviewLotData(null);
-    }
-  }, [isPrintingLot, handleLotPrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -891,15 +884,14 @@ export default function PurchasesPage() {
                 onPrintRequest={handlePrint}
                 />
             )}
-             {previewLotData && (
-                 <div className="hidden">
-                    <div ref={printLotCallbackRef}>
-                        <LotGenerationContent lotData={previewLotData} />
-                    </div>
-                </div>
+             {previewLotData && isLotPreviewOpen && (
+                <LotLabelPreview
+                    isOpen={isLotPreviewOpen}
+                    onOpenChange={setIsLotPreviewOpen}
+                    lotData={previewLotData}
+                />
             )}
         </Tabs>
     </>
   );
 }
-

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useRef } from 'react';
@@ -49,7 +48,7 @@ export function LotLabelPreview({ isOpen, onOpenChange, lotData }: LotLabelPrevi
           <DialogTitle>Previsualización de Etiqueta de Lote</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto bg-gray-200 p-8">
-            <div className="w-[21cm] min-h-[29.7cm] bg-white shadow-lg mx-auto">
+            <div className="w-full">
                 <LotGenerationContent ref={printRef} lotData={lotData} />
             </div>
         </div>
