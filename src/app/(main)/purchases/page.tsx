@@ -111,7 +111,23 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             return;
         }
 
-        const lotItems = selectedEntries.map(({ ocId, caliber: caliberName }, index) => {
+        let highestLotSuffix = 99;
+        allOrders.forEach(order => {
+            order.items.forEach(item => {
+                if (item.lotNumber && item.lotNumber.startsWith('LT-')) {
+                    const parts = item.lotNumber.split('-');
+                    const suffix = parseInt(parts[parts.length - 1], 10);
+                    if (!isNaN(suffix) && suffix > highestLotSuffix) {
+                        highestLotSuffix = suffix;
+                    }
+                }
+            });
+        });
+        
+        let nextLotSuffix = highestLotSuffix + 1;
+
+
+        const lotItems = selectedEntries.map(({ ocId, caliber: caliberName }) => {
             const order = allOrders.find(o => o.id === ocId);
             if (!order || !caliberName) return null;
 
@@ -124,7 +140,7 @@ function LotGenerationTab({ allOrders, suppliers, calibers, setAllOrders }: { al
             const avgWeight = totalPackages > 0 ? totalKilos / totalPackages : 0;
             
             const datePart = format(parseISO(order.date), 'yyyyMMdd');
-            const uniqueLotId = `LT-${datePart}-${100 + index}`;
+            const uniqueLotId = `LT-${datePart}-${nextLotSuffix++}`;
 
 
             return {
@@ -343,11 +359,15 @@ export default function PurchasesPage() {
       items: [lotItem],
     });
     
-    // Use a timeout to ensure state is updated before printing
-    setTimeout(() => {
-        handleLotPrint();
-    }, 100);
+    setIsPrintingLot(true);
   }
+  
+    const printLotCallbackRef = useCallback((node: HTMLDivElement) => {
+        if (node && isPrintingLot) {
+            handleLotPrint();
+            setIsPrintingLot(false); 
+        }
+    }, [isPrintingLot, handleLotPrint]);
 
   useEffect(() => {
     setIsClient(true);
@@ -813,7 +833,7 @@ export default function PurchasesPage() {
             )}
              {previewLotData && (
                 <div className="hidden">
-                    <div ref={printLotRef}>
+                     <div ref={printLotCallbackRef}>
                         <LotGenerationContent lotData={previewLotData} />
                     </div>
                 </div>
@@ -822,6 +842,7 @@ export default function PurchasesPage() {
     </>
   );
 }
+
 
 
 
