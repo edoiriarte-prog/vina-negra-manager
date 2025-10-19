@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -10,11 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { PurchaseOrder, Contact } from '@/lib/types';
 import { PreviewContent } from './purchase-order-preview-content';
 import { useReactToPrint } from 'react-to-print';
 import { Printer } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type PurchaseOrderPreviewProps = {
   order: PurchaseOrder | null;
@@ -50,10 +52,10 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
         </div>
 
         <DialogFooter className="p-6 pt-0 border-t gap-2 no-print">
-            <Button variant="outline" onClick={handlePrint}>
+            <button onClick={handlePrint} className={cn(buttonVariants({ variant: "outline" }))}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir PDF
-            </Button>
+            </button>
             <DialogClose asChild>
                 <Button type="button">Cerrar</Button>
             </DialogClose>

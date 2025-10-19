@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import { useMemo, useRef, forwardRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
@@ -15,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Printer, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 type InventoryHistoryDialogProps = {
   item: InventoryItem | null;
@@ -241,10 +243,10 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
             <Download className="mr-2 h-4 w-4" />
             Exportar a Excel
           </Button>
-          <Button type="button" variant="outline" onClick={handlePrint}>
+          <button type="button" onClick={handlePrint} className={cn(buttonVariants({ variant: "outline" }))}>
             <Printer className="mr-2 h-4 w-4" />
             Imprimir Historial
-          </Button>
+          </button>
           <DialogClose asChild>
             <Button type="button">Cerrar</Button>
           </DialogClose>

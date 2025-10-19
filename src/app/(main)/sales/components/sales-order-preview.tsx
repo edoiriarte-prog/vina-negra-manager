@@ -11,11 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { SalesOrder } from '@/lib/types';
 import { SalesOrderPreviewContent } from './sales-order-preview-content';
 import { useReactToPrint } from 'react-to-print';
 import { Printer, Download } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type SalesOrderPreviewProps = {
   order: SalesOrder;
@@ -55,10 +56,10 @@ export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest
                 <Download className="mr-2 h-4 w-4" />
                 Exportar Excel
             </Button>
-            <Button variant="outline" onClick={handlePrint}>
+            <button onClick={handlePrint} className={cn(buttonVariants({ variant: "outline" }))}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir PDF
-            </Button>
+            </button>
             <DialogClose asChild>
                 <Button type="button">Cerrar</Button>
             </DialogClose>
