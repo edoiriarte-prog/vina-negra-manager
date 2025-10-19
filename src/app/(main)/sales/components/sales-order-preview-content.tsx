@@ -10,7 +10,6 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { useMasterData } from '@/hooks/use-master-data';
-import Barcode from 'react-barcode';
 
 interface PreviewContentProps {
   order: SalesOrder;
@@ -117,7 +116,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             <Table className="text-black text-base">
                 <TableHeader>
                     <TableRow className="bg-gray-100 hover:bg-gray-100 border-b-2 border-gray-300">
-                        <TableHead className="text-black font-bold">Lote / Código de Barras</TableHead>
+                        <TableHead className="text-black font-bold">Lote</TableHead>
                         <TableHead className="text-black font-bold">Descripción</TableHead>
                         <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
                         <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
@@ -128,12 +127,8 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                 <TableBody>
                 {order.items.map((item, index) => (
                     <TableRow key={item.id || index} className="border-gray-200">
-                        <TableCell className="font-medium align-middle">
-                            {item.lotNumber && (
-                                <div className="flex flex-col items-center justify-center py-1">
-                                    <Barcode value={item.lotNumber} height={30} width={1.5} fontSize={10} margin={0} />
-                                </div>
-                            )}
+                        <TableCell className="font-medium align-middle text-sm+">
+                            {item.lotNumber}
                         </TableCell>
                         <TableCell className="align-middle text-sm+">{item.product} - {item.caliber} ({getCaliberCode(item.caliber)})</TableCell>
                         <TableCell className="text-right align-middle text-sm+">{formatPackages(item.packagingQuantity || 0)}</TableCell>
