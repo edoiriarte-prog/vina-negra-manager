@@ -34,9 +34,9 @@ export const purchaseOrders: PurchaseOrder[] = rawPurchaseOrders.map(order => ({
 
 
 export const salesOrders: SalesOrder[] = [
-  { id: 'OV-2001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'UVAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 4500, packagingQuantity: 200, lotNumber: 'LOTE-011023-1-0' }, { id: 's2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 2000, unit: 'Kilos', price: 5000, packagingQuantity: 100, lotNumber: 'LOTE-011023-1-1' }], totalKilos: 6000, totalPackages: 300, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed', paymentMethod: 'Contado', warehouse: 'Bodega Principal', paymentStatus: 'Pagado' },
-  { id: 'OV-2002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'PALTAS', caliber: 'EXTRA', quantity: 5000, unit: 'Kilos', price: 4500, packagingQuantity: 250, lotNumber: 'LOTE-081023-5-0' }, { id: 's4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 3000, unit: 'Kilos', price: 5000, packagingQuantity: 150, lotNumber: 'LOTE-081023-5-1' }], totalKilos: 8000, totalPackages: 400, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed', paymentMethod: 'Pago con Anticipo y Saldo', advancePercentage: 50, advanceDueDate: '2023-10-20', balanceDueDate: '2023-11-20', warehouse: 'Cámara de Frío 1', paymentStatus: 'Pagado' },
-  { id: 'OV-2003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 5500, packagingQuantity: 300, lotNumber: 'LOTE-151023-1-0' }], totalKilos: 6000, totalPackages: 300, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending', paymentMethod: 'Crédito', warehouse: 'Bodega Principal', paymentStatus: 'Pendiente' },
+  { id: 'OV-2001', clientId: '2', date: '2023-10-05', items: [{ id: 's1', product: 'UVAS', caliber: 'PRIMERA', quantity: 4000, unit: 'Kilos', price: 4500, packagingQuantity: 200, lotNumber: 'LOTE-011023-1-0' }, { id: 's2', product: 'UVAS', caliber: 'SEGUNDA', quantity: 2000, unit: 'Kilos', price: 5000, packagingQuantity: 100, lotNumber: 'LOTE-011023-1-1' }], totalKilos: 6000, totalPackages: 300, totalAmount: 28000000, relatedPurchaseIds: ['OC-1001'], status: 'completed', paymentMethod: 'Contado', warehouse: 'Bodega Principal', paymentStatus: 'Pagado', orderType: 'sales', includeVat: true },
+  { id: 'OV-2002', clientId: '3', date: '2023-10-12', items: [{ id: 's3', product: 'PALTAS', caliber: 'EXTRA', quantity: 5000, unit: 'Kilos', price: 4500, packagingQuantity: 250, lotNumber: 'LOTE-081023-5-0' }, { id: 's4', product: 'PALTAS', caliber: 'PRIMERA', quantity: 3000, unit: 'Kilos', price: 5000, packagingQuantity: 150, lotNumber: 'LOTE-081023-5-1' }], totalKilos: 8000, totalPackages: 400, totalAmount: 37500000, relatedPurchaseIds: ['OC-1002'], status: 'completed', paymentMethod: 'Pago con Anticipo y Saldo', advancePercentage: 50, advanceDueDate: '2023-10-20', balanceDueDate: '2023-11-20', warehouse: 'Cámara de Frío 1', paymentStatus: 'Pagado', orderType: 'sales', includeVat: true },
+  { id: 'OV-2003', clientId: '2', date: '2023-10-20', items: [{ id: 's5', product: 'DURAZNOS', caliber: 'EXTRA', quantity: 6000, unit: 'Kilos', price: 5500, packagingQuantity: 300, lotNumber: 'LOTE-151023-1-0' }], totalKilos: 6000, totalPackages: 300, totalAmount: 33000000, relatedPurchaseIds: ['OC-1003'], status: 'pending', paymentMethod: 'Crédito', warehouse: 'Bodega Principal', paymentStatus: 'Pendiente', orderType: 'sales', includeVat: true },
 ];
 
 export const serviceOrders: ServiceOrder[] = [
@@ -66,33 +66,56 @@ export const getInventory = (
   orderBeingEdited?: SalesOrder | null
 ): InventoryItem[] => {
   const inventoryMap = new Map<string, { purchased: number; sold: number; adjusted: number }>();
-  
-  // Process purchases
+
+  // Process purchases and internal transfers (incoming)
   currentPurchaseOrders.forEach(po => {
     if (po.status === 'completed' && po.warehouse) {
       po.items.forEach(item => {
         if (item.unit === 'Kilos') {
-          const key = `${item.product} - ${item.caliber} - ${po.warehouse}`;
-          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
-          existing.purchased += item.quantity;
-          inventoryMap.set(key, existing);
+          // Add to source warehouse
+          const sourceKey = `${item.product} - ${item.caliber} - ${po.warehouse}`;
+          const sourceExisting = inventoryMap.get(sourceKey) || { purchased: 0, sold: 0, adjusted: 0 };
+          sourceExisting.purchased += item.quantity;
+          inventoryMap.set(sourceKey, sourceExisting);
+
+          // If it's a transfer, move stock
+          if (po.destinationWarehouse && po.destinationWarehouse !== po.warehouse) {
+            // Subtract from source
+            sourceExisting.sold += item.quantity;
+            inventoryMap.set(sourceKey, sourceExisting);
+
+            // Add to destination
+            const destKey = `${item.product} - ${item.caliber} - ${po.destinationWarehouse}`;
+            const destExisting = inventoryMap.get(destKey) || { purchased: 0, sold: 0, adjusted: 0 };
+            destExisting.purchased += item.quantity;
+            inventoryMap.set(destKey, destExisting);
+          }
         }
       });
     }
   });
 
-  // Process sales
+  // Process sales and dispatch orders
   currentSalesOrders.forEach(so => {
-     if (orderBeingEdited && so.id === orderBeingEdited.id) {
-        return; // Exclude the order being edited from stock calculation
-     }
-     if ((so.status === 'completed' || so.status === 'pending') && so.warehouse) {
+    if (orderBeingEdited && so.id === orderBeingEdited.id) {
+      return; // Exclude the order being edited from stock calculation
+    }
+    if ((so.status === 'completed' || so.status === 'pending') && so.warehouse) {
       so.items.forEach(item => {
         if (item.unit === 'Kilos') {
-          const key = `${item.product} - ${item.caliber} - ${so.warehouse}`;
-          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
-          existing.sold += item.quantity;
-          inventoryMap.set(key, existing);
+          // Always subtract from the source warehouse
+          const sourceKey = `${item.product} - ${item.caliber} - ${so.warehouse}`;
+          const sourceExisting = inventoryMap.get(sourceKey) || { purchased: 0, sold: 0, adjusted: 0 };
+          sourceExisting.sold += item.quantity;
+          inventoryMap.set(sourceKey, sourceExisting);
+
+          // If it's an internal transfer, add to the destination warehouse
+          if (so.movementType === 'Traslado Bodega Interna' && so.destinationWarehouse) {
+            const destKey = `${item.product} - ${item.caliber} - ${so.destinationWarehouse}`;
+            const destExisting = inventoryMap.get(destKey) || { purchased: 0, sold: 0, adjusted: 0 };
+            destExisting.purchased += item.quantity; // Treat as a "purchase" for the destination
+            inventoryMap.set(destKey, destExisting);
+          }
         }
       });
     }
@@ -111,7 +134,6 @@ export const getInventory = (
       inventoryMap.set(key, existing);
     });
   }
-
 
   const inventory: InventoryItem[] = [];
   inventoryMap.forEach((value, key) => {
