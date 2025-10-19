@@ -56,10 +56,12 @@ type NewSalesOrderSheetProps = {
   purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
   contacts: Contact[];
+  sheetType?: 'sales' | 'dispatch';
 };
 
 
-const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
+const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dispatch'): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
+    const isDispatch = sheetType === 'dispatch';
     if (order) {
         return {
             ...order,
@@ -74,24 +76,28 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
         items: [],
         relatedPurchaseIds: [],
         status: 'pending',
-        paymentMethod: 'Contado',
+        paymentMethod: isDispatch ? 'Contado' : 'Contado',
         advancePercentage: 0,
         advanceDueDate: undefined,
         balanceDueDate: undefined,
         warehouse: '',
-        saleType: 'Venta Firme',
-        movementType: 'Venta Directa',
+        saleType: isDispatch ? 'SOLO TRASLADO' : 'Venta Firme',
+        movementType: isDispatch ? 'Traslado Bodega Interna' : 'Venta Directa',
         destinationWarehouse: '',
         carrierId: '',
         driverName: '',
         licensePlate: '',
-        orderType: 'sales',
-        includeVat: true,
+        orderType: isDispatch ? 'dispatch' : 'sales',
+        includeVat: !isDispatch,
     };
 };
 
-export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, clients, carriers, inventory, nextOrderId, purchaseOrders, salesOrders, contacts }: NewSalesOrderSheetProps) {
-  const [formData, setFormData] = useState(() => getInitialFormData(order));
+export function NewSalesOrderSheet({ 
+    isOpen, onOpenChange, onSave, order, clients, carriers, 
+    inventory, nextOrderId, purchaseOrders, salesOrders, contacts, 
+    sheetType = 'sales' 
+}: NewSalesOrderSheetProps) {
+  const [formData, setFormData] = useState(() => getInitialFormData(order, sheetType));
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [isLotSelectionOpen, setIsLotSelectionOpen] = useState(false);
   const { products, calibers, units, packagingTypes, warehouses } = useMasterData();
@@ -99,9 +105,9 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
 
   useEffect(() => {
     if (isOpen) {
-      setFormData(getInitialFormData(order));
+      setFormData(getInitialFormData(order, sheetType));
     }
-  }, [order, isOpen]);
+  }, [order, isOpen, sheetType]);
 
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
     const newItems = [...formData.items];
@@ -141,7 +147,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         return;
     }
     if (formData.items.length === 0) {
-        toast({ variant: 'destructive', title: 'Error', description: 'La orden de venta debe tener al menos un ítem.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'El documento debe tener al menos un ítem.' });
         return;
     }
     
@@ -158,7 +164,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
             toast({ variant: 'destructive', title: 'Error en Ítem', description: `La unidad del ítem #${index + 1} no ha sido seleccionada.` });
             return;
         }
-        if (!item.price || item.price <= 0) {
+        if (sheetType === 'sales' && (!item.price || item.price <= 0)) {
             toast({ variant: 'destructive', title: 'Error en Ítem', description: `El precio del ítem #${index + 1} debe ser mayor a 0.` });
             return;
         }
@@ -168,7 +174,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
         }
     }
 
-    if (formData.paymentMethod === 'Pago con Anticipo y Saldo') {
+    if (sheetType === 'sales' && formData.paymentMethod === 'Pago con Anticipo y Saldo') {
         if (!formData.advanceDueDate || !formData.balanceDueDate) {
             toast({
                 variant: 'destructive',
@@ -220,7 +226,8 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   const handleMatrixSave = (matrixItems: Omit<OrderItem, 'id'>[]) => {
     const newItems: OrderItem[] = matrixItems.map(item => ({
         ...item,
-        id: `temp-${Date.now()}-${Math.random()}`
+        id: `temp-${Date.now()}-${Math.random()}`,
+        price: sheetType === 'dispatch' ? 0 : item.price,
     }));
 
     if (order) {
@@ -234,7 +241,8 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
   const handleLotSave = (lotItem: OrderItem) => {
     const newItem: OrderItem = {
       ...lotItem,
-      id: `temp-lot-${Date.now()}`
+      id: `temp-lot-${Date.now()}`,
+      price: sheetType === 'dispatch' ? 0 : lotItem.price,
     };
 
     if (order) {
@@ -244,7 +252,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     }
   }
 
-  const title = order ? `Editar ${formData.orderType === 'sales' ? 'Orden de Venta' : 'Orden de Salida'}` : `Crear ${formData.orderType === 'sales' ? 'Orden de Venta' : 'Orden de Salida'}`;
+  const title = order ? `Editar ${sheetType === 'sales' ? 'Orden de Venta' : 'Orden de Salida'}` : `Crear ${sheetType === 'sales' ? 'Orden de Venta' : 'Orden de Salida'}`;
   const description = order 
     ? 'Actualice la información del documento.'
     : 'Complete la información para registrar un nuevo documento.';
@@ -282,26 +290,28 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
             <div className="grid gap-6 py-4">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="orderType" className="text-right">
-                      Tipo Doc.
-                    </Label>
-                     <RadioGroup 
-                        defaultValue="sales" 
-                        onValueChange={(value: 'sales' | 'dispatch') => handleSelectChange('orderType', value)} 
-                        className="col-span-3 flex items-center"
-                        value={formData.orderType}
-                     >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="sales" id="r-sales" />
-                        <Label htmlFor="r-sales">Orden de Venta</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="dispatch" id="r-dispatch" />
-                        <Label htmlFor="r-dispatch">Orden de Salida</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
+                  {sheetType === 'sales' && (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="orderType" className="text-right">
+                        Tipo Doc.
+                      </Label>
+                      <RadioGroup 
+                          defaultValue="sales" 
+                          onValueChange={(value: 'sales' | 'dispatch') => handleSelectChange('orderType', value)} 
+                          className="col-span-3 flex items-center"
+                          value={formData.orderType}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="sales" id="r-sales" />
+                          <Label htmlFor="r-sales">Orden de Venta</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="dispatch" id="r-dispatch" />
+                          <Label htmlFor="r-dispatch">Orden de Salida</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  )}
 
                    <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="date" className="text-right">
@@ -353,6 +363,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                       </SelectContent>
                     </Select>
                   </div>
+                  {sheetType === 'sales' && (
                    <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="saleType" className="text-right">
                         Tipo de Venta
@@ -372,8 +383,10 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                         </SelectContent>
                       </Select>
                     </div>
+                    )}
                 </div>
                 <div className="space-y-4">
+                  {sheetType === 'sales' && (
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="status" className="text-right">
                         Estado
@@ -393,6 +406,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                         </SelectContent>
                         </Select>
                     </div>
+                  )}
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="warehouse" className="text-right">
                             Bodega Origen
@@ -479,7 +493,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
               <Card>
                 <CardHeader>
                     <div className="flex justify-between items-center">
-                        <CardTitle className="text-lg font-headline">Ítems de la Orden</CardTitle>
+                        <CardTitle className="text-lg font-headline">Ítems del Documento</CardTitle>
                          <div className="flex gap-2">
                              <Button type="button" variant="outline" size="sm" onClick={() => setIsLotSelectionOpen(true)} disabled={!formData.warehouse}>
                                 <Layers className="mr-2 h-4 w-4" />
@@ -556,7 +570,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                             {/* Price */}
                             <div className="col-span-6 md:col-span-1">
                                 <Label>Precio</Label>
-                                <Input name={`items.${index}.price`} type="number" value={item.price || ''} onChange={handleInputChange} placeholder="0" required className="text-base" />
+                                <Input name={`items.${index}.price`} type="number" value={item.price || ''} onChange={handleInputChange} placeholder="0" required className="text-base" disabled={sheetType === 'dispatch'}/>
                             </div>
                             {/* Subtotal */}
                             <div className="col-span-6 md:col-span-1">
@@ -586,156 +600,158 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                 </CardContent>
               </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg font-headline">Condiciones de Pago</CardTitle>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="paymentMethod" className="text-right">
-                                Modalidad
+            {sheetType === 'sales' && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg font-headline">Condiciones de Pago</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="paymentMethod" className="text-right">
+                                    Modalidad
+                                </Label>
+                                <Select
+                                    required
+                                    onValueChange={(value: 'Contado' | 'Crédito' | 'Pago con Anticipo y Saldo') => handleSelectChange('paymentMethod', value)}
+                                    value={formData.paymentMethod}
+                                >
+                                    <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Seleccione modalidad" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Contado">Contado</SelectItem>
+                                        <SelectItem value="Crédito">Crédito</SelectItem>
+                                        <SelectItem value="Pago con Anticipo y Saldo">Pago con Anticipo y Saldo</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
+                                <div className="space-y-4 pl-8 border-l-2 ml-4">
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="advancePercentage" className="text-right">
+                                            Anticipo (%)
+                                        </Label>
+                                        <Input id="advancePercentage" name="advancePercentage" type="number" value={formData.advancePercentage || ''} onChange={handleInputChange} className="col-span-3" required min="0" max="100"/>
+                                    </div>
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="advanceDueDate" className="text-right">
+                                            Venc. Anticipo
+                                        </Label>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn(
+                                                "col-span-3 justify-start text-left font-normal",
+                                                !formData.advanceDueDate && "text-muted-foreground"
+                                                )}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                                            </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0">
+                                            <Calendar
+                                                mode="single"
+                                                selected={formData.advanceDueDate ? parseISO(formData.advanceDueDate) : undefined}
+                                                onSelect={(date) => {
+                                                    if (date) {
+                                                        handleSelectChange('advanceDueDate', format(date, 'yyyy-MM-dd'))
+                                                    }
+                                                }}
+                                                initialFocus
+                                            />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="balanceDueDate" className="text-right">
+                                            Venc. Saldo
+                                        </Label>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn(
+                                                "col-span-3 justify-start text-left font-normal",
+                                                !formData.balanceDueDate && "text-muted-foreground"
+                                                )}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                                            </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0">
+                                            <Calendar
+                                                mode="single"
+                                                selected={formData.balanceDueDate ? parseISO(formData.balanceDueDate) : undefined}
+                                                onSelect={(date) => {
+                                                    if (date) {
+                                                        handleSelectChange('balanceDueDate', format(date, 'yyyy-MM-dd'))
+                                                    }
+                                                }}
+                                                initialFocus
+                                            />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="includeVat" className="text-right">
+                                IVA
                             </Label>
-                            <Select
-                                required
-                                onValueChange={(value: 'Contado' | 'Crédito' | 'Pago con Anticipo y Saldo') => handleSelectChange('paymentMethod', value)}
-                                value={formData.paymentMethod}
-                            >
-                                <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Seleccione modalidad" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Contado">Contado</SelectItem>
-                                    <SelectItem value="Crédito">Crédito</SelectItem>
-                                    <SelectItem value="Pago con Anticipo y Saldo">Pago con Anticipo y Saldo</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
-                             <div className="space-y-4 pl-8 border-l-2 ml-4">
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="advancePercentage" className="text-right">
-                                        Anticipo (%)
-                                    </Label>
-                                    <Input id="advancePercentage" name="advancePercentage" type="number" value={formData.advancePercentage || ''} onChange={handleInputChange} className="col-span-3" required min="0" max="100"/>
-                                </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="advanceDueDate" className="text-right">
-                                        Venc. Anticipo
-                                    </Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                            "col-span-3 justify-start text-left font-normal",
-                                            !formData.advanceDueDate && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
-                                        </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0">
-                                        <Calendar
-                                            mode="single"
-                                            selected={formData.advanceDueDate ? parseISO(formData.advanceDueDate) : undefined}
-                                            onSelect={(date) => {
-                                                if (date) {
-                                                    handleSelectChange('advanceDueDate', format(date, 'yyyy-MM-dd'))
-                                                }
-                                            }}
-                                            initialFocus
-                                        />
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="balanceDueDate" className="text-right">
-                                        Venc. Saldo
-                                    </Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                            "col-span-3 justify-start text-left font-normal",
-                                            !formData.balanceDueDate && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
-                                        </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0">
-                                        <Calendar
-                                            mode="single"
-                                            selected={formData.balanceDueDate ? parseISO(formData.balanceDueDate) : undefined}
-                                            onSelect={(date) => {
-                                                if (date) {
-                                                    handleSelectChange('balanceDueDate', format(date, 'yyyy-MM-dd'))
-                                                }
-                                            }}
-                                            initialFocus
-                                        />
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
+                            <div className="col-span-3 flex items-center space-x-2">
+                                <Switch
+                                id="includeVat"
+                                checked={formData.includeVat}
+                                onCheckedChange={(checked) => handleSelectChange('includeVat', checked)}
+                                />
+                                <Label htmlFor="includeVat">Incluir IVA (19%) en el total</Label>
                             </div>
-                        )}
-                         <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="includeVat" className="text-right">
-                            IVA
-                          </Label>
-                           <div className="col-span-3 flex items-center space-x-2">
-                            <Switch
-                              id="includeVat"
-                              checked={formData.includeVat}
-                              onCheckedChange={(checked) => handleSelectChange('includeVat', checked)}
-                            />
-                            <Label htmlFor="includeVat">Incluir IVA (19%) en el total</Label>
-                          </div>
-                        </div>
-                    </div>
-                    <div className="bg-muted p-4 rounded-lg">
-                        <h4 className="font-semibold mb-3">Resumen de Pagos</h4>
-                        <div className='text-sm space-y-2'>
-                           {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
-                                <>
-                                    <div className='flex justify-between'>
-                                        <span className="text-muted-foreground">Monto Anticipo ({formData.advancePercentage}%):</span>
-                                        <span className='font-medium'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(advanceAmount)}</span>
-                                    </div>
-                                    <div className='flex justify-between'>
-                                        <span className="text-muted-foreground">Vencimiento:</span>
-                                        <span className='font-medium'>{formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
-                                    </div>
-                                    <Separator className="my-2" />
-                                    <div className='flex justify-between'>
-                                        <span className="text-muted-foreground">Monto Saldo:</span>
-                                        <span className='font-medium'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(balanceAmount)}</span>
-                                    </div>
-                                    <div className='flex justify-between'>
-                                        <span className="text-muted-foreground">Vencimiento:</span>
-                                        <span className='font-medium'>{formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
-                                    </div>
-                                    <Separator className="my-2 bg-foreground" />
-                                </>
-                            )}
-                            <div className='flex justify-between text-lg'>
-                                <span className="font-bold">Total:</span>
-                                <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalAmount)}</span>
                             </div>
-                            {formData.includeVat && (
-                                 <div className='flex justify-between text-xs text-muted-foreground'>
-                                    <span>Subtotal:</span>
-                                    <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(subtotal)}</span>
-                                </div>
-                            )}
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
+                        <div className="bg-muted p-4 rounded-lg">
+                            <h4 className="font-semibold mb-3">Resumen de Pagos</h4>
+                            <div className='text-sm space-y-2'>
+                            {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
+                                    <>
+                                        <div className='flex justify-between'>
+                                            <span className="text-muted-foreground">Monto Anticipo ({formData.advancePercentage}%):</span>
+                                            <span className='font-medium'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(advanceAmount)}</span>
+                                        </div>
+                                        <div className='flex justify-between'>
+                                            <span className="text-muted-foreground">Vencimiento:</span>
+                                            <span className='font-medium'>{formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
+                                        </div>
+                                        <Separator className="my-2" />
+                                        <div className='flex justify-between'>
+                                            <span className="text-muted-foreground">Monto Saldo:</span>
+                                            <span className='font-medium'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(balanceAmount)}</span>
+                                        </div>
+                                        <div className='flex justify-between'>
+                                            <span className="text-muted-foreground">Vencimiento:</span>
+                                            <span className='font-medium'>{formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
+                                        </div>
+                                        <Separator className="my-2 bg-foreground" />
+                                    </>
+                                )}
+                                <div className='flex justify-between text-lg'>
+                                    <span className="font-bold">Total:</span>
+                                    <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalAmount)}</span>
+                                </div>
+                                {formData.includeVat && (
+                                    <div className='flex justify-between text-xs text-muted-foreground'>
+                                        <span>Subtotal:</span>
+                                        <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(subtotal)}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
             </div>
             <SheetFooter className="mt-6">
               <SheetClose asChild>

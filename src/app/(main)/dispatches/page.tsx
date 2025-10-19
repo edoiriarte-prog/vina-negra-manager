@@ -462,6 +462,7 @@ export default function DispatchesPage() {
             purchaseOrders={purchaseOrders}
             salesOrders={salesOrders}
             contacts={contacts}
+            sheetType="dispatch"
         />
       )}
 
