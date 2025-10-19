@@ -120,25 +120,25 @@ export default function InventoryPage() {
                 purchaseOrders
                     .filter(po => po.status === 'completed' && !isAfter(parseISO(po.date), date))
                     .forEach(po => {
-                        po.items.forEach(item => {
-                            if (item.product === selectedProduct && item.unit === 'Kilos') {
-                                const warehouse = po.destinationWarehouse || po.warehouse;
-                                if (selectedWarehouse === 'All' || warehouse === selectedWarehouse) {
+                        const warehouse = po.destinationWarehouse || po.warehouse;
+                         if (selectedWarehouse === 'All' || warehouse === selectedWarehouse) {
+                            po.items.forEach(item => {
+                                if (item.product === selectedProduct && item.unit === 'Kilos') {
                                     const key = `${item.product}-${item.caliber}`;
                                     const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
                                     currentStock.kg += item.quantity;
                                     currentStock.packages += (item.packagingQuantity || 0);
                                     stockMap.set(key, currentStock);
                                 }
-                            }
-                        });
+                            });
+                        }
                     });
 
                 // Process Sales and Transfers
                 salesOrders
                     .filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date))
                     .forEach(so => {
-                        so.items.forEach(item => {
+                         so.items.forEach(item => {
                             if (item.product === selectedProduct && item.unit === 'Kilos') {
                                 // Decrease from source warehouse
                                 if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
@@ -190,10 +190,10 @@ export default function InventoryPage() {
 
             // Calculate inflows, outflows, and adjustments for the selected period
             purchaseOrders.filter(po => po.status === 'completed' && filterByDate(po.date)).forEach(po => {
-                po.items.forEach(item => {
-                    if (item.product === selectedProduct && item.unit === 'Kilos') {
-                        const warehouse = po.destinationWarehouse || po.warehouse;
-                        if (selectedWarehouse === 'All' || warehouse === selectedWarehouse) {
+                const warehouse = po.destinationWarehouse || po.warehouse;
+                if (selectedWarehouse === 'All' || warehouse === selectedWarehouse) {
+                    po.items.forEach(item => {
+                        if (item.product === selectedProduct && item.unit === 'Kilos') {
                             const key = `${item.product}-${item.caliber}`;
                             const current = inflowsMap.get(key) || { kg: 0, packages: 0 };
                             current.kg += item.quantity;
@@ -201,8 +201,8 @@ export default function InventoryPage() {
                             inflowsMap.set(key, current);
                             allCalibers.add(item.caliber);
                         }
-                    }
-                });
+                    });
+                }
             });
 
             salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && filterByDate(so.date)).forEach(so => {
@@ -336,7 +336,9 @@ export default function InventoryPage() {
             const fromWarehouse = 'warehouse' in movement ? (movement as SalesOrder | InventoryAdjustment).warehouse : '';
             const toWarehouse = isTransfer ? (movement as SalesOrder).destinationWarehouse : undefined;
 
-            movement.items.forEach(item => {
+            const itemsToProcess = 'items' in movement ? movement.items : [movement as InventoryAdjustment];
+
+            itemsToProcess.forEach(item => {
                 if (item.lotNumber && fromWarehouse) {
                     // Decrease from source warehouse
                     const sourceLotKey = `${item.lotNumber}-${fromWarehouse}`;
