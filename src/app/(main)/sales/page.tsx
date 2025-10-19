@@ -37,7 +37,6 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { SalesOrderPreview } from './components/sales-order-preview';
-import { useReactToPrint } from 'react-to-print';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -65,11 +64,6 @@ export default function SalesPage() {
   const [filter, setFilter] = useState('');
 
   const { toast } = useToast();
-  const printComponentRef = useRef<HTMLDivElement>(null);
-  
-  const handlePrint = useReactToPrint({
-    content: () => printComponentRef.current,
-  });
   
   const clients = contacts.filter(c => c.type.includes('client'));
   const carriers = contacts.filter(c => c.type.includes('supplier'));
@@ -147,14 +141,16 @@ export default function SalesPage() {
         }
     }
     
-    const totalAmount = orderToSave.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    const totalKilos = orderToSave.items.reduce((sum, item) => {
+    const subtotal = allItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
+    const totalAmount = orderToSave.includeVat ? subtotal * 1.19 : subtotal;
+    
+    const totalKilos = allItems.reduce((sum, item) => {
       if (item.unit === 'Kilos') {
         return sum + Number(item.quantity || 0);
       }
       return sum;
     }, 0);
-    const totalPackages = orderToSave.items.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
+    const totalPackages = allItems.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
     let finalOrder: SalesOrder;
 
@@ -501,11 +497,9 @@ export default function SalesPage() {
       
       {previewingOrder && (
           <SalesOrderPreview
-            ref={printComponentRef}
             order={previewingOrder}
             isOpen={!!previewingOrder}
             onOpenChange={setPreviewingOrder}
-            onPrintRequest={handlePrint}
             onExportRequest={() => handleExport(previewingOrder)}
         />
       )}

@@ -14,22 +14,28 @@ import {
 import { Button } from '@/components/ui/button';
 import { SalesOrder } from '@/lib/types';
 import { SalesOrderPreviewContent } from './sales-order-preview-content';
+import { useReactToPrint } from 'react-to-print';
 import { Printer, Download } from 'lucide-react';
 
 type SalesOrderPreviewProps = {
   order: SalesOrder;
   isOpen: boolean;
   onOpenChange: (open: boolean | ((prevState: boolean) => boolean)) => void;
-  onPrintRequest: () => void;
   onExportRequest: () => void;
 };
 
-export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPreviewProps>(({ order, isOpen, onOpenChange, onPrintRequest, onExportRequest }, ref) => {
+export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest }: SalesOrderPreviewProps) {
+  const componentRef = useRef<HTMLDivElement>(null);
+  
+  const handlePrint = useReactToPrint({
+    content: () => componentRef.current,
+  });
+
   if (!order) {
     return null;
   }
   
-  const docTitle = order.orderType === 'dispatch' ? 'Guía de Despacho' : 'Orden de Venta';
+  const docTitle = order.orderType === 'dispatch' ? 'Orden de Salida' : 'Orden de Venta';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -39,7 +45,7 @@ export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPrev
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto">
             <SalesOrderPreviewContent
-                ref={ref}
+                ref={componentRef}
                 order={order} 
             />
         </div>
@@ -49,7 +55,7 @@ export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPrev
                 <Download className="mr-2 h-4 w-4" />
                 Exportar Excel
             </Button>
-            <Button variant="outline" onClick={onPrintRequest}>
+            <Button variant="outline" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir PDF
             </Button>
@@ -60,7 +66,7 @@ export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPrev
       </DialogContent>
     </Dialog>
   );
-});
+}
 
 SalesOrderPreview.displayName = 'SalesOrderPreview';
 
