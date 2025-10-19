@@ -71,7 +71,7 @@ export type SalesOrder = {
   paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
   purchaseOrder?: string;
   saleType?: 'Venta Firme' | 'Consignación' | 'Mínimo Garantizado' | 'SOLO TRASLADO';
-  movementType?: 'Venta Directa' | 'Traslado a Bodega Externa';
+  movementType?: 'Venta Directa' | 'Traslado a Bodega Externa' | 'Traslado Bodega Interna';
   destinationWarehouse?: string;
   carrierId?: string;
   driverName?: string;

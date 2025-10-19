@@ -388,7 +388,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                           Tipo Movimiento
                         </Label>
                         <Select
-                          onValueChange={(value: 'Venta Directa' | 'Traslado a Bodega Externa') => handleSelectChange('movementType', value)}
+                          onValueChange={(value: 'Venta Directa' | 'Traslado a Bodega Externa' | 'Traslado Bodega Interna') => handleSelectChange('movementType', value)}
                           value={formData.movementType}
                         >
                           <SelectTrigger className="col-span-3">
@@ -397,6 +397,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                           <SelectContent>
                             <SelectItem value="Venta Directa">Venta Directa</SelectItem>
                             <SelectItem value="Traslado a Bodega Externa">Traslado a Bodega Externa</SelectItem>
+                            <SelectItem value="Traslado Bodega Interna">Traslado Bodega Interna</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
