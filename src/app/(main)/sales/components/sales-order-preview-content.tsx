@@ -163,6 +163,19 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <span className="col-span-2">{order.saleType || 'N/A'}</span>
                         <span className="font-semibold text-gray-600 col-span-1">Modalidad Pago:</span>
                         <span className="col-span-2">{order.paymentMethod}</span>
+
+                        {order.paymentMethod === 'Crédito' && order.creditDays && (
+                            <>
+                                <span className="font-semibold text-gray-600 col-span-1">Plazo Crédito (días):</span>
+                                <span className="col-span-2">{order.creditDays}</span>
+                            </>
+                        )}
+                        {order.paymentMethod === 'Crédito' && order.balanceDueDate && (
+                             <>
+                                <span className="font-semibold text-gray-600 col-span-1">Fecha Vencimiento:</span>
+                                <span className="col-span-2">{format(parseISO(order.balanceDueDate), "dd-MM-yyyy", { locale: es })}</span>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
