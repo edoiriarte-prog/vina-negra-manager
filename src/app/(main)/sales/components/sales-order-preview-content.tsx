@@ -3,7 +3,7 @@
 "use client";
 
 import React from 'react';
-import { SalesOrder, Contact } from '@/lib/types';
+import { SalesOrder, Contact, OrderItem } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { contacts as initialContacts } from '@/lib/data';
 import { format, parseISO } from 'date-fns';
@@ -24,6 +24,16 @@ const formatCurrency = (value: number) =>
 
 const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
 
+type SummarizedItem = {
+    product: string;
+    caliber: string;
+    caliberCode: string;
+    totalPackages: number;
+    totalKilos: number;
+    avgPrice: number;
+}
+
+
 export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order }, ref) => {
     const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
     const { calibers } = useMasterData();
@@ -42,7 +52,47 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
     const iva = order.includeVat ? subtotal * 0.19 : 0;
     const totalConIva = subtotal + iva;
     
-    const docTitle = order.orderType === 'dispatch' ? 'GUÍA DE DESPACHO' : 'ORDEN DE VENTA';
+    const docTitle = order.orderType === 'dispatch' ? 'ORDEN DE SALIDA' : 'ORDEN DE VENTA';
+
+    const summarizedItems = React.useMemo(() => {
+        if (order.orderType !== 'dispatch') {
+            return null;
+        }
+
+        const summary = new Map<string, { totalPackages: number, totalKilos: number, totalValue: number, product: string }>();
+
+        order.items.forEach(item => {
+            const key = item.caliber;
+            const existing = summary.get(key) || { totalPackages: 0, totalKilos: 0, totalValue: 0, product: item.product };
+            
+            existing.totalPackages += item.packagingQuantity || 0;
+            existing.totalKilos += item.unit === 'Kilos' ? item.quantity : 0;
+            existing.totalValue += item.quantity * item.price;
+            existing.product = item.product;
+
+            summary.set(key, existing);
+        });
+
+        const result: SummarizedItem[] = [];
+        summary.forEach((value, key) => {
+            result.push({
+                product: value.product,
+                caliber: key,
+                caliberCode: getCaliberCode(key),
+                totalPackages: value.totalPackages,
+                totalKilos: value.totalKilos,
+                avgPrice: value.totalKilos > 0 ? value.totalValue / value.totalKilos : 0,
+            });
+        });
+        
+        return result.sort((a,b) => {
+            const caliberAIndex = calibers.findIndex(c => c.name === a.caliber);
+            const caliberBIndex = calibers.findIndex(c => c.name === b.caliber);
+            return caliberAIndex - caliberBIndex;
+        });
+
+    }, [order, calibers]);
+
 
     return (
         <div ref={ref} className="p-10 bg-white text-black font-sans text-base">
@@ -121,28 +171,52 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             {/* Items Table */}
             <Table className="text-black text-base">
                 <TableHeader>
-                    <TableRow className="bg-gray-100 hover:bg-gray-100 border-b-2 border-gray-300">
-                        <TableHead className="text-black font-bold">Lote</TableHead>
-                        <TableHead className="text-black font-bold">Descripción</TableHead>
-                        <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
-                        <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
-                        <TableHead className="text-right text-black font-bold">Precio Unit.</TableHead>
-                        <TableHead className="text-right text-black font-bold">SUB TOTAL</TableHead>
-                    </TableRow>
+                     {order.orderType === 'dispatch' ? (
+                        <TableRow className="bg-gray-100 hover:bg-gray-100 border-b-2 border-gray-300">
+                            <TableHead className="text-black font-bold">Producto</TableHead>
+                            <TableHead className="text-black font-bold">Calibre</TableHead>
+                            <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
+                            <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
+                            <TableHead className="text-right text-black font-bold">Precio Prom./kg</TableHead>
+                            <TableHead className="text-right text-black font-bold">SUB TOTAL</TableHead>
+                        </TableRow>
+                     ) : (
+                        <TableRow className="bg-gray-100 hover:bg-gray-100 border-b-2 border-gray-300">
+                            <TableHead className="text-black font-bold">Lote</TableHead>
+                            <TableHead className="text-black font-bold">Descripción</TableHead>
+                            <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
+                            <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
+                            <TableHead className="text-right text-black font-bold">Precio Unit.</TableHead>
+                            <TableHead className="text-right text-black font-bold">SUB TOTAL</TableHead>
+                        </TableRow>
+                     )}
                 </TableHeader>
                 <TableBody>
-                {order.items.map((item, index) => (
-                    <TableRow key={item.id || index} className="border-gray-200">
-                        <TableCell className="font-medium align-middle text-sm+">
-                            {item.lotNumber}
-                        </TableCell>
-                        <TableCell className="align-middle text-sm+">{item.product} - {item.caliber} ({getCaliberCode(item.caliber)})</TableCell>
-                        <TableCell className="text-right align-middle text-sm+">{formatPackages(item.packagingQuantity || 0)}</TableCell>
-                        <TableCell className="text-right align-middle text-sm+">{item.quantity.toLocaleString('es-CL')} kg</TableCell>
-                        <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.price)}</TableCell>
-                        <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.quantity * item.price)}</TableCell>
-                    </TableRow>
-                ))}
+                {order.orderType === 'dispatch' && summarizedItems ? (
+                     summarizedItems.map((item, index) => (
+                        <TableRow key={index} className="border-gray-200">
+                            <TableCell className="align-middle text-sm+">{item.product}</TableCell>
+                            <TableCell className="align-middle text-sm+">{item.caliber} ({item.caliberCode})</TableCell>
+                            <TableCell className="text-right align-middle text-sm+">{formatPackages(item.totalPackages)}</TableCell>
+                            <TableCell className="text-right align-middle text-sm+">{item.totalKilos.toLocaleString('es-CL')} kg</TableCell>
+                            <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgPrice)}</TableCell>
+                            <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.totalKilos * item.avgPrice)}</TableCell>
+                        </TableRow>
+                    ))
+                ) : (
+                    order.items.map((item, index) => (
+                        <TableRow key={item.id || index} className="border-gray-200">
+                            <TableCell className="font-medium align-middle text-sm+">
+                                {item.lotNumber}
+                            </TableCell>
+                            <TableCell className="align-middle text-sm+">{item.product} - {item.caliber} ({getCaliberCode(item.caliber)})</TableCell>
+                            <TableCell className="text-right align-middle text-sm+">{formatPackages(item.packagingQuantity || 0)}</TableCell>
+                            <TableCell className="text-right align-middle text-sm+">{item.quantity.toLocaleString('es-CL')} kg</TableCell>
+                            <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.price)}</TableCell>
+                            <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.quantity * item.price)}</TableCell>
+                        </TableRow>
+                    ))
+                )}
                 </TableBody>
                 <TableFooter>
                     <TableRow className="bg-gray-100 hover:bg-gray-100 border-t-2 border-gray-300">
