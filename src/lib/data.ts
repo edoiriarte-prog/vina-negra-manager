@@ -1,4 +1,5 @@
 
+
 import { Contact, PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, InventoryItem, Interaction, BankAccount, InventoryAdjustment } from './types';
 import { initialCalibers } from './master-data';
 import { format } from 'date-fns';

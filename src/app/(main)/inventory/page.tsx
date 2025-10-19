@@ -272,95 +272,122 @@ export default function InventoryPage() {
     }, [isClient, dateRange, selectedWarehouse, selectedProduct, purchaseOrders, salesOrders, inventoryAdjustments, masterCalibers, masterProducts]);
     
     const lotInventory = useMemo(() => {
-      if (!isClient) return [];
-  
-      const lotMap = new Map<string, LotInventoryItem>();
-  
-      purchaseOrders.forEach(po => {
-          if (po.status === 'completed') {
-              po.items.forEach(item => {
-                  if (item.lotNumber) {
-                      let lot = lotMap.get(item.lotNumber);
-                      if (!lot) {
-                           lot = {
-                              lotNumber: item.lotNumber,
-                              product: item.product,
-                              caliber: item.caliber,
-                              purchaseOrderId: po.id,
-                              supplierId: po.supplierId,
-                              supplierName: contacts.find(c => c.id === po.supplierId)?.name || 'N/A',
-                              purchaseDate: po.date,
-                              initialKilos: 0,
-                              initialPackages: 0,
-                              availableKilos: 0,
-                              availablePackages: 0,
-                              avgWeight: 0,
-                              dispatches: [],
-                          };
-                      }
-                      lot.initialKilos += item.quantity;
-                      lot.initialPackages += item.packagingQuantity || 0;
-                      lot.availableKilos += item.quantity;
-                      lot.availablePackages += item.packagingQuantity || 0;
-                      lotMap.set(item.lotNumber, lot);
-                  }
-              });
-          }
-      });
-  
-      salesOrders.forEach(so => {
-          if (so.status === 'completed' || so.status === 'pending') {
-              so.items.forEach(item => {
-                  if (item.lotNumber) {
-                      const lot = lotMap.get(item.lotNumber);
-                      if (lot) {
-                          lot.availableKilos -= item.quantity;
-                          lot.availablePackages -= (item.packagingQuantity || 0);
-                          lot.dispatches.push({
-                              date: so.date,
-                              documentId: so.id,
-                              clientName: contacts.find(c => c.id === so.clientId)?.name || 'N/A',
-                              packages: item.packagingQuantity || 0,
-                              kilos: item.quantity,
-                          });
-                      }
-                  }
-              });
-          }
-      });
-      
-      inventoryAdjustments.forEach(adj => {
-        if (adj.lotNumber) {
-          const lot = lotMap.get(adj.lotNumber);
-          if (lot) {
-              const quantityKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
-              const quantityPkg = adj.type === 'increase' ? (adj.packagingQuantity || 0) : -(adj.packagingQuantity || 0);
-              lot.availableKilos += quantityKg;
-              lot.availablePackages += quantityPkg;
-              
-              if (adj.type === 'decrease') {
-                  lot.dispatches.push({
-                      date: adj.date,
-                      documentId: `Ajuste (${adj.reason})`,
-                      clientName: 'Ajuste Interno',
-                      packages: adj.packagingQuantity || 0,
-                      kilos: adj.quantity,
-                  });
-              }
-          }
-        }
-      });
-  
-      lotMap.forEach(lot => {
-          if (lot.initialPackages > 0) {
-              lot.avgWeight = lot.initialKilos / lot.initialPackages;
-          }
-          lot.dispatches.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      });
+        if (!isClient) return [];
+    
+        const lotMap = new Map<string, LotInventoryItem>();
+    
+        // 1. Initialize lots from all purchase orders
+        purchaseOrders.forEach(po => {
+            if (po.status === 'completed') {
+                po.items.forEach(item => {
+                    if (item.lotNumber) {
+                        const lotKey = `${item.lotNumber}-${po.warehouse}`;
+                        if (!lotMap.has(lotKey)) {
+                            lotMap.set(lotKey, {
+                                lotNumber: item.lotNumber,
+                                product: item.product,
+                                caliber: item.caliber,
+                                purchaseOrderId: po.id,
+                                supplierId: po.supplierId,
+                                supplierName: contacts.find(c => c.id === po.supplierId)?.name || 'N/A',
+                                purchaseDate: po.date,
+                                initialKilos: 0,
+                                initialPackages: 0,
+                                availableKilos: 0,
+                                availablePackages: 0,
+                                avgWeight: 0,
+                                dispatches: [],
+                            });
+                        }
+                        const lot = lotMap.get(lotKey)!;
+                        lot.initialKilos += item.quantity;
+                        lot.initialPackages += item.packagingQuantity || 0;
+                        lot.availableKilos += item.quantity;
+                        lot.availablePackages += item.packagingQuantity || 0;
+                    }
+                });
+            }
+        });
+    
+        // 2. Handle all movements (sales, transfers, adjustments)
+        const allMovements = [
+            ...salesOrders,
+            ...inventoryAdjustments.map(adj => ({...adj, id: adj.id, items: [{...adj, id: adj.id}]})) // Standardize adjustments
+        ];
 
-      return Array.from(lotMap.values()).sort((a,b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+        allMovements.forEach(movement => {
+            const isTransfer = 'movementType' in movement && (movement as SalesOrder).movementType === 'Traslado Bodega Interna';
+            const fromWarehouse = 'warehouse' in movement ? (movement as SalesOrder | InventoryAdjustment).warehouse : '';
+            const toWarehouse = isTransfer ? (movement as SalesOrder).destinationWarehouse : undefined;
 
-  }, [isClient, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
+            movement.items.forEach(item => {
+                if (item.lotNumber && fromWarehouse) {
+                    // Decrease from source warehouse
+                    const sourceLotKey = `${item.lotNumber}-${fromWarehouse}`;
+                    const sourceLot = lotMap.get(sourceLotKey);
+                    if (sourceLot) {
+                        const quantityKg = item.quantity;
+                        const quantityPkg = item.packagingQuantity || 0;
+
+                        sourceLot.availableKilos -= quantityKg;
+                        sourceLot.availablePackages -= quantityPkg;
+
+                        if (movement.id.startsWith('OV-')) {
+                            sourceLot.dispatches.push({
+                                date: (movement as SalesOrder).date,
+                                documentId: movement.id,
+                                clientName: contacts.find(c => c.id === (movement as SalesOrder).clientId)?.name || 'N/A',
+                                packages: quantityPkg,
+                                kilos: quantityKg,
+                            });
+                        } else if (movement.id.startsWith('ADJ-')) {
+                             sourceLot.dispatches.push({
+                                date: (movement as InventoryAdjustment).date,
+                                documentId: `Ajuste (${(movement as InventoryAdjustment).reason})`,
+                                clientName: 'Ajuste Interno',
+                                packages: quantityPkg,
+                                kilos: quantityKg,
+                            });
+                        }
+                    }
+
+                    // If it's a transfer, increase in destination warehouse
+                    if (isTransfer && toWarehouse) {
+                        const destLotKey = `${item.lotNumber}-${toWarehouse}`;
+                        let destLot = lotMap.get(destLotKey);
+                        if (!destLot) {
+                            // If the lot doesn't exist in the destination, create it.
+                            const originalLot = lotMap.get(`${item.lotNumber}-${fromWarehouse}`) || lotMap.get(`${item.lotNumber}-${(purchaseOrders.find(po => po.items.some(i => i.lotNumber === item.lotNumber)))?.warehouse}`);
+                            if (originalLot) {
+                                destLot = {
+                                    ...originalLot,
+                                    initialKilos: 0, // It wasn't originally purchased here
+                                    initialPackages: 0,
+                                    availableKilos: 0,
+                                    availablePackages: 0,
+                                    dispatches: [], // Dispatches are warehouse-specific
+                                };
+                                lotMap.set(destLotKey, destLot);
+                            }
+                        }
+                        if (destLot) {
+                            destLot.availableKilos += item.quantity;
+                            destLot.availablePackages += item.packagingQuantity || 0;
+                        }
+                    }
+                }
+            });
+        });
+    
+        lotMap.forEach(lot => {
+            if (lot.initialPackages > 0) {
+                lot.avgWeight = lot.initialKilos / lot.initialPackages;
+            }
+        });
+  
+        return Array.from(lotMap.values()).sort((a,b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+  
+    }, [isClient, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
 
   const groupedLotInventory = useMemo(() => {
       const groups: Record<string, LotInventoryItem[]> = {};
@@ -806,6 +833,7 @@ export default function InventoryPage() {
         </>
     );
 }
+
 
 
 
