@@ -88,6 +88,7 @@ export type PurchaseOrder = {
   totalPackages: number;
   status: 'pending' | 'completed' | 'cancelled';
   warehouse: string;
+  destinationWarehouse?: string;
   paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
 };
 

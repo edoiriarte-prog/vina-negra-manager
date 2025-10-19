@@ -57,6 +57,7 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
         items: [],
         status: 'pending' as 'pending' | 'completed' | 'cancelled',
         warehouse: 'Bodega Principal',
+        destinationWarehouse: '',
     };
 };
 
@@ -141,16 +142,16 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   }
 
     const generateLotNumber = (itemIndex: number) => {
-        if (!formData.supplierId) {
+        if (!formData.date) {
         toast({
             variant: "destructive",
             title: "Error",
-            description: "Por favor, seleccione un proveedor antes de generar un lote.",
+            description: "Por favor, seleccione una fecha para la orden de compra.",
         });
         return;
         }
         const datePart = format(new Date(formData.date), 'ddMMyy');
-        const lot = `LOTE-${datePart}-${formData.supplierId}-${itemIndex}`;
+        const lot = `LOTE-${datePart}-${itemIndex + 1}`;
         handleItemChange(itemIndex, 'lotNumber', lot);
         toast({
             title: "Lote Generado",
@@ -332,7 +333,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="warehouse" className="text-right">
-                  Bodega
+                  Bodega Origen
                 </Label>
                 <Select
                   required
@@ -344,6 +345,25 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                   </SelectTrigger>
                   <SelectContent>
                     {warehouses.map(w => (
+                      <SelectItem key={w} value={w}>{w}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4 col-start-2">
+                <Label htmlFor="destinationWarehouse" className="text-right">
+                  Bodega Destino
+                </Label>
+                <Select
+                  onValueChange={(value) => handleSelectChange('destinationWarehouse', value)}
+                  value={formData.destinationWarehouse}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Opcional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                     <SelectItem value="">Ninguna</SelectItem>
+                    {warehouses.filter(w => w !== formData.warehouse).map(w => (
                       <SelectItem key={w} value={w}>{w}</SelectItem>
                     ))}
                   </SelectContent>
