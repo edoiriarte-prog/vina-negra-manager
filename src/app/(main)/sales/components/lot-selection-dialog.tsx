@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -43,9 +44,15 @@ type AvailableLot = {
   avgWeight: number;
 };
 
+type LotInputs = {
+    packages: number;
+    kilos: number;
+    price: number;
+}
+
 export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrders, salesOrders, warehouse, contacts }: LotSelectionDialogProps) {
   const [filter, setFilter] = useState('');
-  const [quantitiesToLoad, setQuantitiesToLoad] = useState<Record<string, number>>({});
+  const [lotInputs, setLotInputs] = useState<Record<string, LotInputs>>({});
   const { toast } = useToast();
 
   const availableLots = useMemo(() => {
@@ -113,6 +120,17 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
     return lotsArray.filter(l => l.availableQuantity > 0 && l.availablePackagingQuantity > 0);
 
   }, [purchaseOrders, salesOrders, warehouse]);
+
+   useEffect(() => {
+    if (isOpen) {
+      // Pre-fill inputs when dialog opens
+      const initialInputs: Record<string, LotInputs> = {};
+      availableLots.forEach(lot => {
+        initialInputs[lot.lotNumber] = { packages: 0, kilos: 0, price: 0 };
+      });
+      setLotInputs(initialInputs);
+    }
+  }, [isOpen, availableLots]);
   
   const filteredLots = useMemo(() => {
     if (!filter) return availableLots;
@@ -124,46 +142,70 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
   }, [availableLots, filter])
 
   const handleAddLot = (lot: AvailableLot) => {
-    const packagesToLoad = quantitiesToLoad[lot.lotNumber] || 0;
-    if (packagesToLoad <= 0) {
+    const inputs = lotInputs[lot.lotNumber] || { packages: 0, kilos: 0, price: 0 };
+    if (inputs.packages <= 0) {
       toast({ variant: 'destructive', title: 'Error', description: 'La cantidad de envases debe ser mayor a 0.'});
       return;
     }
-    if (packagesToLoad > lot.availablePackagingQuantity) {
+    if (inputs.packages > lot.availablePackagingQuantity) {
       toast({ variant: 'destructive', title: 'Error de Stock', description: 'La cantidad de envases supera el stock disponible del lote.'});
       return;
     }
-
-    const calculatedKilos = packagesToLoad * lot.avgWeight;
+     if (inputs.kilos <= 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Los kilos a cargar deben ser mayor a 0.'});
+      return;
+    }
+    if (inputs.price <= 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'El precio debe ser mayor a 0.'});
+      return;
+    }
 
     const item: OrderItem = {
       id: `lot-item-${lot.lotNumber}`, // temporary id
       product: lot.product,
       caliber: lot.caliber,
-      quantity: calculatedKilos,
-      packagingQuantity: packagesToLoad,
+      quantity: inputs.kilos,
+      packagingQuantity: inputs.packages,
       unit: 'Kilos',
-      price: 0, // Price should be set in the sales order form
+      price: inputs.price,
       lotNumber: lot.lotNumber,
     };
     onSave(item);
-    // Reset quantity for this lot after adding
-    setQuantitiesToLoad(prev => ({ ...prev, [lot.lotNumber]: 0 }));
-    toast({ title: 'Lote Agregado', description: `${packagesToLoad} envases del lote ${lot.lotNumber} agregados a la orden.`});
+    
+    // Reset inputs for this lot after adding
+    setLotInputs(prev => ({
+      ...prev,
+      [lot.lotNumber]: { packages: 0, kilos: 0, price: 0 },
+    }));
+    
+    toast({ title: 'Lote Agregado', description: `${inputs.packages} envases del lote ${lot.lotNumber} agregados a la orden.`});
   };
 
   const getSupplierName = (id: string) => {
     return contacts.find(c => c.id === id)?.name || 'Desconocido';
   }
 
-  const handleQuantityChange = (lotNumber: string, value: string) => {
+  const handleInputChange = (lotNumber: string, field: keyof LotInputs, value: string) => {
       const numValue = Number(value);
-      setQuantitiesToLoad(prev => ({ ...prev, [lotNumber]: numValue }));
+      setLotInputs(prev => {
+          const newInputs = { ...prev };
+          const currentLotInputs = newInputs[lotNumber] || { packages: 0, kilos: 0, price: 0 };
+          
+          if (field === 'packages') {
+              const lot = availableLots.find(l => l.lotNumber === lotNumber);
+              const calculatedKilos = lot ? numValue * lot.avgWeight : 0;
+              newInputs[lotNumber] = { ...currentLotInputs, packages: numValue, kilos: calculatedKilos };
+          } else {
+              newInputs[lotNumber] = { ...currentLotInputs, [field]: numValue };
+          }
+
+          return newInputs;
+      });
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-7xl">
         <DialogHeader>
           <DialogTitle>Seleccionar Lote de Inventario</DialogTitle>
           <DialogDescription>
@@ -188,17 +230,21 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
                   <TableHead>Calibre</TableHead>
                   <TableHead>Proveedor</TableHead>
                   <TableHead className="text-right">Stock Disp.</TableHead>
-                  <TableHead className="w-[150px]">Envases a Cargar</TableHead>
+                  <TableHead className="w-[140px]">Envases a Cargar</TableHead>
+                  <TableHead className="w-[140px]">Kg a Cargar</TableHead>
+                  <TableHead className="w-[120px]">Precio</TableHead>
                   <TableHead className="w-[100px]">Acción</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredLots.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">No hay lotes disponibles en esta bodega.</TableCell>
+                    <TableCell colSpan={9} className="h-24 text-center">No hay lotes disponibles en esta bodega.</TableCell>
                   </TableRow>
                 )}
-                {filteredLots.map(lot => (
+                {filteredLots.map(lot => {
+                   const inputs = lotInputs[lot.lotNumber] || { packages: 0, kilos: 0, price: 0 };
+                   return (
                   <TableRow key={lot.purchaseOrderId + '-' + lot.lotNumber}>
                     <TableCell><Badge variant="outline">{lot.lotNumber}</Badge></TableCell>
                     <TableCell>{lot.product}</TableCell>
@@ -213,16 +259,33 @@ export function LotSelectionDialog({ isOpen, onOpenChange, onSave, purchaseOrder
                       <Input
                         type="number"
                         placeholder="0"
-                        value={quantitiesToLoad[lot.lotNumber] || ''}
-                        onChange={e => handleQuantityChange(lot.lotNumber, e.target.value)}
+                        value={inputs.packages || ''}
+                        onChange={e => handleInputChange(lot.lotNumber, 'packages', e.target.value)}
                         max={lot.availablePackagingQuantity}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={inputs.kilos || ''}
+                        onChange={e => handleInputChange(lot.lotNumber, 'kilos', e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={inputs.price || ''}
+                        onChange={e => handleInputChange(lot.lotNumber, 'price', e.target.value)}
                       />
                     </TableCell>
                     <TableCell>
                       <Button size="sm" onClick={() => handleAddLot(lot)}>Agregar</Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                   )
+                })}
               </TableBody>
             </Table>
         </div>
