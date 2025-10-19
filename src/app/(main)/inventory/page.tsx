@@ -15,9 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, Eye, Download, Printer } from 'lucide-react';
+import { CalendarIcon, Eye, Download, Printer, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, parseISO, isBefore, isAfter, startOfMonth, endOfMonth } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 import { InventoryReportPreview } from './components/inventory-report-preview';
@@ -45,10 +45,19 @@ type InventoryReportItem = {
     finalStockPackages: number;
 };
 
+type LotDispatch = {
+    date: string;
+    documentId: string; // SO id or adjustment reason
+    clientName: string; // Or "Ajuste"
+    packages: number;
+    kilos: number;
+};
+
 type LotInventoryItem = {
     lotNumber: string;
     product: string;
     caliber: string;
+    purchaseOrderId: string;
     supplierId: string;
     supplierName: string;
     purchaseDate: string;
@@ -57,6 +66,7 @@ type LotInventoryItem = {
     availablePackages: number;
     availableKilos: number;
     avgWeight: number;
+    dispatches: LotDispatch[];
 };
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
@@ -81,6 +91,7 @@ export default function InventoryPage() {
     const [viewingHistory, setViewingHistory] = useState<any | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [lotFilter, setLotFilter] = useState('');
+    const [openLotGroups, setOpenLotGroups] = useState<Record<string, boolean>>({});
 
     const { toast } = useToast();
     const printRef = useRef<HTMLDivElement>(null);
@@ -261,97 +272,135 @@ export default function InventoryPage() {
     }, [isClient, dateRange, selectedWarehouse, selectedProduct, purchaseOrders, salesOrders, inventoryAdjustments, masterCalibers, masterProducts]);
     
     const lotInventory = useMemo(() => {
-        if (!isClient) return [];
-
-        const lotMap = new Map<string, LotInventoryItem>();
-
-        purchaseOrders.forEach(po => {
-            if (po.status === 'completed') {
-                po.items.forEach(item => {
-                    if (item.lotNumber) {
-                        let lot = lotMap.get(item.lotNumber);
-                        if (!lot) {
-                             lot = {
-                                lotNumber: item.lotNumber,
-                                product: item.product,
-                                caliber: item.caliber,
-                                supplierId: po.supplierId,
-                                supplierName: contacts.find(c => c.id === po.supplierId)?.name || 'N/A',
-                                purchaseDate: po.date,
-                                initialKilos: 0,
-                                initialPackages: 0,
-                                availableKilos: 0,
-                                availablePackages: 0,
-                                avgWeight: 0,
-                            };
-                        }
-                        lot.initialKilos += item.quantity;
-                        lot.initialPackages += item.packagingQuantity || 0;
-                        lot.availableKilos += item.quantity;
-                        lot.availablePackages += item.packagingQuantity || 0;
-                        lotMap.set(item.lotNumber, lot);
-                    }
-                });
-            }
-        });
-
-        salesOrders.forEach(so => {
-            if (so.status === 'completed' || so.status === 'pending') {
-                so.items.forEach(item => {
-                    if (item.lotNumber) {
-                        const lot = lotMap.get(item.lotNumber);
-                        if (lot) {
-                            lot.availableKilos -= item.quantity;
-                            lot.availablePackages -= item.packagingQuantity || 0;
-                        }
-                    }
-                });
-            }
-        });
-        
-        inventoryAdjustments.forEach(adj => {
-          if (adj.lotNumber) {
-            const lot = lotMap.get(adj.lotNumber);
-            if (lot) {
-                const quantityKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
-                const quantityPkg = adj.type === 'increase' ? (adj.packagingQuantity || 0) : -(adj.packagingQuantity || 0);
-                lot.availableKilos += quantityKg;
-                lot.availablePackages += quantityPkg;
-            }
+      if (!isClient) return [];
+  
+      const lotMap = new Map<string, LotInventoryItem>();
+  
+      purchaseOrders.forEach(po => {
+          if (po.status === 'completed') {
+              po.items.forEach(item => {
+                  if (item.lotNumber) {
+                      let lot = lotMap.get(item.lotNumber);
+                      if (!lot) {
+                           lot = {
+                              lotNumber: item.lotNumber,
+                              product: item.product,
+                              caliber: item.caliber,
+                              purchaseOrderId: po.id,
+                              supplierId: po.supplierId,
+                              supplierName: contacts.find(c => c.id === po.supplierId)?.name || 'N/A',
+                              purchaseDate: po.date,
+                              initialKilos: 0,
+                              initialPackages: 0,
+                              availableKilos: 0,
+                              availablePackages: 0,
+                              avgWeight: 0,
+                              dispatches: [],
+                          };
+                      }
+                      lot.initialKilos += item.quantity;
+                      lot.initialPackages += item.packagingQuantity || 0;
+                      lot.availableKilos += item.quantity;
+                      lot.availablePackages += item.packagingQuantity || 0;
+                      lotMap.set(item.lotNumber, lot);
+                  }
+              });
           }
-        });
+      });
+  
+      salesOrders.forEach(so => {
+          if (so.status === 'completed' || so.status === 'pending') {
+              so.items.forEach(item => {
+                  if (item.lotNumber) {
+                      const lot = lotMap.get(item.lotNumber);
+                      if (lot) {
+                          lot.availableKilos -= item.quantity;
+                          lot.availablePackages -= (item.packagingQuantity || 0);
+                          lot.dispatches.push({
+                              date: so.date,
+                              documentId: so.id,
+                              clientName: contacts.find(c => c.id === so.clientId)?.name || 'N/A',
+                              packages: item.packagingQuantity || 0,
+                              kilos: item.quantity,
+                          });
+                      }
+                  }
+              });
+          }
+      });
+      
+      inventoryAdjustments.forEach(adj => {
+        if (adj.lotNumber) {
+          const lot = lotMap.get(adj.lotNumber);
+          if (lot) {
+              const quantityKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
+              const quantityPkg = adj.type === 'increase' ? (adj.packagingQuantity || 0) : -(adj.packagingQuantity || 0);
+              lot.availableKilos += quantityKg;
+              lot.availablePackages += quantityPkg;
+              
+              if (adj.type === 'decrease') {
+                  lot.dispatches.push({
+                      date: adj.date,
+                      documentId: `Ajuste (${adj.reason})`,
+                      clientName: 'Ajuste Interno',
+                      packages: adj.packagingQuantity || 0,
+                      kilos: adj.quantity,
+                  });
+              }
+          }
+        }
+      });
+  
+      lotMap.forEach(lot => {
+          if (lot.initialPackages > 0) {
+              lot.avgWeight = lot.initialKilos / lot.initialPackages;
+          }
+          lot.dispatches.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      });
 
-        lotMap.forEach(lot => {
-            if (lot.initialPackages > 0) {
-                lot.avgWeight = lot.initialKilos / lot.initialPackages;
-            }
-        });
+      return Array.from(lotMap.values()).sort((a,b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
 
+  }, [isClient, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
 
-        return Array.from(lotMap.values()).sort((a,b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
-
-    }, [isClient, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
+  const groupedLotInventory = useMemo(() => {
+      const groups: Record<string, LotInventoryItem[]> = {};
+      lotInventory.forEach(lot => {
+          if (!groups[lot.purchaseOrderId]) {
+              groups[lot.purchaseOrderId] = [];
+          }
+          groups[lot.purchaseOrderId].push(lot);
+      });
+      
+      const filteredGroups: Record<string, LotInventoryItem[]> = {};
+      if (lotFilter) {
+          const lowercasedFilter = lotFilter.toLowerCase();
+          for (const ocId in groups) {
+              const matchingLots = groups[ocId].filter(lot =>
+                  lot.lotNumber.toLowerCase().includes(lowercasedFilter) ||
+                  lot.product.toLowerCase().includes(lowercasedFilter) ||
+                  lot.caliber.toLowerCase().includes(lowercasedFilter) ||
+                  lot.supplierName.toLowerCase().includes(lowercasedFilter)
+              );
+              if (matchingLots.length > 0) {
+                  filteredGroups[ocId] = matchingLots;
+              }
+          }
+           return filteredGroups;
+      }
+      return groups;
+  }, [lotInventory, lotFilter]);
     
-    const filteredLotInventory = useMemo(() => {
-        if (!lotFilter) return lotInventory;
-        const lowercasedFilter = lotFilter.toLowerCase();
-        return lotInventory.filter(lot => 
-            lot.lotNumber.toLowerCase().includes(lowercasedFilter) ||
-            lot.product.toLowerCase().includes(lowercasedFilter) ||
-            lot.caliber.toLowerCase().includes(lowercasedFilter) ||
-            lot.supplierName.toLowerCase().includes(lowercasedFilter)
-        );
-    }, [lotInventory, lotFilter]);
     
     const lotInventoryTotals = useMemo(() => {
-        return filteredLotInventory.reduce((acc, lot) => {
+      const lotsToSum = lotFilter ? Object.values(groupedLotInventory).flat() : lotInventory;
+      return lotsToSum.reduce((acc, lot) => {
             acc.initialPackages += lot.initialPackages;
             acc.initialKilos += lot.initialKilos;
             acc.availablePackages += lot.availablePackages;
             acc.availableKilos += lot.availableKilos;
             return acc;
         }, { initialPackages: 0, initialKilos: 0, availablePackages: 0, availableKilos: 0 });
-    }, [filteredLotInventory]);
+    }, [lotFilter, groupedLotInventory, lotInventory]);
 
 
     const handleExport = () => {
@@ -394,13 +443,15 @@ export default function InventoryPage() {
     };
 
     const handleExportLots = () => {
-        if (filteredLotInventory.length === 0) {
+        const lotsToExport = lotFilter ? Object.values(groupedLotInventory).flat() : lotInventory;
+        if (lotsToExport.length === 0) {
             toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay lotes para exportar.'});
             return;
         }
 
-        const dataForSheet = filteredLotInventory.map(lot => ({
+        const dataForSheet = lotsToExport.map(lot => ({
             'Lote': lot.lotNumber,
+            'O/C': lot.purchaseOrderId,
             'Producto': lot.product,
             'Calibre': lot.caliber,
             'Proveedor': lot.supplierName,
@@ -536,41 +587,70 @@ export default function InventoryPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[250px]">Orden de Compra</TableHead>
                                 <TableHead>Lote</TableHead>
-                                <TableHead>Producto</TableHead>
-                                <TableHead>Calibre</TableHead>
-                                <TableHead>Proveedor</TableHead>
-                                <TableHead>Fecha Compra</TableHead>
                                 <TableHead className="text-right">Stock Inicial</TableHead>
                                 <TableHead className="text-right">Stock Disponible</TableHead>
+                                <TableHead>Salidas del Lote</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredLotInventory.length > 0 ? filteredLotInventory.map(lot => (
-                                <TableRow key={lot.lotNumber}>
-                                    <TableCell><Badge variant="secondary">{lot.lotNumber}</Badge></TableCell>
-                                    <TableCell>{lot.product}</TableCell>
-                                    <TableCell>{lot.caliber}</TableCell>
-                                    <TableCell className="text-xs">{lot.supplierName}</TableCell>
-                                    <TableCell>{format(parseISO(lot.purchaseDate), 'dd-MM-yyyy')}</TableCell>
-                                    <TableCell className="text-right">
-                                        {formatPackages(lot.initialPackages)} / {formatKilos(lot.initialKilos)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-bold">
-                                        {formatPackages(lot.availablePackages)} / {formatKilos(lot.availableKilos)}
-                                    </TableCell>
-                                </TableRow>
+                            {Object.keys(groupedLotInventory).length > 0 ? Object.entries(groupedLotInventory).map(([ocId, lots]) => (
+                                <React.Fragment key={ocId}>
+                                    <TableRow className="bg-muted/50 cursor-pointer" onClick={() => setOpenLotGroups(p => ({...p, [ocId]: !p[ocId]}))}>
+                                        <TableCell colSpan={5} className="font-bold">
+                                            <div className="flex items-center gap-2">
+                                                <ChevronDown className={cn("h-4 w-4 transition-transform", openLotGroups[ocId] && "rotate-180")} />
+                                                {ocId} - {lots[0].supplierName}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                    {openLotGroups[ocId] && lots.map(lot => (
+                                        <TableRow key={lot.lotNumber}>
+                                            <TableCell></TableCell>
+                                            <TableCell>
+                                                <Badge variant="secondary">{lot.lotNumber}</Badge>
+                                                <div className="text-xs text-muted-foreground">{lot.product} - {lot.caliber}</div>
+                                            </TableCell>
+                                            <TableCell className="text-right text-sm">
+                                                {formatPackages(lot.initialPackages)}<br/>{formatKilos(lot.initialKilos)}
+                                            </TableCell>
+                                            <TableCell className="text-right font-bold text-sm">
+                                                {formatPackages(lot.availablePackages)}<br/>{formatKilos(lot.availableKilos)}
+                                            </TableCell>
+                                            <TableCell className="text-xs">
+                                                {lot.dispatches.length > 0 ? (
+                                                    <div className="space-y-1 max-w-xs">
+                                                        {lot.dispatches.map((d, i) => (
+                                                            <div key={i} className="flex justify-between gap-2 border-b last:border-b-0 py-1">
+                                                                <div>
+                                                                    <p>{d.documentId} ({d.clientName})</p>
+                                                                    <p className="text-muted-foreground">{format(parseISO(d.date), 'dd-MM-yy')}</p>
+                                                                </div>
+                                                                <div className="text-right font-medium">
+                                                                    <p>-{formatPackages(d.packages)}</p>
+                                                                    <p>-{formatKilos(d.kilos)}</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : '-'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </React.Fragment>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center h-24">No hay lotes que coincidan con la búsqueda.</TableCell>
+                                    <TableCell colSpan={8} className="text-center h-24">No hay lotes que coincidan con la búsqueda.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
                         <TableFooter>
                           <TableRow>
-                            <TableHead colSpan={5} className="text-right font-bold text-lg">Totales</TableHead>
+                            <TableHead colSpan={2} className="text-right font-bold text-lg">Totales</TableHead>
                             <TableHead className="text-right font-bold text-lg">{formatPackages(lotInventoryTotals.initialPackages)} / {formatKilos(lotInventoryTotals.initialKilos)}</TableHead>
                             <TableHead className="text-right font-bold text-lg">{formatPackages(lotInventoryTotals.availablePackages)} / {formatKilos(lotInventoryTotals.availableKilos)}</TableHead>
+                            <TableHead></TableHead>
                           </TableRow>
                         </TableFooter>
                     </Table>
@@ -726,4 +806,5 @@ export default function InventoryPage() {
         </>
     );
 }
+
 
