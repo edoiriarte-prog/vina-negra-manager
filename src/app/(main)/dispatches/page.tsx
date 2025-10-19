@@ -316,6 +316,10 @@ export default function DispatchesPage() {
     toast({ title: 'Exportación Exitosa', description: 'Se ha generado el packing list con todas las órdenes completadas.' });
   }
 
+    const handlePreviewRequest = (order: SalesOrder) => {
+        setPreviewingOrder(order);
+    }
+
   const renderContent = () => {
     if (!isClient) {
       return (
@@ -379,6 +383,10 @@ export default function DispatchesPage() {
                                                                     </DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end">
                                                                       <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                                                      <DropdownMenuItem onClick={() => handlePreviewRequest(order)}>
+                                                                            <Eye className='mr-2 h-4 w-4' />
+                                                                            Visualizar
+                                                                        </DropdownMenuItem>
                                                                       <DropdownMenuItem onClick={() => handleEdit(order)}>
                                                                         <Edit className='mr-2 h-4 w-4' />
                                                                         Editar
@@ -510,5 +518,3 @@ export default function DispatchesPage() {
     </>
   );
 }
-
-    

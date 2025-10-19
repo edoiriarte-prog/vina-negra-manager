@@ -3,7 +3,7 @@
 
 import { ColumnDef } from '@tanstack/react-table';
 import { SalesOrder, Contact } from '@/lib/types';
-import { MoreHorizontal, ArrowUpDown, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal, ArrowUpDown, Edit, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -20,6 +20,7 @@ import { es } from 'date-fns/locale';
 type GetColumnsProps = {
   onEdit: (order: SalesOrder) => void;
   onDelete: (order: SalesOrder) => void;
+  onPreview: (order: SalesOrder) => void;
   clients: Contact[];
 }
 
@@ -37,7 +38,7 @@ const formatPackages = (value: number) =>
     `${new Intl.NumberFormat('es-CL').format(value)}`;
 
 
-export const getColumns = ({ onEdit, onDelete, clients }: GetColumnsProps): ColumnDef<SalesOrder>[] => [
+export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsProps): ColumnDef<SalesOrder>[] => [
   {
     accessorKey: 'id',
     header: ({ column }) => {
@@ -122,6 +123,10 @@ export const getColumns = ({ onEdit, onDelete, clients }: GetColumnsProps): Colu
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => onPreview(order)}>
+              <Eye className='mr-2 h-4 w-4' />
+              Visualizar
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(order)}>
               <Edit className='mr-2 h-4 w-4' />
               Editar

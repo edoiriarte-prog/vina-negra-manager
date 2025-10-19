@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -37,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { SalesOrderPreview } from './components/sales-order-preview';
+import { getColumns } from './components/columns';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -313,6 +313,12 @@ export default function SalesPage() {
     toast({ title: 'Exportación Exitosa', description: 'Se ha generado el packing list con todas las órdenes completadas.' });
   }
 
+  const handlePreviewRequest = (order: SalesOrder) => {
+    setPreviewingOrder(order);
+  }
+
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreviewRequest, clients });
+
   const renderContent = () => {
     if (!isClient) {
       return (
@@ -376,6 +382,10 @@ export default function SalesPage() {
                                                                     </DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end">
                                                                       <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                                                        <DropdownMenuItem onClick={() => handlePreviewRequest(order)}>
+                                                                            <Eye className='mr-2 h-4 w-4' />
+                                                                            Visualizar
+                                                                        </DropdownMenuItem>
                                                                       <DropdownMenuItem onClick={() => handleEdit(order)}>
                                                                         <Edit className='mr-2 h-4 w-4' />
                                                                         Editar
@@ -506,5 +516,3 @@ export default function SalesPage() {
     </>
   );
 }
-
-    
