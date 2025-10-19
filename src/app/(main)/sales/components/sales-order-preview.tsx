@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useRef } from 'react';
@@ -18,7 +19,7 @@ import { Printer, Download } from 'lucide-react';
 type SalesOrderPreviewProps = {
   order: SalesOrder;
   isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (open: boolean | ((prevState: boolean) => boolean)) => void;
   onPrintRequest: () => void;
   onExportRequest: () => void;
 };
@@ -28,11 +29,13 @@ export const SalesOrderPreview = React.forwardRef<HTMLDivElement, SalesOrderPrev
     return null;
   }
   
+  const docTitle = order.orderType === 'dispatch' ? 'Guía de Despacho' : 'Orden de Venta';
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl p-0">
         <DialogHeader className="p-6 pb-0 no-print">
-          <DialogTitle>Orden de Venta: {order.id}</DialogTitle>
+          <DialogTitle>{docTitle}: {order.id}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto">
             <SalesOrderPreviewContent

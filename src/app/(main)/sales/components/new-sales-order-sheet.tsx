@@ -41,6 +41,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 
 type NewSalesOrderSheetProps = {
   isOpen: boolean;
@@ -83,6 +85,8 @@ const getInitialFormData = (order: SalesOrder | null): Omit<SalesOrder, 'id' | '
         carrierId: '',
         driverName: '',
         licensePlate: '',
+        orderType: 'sales',
+        includeVat: true,
     };
 };
 
@@ -240,15 +244,19 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
     }
   }
 
-  const title = order ? 'Editar Orden de Venta' : 'Crear Orden de Venta';
+  const title = order ? `Editar ${formData.orderType === 'sales' ? 'Orden de Venta' : 'Orden de Salida'}` : `Crear ${formData.orderType === 'sales' ? 'Orden de Venta' : 'Orden de Salida'}`;
   const description = order 
-    ? 'Actualice la información de la orden.'
-    : 'Complete la información para registrar una nueva orden de venta.';
+    ? 'Actualice la información del documento.'
+    : 'Complete la información para registrar un nuevo documento.';
 
-  const totalAmount = useMemo(() => {
+  const subtotal = useMemo(() => {
     return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0)
   }, [formData.items]);
   
+  const totalAmount = useMemo(() => {
+    return formData.includeVat ? subtotal * 1.19 : subtotal;
+  }, [subtotal, formData.includeVat]);
+
   const advanceAmount = useMemo(() => {
     if (formData.paymentMethod !== 'Pago con Anticipo y Saldo' || !formData.advancePercentage) return 0;
     return totalAmount * (formData.advancePercentage / 100);
@@ -274,6 +282,27 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
             <div className="grid gap-6 py-4">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="orderType" className="text-right">
+                      Tipo Doc.
+                    </Label>
+                     <RadioGroup 
+                        defaultValue="sales" 
+                        onValueChange={(value: 'sales' | 'dispatch') => handleSelectChange('orderType', value)} 
+                        className="col-span-3 flex items-center"
+                        value={formData.orderType}
+                     >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="sales" id="r-sales" />
+                        <Label htmlFor="r-sales">Orden de Venta</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="dispatch" id="r-dispatch" />
+                        <Label htmlFor="r-dispatch">Orden de Salida</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
                    <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="date" className="text-right">
                       Fecha
@@ -654,31 +683,57 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                                 </div>
                             </div>
                         )}
-                    </div>
-                    {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
-                        <div className="bg-muted p-4 rounded-lg">
-                            <h4 className="font-semibold mb-3">Resumen de Pagos</h4>
-                            <div className='text-sm space-y-2'>
-                                <div className='flex justify-between'>
-                                    <span className="text-muted-foreground">Monto Anticipo ({formData.advancePercentage}%):</span>
-                                    <span className='font-medium'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(advanceAmount)}</span>
-                                </div>
-                                <div className='flex justify-between'>
-                                    <span className="text-muted-foreground">Vencimiento:</span>
-                                    <span className='font-medium'>{formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
-                                </div>
-                                <Separator className="my-2" />
-                                 <div className='flex justify-between'>
-                                    <span className="text-muted-foreground">Monto Saldo:</span>
-                                    <span className='font-medium'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(balanceAmount)}</span>
-                                </div>
-                                <div className='flex justify-between'>
-                                    <span className="text-muted-foreground">Vencimiento:</span>
-                                    <span className='font-medium'>{formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
-                                </div>
-                            </div>
+                         <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="includeVat" className="text-right">
+                            IVA
+                          </Label>
+                           <div className="col-span-3 flex items-center space-x-2">
+                            <Switch
+                              id="includeVat"
+                              checked={formData.includeVat}
+                              onCheckedChange={(checked) => handleSelectChange('includeVat', checked)}
+                            />
+                            <Label htmlFor="includeVat">Incluir IVA (19%) en el total</Label>
+                          </div>
                         </div>
-                    )}
+                    </div>
+                    <div className="bg-muted p-4 rounded-lg">
+                        <h4 className="font-semibold mb-3">Resumen de Pagos</h4>
+                        <div className='text-sm space-y-2'>
+                           {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
+                                <>
+                                    <div className='flex justify-between'>
+                                        <span className="text-muted-foreground">Monto Anticipo ({formData.advancePercentage}%):</span>
+                                        <span className='font-medium'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(advanceAmount)}</span>
+                                    </div>
+                                    <div className='flex justify-between'>
+                                        <span className="text-muted-foreground">Vencimiento:</span>
+                                        <span className='font-medium'>{formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
+                                    </div>
+                                    <Separator className="my-2" />
+                                    <div className='flex justify-between'>
+                                        <span className="text-muted-foreground">Monto Saldo:</span>
+                                        <span className='font-medium'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(balanceAmount)}</span>
+                                    </div>
+                                    <div className='flex justify-between'>
+                                        <span className="text-muted-foreground">Vencimiento:</span>
+                                        <span className='font-medium'>{formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
+                                    </div>
+                                    <Separator className="my-2 bg-foreground" />
+                                </>
+                            )}
+                            <div className='flex justify-between text-lg'>
+                                <span className="font-bold">Total:</span>
+                                <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalAmount)}</span>
+                            </div>
+                            {formData.includeVat && (
+                                 <div className='flex justify-between text-xs text-muted-foreground'>
+                                    <span>Subtotal:</span>
+                                    <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(subtotal)}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
             </div>

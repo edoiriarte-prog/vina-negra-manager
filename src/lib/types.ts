@@ -76,6 +76,8 @@ export type SalesOrder = {
   carrierId?: string;
   driverName?: string;
   licensePlate?: string;
+  orderType: 'sales' | 'dispatch';
+  includeVat: boolean;
 };
 
 export type PurchaseOrder = {

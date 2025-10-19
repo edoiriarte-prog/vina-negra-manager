@@ -37,6 +37,12 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
 
     const totalPackages = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const totalKilos = order.items.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0);
+    
+    const subtotal = order.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    const iva = order.includeVat ? subtotal * 0.19 : 0;
+    const totalConIva = subtotal + iva;
+    
+    const docTitle = order.orderType === 'dispatch' ? 'GUÍA DE DESPACHO' : 'ORDEN DE VENTA';
 
     return (
         <div ref={ref} className="p-10 bg-white text-black font-sans text-base">
@@ -52,9 +58,9 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                     </div>
                 </div>
                 <div className='text-right'>
-                    <h1 className="text-4xl font-bold text-gray-900 tracking-tight">ORDEN DE VENTA</h1>
+                    <h1 className="text-4xl font-bold text-gray-900 tracking-tight">{docTitle}</h1>
                     <div className="mt-2 space-y-1 text-sm">
-                        <p><span className="font-semibold text-gray-600">Nº de OV:</span> <span className="font-mono">{order.id}</span></p>
+                        <p><span className="font-semibold text-gray-600">Nº de Documento:</span> <span className="font-mono">{order.id}</span></p>
                         <p><span className="font-semibold text-gray-600">Fecha Emisión:</span> {format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</p>
                     </div>
                 </div>
@@ -143,8 +149,26 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <TableHead colSpan={2} className="text-right text-black font-bold text-base">TOTALES</TableHead>
                         <TableHead className="text-right text-black font-bold text-base">{formatPackages(totalPackages)}</TableHead>
                         <TableHead className="text-right text-black font-bold text-base">{totalKilos.toLocaleString('es-CL')} kg</TableHead>
-                        <TableHead colSpan={1} />
-                        <TableHead className="text-right text-black font-bold text-base">{formatCurrency(order.totalAmount)}</TableHead>
+                        <TableHead colSpan={2} className="text-right text-black font-bold text-base">
+                             <div className="flex justify-end mt-4">
+                                <div className="w-full max-w-sm space-y-2 text-sm">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-normal text-gray-600">Subtotal:</span>
+                                        <span>{formatCurrency(subtotal)}</span>
+                                    </div>
+                                    {order.includeVat && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-normal text-gray-600">IVA (19%):</span>
+                                            <span>{formatCurrency(iva)}</span>
+                                        </div>
+                                    )}
+                                     <div className="flex justify-between items-center text-base pt-1 border-t border-gray-400">
+                                        <span className="font-bold">TOTAL A PAGAR:</span>
+                                        <span className="font-bold">{formatCurrency(totalConIva)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </TableHead>
                     </TableRow>
                 </TableFooter>
             </Table>
