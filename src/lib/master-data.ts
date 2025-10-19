@@ -16,7 +16,7 @@ export const initialCalibers = [
 
 export const initialUnits = ["Kilos", "Cajas"];
 export const initialPackagingTypes = ["CAJAS", "BINS", "PALLETS", "SACOS"];
-export const initialWarehouses = ["Bodega Principal", "Cámara de Frío 1", "Campo A"];
+export const initialWarehouses = ["Bodega Principal", "Cámara de Frío 1", "Campo A", "BODEGA CASA ACONCAGUA 80"];
 export const initialBankAccounts = [
     {
         id: 'acc-1',
@@ -52,6 +52,7 @@ export const productCaliberMatrix: ProductMatrix = {
     "CLEMENTINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
     "MANDARINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
 };
+
 
 
 
