@@ -329,7 +329,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                         Tipo de Venta
                       </Label>
                       <Select
-                        onValueChange={(value: 'Venta Firme' | 'Consignación' | 'Mínimo Garantizado') => handleSelectChange('saleType', value)}
+                        onValueChange={(value: 'Venta Firme' | 'Consignación' | 'Mínimo Garantizado' | 'SOLO TRASLADO') => handleSelectChange('saleType', value)}
                         value={formData.saleType}
                       >
                         <SelectTrigger className="col-span-3">
@@ -339,6 +339,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                           <SelectItem value="Venta Firme">Venta Firme</SelectItem>
                           <SelectItem value="Consignación">Consignación</SelectItem>
                           <SelectItem value="Mínimo Garantizado">Mínimo Garantizado</SelectItem>
+                          <SelectItem value="SOLO TRASLADO">SOLO TRASLADO</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

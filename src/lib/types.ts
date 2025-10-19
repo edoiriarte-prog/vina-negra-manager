@@ -70,7 +70,7 @@ export type SalesOrder = {
   warehouse?: string;
   paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
   purchaseOrder?: string;
-  saleType?: 'Venta Firme' | 'Consignación' | 'Mínimo Garantizado';
+  saleType?: 'Venta Firme' | 'Consignación' | 'Mínimo Garantizado' | 'SOLO TRASLADO';
   movementType?: 'Venta Directa' | 'Traslado a Bodega Externa';
   destinationWarehouse?: string;
   carrierId?: string;
@@ -163,4 +163,3 @@ export type BankAccount = {
     
 
     
-
