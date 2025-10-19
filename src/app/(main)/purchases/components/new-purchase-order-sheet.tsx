@@ -359,7 +359,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                   value={formData.destinationWarehouse}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Opcional" />
+                    <SelectValue placeholder="Opcional (para traslados)" />
                   </SelectTrigger>
                   <SelectContent>
                      <SelectItem value="">Ninguna</SelectItem>
