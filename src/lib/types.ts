@@ -64,6 +64,7 @@ export type SalesOrder = {
   relatedPurchaseIds: string[];
   status: 'pending' | 'completed' | 'cancelled';
   paymentMethod: 'Contado' | 'Crédito' | 'Pago con Anticipo y Saldo';
+  creditDays?: number;
   advancePercentage?: number;
   advanceDueDate?: string;
   balanceDueDate?: string;

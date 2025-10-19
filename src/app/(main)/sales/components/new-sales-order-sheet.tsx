@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/popover';
 
 import { SalesOrder, OrderItem, Contact, InventoryItem, PurchaseOrder } from '@/lib/types';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -77,6 +77,7 @@ const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dis
         relatedPurchaseIds: [],
         status: 'pending',
         paymentMethod: isDispatch ? 'Contado' : 'Contado',
+        creditDays: 0,
         advancePercentage: 0,
         advanceDueDate: undefined,
         balanceDueDate: undefined,
@@ -126,6 +127,13 @@ export function NewSalesOrderSheet({
         setFormData(prev => ({ ...prev, [name as keyof typeof formData]: value }));
     }
   };
+  
+  useEffect(() => {
+      if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0) {
+          const dueDate = addDays(parseISO(formData.date), formData.creditDays);
+          setFormData(prev => ({...prev, balanceDueDate: format(dueDate, 'yyyy-MM-dd')}))
+      }
+  }, [formData.creditDays, formData.date, formData.paymentMethod]);
 
   const removeItem = (index: number) => {
     setFormData(prev => ({
@@ -219,7 +227,7 @@ export function NewSalesOrderSheet({
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'advancePercentage', 'packagingQuantity'].includes(field) ? Number(value) : value);
     } else {
-        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage'].includes(name) ? Number(value) : value }));
+        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage', 'creditDays'].includes(name) ? Number(value) : value }));
     }
   };
 
@@ -626,6 +634,7 @@ export function NewSalesOrderSheet({
                                     </SelectContent>
                                 </Select>
                             </div>
+
                             {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
                                 <div className="space-y-4 pl-8 border-l-2 ml-4">
                                     <div className="grid grid-cols-4 items-center gap-4">
@@ -640,64 +649,49 @@ export function NewSalesOrderSheet({
                                         </Label>
                                         <Popover>
                                             <PopoverTrigger asChild>
-                                            <Button
-                                                variant={"outline"}
-                                                className={cn(
-                                                "col-span-3 justify-start text-left font-normal",
-                                                !formData.advanceDueDate && "text-muted-foreground"
-                                                )}
-                                            >
+                                            <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !formData.advanceDueDate && "text-muted-foreground")}>
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 {formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
                                             </Button>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-auto p-0">
-                                            <Calendar
-                                                mode="single"
-                                                selected={formData.advanceDueDate ? parseISO(formData.advanceDueDate) : undefined}
-                                                onSelect={(date) => {
-                                                    if (date) {
-                                                        handleSelectChange('advanceDueDate', format(date, 'yyyy-MM-dd'))
-                                                    }
-                                                }}
-                                                initialFocus
-                                            />
-                                            </PopoverContent>
-                                        </Popover>
-                                    </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="balanceDueDate" className="text-right">
-                                            Venc. Saldo
-                                        </Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                            <Button
-                                                variant={"outline"}
-                                                className={cn(
-                                                "col-span-3 justify-start text-left font-normal",
-                                                !formData.balanceDueDate && "text-muted-foreground"
-                                                )}
-                                            >
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
-                                            </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0">
-                                            <Calendar
-                                                mode="single"
-                                                selected={formData.balanceDueDate ? parseISO(formData.balanceDueDate) : undefined}
-                                                onSelect={(date) => {
-                                                    if (date) {
-                                                        handleSelectChange('balanceDueDate', format(date, 'yyyy-MM-dd'))
-                                                    }
-                                                }}
-                                                initialFocus
-                                            />
+                                            <Calendar mode="single" selected={formData.advanceDueDate ? parseISO(formData.advanceDueDate) : undefined} onSelect={(date) => date && handleSelectChange('advanceDueDate', format(date, 'yyyy-MM-dd'))} initialFocus />
                                             </PopoverContent>
                                         </Popover>
                                     </div>
                                 </div>
                             )}
+
+                             {formData.paymentMethod === 'Crédito' && (
+                                <div className="space-y-4 pl-8 border-l-2 ml-4">
+                                     <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="creditDays" className="text-right">
+                                            Días Crédito
+                                        </Label>
+                                        <Input id="creditDays" name="creditDays" type="number" value={formData.creditDays || ''} onChange={handleInputChange} className="col-span-3" required min="0"/>
+                                    </div>
+                                </div>
+                            )}
+
+                            {(formData.paymentMethod === 'Crédito' || formData.paymentMethod === 'Pago con Anticipo y Saldo') && (
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="balanceDueDate" className="text-right">
+                                        Venc. Saldo
+                                    </Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                        <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !formData.balanceDueDate && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                                        </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                        <Calendar mode="single" selected={formData.balanceDueDate ? parseISO(formData.balanceDueDate) : undefined} onSelect={(date) => date && handleSelectChange('balanceDueDate', format(date, 'yyyy-MM-dd'))} initialFocus />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="includeVat" className="text-right">
                                 IVA
