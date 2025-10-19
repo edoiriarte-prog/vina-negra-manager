@@ -31,6 +31,7 @@ type SummarizedItem = {
     totalPackages: number;
     totalKilos: number;
     avgPrice: number;
+    relatedPurchaseIds?: string[];
 }
 
 
@@ -55,20 +56,19 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
     const docTitle = order.orderType === 'dispatch' ? 'ORDEN DE SALIDA' : 'ORDEN DE VENTA';
 
     const summarizedItems = React.useMemo(() => {
-        if (order.orderType !== 'dispatch') {
-            return null;
-        }
-
-        const summary = new Map<string, { totalPackages: number, totalKilos: number, totalValue: number, product: string }>();
+        const summary = new Map<string, { totalPackages: number, totalKilos: number, totalValue: number, product: string, relatedPurchaseIds: Set<string> }>();
 
         order.items.forEach(item => {
             const key = item.caliber;
-            const existing = summary.get(key) || { totalPackages: 0, totalKilos: 0, totalValue: 0, product: item.product };
+            const existing = summary.get(key) || { totalPackages: 0, totalKilos: 0, totalValue: 0, product: item.product, relatedPurchaseIds: new Set() };
             
             existing.totalPackages += item.packagingQuantity || 0;
             existing.totalKilos += item.unit === 'Kilos' ? item.quantity : 0;
             existing.totalValue += item.quantity * item.price;
             existing.product = item.product;
+            if(order.relatedPurchaseIds) {
+                order.relatedPurchaseIds.forEach(id => existing.relatedPurchaseIds.add(id));
+            }
 
             summary.set(key, existing);
         });
@@ -82,6 +82,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                 totalPackages: value.totalPackages,
                 totalKilos: value.totalKilos,
                 avgPrice: value.totalKilos > 0 ? value.totalValue / value.totalKilos : 0,
+                relatedPurchaseIds: Array.from(value.relatedPurchaseIds)
             });
         });
         
@@ -184,56 +185,35 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             {/* Items Table */}
             <Table className="text-black text-base">
                 <TableHeader>
-                     {order.orderType === 'dispatch' ? (
-                        <TableRow className="bg-gray-100 hover:bg-gray-100 border-b-2 border-gray-300">
-                            <TableHead className="text-black font-bold">Producto</TableHead>
-                            <TableHead className="text-black font-bold">Calibre</TableHead>
-                            <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
-                            <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
-                            <TableHead className="text-right text-black font-bold">Precio Prom./kg</TableHead>
-                            <TableHead className="text-right text-black font-bold">SUB TOTAL</TableHead>
-                        </TableRow>
-                     ) : (
-                        <TableRow className="bg-gray-100 hover:bg-gray-100 border-b-2 border-gray-300">
-                            <TableHead className="text-black font-bold">Lote</TableHead>
-                            <TableHead className="text-black font-bold">Descripción</TableHead>
-                            <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
-                            <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
-                            <TableHead className="text-right text-black font-bold">Precio Unit.</TableHead>
-                            <TableHead className="text-right text-black font-bold">SUB TOTAL</TableHead>
-                        </TableRow>
-                     )}
+                    <TableRow className="bg-gray-100 hover:bg-gray-100 border-b-2 border-gray-300">
+                        <TableHead className="text-black font-bold">Descripción</TableHead>
+                        <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
+                        <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
+                        <TableHead className="text-right text-black font-bold">Precio Unit.</TableHead>
+                        <TableHead className="text-right text-black font-bold">SUB TOTAL</TableHead>
+                    </TableRow>
                 </TableHeader>
                 <TableBody>
-                {order.orderType === 'dispatch' && summarizedItems ? (
-                     summarizedItems.map((item, index) => (
-                        <TableRow key={index} className="border-gray-200">
-                            <TableCell className="align-middle text-sm+">{item.product}</TableCell>
-                            <TableCell className="align-middle text-sm+">{item.caliber} ({item.caliberCode})</TableCell>
-                            <TableCell className="text-right align-middle text-sm+">{formatPackages(item.totalPackages)}</TableCell>
-                            <TableCell className="text-right align-middle text-sm+">{item.totalKilos.toLocaleString('es-CL')} kg</TableCell>
-                            <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgPrice)}</TableCell>
-                            <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.totalKilos * item.avgPrice)}</TableCell>
-                        </TableRow>
-                    ))
-                ) : (
-                    order.items.map((item, index) => (
-                        <TableRow key={item.id || index} className="border-gray-200">
-                            <TableCell className="font-medium align-middle text-sm+">
-                                {item.lotNumber}
-                            </TableCell>
-                            <TableCell className="align-middle text-sm+">{item.product} - {item.caliber} ({getCaliberCode(item.caliber)})</TableCell>
-                            <TableCell className="text-right align-middle text-sm+">{formatPackages(item.packagingQuantity || 0)}</TableCell>
-                            <TableCell className="text-right align-middle text-sm+">{item.quantity.toLocaleString('es-CL')} kg</TableCell>
-                            <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.price)}</TableCell>
-                            <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.quantity * item.price)}</TableCell>
-                        </TableRow>
-                    ))
-                )}
+                {summarizedItems.map((item, index) => (
+                    <TableRow key={index} className="border-gray-200">
+                        <TableCell className="align-middle text-sm+">
+                            {item.product} - {item.caliber} ({item.caliberCode})
+                            {item.relatedPurchaseIds && item.relatedPurchaseIds.length > 0 && (
+                                <span className="text-xs text-gray-500 block">
+                                    (Origen: {item.relatedPurchaseIds.map(id => id.split('-')[1]).join(', ')})
+                                </span>
+                            )}
+                        </TableCell>
+                        <TableCell className="text-right align-middle text-sm+">{formatPackages(item.totalPackages)}</TableCell>
+                        <TableCell className="text-right align-middle text-sm+">{item.totalKilos.toLocaleString('es-CL')} kg</TableCell>
+                        <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgPrice)}</TableCell>
+                        <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.totalKilos * item.avgPrice)}</TableCell>
+                    </TableRow>
+                ))}
                 </TableBody>
                 <TableFooter>
                     <TableRow className="bg-gray-100 hover:bg-gray-100 border-t-2 border-gray-300">
-                        <TableHead colSpan={2} className="text-right text-black font-bold text-base">TOTALES</TableHead>
+                        <TableHead className="text-right text-black font-bold text-base">TOTALES</TableHead>
                         <TableHead className="text-right text-black font-bold text-base">{formatPackages(totalPackages)}</TableHead>
                         <TableHead className="text-right text-black font-bold text-base">{totalKilos.toLocaleString('es-CL')} kg</TableHead>
                         <TableHead colSpan={2} className="text-right text-black font-bold text-base">
