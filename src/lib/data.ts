@@ -73,20 +73,12 @@ export const getInventory = (
     if (po.status === 'completed' && po.warehouse) {
       po.items.forEach(item => {
         if (item.unit === 'Kilos') {
-          const sourceKey = `${item.product} - ${item.caliber} - ${po.warehouse}`;
-          const sourceExisting = inventoryMap.get(sourceKey) || { purchased: 0, sold: 0, adjusted: 0 };
-          sourceExisting.purchased += item.quantity;
-          inventoryMap.set(sourceKey, sourceExisting);
-
-          if (po.destinationWarehouse && po.destinationWarehouse !== po.warehouse) {
-            sourceExisting.sold += item.quantity; // Decrease from source
-            inventoryMap.set(sourceKey, sourceExisting);
-
-            const destKey = `${item.product} - ${item.caliber} - ${po.destinationWarehouse}`;
-            const destExisting = inventoryMap.get(destKey) || { purchased: 0, sold: 0, adjusted: 0 };
-            destExisting.purchased += item.quantity; // Increase in destination
-            inventoryMap.set(destKey, destExisting);
-          }
+          // If there's a destination warehouse, stock goes there. Otherwise, it stays in the source warehouse.
+          const finalWarehouse = po.destinationWarehouse || po.warehouse;
+          const key = `${item.product} - ${item.caliber} - ${finalWarehouse}`;
+          const existing = inventoryMap.get(key) || { purchased: 0, sold: 0, adjusted: 0 };
+          existing.purchased += item.quantity;
+          inventoryMap.set(key, existing);
         }
       });
     }
