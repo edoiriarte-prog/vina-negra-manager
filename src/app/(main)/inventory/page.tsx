@@ -55,6 +55,7 @@ type LotDispatch = {
 
 type LotInventoryItem = {
     lotNumber: string;
+    warehouse: string;
     product: string;
     caliber: string;
     purchaseOrderId: string;
@@ -165,7 +166,7 @@ export default function InventoryPage() {
 
                 // Process Adjustments
                 inventoryAdjustments
-                    .filter(adj => !isAfter(parseISO(adj.date), date) && adj.product === selectedProduct)
+                    .filter(adj => adj.product === selectedProduct && !isAfter(parseISO(adj.date), date))
                     .forEach(adj => {
                         if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
                             const key = `${adj.product}-${adj.caliber}`;
@@ -301,6 +302,7 @@ export default function InventoryPage() {
                         if (!lotMap.has(lotKey)) {
                             lotMap.set(lotKey, {
                                 lotNumber: item.lotNumber,
+                                warehouse: warehouse,
                                 product: item.product,
                                 caliber: item.caliber,
                                 purchaseOrderId: po.id,
@@ -350,7 +352,7 @@ export default function InventoryPage() {
                         sourceLot.availableKilos -= quantityKg;
                         sourceLot.availablePackages -= quantityPkg;
 
-                        if (movement.id.startsWith('OV-') || movement.id.startsWith('O/SAL-')) {
+                        if ('orderType' in movement) { // It's a SalesOrder
                              sourceLot.dispatches.push({
                                 date: (movement as SalesOrder).date,
                                 documentId: movement.id,
@@ -358,7 +360,7 @@ export default function InventoryPage() {
                                 packages: quantityPkg,
                                 kilos: quantityKg,
                             });
-                        } else if (movement.id.startsWith('ADJ-')) {
+                        } else if ('reason' in movement) { // It's an InventoryAdjustment
                              sourceLot.dispatches.push({
                                 date: (movement as InventoryAdjustment).date,
                                 documentId: `Ajuste (${(movement as InventoryAdjustment).reason})`,
@@ -378,6 +380,7 @@ export default function InventoryPage() {
                              if (originalLot) {
                                 destLot = {
                                     ...originalLot,
+                                    warehouse: toWarehouse,
                                     initialKilos: 0,
                                     initialPackages: 0,
                                     availableKilos: 0,
@@ -650,8 +653,10 @@ export default function InventoryPage() {
                                         </TableCell>
                                     </TableRow>
                                     {openLotGroups[ocId] && lots.map(lot => (
-                                        <TableRow key={lot.lotNumber}>
-                                            <TableCell></TableCell>
+                                        <TableRow key={`${lot.lotNumber}-${lot.warehouse}`}>
+                                            <TableCell>
+                                                <div className="text-xs text-muted-foreground">{lot.warehouse}</div>
+                                            </TableCell>
                                             <TableCell>
                                                 <Badge variant="secondary">{lot.lotNumber}</Badge>
                                                 <div className="text-xs text-muted-foreground">{lot.product} - {lot.caliber}</div>
