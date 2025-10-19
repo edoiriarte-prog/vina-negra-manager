@@ -64,7 +64,7 @@ export default function DashboardPage() {
 
   const totalKilosSold = useMemo(() =>
     salesOrders
-      .filter(so => so.status === 'completed')
+      .filter(so => so.status === 'completed' && so.orderType !== 'dispatch')
       .reduce((sum, so) => sum + so.totalKilos, 0),
     [salesOrders]
   );
@@ -87,7 +87,7 @@ export default function DashboardPage() {
 
   const totalSalesAmount = useMemo(() =>
     salesOrders
-      .filter(so => so.status === 'completed')
+      .filter(so => so.status === 'completed' && so.orderType !== 'dispatch')
       .reduce((sum, order) => sum + order.totalAmount, 0),
     [salesOrders]
   );
@@ -121,10 +121,11 @@ export default function DashboardPage() {
 
   // --- Sales KPIs based on filter ---
   const filteredSalesOrders = useMemo(() => {
+    let relevantOrders = salesOrders.filter(o => o.orderType !== 'dispatch');
     if (selectedClientIds.length === 0) {
-      return salesOrders;
+      return relevantOrders;
     }
-    return salesOrders.filter(order => selectedClientIds.includes(order.clientId));
+    return relevantOrders.filter(order => selectedClientIds.includes(order.clientId));
   }, [salesOrders, selectedClientIds]);
 
   const filteredTotalSalesAmount = useMemo(() =>

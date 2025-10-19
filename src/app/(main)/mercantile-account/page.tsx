@@ -125,7 +125,7 @@ export default function MercantileAccountPage() {
       const clients = contacts.filter(c => c.type.includes('client'));
       const clientReportData = clients.map(client => {
         const clientSalesOrders = salesOrders
-          .filter(so => so.clientId === client.id && (so.status === 'completed' || so.status === 'pending'))
+          .filter(so => so.orderType !== 'dispatch' && so.clientId === client.id && (so.status === 'completed' || so.status === 'pending'))
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
         const clientMovements = financialMovements
