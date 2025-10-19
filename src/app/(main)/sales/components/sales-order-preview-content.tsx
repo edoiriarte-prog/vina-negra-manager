@@ -32,6 +32,7 @@ type SummarizedItem = {
     totalKilos: number;
     avgPrice: number;
     relatedPurchaseIds?: string[];
+    lotNumbers?: string[];
 }
 
 
@@ -56,11 +57,11 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
     const docTitle = order.orderType === 'dispatch' ? 'ORDEN DE SALIDA' : 'ORDEN DE VENTA';
 
     const summarizedItems = React.useMemo(() => {
-        const summary = new Map<string, { totalPackages: number, totalKilos: number, totalValue: number, product: string, relatedPurchaseIds: Set<string> }>();
+        const summary = new Map<string, { totalPackages: number, totalKilos: number, totalValue: number, product: string, relatedPurchaseIds: Set<string>, lotNumbers: Set<string> }>();
 
         order.items.forEach(item => {
             const key = item.caliber;
-            const existing = summary.get(key) || { totalPackages: 0, totalKilos: 0, totalValue: 0, product: item.product, relatedPurchaseIds: new Set() };
+            const existing = summary.get(key) || { totalPackages: 0, totalKilos: 0, totalValue: 0, product: item.product, relatedPurchaseIds: new Set(), lotNumbers: new Set() };
             
             existing.totalPackages += item.packagingQuantity || 0;
             existing.totalKilos += item.unit === 'Kilos' ? item.quantity : 0;
@@ -68,6 +69,9 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             existing.product = item.product;
             if(order.relatedPurchaseIds) {
                 order.relatedPurchaseIds.forEach(id => existing.relatedPurchaseIds.add(id));
+            }
+            if(item.lotNumber) {
+                existing.lotNumbers.add(item.lotNumber);
             }
 
             summary.set(key, existing);
@@ -82,7 +86,8 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                 totalPackages: value.totalPackages,
                 totalKilos: value.totalKilos,
                 avgPrice: value.totalKilos > 0 ? value.totalValue / value.totalKilos : 0,
-                relatedPurchaseIds: Array.from(value.relatedPurchaseIds)
+                relatedPurchaseIds: Array.from(value.relatedPurchaseIds),
+                lotNumbers: Array.from(value.lotNumbers)
             });
         });
         
@@ -198,11 +203,14 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                     <TableRow key={index} className="border-gray-200">
                         <TableCell className="align-middle text-sm+">
                             {item.product} - {item.caliber} ({item.caliberCode})
-                            {item.relatedPurchaseIds && item.relatedPurchaseIds.length > 0 && (
-                                <span className="text-xs text-gray-500 block">
-                                    (Origen: {item.relatedPurchaseIds.map(id => id.split('-')[1]).join(', ')})
-                                </span>
-                            )}
+                            <span className="text-xs text-gray-500 block">
+                                {item.relatedPurchaseIds && item.relatedPurchaseIds.length > 0 && (
+                                    ` (Origen: ${item.relatedPurchaseIds.map(id => id.split('-')[1]).join(', ')})`
+                                )}
+                                {item.lotNumbers && item.lotNumbers.length > 0 && (
+                                    ` (Lote: ${item.lotNumbers.map(ln => ln.split('-').pop()).join(', ')})`
+                                )}
+                            </span>
                         </TableCell>
                         <TableCell className="text-right align-middle text-sm+">{formatPackages(item.totalPackages)}</TableCell>
                         <TableCell className="text-right align-middle text-sm+">{item.totalKilos.toLocaleString('es-CL')} kg</TableCell>
