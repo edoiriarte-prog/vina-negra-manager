@@ -401,7 +401,7 @@ export function NewSalesOrderSheet({ isOpen, onOpenChange, onSave, order, client
                           </SelectContent>
                         </Select>
                       </div>
-                      {formData.movementType === 'Traslado a Bodega Externa' && (
+                      {(formData.movementType === 'Traslado a Bodega Externa' || formData.movementType === 'Traslado Bodega Interna') && (
                         <div className="grid grid-cols-4 items-center gap-4">
                           <Label htmlFor="destinationWarehouse" className="text-right">
                             Bodega Destino
