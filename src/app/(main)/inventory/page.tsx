@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Eye, Download, Printer, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, isAfter, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 import { InventoryReportPreview } from './components/inventory-report-preview';
@@ -806,5 +806,6 @@ export default function InventoryPage() {
         </>
     );
 }
+
 
 
