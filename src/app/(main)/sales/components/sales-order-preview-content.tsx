@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -105,12 +104,11 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             {/* Header */}
             <div className="flex justify-between items-start pb-6 mb-8 border-b-2 border-gray-900">
                 <div className='text-left'>
-                    <h2 className="text-2xl font-bold text-gray-800">Viña Negra SpA</h2>
-                    <p className="text-xs text-gray-600">AGROCOMERCIAL</p>
+                    <h2 className="text-4xl font-bold text-gray-800">AVN</h2>
+                    <p className="text-lg text-gray-600">AGROCOMERCIAL</p>
                     <div className="mt-4 text-xs space-y-px text-gray-600">
                         <p>RUT: 78.261.683-8</p>
-                        <p>Tulahuen S/N, Monte Patria, Chile</p>
-                        <p>comercial@vinanegra.cl</p>
+                        <p>MONTE PATRIA, LIMARI, CUARTA REGION</p>
                     </div>
                 </div>
                 <div className='text-right'>
@@ -256,7 +254,3 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
 });
 
 SalesOrderPreviewContent.displayName = 'SalesOrderPreviewContent';
-
-    
-
-    
