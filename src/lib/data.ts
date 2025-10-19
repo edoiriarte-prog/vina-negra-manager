@@ -67,27 +67,23 @@ export const getInventory = (
 ): InventoryItem[] => {
   const inventoryMap = new Map<string, { purchased: number; sold: number; adjusted: number }>();
 
-  // Process purchases and internal transfers (incoming)
+  // Process purchases and internal transfers from purchases
   currentPurchaseOrders.forEach(po => {
     if (po.status === 'completed' && po.warehouse) {
       po.items.forEach(item => {
         if (item.unit === 'Kilos') {
-          // Add to source warehouse
           const sourceKey = `${item.product} - ${item.caliber} - ${po.warehouse}`;
           const sourceExisting = inventoryMap.get(sourceKey) || { purchased: 0, sold: 0, adjusted: 0 };
           sourceExisting.purchased += item.quantity;
           inventoryMap.set(sourceKey, sourceExisting);
 
-          // If it's a transfer, move stock
           if (po.destinationWarehouse && po.destinationWarehouse !== po.warehouse) {
-            // Subtract from source
-            sourceExisting.sold += item.quantity;
+            sourceExisting.sold += item.quantity; // Decrease from source
             inventoryMap.set(sourceKey, sourceExisting);
 
-            // Add to destination
             const destKey = `${item.product} - ${item.caliber} - ${po.destinationWarehouse}`;
             const destExisting = inventoryMap.get(destKey) || { purchased: 0, sold: 0, adjusted: 0 };
-            destExisting.purchased += item.quantity;
+            destExisting.purchased += item.quantity; // Increase in destination
             inventoryMap.set(destKey, destExisting);
           }
         }
@@ -95,7 +91,7 @@ export const getInventory = (
     }
   });
 
-  // Process sales and dispatch orders
+  // Process sales and internal transfers from sales
   currentSalesOrders.forEach(so => {
     if (orderBeingEdited && so.id === orderBeingEdited.id) {
       return; // Exclude the order being edited from stock calculation
@@ -103,13 +99,13 @@ export const getInventory = (
     if ((so.status === 'completed' || so.status === 'pending') && so.warehouse) {
       so.items.forEach(item => {
         if (item.unit === 'Kilos') {
-          // Always subtract from the source warehouse
+          // Always decrease stock from the source warehouse for any sale/dispatch
           const sourceKey = `${item.product} - ${item.caliber} - ${so.warehouse}`;
           const sourceExisting = inventoryMap.get(sourceKey) || { purchased: 0, sold: 0, adjusted: 0 };
           sourceExisting.sold += item.quantity;
           inventoryMap.set(sourceKey, sourceExisting);
 
-          // If it's an internal transfer, add to the destination warehouse
+          // If it is an internal warehouse transfer, it must be added to the destination
           if (so.movementType === 'Traslado Bodega Interna' && so.destinationWarehouse) {
             const destKey = `${item.product} - ${item.caliber} - ${so.destinationWarehouse}`;
             const destExisting = inventoryMap.get(destKey) || { purchased: 0, sold: 0, adjusted: 0 };
