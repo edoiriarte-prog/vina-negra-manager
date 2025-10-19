@@ -15,6 +15,7 @@ import {
   HelpCircle,
   FileSliders,
   Settings,
+  PackageCheck,
 } from "lucide-react"
 
 import {
@@ -29,6 +30,7 @@ const menuItems = [
   { href: "/contacts", label: "Contactos", icon: Users },
   { href: "/purchases", label: "Compras (O/C)", icon: ShoppingBag },
   { href: "/sales", label: "Ventas (O/V)", icon: ShoppingCart },
+  { href: "/dispatches", label: "Orden de Salida", icon: PackageCheck },
   { href: "/services", label: "Servicios (O/S)", icon: Truck },
   { href: "/inventory", label: "Inventario", icon: Boxes },
   { href: "/inventory-adjustments", label: "Ajustes de Inventario", icon: FileSliders },
