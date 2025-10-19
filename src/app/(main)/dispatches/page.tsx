@@ -109,11 +109,13 @@ export default function DispatchesPage() {
   const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, inventoryAdjustments, editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
 
   const nextOrderId = useMemo(() => {
-    const lastIdNumber = salesOrders.reduce((max, order) => {
+    const lastIdNumber = salesOrders
+      .filter(o => o.id.startsWith('O/SAL-'))
+      .reduce((max, order) => {
         const idNum = parseInt(order.id.split('-')[1]);
         return idNum > max ? idNum : max;
-    }, 2000); 
-    return `OV-${lastIdNumber + 1}`;
+      }, 3000); 
+    return `O/SAL-${lastIdNumber + 1}`;
   }, [salesOrders]);
 
 
@@ -508,3 +510,5 @@ export default function DispatchesPage() {
     </>
   );
 }
+
+    
