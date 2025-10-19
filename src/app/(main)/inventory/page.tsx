@@ -116,121 +116,138 @@ export default function InventoryPage() {
             const getStockAsOf = (date: Date) => {
                 const stockMap = new Map<string, { kg: number, packages: number }>();
 
-                const relevantPOs = purchaseOrders
+                // Process Purchases
+                purchaseOrders
                     .filter(po => po.status === 'completed' && !isAfter(parseISO(po.date), date))
-                    .filter(po => po.items.some(item => item.product === selectedProduct));
-                
-                const relevantSOs = salesOrders
-                    .filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date))
-                    .filter(so => so.items.some(item => item.product === selectedProduct));
-                
-                const relevantAdjs = inventoryAdjustments
-                    .filter(adj => !isAfter(parseISO(adj.date), date))
-                    .filter(adj => adj.product === selectedProduct);
-
-
-                relevantPOs.forEach(po => {
-                    if (selectedWarehouse === 'All' || po.warehouse === selectedWarehouse) {
+                    .forEach(po => {
                         po.items.forEach(item => {
-                            if (item.product === selectedProduct) {
-                                const key = `${item.product}-${item.caliber}`;
-                                const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
-                                if (item.unit === 'Kilos') {
+                            if (item.product === selectedProduct && item.unit === 'Kilos') {
+                                const warehouse = po.destinationWarehouse || po.warehouse;
+                                if (selectedWarehouse === 'All' || warehouse === selectedWarehouse) {
+                                    const key = `${item.product}-${item.caliber}`;
+                                    const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
                                     currentStock.kg += item.quantity;
+                                    currentStock.packages += (item.packagingQuantity || 0);
+                                    stockMap.set(key, currentStock);
                                 }
-                                currentStock.packages += (item.packagingQuantity || 0);
-                                stockMap.set(key, currentStock);
                             }
                         });
-                    }
-                });
-                
-                relevantSOs.forEach(so => {
-                     if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
-                        so.items.forEach(item => {
-                            if (item.product === selectedProduct) {
-                                const key = `${item.product}-${item.caliber}`;
-                                const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
-                                 if (item.unit === 'Kilos') {
-                                    currentStock.kg -= item.quantity;
-                                }
-                                currentStock.packages -= (item.packagingQuantity || 0);
-                                stockMap.set(key, currentStock);
-                            }
-                        });
-                    }
-                });
+                    });
 
-                relevantAdjs.forEach(adj => {
-                    if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
-                        const key = `${adj.product}-${adj.caliber}`;
-                        const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
-                        const adjustmentKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
-                        const adjustmentPkg = adj.type === 'increase' ? (adj.packagingQuantity || 0) : -(adj.packagingQuantity || 0);
-                        currentStock.kg += adjustmentKg;
-                        currentStock.packages += adjustmentPkg;
-                        stockMap.set(key, currentStock);
-                    }
-                });
+                // Process Sales and Transfers
+                salesOrders
+                    .filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date))
+                    .forEach(so => {
+                        so.items.forEach(item => {
+                            if (item.product === selectedProduct && item.unit === 'Kilos') {
+                                // Decrease from source warehouse
+                                if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
+                                    const key = `${item.product}-${item.caliber}`;
+                                    const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
+                                    currentStock.kg -= item.quantity;
+                                    currentStock.packages -= (item.packagingQuantity || 0);
+                                    stockMap.set(key, currentStock);
+                                }
+
+                                // Increase in destination warehouse (for internal transfers)
+                                if (so.movementType === 'Traslado Bodega Interna' && so.destinationWarehouse) {
+                                    if (selectedWarehouse === 'All' || so.destinationWarehouse === selectedWarehouse) {
+                                        const key = `${item.product}-${item.caliber}`;
+                                        const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
+                                        currentStock.kg += item.quantity;
+                                        currentStock.packages += (item.packagingQuantity || 0);
+                                        stockMap.set(key, currentStock);
+                                    }
+                                }
+                            }
+                        });
+                    });
+
+                // Process Adjustments
+                inventoryAdjustments
+                    .filter(adj => !isAfter(parseISO(adj.date), date) && adj.product === selectedProduct)
+                    .forEach(adj => {
+                        if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
+                            const key = `${adj.product}-${adj.caliber}`;
+                            const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
+                            const sign = adj.type === 'increase' ? 1 : -1;
+                            currentStock.kg += adj.quantity * sign;
+                            currentStock.packages += (adj.packagingQuantity || 0) * sign;
+                            stockMap.set(key, currentStock);
+                        }
+                    });
 
                 return stockMap;
             };
 
             const initialStockMap = getStockAsOf(new Date(dateRange.from.getTime() - 86400000));
+            const filterByDate = (dateStr: string) => !isBefore(parseISO(dateStr), dateRange.from) && !isAfter(parseISO(dateStr), dateRange.to);
 
             const inflowsMap = new Map<string, { kg: number, packages: number }>();
             const outflowsMap = new Map<string, { kg: number, packages: number }>();
             const adjustmentsMap = new Map<string, { kg: number, packages: number }>();
             const allCalibers = new Set<string>();
 
-            const filterByDate = (dateStr: string) => {
-                const date = parseISO(dateStr);
-                return !isBefore(date, dateRange.from) && !isAfter(date, dateRange.to);
-            };
-
+            // Calculate inflows, outflows, and adjustments for the selected period
             purchaseOrders.filter(po => po.status === 'completed' && filterByDate(po.date)).forEach(po => {
                 po.items.forEach(item => {
-                    if (item.product === selectedProduct && (selectedWarehouse === 'All' || po.warehouse === selectedWarehouse)) {
-                        const key = `${item.product}-${item.caliber}`;
-                        const current = inflowsMap.get(key) || { kg: 0, packages: 0 };
-                        current.kg += item.unit === 'Kilos' ? item.quantity : 0;
-                        current.packages += item.packagingQuantity || 0;
-                        inflowsMap.set(key, current);
-                        allCalibers.add(item.caliber);
+                    if (item.product === selectedProduct && item.unit === 'Kilos') {
+                        const warehouse = po.destinationWarehouse || po.warehouse;
+                        if (selectedWarehouse === 'All' || warehouse === selectedWarehouse) {
+                            const key = `${item.product}-${item.caliber}`;
+                            const current = inflowsMap.get(key) || { kg: 0, packages: 0 };
+                            current.kg += item.quantity;
+                            current.packages += item.packagingQuantity || 0;
+                            inflowsMap.set(key, current);
+                            allCalibers.add(item.caliber);
+                        }
                     }
                 });
             });
 
             salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && filterByDate(so.date)).forEach(so => {
                 so.items.forEach(item => {
-                    if (item.product === selectedProduct && (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse)) {
-                        const key = `${item.product}-${item.caliber}`;
-                        const current = outflowsMap.get(key) || { kg: 0, packages: 0 };
-                        current.kg += item.unit === 'Kilos' ? item.quantity : 0;
-                        current.packages += item.packagingQuantity || 0;
-                        outflowsMap.set(key, current);
-                        allCalibers.add(item.caliber);
+                    if (item.product === selectedProduct && item.unit === 'Kilos') {
+                        // Outflow from source
+                        if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
+                            const key = `${item.product}-${item.caliber}`;
+                            const current = outflowsMap.get(key) || { kg: 0, packages: 0 };
+                            current.kg += item.quantity;
+                            current.packages += (item.packagingQuantity || 0);
+                            outflowsMap.set(key, current);
+                            allCalibers.add(item.caliber);
+                        }
+                        // Inflow to destination for transfers
+                        if (so.movementType === 'Traslado Bodega Interna' && so.destinationWarehouse) {
+                            if (selectedWarehouse === 'All' || so.destinationWarehouse === selectedWarehouse) {
+                                const key = `${item.product}-${item.caliber}`;
+                                const current = inflowsMap.get(key) || { kg: 0, packages: 0 };
+                                current.kg += item.quantity;
+                                current.packages += (item.packagingQuantity || 0);
+                                inflowsMap.set(key, current);
+                                allCalibers.add(item.caliber);
+                            }
+                        }
                     }
                 });
             });
 
-            inventoryAdjustments.filter(adj => filterByDate(adj.date)).forEach(adj => {
-                if (adj.product === selectedProduct && (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse)) {
+            inventoryAdjustments.filter(adj => filterByDate(adj.date) && adj.product === selectedProduct).forEach(adj => {
+                if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
                     const key = `${adj.product}-${adj.caliber}`;
                     const current = adjustmentsMap.get(key) || { kg: 0, packages: 0 };
-                    const adjustmentKg = adj.type === 'increase' ? adj.quantity : -adj.quantity;
-                    const adjustmentPkg = adj.type === 'increase' ? (adj.packagingQuantity || 0) : -(adj.packagingQuantity || 0);
-                    current.kg += adjustmentKg;
-                    current.packages += adjustmentPkg;
+                    const sign = adj.type === 'increase' ? 1 : -1;
+                    current.kg += adj.quantity * sign;
+                    current.packages += (adj.packagingQuantity || 0) * sign;
                     adjustmentsMap.set(key, current);
                     allCalibers.add(adj.caliber);
                 }
             });
-            
-            initialStockMap.forEach((_, key) => {
-                const caliber = key.split('-')[1];
-                allCalibers.add(caliber);
-            });
+
+            initialStockMap.forEach((_, key) => allCalibers.add(key.split('-')[1]));
+            inflowsMap.forEach((_, key) => allCalibers.add(key.split('-')[1]));
+            outflowsMap.forEach((_, key) => allCalibers.add(key.split('-')[1]));
+            adjustmentsMap.forEach((_, key) => allCalibers.add(key.split('-')[1]));
 
             const reportData: InventoryReportItem[] = Array.from(allCalibers).map(caliber => {
                 const key = `${selectedProduct}-${caliber}`;
@@ -238,9 +255,6 @@ export default function InventoryPage() {
                 const inflows = inflowsMap.get(key) || { kg: 0, packages: 0 };
                 const outflows = outflowsMap.get(key) || { kg: 0, packages: 0 };
                 const adjustments = adjustmentsMap.get(key) || { kg: 0, packages: 0 };
-                
-                const finalStockKg = initialStock.kg + inflows.kg - outflows.kg + adjustments.kg;
-                const finalStockPackages = initialStock.packages + inflows.packages - outflows.packages + adjustments.packages;
 
                 return {
                     key,
@@ -248,15 +262,15 @@ export default function InventoryPage() {
                     caliber,
                     caliberCode: masterCalibers.find(c => c.name === caliber)?.code || 'N/A',
                     initialStockKg: initialStock.kg,
-                    inflowKg: inflows.kg,
-                    outflowKg: outflows.kg,
-                    adjustmentsKg: adjustments.kg,
-                    finalStockKg: finalStockKg,
                     initialStockPackages: initialStock.packages,
+                    inflowKg: inflows.kg,
                     inflowPackages: inflows.packages,
+                    outflowKg: outflows.kg,
                     outflowPackages: outflows.packages,
+                    adjustmentsKg: adjustments.kg,
                     adjustmentsPackages: adjustments.packages,
-                    finalStockPackages: finalStockPackages,
+                    finalStockKg: initialStock.kg + inflows.kg - outflows.kg + adjustments.kg,
+                    finalStockPackages: initialStock.packages + inflows.packages - outflows.packages + adjustments.packages,
                 };
             }).sort((a, b) => {
                 const caliberAIndex = masterCalibers.findIndex(c => c.code === a.caliberCode);
@@ -281,7 +295,9 @@ export default function InventoryPage() {
             if (po.status === 'completed') {
                 po.items.forEach(item => {
                     if (item.lotNumber) {
-                        const lotKey = `${item.lotNumber}-${po.warehouse}`;
+                        const warehouse = po.destinationWarehouse || po.warehouse;
+                        const lotKey = `${item.lotNumber}-${warehouse}`;
+
                         if (!lotMap.has(lotKey)) {
                             lotMap.set(lotKey, {
                                 lotNumber: item.lotNumber,
@@ -310,9 +326,9 @@ export default function InventoryPage() {
         });
     
         // 2. Handle all movements (sales, transfers, adjustments)
-        const allMovements = [
+        const allMovements: (SalesOrder | InventoryAdjustment)[] = [
             ...salesOrders,
-            ...inventoryAdjustments.map(adj => ({...adj, id: adj.id, items: [{...adj, id: adj.id}]})) // Standardize adjustments
+            ...inventoryAdjustments
         ];
 
         allMovements.forEach(movement => {
@@ -332,8 +348,8 @@ export default function InventoryPage() {
                         sourceLot.availableKilos -= quantityKg;
                         sourceLot.availablePackages -= quantityPkg;
 
-                        if (movement.id.startsWith('OV-')) {
-                            sourceLot.dispatches.push({
+                        if (movement.id.startsWith('OV-') || movement.id.startsWith('O/SAL-')) {
+                             sourceLot.dispatches.push({
                                 date: (movement as SalesOrder).date,
                                 documentId: movement.id,
                                 clientName: contacts.find(c => c.id === (movement as SalesOrder).clientId)?.name || 'N/A',
@@ -356,16 +372,15 @@ export default function InventoryPage() {
                         const destLotKey = `${item.lotNumber}-${toWarehouse}`;
                         let destLot = lotMap.get(destLotKey);
                         if (!destLot) {
-                            // If the lot doesn't exist in the destination, create it.
-                            const originalLot = lotMap.get(`${item.lotNumber}-${fromWarehouse}`) || lotMap.get(`${item.lotNumber}-${(purchaseOrders.find(po => po.items.some(i => i.lotNumber === item.lotNumber)))?.warehouse}`);
-                            if (originalLot) {
+                            const originalLot = lotMap.get(sourceLotKey);
+                             if (originalLot) {
                                 destLot = {
                                     ...originalLot,
-                                    initialKilos: 0, // It wasn't originally purchased here
+                                    initialKilos: 0,
                                     initialPackages: 0,
                                     availableKilos: 0,
                                     availablePackages: 0,
-                                    dispatches: [], // Dispatches are warehouse-specific
+                                    dispatches: [],
                                 };
                                 lotMap.set(destLotKey, destLot);
                             }
@@ -833,7 +848,3 @@ export default function InventoryPage() {
         </>
     );
 }
-
-
-
-
