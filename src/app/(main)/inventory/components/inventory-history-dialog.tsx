@@ -243,10 +243,10 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
             <Download className="mr-2 h-4 w-4" />
             Exportar a Excel
           </Button>
-          <button type="button" onClick={handlePrint} className={cn(buttonVariants({ variant: "outline" }))}>
+          <Button onClick={handlePrint} variant="outline">
             <Printer className="mr-2 h-4 w-4" />
             Imprimir Historial
-          </button>
+          </Button>
           <DialogClose asChild>
             <Button type="button">Cerrar</Button>
           </DialogClose>

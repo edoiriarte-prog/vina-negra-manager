@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -29,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DueDatesReport } from '../reports/components/due-dates-report';
+import { useReactToPrint } from 'react-to-print';
 
 type DocumentDetail = {
   id: string;
@@ -86,6 +88,14 @@ export default function MercantileAccountPage() {
   const printRef = useRef<HTMLDivElement>(null);
   const dueDatePrintRef = useRef<HTMLDivElement>(null);
 
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+  });
+
+  const handleDueDatePrint = useReactToPrint({
+    content: () => dueDatePrintRef.current,
+  });
+
 
   useEffect(() => {
     setIsClient(true);
@@ -93,64 +103,12 @@ export default function MercantileAccountPage() {
 
   const handlePrintRequest = (report: ReportData) => {
     setPrintingReport(report);
+    setTimeout(() => {
+        handlePrint();
+        setPrintingReport(null);
+    }, 100);
   };
 
-  const handleDueDatePrint = () => {
-    if (dueDatePrintRef.current) {
-        const printContents = dueDatePrintRef.current.innerHTML;
-        const printWindow = window.open('', '', 'height=800,width=800');
-        if (printWindow) {
-            printWindow.document.write('<html><head><title>Informe de Vencimientos</title>');
-            const styles = Array.from(document.styleSheets)
-              .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
-              .join('');
-            printWindow.document.write(styles);
-            printWindow.document.write('<style>body { padding: 2rem; } .no-print { display: none !important; } .print-container { margin-bottom: 2rem; } .print-section { page-break-inside: avoid; } </style>');
-            printWindow.document.write('</head><body class="bg-white">');
-            printWindow.document.write(printContents);
-            printWindow.document.write('</body></html>');
-            printWindow.document.close();
-            printWindow.focus();
-            
-            setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-            }, 500);
-        }
-    }
-  };
-
-
-  useEffect(() => {
-    if (printingReport) {
-      setTimeout(() => {
-        if (printRef.current) {
-          const printContents = printRef.current.innerHTML;
-          const printWindow = window.open('', '', 'height=800,width=800');
-          
-          if(printWindow){
-            printWindow.document.write('<html><head><title>Estado de Cuenta</title>');
-            const styles = Array.from(document.styleSheets)
-              .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
-              .join('');
-            printWindow.document.write(styles);
-            printWindow.document.write('<style>body { padding: 2rem; } .print-only { display: block !important; } .no-print { display: none !important; } .print-order-section { page-break-inside: avoid; }</style>');
-            printWindow.document.write('</head><body class="bg-white">');
-            printWindow.document.write(printContents);
-            printWindow.document.write('</body></html>');
-            printWindow.document.close();
-            printWindow.focus();
-            
-            setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-                setPrintingReport(null);
-            }, 500);
-          }
-        }
-      }, 100);
-    }
-  }, [printingReport]);
 
   useEffect(() => {
     if (isClient) {
@@ -636,14 +594,16 @@ export default function MercantileAccountPage() {
             </CardContent>
         </Card>
 
-         <div ref={dueDatePrintRef} className="print-container">
-            <DueDatesReport 
-                salesOrders={salesOrders} 
-                financialMovements={financialMovements} 
-                contacts={contacts}
-                onPrint={handleDueDatePrint}
-            />
-        </div>
+         <Card>
+            <div ref={dueDatePrintRef} className="print-container">
+                <DueDatesReport 
+                    salesOrders={salesOrders} 
+                    financialMovements={financialMovements} 
+                    contacts={contacts}
+                    onPrint={handleDueDatePrint}
+                />
+            </div>
+        </Card>
 
         {/* Hidden container for printing */}
         <div className="hidden print-only">

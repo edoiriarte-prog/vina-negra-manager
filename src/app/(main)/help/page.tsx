@@ -12,33 +12,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { HelpCircle, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useReactToPrint } from 'react-to-print';
 
 export default function HelpPage() {
   const printRef = useRef<HTMLDivElement>(null);
-
-  const handlePrint = () => {
-    const printContents = printRef.current?.innerHTML;
-    if (printContents) {
-      const printWindow = window.open('', '', 'height=800,width=800');
-      printWindow?.document.write('<html><head><title>Manual de Usuario</title>');
-      
-      const styles = Array.from(document.styleSheets)
-        .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
-        .join('');
-      printWindow?.document.write(styles);
-      
-      printWindow?.document.write('<style>body { padding: 2rem; } .no-print { display: none; }</style>');
-      printWindow?.document.write('</head><body>');
-      printWindow?.document.write(printContents);
-      printWindow?.document.write('</body></html>');
-      printWindow?.document.close();
-      printWindow?.focus();
-      setTimeout(() => { 
-        printWindow?.print();
-        printWindow?.close();
-      }, 500);
-    }
-  }
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+  });
 
   return (
     <div className="container mx-auto p-4 md:p-6">

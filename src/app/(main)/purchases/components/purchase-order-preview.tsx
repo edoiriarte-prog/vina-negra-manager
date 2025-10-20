@@ -52,10 +52,10 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
         </div>
 
         <DialogFooter className="p-6 pt-0 border-t gap-2 no-print">
-            <button onClick={handlePrint} className={cn(buttonVariants({ variant: "outline" }))}>
+            <Button onClick={handlePrint} variant="outline">
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir PDF
-            </button>
+            </Button>
             <DialogClose asChild>
                 <Button type="button">Cerrar</Button>
             </DialogClose>
