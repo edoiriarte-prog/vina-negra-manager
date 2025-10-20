@@ -129,7 +129,7 @@ export function NewSalesOrderSheet({
   };
   
   useEffect(() => {
-      if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0) {
+      if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {
           const dueDate = addDays(parseISO(formData.date), formData.creditDays);
           setFormData(prev => ({...prev, balanceDueDate: format(dueDate, 'yyyy-MM-dd')}))
       }
@@ -220,8 +220,10 @@ export function NewSalesOrderSheet({
       }
     }
     // --- VALIDATION END ---
+    const grossAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0)
+    const finalOrderData = {...formData, totalAmount: grossAmount};
 
-    onSave(formData);
+    onSave(finalOrderData);
   };
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,23 +271,29 @@ export function NewSalesOrderSheet({
     ? 'Actualice la información del documento.'
     : 'Complete la información para registrar un nuevo documento.';
 
-  const subtotal = useMemo(() => {
-    return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0)
+  const grossTotal = useMemo(() => {
+    return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
   }, [formData.items]);
   
-  const totalAmount = useMemo(() => {
-    return formData.includeVat ? subtotal * 1.19 : subtotal;
-  }, [subtotal, formData.includeVat]);
+  const { netTotal, vatAmount } = useMemo(() => {
+    if (!formData.includeVat) {
+        return { netTotal: grossTotal, vatAmount: 0 };
+    }
+    const net = grossTotal / 1.19;
+    const vat = grossTotal - net;
+    return { netTotal: net, vatAmount: vat };
+  }, [grossTotal, formData.includeVat]);
+
 
   const advanceAmount = useMemo(() => {
     if (formData.paymentMethod !== 'Pago con Anticipo y Saldo' || !formData.advancePercentage) return 0;
-    return totalAmount * (formData.advancePercentage / 100);
-  }, [totalAmount, formData.paymentMethod, formData.advancePercentage]);
+    return grossTotal * (formData.advancePercentage / 100);
+  }, [grossTotal, formData.paymentMethod, formData.advancePercentage]);
 
   const balanceAmount = useMemo(() => {
      if (formData.paymentMethod !== 'Pago con Anticipo y Saldo') return 0;
-     return totalAmount - advanceAmount;
-  }, [totalAmount, advanceAmount, formData.paymentMethod]);
+     return grossTotal - advanceAmount;
+  }, [grossTotal, advanceAmount, formData.paymentMethod]);
 
 
   if (!formData) return null;
@@ -683,12 +691,12 @@ export function NewSalesOrderSheet({
                                 checked={formData.includeVat}
                                 onCheckedChange={(checked) => handleSelectChange('includeVat', checked)}
                                 />
-                                <Label htmlFor="includeVat">Incluir IVA (19%) en el total</Label>
+                                <Label htmlFor="includeVat">Desglosar IVA (19%)</Label>
                             </div>
                             </div>
                         </div>
                         <div className="bg-muted p-4 rounded-lg">
-                            <h4 className="font-semibold mb-3">Resumen de Pagos</h4>
+                            <h4 className="font-semibold mb-3">Resumen</h4>
                             <div className='text-sm space-y-2'>
                             {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
                                     <>
@@ -712,16 +720,22 @@ export function NewSalesOrderSheet({
                                         <Separator className="my-2 bg-foreground" />
                                     </>
                                 )}
+                                {formData.includeVat && (
+                                    <>
+                                        <div className='flex justify-between text-xs'>
+                                            <span>Neto:</span>
+                                            <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(netTotal)}</span>
+                                        </div>
+                                        <div className='flex justify-between text-xs'>
+                                            <span>IVA (19%):</span>
+                                            <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(vatAmount)}</span>
+                                        </div>
+                                    </>
+                                )}
                                 <div className='flex justify-between text-lg'>
                                     <span className="font-bold">Total:</span>
-                                    <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalAmount)}</span>
+                                    <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(grossTotal)}</span>
                                 </div>
-                                {formData.includeVat && (
-                                    <div className='flex justify-between text-xs text-muted-foreground'>
-                                        <span>Subtotal:</span>
-                                        <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(subtotal)}</span>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </CardContent>
