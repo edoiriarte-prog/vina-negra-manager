@@ -93,6 +93,7 @@ export type PurchaseOrder = {
   warehouse: string;
   destinationWarehouse?: string;
   paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
+  description?: string;
 };
 
 export type ServiceOrder = {
@@ -167,3 +168,4 @@ export type BankAccount = {
     
 
     
+
