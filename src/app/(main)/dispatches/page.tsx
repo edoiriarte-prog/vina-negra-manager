@@ -550,6 +550,7 @@ export default function DispatchesPage() {
             nextOrderId={nextOrderId}
             purchaseOrders={purchaseOrders}
             salesOrders={salesOrders}
+            inventoryAdjustments={inventoryAdjustments}
             contacts={contacts}
             sheetType="dispatch"
         />
@@ -597,6 +598,3 @@ export default function DispatchesPage() {
     </>
   );
 }
-
-
-

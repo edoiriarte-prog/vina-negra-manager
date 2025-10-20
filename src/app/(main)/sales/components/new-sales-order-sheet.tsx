@@ -28,7 +28,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 
-import { SalesOrder, OrderItem, Contact, InventoryItem, PurchaseOrder } from '@/lib/types';
+import { SalesOrder, OrderItem, Contact, InventoryItem, PurchaseOrder, InventoryAdjustment } from '@/lib/types';
 import { format, parseISO, addDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useMasterData } from '@/hooks/use-master-data';
@@ -54,6 +54,7 @@ type NewSalesOrderSheetProps = {
   nextOrderId: string;
   purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
+  inventoryAdjustments: InventoryAdjustment[];
   contacts: Contact[];
   sheetType?: 'sales' | 'dispatch';
 };
@@ -94,7 +95,7 @@ const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dis
 
 export function NewSalesOrderSheet({ 
     isOpen, onOpenChange, onSave, order, clients, carriers, 
-    inventory, nextOrderId, purchaseOrders, salesOrders, contacts, 
+    inventory, nextOrderId, purchaseOrders, salesOrders, inventoryAdjustments, contacts, 
     sheetType = 'sales' 
 }: NewSalesOrderSheetProps) {
   const [formData, setFormData] = useState(() => getInitialFormData(order, sheetType));
@@ -752,6 +753,7 @@ export function NewSalesOrderSheet({
         onOpenChange={setIsLotSelectionOpen}
         purchaseOrders={purchaseOrders}
         salesOrders={salesOrders}
+        inventoryAdjustments={inventoryAdjustments}
         onSave={handleLotSave}
         warehouse={formData.warehouse}
         contacts={contacts}
@@ -759,5 +761,3 @@ export function NewSalesOrderSheet({
     </>
   );
 }
-
-    

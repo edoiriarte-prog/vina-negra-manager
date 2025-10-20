@@ -369,6 +369,7 @@ export default function SalesPage() {
             nextOrderId={nextOrderId}
             purchaseOrders={purchaseOrders}
             salesOrders={salesOrders}
+            inventoryAdjustments={inventoryAdjustments}
             contacts={contacts}
         />
       )}
@@ -415,5 +416,3 @@ export default function SalesPage() {
     </>
   );
 }
-
-
