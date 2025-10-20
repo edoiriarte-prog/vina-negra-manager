@@ -390,7 +390,7 @@ export default function InventoryPage() {
             });
         });
         
-        return Array.from(lots.values()).sort((a,b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+        return Array.from(lots.values()).sort((a,b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
     
     }, [isClient, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
 
@@ -853,3 +853,4 @@ export default function InventoryPage() {
         </>
     );
 }
+
