@@ -87,7 +87,7 @@ const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dis
         carrierId: '',
         driverName: '',
         licensePlate: '',
-        orderType: isDispatch ? 'dispatch' : 'sales',
+        orderType: 'sales', // Always 'sales' now
         includeVat: !isDispatch,
     };
 };
