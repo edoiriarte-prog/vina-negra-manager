@@ -37,6 +37,8 @@ import { LotGenerationContent } from './components/lot-generation-content';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Badge } from '@/components/ui/badge';
 import { LotLabelPreview } from './components/lot-label-preview';
+import { getColumns } from './components/columns';
+import { DataTable } from './components/data-table';
 
 
 const formatCurrency = (value: number) =>
@@ -457,10 +459,23 @@ export default function PurchasesPage() {
     });
   }, [purchaseOrders, financialMovements]);
 
+  const { regularPurchaseOrders, internalTransferOrders } = useMemo(() => {
+    const regular: PurchaseOrder[] = [];
+    const transfers: PurchaseOrder[] = [];
+    ordersWithPaymentStatus.forEach(order => {
+        if (order.id.startsWith('OC-T-')) {
+            transfers.push(order);
+        } else {
+            regular.push(order);
+        }
+    });
+    return { regularPurchaseOrders: regular, internalTransferOrders: transfers };
+  }, [ordersWithPaymentStatus]);
+
   const groupedOrders = useMemo(() => {
     const groups: Record<string, { monthName: string; orders: PurchaseOrder[]; subtotalAmount: number; subtotalKilos: number; subtotalPackages: number; }> = {};
     
-    ordersWithPaymentStatus.forEach(order => {
+    regularPurchaseOrders.forEach(order => {
         const monthKey = format(parseISO(order.date), 'yyyy-MM');
         const monthName = format(parseISO(order.date), 'MMMM yyyy', { locale: es });
 
@@ -481,7 +496,7 @@ export default function PurchasesPage() {
 
     const sortedMonthKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
     return sortedMonthKeys.map(key => groups[key]);
-  }, [ordersWithPaymentStatus]);
+  }, [regularPurchaseOrders]);
 
   const grandTotal = useMemo(() => {
     return groupedOrders.reduce((sum, group) => sum + group.subtotalAmount, 0);
@@ -669,6 +684,9 @@ export default function PurchasesPage() {
   const toggleCollapsible = (monthKey: string) => {
     setOpenCollapsibles(prev => ({...prev, [monthKey]: !prev[monthKey]}));
   }
+  
+  const purchaseColumns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreviewRequest, suppliers });
+
 
   const renderContent = () => {
     if (!isClient) {
@@ -767,8 +785,9 @@ export default function PurchasesPage() {
   return (
     <>
         <Tabs defaultValue="list">
-            <TabsList className="mb-4">
+            <TabsList className="mb-4 grid w-full grid-cols-4">
                 <TabsTrigger value="list">Listado de O/C</TabsTrigger>
+                <TabsTrigger value="transfers">Traspasos Internos</TabsTrigger>
                 <TabsTrigger value="lots">Generar Lotes</TabsTrigger>
                 <TabsTrigger value="created-lots">Lotes Creados</TabsTrigger>
             </TabsList>
@@ -802,6 +821,17 @@ export default function PurchasesPage() {
                     </CardHeader>
                     <CardContent>
                     {renderContent()}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="transfers">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="font-headline text-2xl">O/C por Traspasos Internos</CardTitle>
+                        <CardDescription>Órdenes de Compra generadas automáticamente por movimientos entre bodegas.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <DataTable columns={purchaseColumns} data={internalTransferOrders} />
                     </CardContent>
                 </Card>
             </TabsContent>
