@@ -45,29 +45,29 @@ type InventoryReportItem = {
     finalStockPackages: number;
 };
 
-type LotDispatch = {
+type LotMovement = {
     date: string;
-    documentId: string; // SO id or adjustment reason
-    clientName: string; // Or "Ajuste"
+    type: 'Entrada Inicial' | 'Salida' | 'Ajuste';
+    documentId: string;
+    warehouse: string;
     packages: number;
     kilos: number;
+    balancePackages: number;
+    balanceKilos: number;
 };
 
-type LotInventoryItem = {
+type LotTraceability = {
     lotNumber: string;
-    warehouse: string;
     product: string;
     caliber: string;
     purchaseOrderId: string;
-    supplierId: string;
     supplierName: string;
     purchaseDate: string;
-    initialPackages: number;
-    initialKilos: number;
-    availablePackages: number;
-    availableKilos: number;
-    avgWeight: number;
-    dispatches: LotDispatch[];
+    movements: LotMovement[];
+    totalInitialPackages: number;
+    totalInitialKilos: number;
+    currentAvailablePackages: number;
+    currentAvailableKilos: number;
 };
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
@@ -287,172 +287,144 @@ export default function InventoryPage() {
         }
     }, [isClient, dateRange, selectedWarehouse, selectedProduct, purchaseOrders, salesOrders, inventoryAdjustments, masterCalibers, masterProducts]);
     
-    const lotInventory = useMemo(() => {
+    const lotTraceabilityData = useMemo(() => {
         if (!isClient) return [];
     
-        const lotMap = new Map<string, LotInventoryItem>();
+        const lots = new Map<string, LotTraceability>();
     
-        // 1. Initialize lots from all purchase orders
+        // 1. Initialize all lots from purchase orders
         purchaseOrders.forEach(po => {
-            if (po.status === 'completed') {
-                po.items.forEach(item => {
-                    if (item.lotNumber) {
-                        const warehouse = po.destinationWarehouse || po.warehouse;
-                        const lotKey = `${item.lotNumber}-${warehouse}`;
-
-                        if (!lotMap.has(lotKey)) {
-                            lotMap.set(lotKey, {
-                                lotNumber: item.lotNumber,
-                                warehouse: warehouse,
-                                product: item.product,
-                                caliber: item.caliber,
-                                purchaseOrderId: po.id,
-                                supplierId: po.supplierId,
-                                supplierName: contacts.find(c => c.id === po.supplierId)?.name || 'N/A',
-                                purchaseDate: po.date,
-                                initialKilos: 0,
-                                initialPackages: 0,
-                                availableKilos: 0,
-                                availablePackages: 0,
-                                avgWeight: 0,
-                                dispatches: [],
-                            });
-                        }
-                        const lot = lotMap.get(lotKey)!;
-                        lot.initialKilos += item.quantity;
-                        lot.initialPackages += item.packagingQuantity || 0;
-                        lot.availableKilos += item.quantity;
-                        lot.availablePackages += item.packagingQuantity || 0;
+            if (po.status !== 'completed') return;
+    
+            po.items.forEach(item => {
+                if (item.lotNumber) {
+                    if (!lots.has(item.lotNumber)) {
+                        lots.set(item.lotNumber, {
+                            lotNumber: item.lotNumber,
+                            product: item.product,
+                            caliber: item.caliber,
+                            purchaseOrderId: po.id,
+                            supplierName: contacts.find(c => c.id === po.supplierId)?.name || 'N/A',
+                            purchaseDate: po.date,
+                            movements: [],
+                            totalInitialKilos: 0,
+                            totalInitialPackages: 0,
+                            currentAvailableKilos: 0,
+                            currentAvailablePackages: 0,
+                        });
                     }
-                });
-            }
+                    const lotData = lots.get(item.lotNumber)!;
+                    lotData.totalInitialKilos += item.quantity;
+                    lotData.totalInitialPackages += item.packagingQuantity || 0;
+                    lotData.currentAvailableKilos += item.quantity;
+                    lotData.currentAvailablePackages += item.packagingQuantity || 0;
+    
+                    lotData.movements.push({
+                        date: po.date,
+                        type: 'Entrada Inicial',
+                        documentId: po.id,
+                        warehouse: po.destinationWarehouse || po.warehouse,
+                        packages: item.packagingQuantity || 0,
+                        kilos: item.quantity,
+                        balancePackages: 0, 
+                        balanceKilos: 0,
+                    });
+                }
+            });
         });
     
-        // 2. Handle all movements (sales, transfers, adjustments)
-        const allMovements: (SalesOrder | InventoryAdjustment)[] = [
-            ...salesOrders,
-            ...inventoryAdjustments
-        ];
-
-        allMovements.forEach(movement => {
-            const isTransfer = 'movementType' in movement && (movement as SalesOrder).movementType === 'Traslado Bodega Interna';
-            const fromWarehouse = 'warehouse' in movement ? (movement as SalesOrder | InventoryAdjustment).warehouse : '';
-            const toWarehouse = isTransfer ? (movement as SalesOrder).destinationWarehouse : undefined;
-
+        // 2. Process all sales and adjustments
+        const allOutflows = [...salesOrders, ...inventoryAdjustments];
+    
+        allOutflows.forEach(movement => {
             const itemsToProcess = 'items' in movement ? movement.items : [movement as InventoryAdjustment];
-
+            
             itemsToProcess.forEach(item => {
-                if (item.lotNumber && fromWarehouse) {
-                    // Decrease from source warehouse
-                    const sourceLotKey = `${item.lotNumber}-${fromWarehouse}`;
-                    const sourceLot = lotMap.get(sourceLotKey);
-                    if (sourceLot) {
-                        const quantityKg = item.quantity;
-                        const quantityPkg = item.packagingQuantity || 0;
-
-                        sourceLot.availableKilos -= quantityKg;
-                        sourceLot.availablePackages -= quantityPkg;
-
-                        if ('orderType' in movement) { // It's a SalesOrder
-                             sourceLot.dispatches.push({
-                                date: (movement as SalesOrder).date,
-                                documentId: movement.id,
-                                clientName: contacts.find(c => c.id === (movement as SalesOrder).clientId)?.name || 'N/A',
-                                packages: quantityPkg,
-                                kilos: quantityKg,
-                            });
-                        } else if ('reason' in movement) { // It's an InventoryAdjustment
-                             sourceLot.dispatches.push({
-                                date: (movement as InventoryAdjustment).date,
-                                documentId: `Ajuste (${(movement as InventoryAdjustment).reason})`,
-                                clientName: 'Ajuste Interno',
-                                packages: quantityPkg,
-                                kilos: quantityKg,
-                            });
-                        }
-                    }
-
-                    // If it's a transfer, increase in destination warehouse
-                    if (isTransfer && toWarehouse) {
-                        const destLotKey = `${item.lotNumber}-${toWarehouse}`;
-                        let destLot = lotMap.get(destLotKey);
-                        if (!destLot) {
-                            const originalLot = lotMap.get(sourceLotKey);
-                             if (originalLot) {
-                                destLot = {
-                                    ...originalLot,
-                                    warehouse: toWarehouse,
-                                    initialKilos: 0,
-                                    initialPackages: 0,
-                                    availableKilos: 0,
-                                    availablePackages: 0,
-                                    dispatches: [],
-                                };
-                                lotMap.set(destLotKey, destLot);
-                            }
-                        }
-                        if (destLot) {
-                            destLot.availableKilos += item.quantity;
-                            destLot.availablePackages += item.packagingQuantity || 0;
-                        }
+                if (item.lotNumber && lots.has(item.lotNumber)) {
+                    const lotData = lots.get(item.lotNumber)!;
+                    const warehouse = 'warehouse' in movement ? movement.warehouse : '';
+                    const date = 'date' in movement ? movement.date : '';
+                    const kilos = item.quantity;
+                    const packages = item.packagingQuantity || 0;
+    
+                    lotData.currentAvailableKilos -= kilos;
+                    lotData.currentAvailablePackages -= packages;
+    
+                    if ('orderType' in movement) { // SalesOrder
+                        lotData.movements.push({
+                            date,
+                            type: 'Salida',
+                            documentId: movement.id,
+                            warehouse: warehouse,
+                            packages: -packages,
+                            kilos: -kilos,
+                            balanceKilos: 0,
+                            balancePackages: 0,
+                        });
+                    } else if ('reason' in movement) { // InventoryAdjustment
+                        lotData.movements.push({
+                            date,
+                            type: 'Ajuste',
+                            documentId: (movement as InventoryAdjustment).reason,
+                            warehouse: warehouse,
+                            packages: (movement as InventoryAdjustment).type === 'increase' ? packages : -packages,
+                            kilos: (movement as InventoryAdjustment).type === 'increase' ? kilos : -kilos,
+                            balanceKilos: 0,
+                            balancePackages: 0,
+                        });
                     }
                 }
             });
         });
     
-        lotMap.forEach(lot => {
-            if (lot.initialPackages > 0) {
-                lot.avgWeight = lot.initialKilos / lot.initialPackages;
-            }
+        // 3. Sort movements and calculate running balance
+        lots.forEach(lot => {
+            lot.movements.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            let runningKilos = 0;
+            let runningPackages = 0;
+            lot.movements.forEach(mov => {
+                runningKilos += mov.kilos;
+                runningPackages += mov.packages;
+                mov.balanceKilos = runningKilos;
+                mov.balancePackages = runningPackages;
+            });
         });
-  
-        return Array.from(lotMap.values()).sort((a,b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
-  
+        
+        return Array.from(lots.values()).sort((a,b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+    
     }, [isClient, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
 
-    const filteredLotInventory = useMemo(() => {
-        return lotInventory.filter(lot => selectedLotWarehouse === 'All' || lot.warehouse === selectedLotWarehouse);
-    }, [lotInventory, selectedLotWarehouse]);
+    const filteredLotTraceabilityData = useMemo(() => {
+        let filtered = lotTraceabilityData;
 
-    const groupedLotInventory = useMemo(() => {
-      const groups: Record<string, LotInventoryItem[]> = {};
-      filteredLotInventory.forEach(lot => {
-          if (!groups[lot.purchaseOrderId]) {
-              groups[lot.purchaseOrderId] = [];
-          }
-          groups[lot.purchaseOrderId].push(lot);
-      });
-      
-      const filteredGroups: Record<string, LotInventoryItem[]> = {};
-      if (lotFilter) {
-          const lowercasedFilter = lotFilter.toLowerCase();
-          for (const ocId in groups) {
-              const matchingLots = groups[ocId].filter(lot =>
-                  lot.lotNumber.toLowerCase().includes(lowercasedFilter) ||
-                  lot.product.toLowerCase().includes(lowercasedFilter) ||
-                  lot.caliber.toLowerCase().includes(lowercasedFilter) ||
-                  lot.supplierName.toLowerCase().includes(lowercasedFilter)
-              );
-              if (matchingLots.length > 0) {
-                  filteredGroups[ocId] = matchingLots;
-              }
-          }
-           return filteredGroups;
-      }
-      return groups;
-  }, [filteredLotInventory, lotFilter]);
+        if (selectedLotWarehouse !== 'All') {
+             filtered = filtered.filter(lot => lot.movements.some(m => m.warehouse === selectedLotWarehouse));
+        }
+
+        if (lotFilter) {
+            const lowercasedFilter = lotFilter.toLowerCase();
+            filtered = filtered.filter(lot =>
+                lot.lotNumber.toLowerCase().includes(lowercasedFilter) ||
+                lot.product.toLowerCase().includes(lowercasedFilter) ||
+                lot.caliber.toLowerCase().includes(lowercasedFilter) ||
+                lot.supplierName.toLowerCase().includes(lowercasedFilter) ||
+                lot.purchaseOrderId.toLowerCase().includes(lowercasedFilter)
+            );
+        }
+
+        return filtered;
+    }, [lotTraceabilityData, selectedLotWarehouse, lotFilter]);
     
     
     const lotInventoryTotals = useMemo(() => {
-      const lotsToSum = lotFilter ? Object.values(groupedLotInventory).flat() : filteredLotInventory;
-      return lotsToSum.reduce((acc, lot) => {
-            acc.initialPackages += lot.initialPackages;
-            acc.initialKilos += lot.initialKilos;
-            acc.availablePackages += lot.availablePackages;
-            acc.availableKilos += lot.availableKilos;
+        return filteredLotTraceabilityData.reduce((acc, lot) => {
+            acc.initialPackages += lot.totalInitialPackages;
+            acc.initialKilos += lot.totalInitialKilos;
+            acc.availablePackages += lot.currentAvailablePackages;
+            acc.availableKilos += lot.currentAvailableKilos;
             return acc;
         }, { initialPackages: 0, initialKilos: 0, availablePackages: 0, availableKilos: 0 });
-    }, [lotFilter, groupedLotInventory, filteredLotInventory]);
+    }, [filteredLotTraceabilityData]);
 
 
     const handleExport = () => {
@@ -495,25 +467,22 @@ export default function InventoryPage() {
     };
 
     const handleExportLots = () => {
-        const lotsToExport = lotFilter ? Object.values(groupedLotInventory).flat() : filteredLotInventory;
-        if (lotsToExport.length === 0) {
+        if (filteredLotTraceabilityData.length === 0) {
             toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay lotes para exportar.'});
             return;
         }
 
-        const dataForSheet = lotsToExport.map(lot => ({
+        const dataForSheet = filteredLotTraceabilityData.map(lot => ({
             'Lote': lot.lotNumber,
-            'Bodega': lot.warehouse,
-            'O/C': lot.purchaseOrderId,
+            'O/C Origen': lot.purchaseOrderId,
             'Producto': lot.product,
             'Calibre': lot.caliber,
             'Proveedor': lot.supplierName,
             'Fecha Compra': format(parseISO(lot.purchaseDate), 'dd-MM-yyyy'),
-            'Envases Iniciales': lot.initialPackages,
-            'Kilos Iniciales': lot.initialKilos,
-            'Envases Disponibles': lot.availablePackages,
-            'Kilos Disponibles': lot.availableKilos,
-            'Peso Promedio x Envase': lot.avgWeight.toFixed(2),
+            'Envases Iniciales': lot.totalInitialPackages,
+            'Kilos Iniciales': lot.totalInitialKilos,
+            'Envases Disponibles': lot.currentAvailablePackages,
+            'Kilos Disponibles': lot.currentAvailableKilos,
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
@@ -621,13 +590,13 @@ export default function InventoryPage() {
     
      const renderLotInventoryContent = () => {
         if (!isClient) return <Skeleton className="h-96 w-full" />;
-
+    
         return (
             <>
                 <div className="py-4 flex justify-between items-center">
                     <div className="flex gap-4">
                         <Input
-                            placeholder="Filtrar por lote, producto, calibre o proveedor..."
+                            placeholder="Filtrar por lote, producto, calibre, O/C o proveedor..."
                             value={lotFilter}
                             onChange={(e) => setLotFilter(e.target.value)}
                             className="max-w-md"
@@ -653,63 +622,74 @@ export default function InventoryPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[250px]">Orden de Compra</TableHead>
-                                <TableHead>Lote</TableHead>
+                                <TableHead className="w-[250px]">Lote</TableHead>
+                                <TableHead>Producto / Calibre</TableHead>
                                 <TableHead className="text-right">Stock Inicial</TableHead>
                                 <TableHead className="text-right">Stock Disponible</TableHead>
-                                <TableHead>Salidas del Lote</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {Object.keys(groupedLotInventory).length > 0 ? Object.entries(groupedLotInventory).map(([ocId, lots]) => (
-                                <React.Fragment key={ocId}>
-                                    <TableRow className="bg-muted/50 cursor-pointer" onClick={() => setOpenLotGroups(p => ({...p, [ocId]: !p[ocId]}))}>
-                                        <TableCell colSpan={5} className="font-bold">
+                            {filteredLotTraceabilityData.length > 0 ? filteredLotTraceabilityData.map(lot => (
+                                <React.Fragment key={lot.lotNumber}>
+                                    <TableRow className="bg-muted/50 cursor-pointer" onClick={() => setOpenLotGroups(p => ({...p, [lot.lotNumber]: !p[lot.lotNumber]}))}>
+                                        <TableCell className="font-bold">
                                             <div className="flex items-center gap-2">
-                                                <ChevronDown className={cn("h-4 w-4 transition-transform", openLotGroups[ocId] && "rotate-180")} />
-                                                {ocId} - {lots[0].supplierName}
+                                                <ChevronDown className={cn("h-4 w-4 transition-transform", openLotGroups[lot.lotNumber] && "rotate-180")} />
+                                                <Badge variant="secondary">{lot.lotNumber}</Badge>
                                             </div>
                                         </TableCell>
+                                        <TableCell>
+                                            <div>{lot.product} - {lot.caliber}</div>
+                                            <div className="text-xs text-muted-foreground">{lot.supplierName} (O/C: {lot.purchaseOrderId})</div>
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm">
+                                            {formatPackages(lot.totalInitialPackages)}<br/>{formatKilos(lot.totalInitialKilos)}
+                                        </TableCell>
+                                        <TableCell className="text-right font-bold text-sm">
+                                            {formatPackages(lot.currentAvailablePackages)}<br/>{formatKilos(lot.currentAvailableKilos)}
+                                        </TableCell>
                                     </TableRow>
-                                    {openLotGroups[ocId] && lots.map(lot => (
-                                        <TableRow key={`${lot.lotNumber}-${lot.warehouse}`}>
-                                            <TableCell>
-                                                <div className="text-xs text-muted-foreground">{lot.warehouse}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="secondary">{lot.lotNumber}</Badge>
-                                                <div className="text-xs text-muted-foreground">{lot.product} - {lot.caliber}</div>
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm">
-                                                {formatPackages(lot.initialPackages)}<br/>{formatKilos(lot.initialKilos)}
-                                            </TableCell>
-                                            <TableCell className="text-right font-bold text-sm">
-                                                {formatPackages(lot.availablePackages)}<br/>{formatKilos(lot.availableKilos)}
-                                            </TableCell>
-                                            <TableCell className="text-xs">
-                                                {lot.dispatches.length > 0 ? (
-                                                    <div className="space-y-1 max-w-xs">
-                                                        {lot.dispatches.map((d, i) => (
-                                                            <div key={i} className="flex justify-between gap-2 border-b last:border-b-0 py-1">
-                                                                <div>
-                                                                    <p>{d.documentId} ({d.clientName})</p>
-                                                                    <p className="text-muted-foreground">{format(parseISO(d.date), 'dd-MM-yy')}</p>
-                                                                </div>
-                                                                <div className="text-right font-medium">
-                                                                    <p>-{formatPackages(d.packages)}</p>
-                                                                    <p>-{formatKilos(d.kilos)}</p>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : '-'}
+                                    {openLotGroups[lot.lotNumber] && (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="p-2 bg-background">
+                                                <div className="p-2 border rounded-md">
+                                                    <h4 className="font-semibold text-sm mb-2">Historial de Movimientos del Lote</h4>
+                                                    <Table>
+                                                         <TableHeader>
+                                                            <TableRow>
+                                                                <TableHead>Fecha</TableHead>
+                                                                <TableHead>Tipo</TableHead>
+                                                                <TableHead>Documento</TableHead>
+                                                                <TableHead>Bodega</TableHead>
+                                                                <TableHead className="text-right">Mov. Envases</TableHead>
+                                                                <TableHead className="text-right">Mov. Kilos</TableHead>
+                                                                <TableHead className="text-right">Saldo Envases</TableHead>
+                                                                <TableHead className="text-right">Saldo Kilos</TableHead>
+                                                            </TableRow>
+                                                        </TableHeader>
+                                                        <TableBody>
+                                                            {lot.movements.map((mov, index) => (
+                                                                <TableRow key={index}>
+                                                                    <TableCell className="text-xs">{format(parseISO(mov.date), 'dd-MM-yy')}</TableCell>
+                                                                    <TableCell><Badge variant={mov.kilos > 0 ? 'secondary' : 'destructive'} className="text-xs">{mov.type}</Badge></TableCell>
+                                                                    <TableCell className="text-xs">{mov.documentId}</TableCell>
+                                                                    <TableCell className="text-xs">{mov.warehouse}</TableCell>
+                                                                    <TableCell className="text-right text-xs">{mov.packages > 0 ? `+${formatPackages(mov.packages)}` : formatPackages(mov.packages)}</TableCell>
+                                                                    <TableCell className="text-right text-xs">{mov.kilos > 0 ? `+${formatKilos(mov.kilos)}` : formatKilos(mov.kilos)}</TableCell>
+                                                                    <TableCell className="text-right font-semibold text-xs">{formatPackages(mov.balancePackages)}</TableCell>
+                                                                    <TableCell className="text-right font-semibold text-xs">{formatKilos(mov.balanceKilos)}</TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                        </TableBody>
+                                                    </Table>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
-                                    ))}
+                                    )}
                                 </React.Fragment>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-24">No hay lotes que coincidan con la búsqueda.</TableCell>
+                                    <TableCell colSpan={4} className="text-center h-24">No hay lotes que coincidan con la búsqueda.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
@@ -718,7 +698,6 @@ export default function InventoryPage() {
                             <TableHead colSpan={2} className="text-right font-bold text-lg">Totales</TableHead>
                             <TableHead className="text-right font-bold text-lg">{formatPackages(lotInventoryTotals.initialPackages)} / {formatKilos(lotInventoryTotals.initialKilos)}</TableHead>
                             <TableHead className="text-right font-bold text-lg">{formatPackages(lotInventoryTotals.availablePackages)} / {formatKilos(lotInventoryTotals.availableKilos)}</TableHead>
-                            <TableHead></TableHead>
                           </TableRow>
                         </TableFooter>
                     </Table>
