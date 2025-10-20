@@ -414,7 +414,7 @@ export default function InventoryPage() {
         return lotInventory.filter(lot => selectedLotWarehouse === 'All' || lot.warehouse === selectedLotWarehouse);
     }, [lotInventory, selectedLotWarehouse]);
 
-  const groupedLotInventory = useMemo(() => {
+    const groupedLotInventory = useMemo(() => {
       const groups: Record<string, LotInventoryItem[]> = {};
       filteredLotInventory.forEach(lot => {
           if (!groups[lot.purchaseOrderId]) {
@@ -709,7 +709,7 @@ export default function InventoryPage() {
                                 </React.Fragment>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center h-24">No hay lotes que coincidan con la búsqueda.</TableCell>
+                                    <TableCell colSpan={5} className="text-center h-24">No hay lotes que coincidan con la búsqueda.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
