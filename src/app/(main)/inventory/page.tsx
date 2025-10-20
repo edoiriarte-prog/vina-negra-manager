@@ -87,6 +87,7 @@ export default function InventoryPage() {
         to: endOfMonth(new Date()),
     });
     const [selectedWarehouse, setSelectedWarehouse] = useState<string>('All');
+    const [selectedLotWarehouse, setSelectedLotWarehouse] = useState<string>('All');
     const [selectedProduct, setSelectedProduct] = useState<string>('');
     const [inventoryData, setInventoryData] = useState<InventoryReportItem[]>([]);
     const [viewingHistory, setViewingHistory] = useState<any | null>(null);
@@ -409,9 +410,13 @@ export default function InventoryPage() {
   
     }, [isClient, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
 
+    const filteredLotInventory = useMemo(() => {
+        return lotInventory.filter(lot => selectedLotWarehouse === 'All' || lot.warehouse === selectedLotWarehouse);
+    }, [lotInventory, selectedLotWarehouse]);
+
   const groupedLotInventory = useMemo(() => {
       const groups: Record<string, LotInventoryItem[]> = {};
-      lotInventory.forEach(lot => {
+      filteredLotInventory.forEach(lot => {
           if (!groups[lot.purchaseOrderId]) {
               groups[lot.purchaseOrderId] = [];
           }
@@ -435,11 +440,11 @@ export default function InventoryPage() {
            return filteredGroups;
       }
       return groups;
-  }, [lotInventory, lotFilter]);
+  }, [filteredLotInventory, lotFilter]);
     
     
     const lotInventoryTotals = useMemo(() => {
-      const lotsToSum = lotFilter ? Object.values(groupedLotInventory).flat() : lotInventory;
+      const lotsToSum = lotFilter ? Object.values(groupedLotInventory).flat() : filteredLotInventory;
       return lotsToSum.reduce((acc, lot) => {
             acc.initialPackages += lot.initialPackages;
             acc.initialKilos += lot.initialKilos;
@@ -447,7 +452,7 @@ export default function InventoryPage() {
             acc.availableKilos += lot.availableKilos;
             return acc;
         }, { initialPackages: 0, initialKilos: 0, availablePackages: 0, availableKilos: 0 });
-    }, [lotFilter, groupedLotInventory, lotInventory]);
+    }, [lotFilter, groupedLotInventory, filteredLotInventory]);
 
 
     const handleExport = () => {
@@ -490,7 +495,7 @@ export default function InventoryPage() {
     };
 
     const handleExportLots = () => {
-        const lotsToExport = lotFilter ? Object.values(groupedLotInventory).flat() : lotInventory;
+        const lotsToExport = lotFilter ? Object.values(groupedLotInventory).flat() : filteredLotInventory;
         if (lotsToExport.length === 0) {
             toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay lotes para exportar.'});
             return;
@@ -498,6 +503,7 @@ export default function InventoryPage() {
 
         const dataForSheet = lotsToExport.map(lot => ({
             'Lote': lot.lotNumber,
+            'Bodega': lot.warehouse,
             'O/C': lot.purchaseOrderId,
             'Producto': lot.product,
             'Calibre': lot.caliber,
@@ -619,12 +625,25 @@ export default function InventoryPage() {
         return (
             <>
                 <div className="py-4 flex justify-between items-center">
-                    <Input
-                        placeholder="Filtrar por lote, producto, calibre o proveedor..."
-                        value={lotFilter}
-                        onChange={(e) => setLotFilter(e.target.value)}
-                        className="max-w-md"
-                    />
+                    <div className="flex gap-4">
+                        <Input
+                            placeholder="Filtrar por lote, producto, calibre o proveedor..."
+                            value={lotFilter}
+                            onChange={(e) => setLotFilter(e.target.value)}
+                            className="max-w-md"
+                        />
+                         <Select value={selectedLotWarehouse} onValueChange={setSelectedLotWarehouse}>
+                            <SelectTrigger className="w-[250px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">Todas las Bodegas</SelectItem>
+                                {warehouses.map(w => (
+                                    <SelectItem key={w} value={w}>{w}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <Button onClick={handleExportLots} variant="outline">
                         <Download className="mr-2 h-4 w-4" />
                         Exportar a Excel
