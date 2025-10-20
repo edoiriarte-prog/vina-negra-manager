@@ -2,9 +2,9 @@
 "use client";
 
 import React from 'react';
-import { SalesOrder, Contact, OrderItem } from '@/lib/types';
+import { SalesOrder, Contact, OrderItem, PurchaseOrder } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { contacts as initialContacts } from '@/lib/data';
+import { contacts as initialContacts, purchaseOrders as initialPurchaseOrders } from '@/lib/data';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
@@ -32,11 +32,13 @@ type SummarizedItem = {
     avgPrice: number;
     relatedPurchaseIds?: string[];
     lotNumbers?: string[];
+    destinationLotNumber?: string;
 }
 
 
 export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order }, ref) => {
     const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+    const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
     const { calibers } = useMasterData();
     const client = contacts.find(c => c.id === order.clientId);
     const carrier = contacts.find(c => c.id === order.carrierId);
@@ -56,7 +58,10 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
     const docTitle = order.orderType === 'dispatch' ? 'ORDEN DE SALIDA' : 'ORDEN DE VENTA';
 
     const summarizedItems = React.useMemo(() => {
-        const summary = new Map<string, { totalPackages: number, totalKilos: number, totalValue: number, product: string, relatedPurchaseIds: Set<string>, lotNumbers: Set<string> }>();
+        const summary = new Map<string, { totalPackages: number, totalKilos: number, totalValue: number, product: string, relatedPurchaseIds: Set<string>, lotNumbers: Set<string>, destinationLotNumber?: string }>();
+        const transferPurchaseOrder = order.movementType === 'Traslado Bodega Interna' 
+            ? purchaseOrders.find(po => po.description?.includes(order.id))
+            : undefined;
 
         order.items.forEach(item => {
             const key = item.caliber;
@@ -72,6 +77,14 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             if(item.lotNumber) {
                 existing.lotNumbers.add(item.lotNumber);
             }
+            
+            if (transferPurchaseOrder) {
+                const transferItem = transferPurchaseOrder.items.find(tItem => tItem.caliber === item.caliber && tItem.product === item.product);
+                if (transferItem?.lotNumber) {
+                    existing.destinationLotNumber = transferItem.lotNumber;
+                }
+            }
+
 
             summary.set(key, existing);
         });
@@ -86,7 +99,8 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                 totalKilos: value.totalKilos,
                 avgPrice: value.totalKilos > 0 ? value.totalValue / value.totalKilos : 0,
                 relatedPurchaseIds: Array.from(value.relatedPurchaseIds),
-                lotNumbers: Array.from(value.lotNumbers)
+                lotNumbers: Array.from(value.lotNumbers),
+                destinationLotNumber: value.destinationLotNumber
             });
         });
         
@@ -96,7 +110,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             return caliberAIndex - caliberBIndex;
         });
 
-    }, [order, calibers]);
+    }, [order, calibers, purchaseOrders]);
 
 
     return (
@@ -202,11 +216,11 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <TableCell className="align-middle text-sm+">
                             {item.product} - {item.caliber} ({item.caliberCode})
                             <span className="text-xs text-gray-500 block">
-                                {item.relatedPurchaseIds && item.relatedPurchaseIds.length > 0 && (
-                                    ` (Origen: ${item.relatedPurchaseIds.map(id => id.split('-')[1]).join(', ')})`
-                                )}
                                 {item.lotNumbers && item.lotNumbers.length > 0 && (
-                                    ` (Lote: ${item.lotNumbers.map(ln => ln.split('-').pop()).join(', ')})`
+                                    ` (Lote Origen: ${item.lotNumbers.map(ln => ln.split('-').pop()).join(', ')})`
+                                )}
+                                {item.destinationLotNumber && (
+                                    ` (Lote Destino: ${item.destinationLotNumber.split('-').pop()})`
                                 )}
                             </span>
                         </TableCell>
@@ -254,3 +268,5 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
 });
 
 SalesOrderPreviewContent.displayName = 'SalesOrderPreviewContent';
+
+    
