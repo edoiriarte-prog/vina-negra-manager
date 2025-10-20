@@ -28,6 +28,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { DueDatesReport } from '../reports/components/due-dates-report';
 
 type DocumentDetail = {
   id: string;
@@ -83,11 +84,42 @@ export default function MercantileAccountPage() {
   const [printingReport, setPrintingReport] = useState<ReportData | null>(null);
 
   const printRef = useRef<HTMLDivElement>(null);
+  const dueDatePrintRef = useRef<HTMLDivElement>(null);
 
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  const handlePrintRequest = (report: ReportData) => {
+    setPrintingReport(report);
+  };
+
+  const handleDueDatePrint = () => {
+    if (dueDatePrintRef.current) {
+        const printContents = dueDatePrintRef.current.innerHTML;
+        const printWindow = window.open('', '', 'height=800,width=800');
+        if (printWindow) {
+            printWindow.document.write('<html><head><title>Informe de Vencimientos</title>');
+            const styles = Array.from(document.styleSheets)
+              .map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : '')
+              .join('');
+            printWindow.document.write(styles);
+            printWindow.document.write('<style>body { padding: 2rem; } .no-print { display: none !important; } .print-container { margin-bottom: 2rem; } .print-section { page-break-inside: avoid; } </style>');
+            printWindow.document.write('</head><body class="bg-white">');
+            printWindow.document.write(printContents);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
+            
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+        }
+    }
+  };
+
 
   useEffect(() => {
     if (printingReport) {
@@ -291,9 +323,6 @@ export default function MercantileAccountPage() {
   }, [supplierReports]);
 
 
-  const handlePrintRequest = (report: ReportData) => {
-    setPrintingReport(report);
-  };
   
   const toggleCollapsible = (id: string) => {
     setOpenCollapsibles(prev => ({...prev, [id]: !prev[id]}));
@@ -606,6 +635,15 @@ export default function MercantileAccountPage() {
               </div>
             </CardContent>
         </Card>
+
+         <div ref={dueDatePrintRef} className="print-container">
+            <DueDatesReport 
+                salesOrders={salesOrders} 
+                financialMovements={financialMovements} 
+                contacts={contacts}
+                onPrint={handleDueDatePrint}
+            />
+        </div>
 
         {/* Hidden container for printing */}
         <div className="hidden print-only">
