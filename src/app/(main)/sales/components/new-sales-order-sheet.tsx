@@ -71,7 +71,7 @@ const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dis
     }
     return {
         clientId: '',
-        date: format(new Date(), 'yyyy-MM-dd'),
+        date: '',
         items: [],
         relatedPurchaseIds: [],
         status: 'pending',
@@ -145,6 +145,10 @@ export function NewSalesOrderSheet({
     event.preventDefault();
     
     // --- VALIDATION START ---
+    if (!formData.date) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Por favor, seleccione una fecha.' });
+        return;
+    }
     if (!formData.clientId) {
         toast({ variant: 'destructive', title: 'Error', description: 'Por favor, seleccione un cliente.' });
         return;
@@ -755,3 +759,5 @@ export function NewSalesOrderSheet({
     </>
   );
 }
+
+    

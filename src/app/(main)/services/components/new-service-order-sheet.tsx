@@ -27,7 +27,7 @@ type NewServiceOrderSheetProps = {
 
 const getInitialFormData = (): Omit<ServiceOrder, 'id'> => ({
     provider: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
+    date: '',
     serviceType: '',
     cost: 0,
     description: '',
@@ -126,3 +126,5 @@ export function NewServiceOrderSheet({ isOpen, onOpenChange, onSave, order }: Ne
     </Sheet>
   );
 }
+
+    

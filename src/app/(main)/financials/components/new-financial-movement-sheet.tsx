@@ -51,7 +51,7 @@ type NewFinancialMovementSheetProps = {
 type BatchMovement = Omit<FinancialMovement, 'id' | 'contactId' | 'type'> & { batchId: number };
 
 const getInitialFormData = (): Omit<FinancialMovement, 'id'> => ({
-    date: format(new Date(), 'yyyy-MM-dd'),
+    date: '',
     type: 'expense',
     description: '',
     amount: 0,
@@ -277,6 +277,10 @@ export function NewFinancialMovementSheet({
         }));
         onSave(movementsToSave);
     } else {
+        if (!formData.date) {
+            toast({ variant: "destructive", title: "Error", description: "Debe seleccionar una fecha." });
+            return;
+        }
         if (movement) {
             onSave({ ...formData, id: movement.id });
         } else {
@@ -703,5 +707,7 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
+
+    
 
     
