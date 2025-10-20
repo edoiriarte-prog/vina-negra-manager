@@ -111,13 +111,13 @@ export default function DispatchesPage() {
 
   const nextOrderId = useMemo(() => {
     const lastIdNumber = salesOrders.reduce((max, order) => {
-      if (order.id.startsWith('O/SAL-')) {
+      if (order.id.startsWith('O/S-')) { // Changed from O/SAL-
         const idNum = parseInt(order.id.split('-')[1]);
         return idNum > max ? idNum : max;
       }
       return max;
     }, 3000); 
-    return `O/SAL-${lastIdNumber + 1}`;
+    return `O/S-${lastIdNumber + 1}`; // Changed from O/SAL-
   }, [salesOrders]);
 
 
@@ -180,69 +180,65 @@ export default function DispatchesPage() {
     if (finalOrder.movementType === 'Traslado Bodega Interna' && finalOrder.destinationWarehouse) {
         const internalSupplier = contacts.find(c => c.rut === '0-0');
         if (internalSupplier) {
-            const existingTransferPo = purchaseOrders.find(po => po.description?.includes(finalOrder.id));
+            setPurchaseOrders(prevPOs => {
+                let existingTransferPo = prevPOs.find(po => po.description?.includes(finalOrder.id));
 
-            const poData = {
-                supplierId: internalSupplier.id,
-                date: finalOrder.date,
-                status: 'completed' as 'completed',
-                warehouse: finalOrder.destinationWarehouse,
-                description: `Traspaso desde O/V ${finalOrder.id}`,
-                items: finalOrder.items.map((item, index) => ({
-                    ...item,
-                    price: 0,
-                })),
-                totalAmount: 0,
-                totalKilos: finalOrder.totalKilos,
-                totalPackages: finalOrder.totalPackages,
-            };
+                const poData = {
+                    supplierId: internalSupplier.id,
+                    date: finalOrder.date,
+                    status: 'completed' as 'completed',
+                    warehouse: finalOrder.destinationWarehouse,
+                    description: `Traspaso desde O/S ${finalOrder.id}`,
+                    items: finalOrder.items.map(item => ({...item})), // create a copy
+                    totalAmount: 0, // Transfers have no cost
+                    totalKilos: finalOrder.totalKilos,
+                    totalPackages: finalOrder.totalPackages,
+                };
 
-            if (existingTransferPo) {
-                // Update existing transfer PO
-                const updatedPo: PurchaseOrder = {
-                    ...existingTransferPo,
-                    ...poData,
-                    items: poData.items.map((item, index) => {
-                        const existingItem = existingTransferPo.items.find(i => i.caliber === item.caliber && i.product === item.product);
-                        return {
+                if (existingTransferPo) {
+                    // Update existing transfer PO
+                    const updatedPo: PurchaseOrder = {
+                        ...existingTransferPo,
+                        ...poData,
+                        items: poData.items.map((item, index) => {
+                            const newLotId = existingTransferPo?.items[index]?.lotNumber || `LOTE-T-${format(parseISO(finalOrder.date), 'ddMMyy')}-${existingTransferPo.id.split('-')[2]}-${index}`;
+                            return { ...item, price: 0, id: `po-item-${existingTransferPo.id}-${index}`, lotNumber: newLotId };
+                        })
+                    };
+                    toast({
+                        title: 'Transferencia Actualizada',
+                        description: `La Orden de Compra de traspaso ${updatedPo.id} ha sido actualizada.`
+                    });
+                    return prevPOs.map(po => po.id === updatedPo.id ? updatedPo : po);
+                } else {
+                    // Create new transfer PO
+                    const lastPoId = prevPOs.reduce((max, o) => {
+                        if (o.id.startsWith('OC-T-')) {
+                            const num = parseInt(o.id.split('-')[2]);
+                            return num > max ? num : max;
+                        }
+                        return max;
+                    }, 0);
+                    const newPoId = `OC-T-${lastPoId + 1}`;
+                    
+                    const newPo: PurchaseOrder = {
+                        ...poData,
+                        id: newPoId,
+                        items: poData.items.map((item, index) => ({
                             ...item,
-                            id: existingItem?.id || `po-item-${existingTransferPo.id}-${index}`,
-                            lotNumber: existingItem?.lotNumber || `LOTE-T-${format(parseISO(finalOrder.date), 'ddMMyy')}-${existingTransferPo.id.split('-')[2]}-${index}`
-                        };
-                    })
-                };
-                setPurchaseOrders(prev => prev.map(po => po.id === updatedPo.id ? updatedPo : po));
-                toast({
-                    title: 'Transferencia Actualizada',
-                    description: `La Orden de Compra de traspaso ${updatedPo.id} ha sido actualizada.`
-                });
-            } else {
-                // Create new transfer PO
-                const lastPoId = purchaseOrders.reduce((max, o) => {
-                    if (o.id.startsWith('OC-T-')) {
-                        const num = parseInt(o.id.split('-')[2]);
-                        return num > max ? num : max;
-                    }
-                    return max;
-                }, 0);
-                const newPoId = `OC-T-${lastPoId + 1}`;
-                
-                const newPo: PurchaseOrder = {
-                    ...poData,
-                    id: newPoId,
-                    items: poData.items.map((item, index) => ({
-                        ...item,
-                        id: `po-item-${newPoId}-${index}`,
-                        lotNumber: `LOTE-T-${format(parseISO(finalOrder.date), 'ddMMyy')}-${newPoId.split('-')[2]}-${index}`
-                    })),
-                };
-                
-                setPurchaseOrders(prev => [...prev, newPo]);
-                toast({
-                    title: 'Transferencia Procesada',
-                    description: `Se ha creado la Orden de Compra ${newPo.id} para el ingreso en ${finalOrder.destinationWarehouse}.`
-                });
-            }
+                            price: 0, // No cost for internal transfers
+                            id: `po-item-${newPoId}-${index}`,
+                            lotNumber: `LOTE-T-${format(parseISO(finalOrder.date), 'ddMMyy')}-${newPoId.split('-')[2]}-${index}`
+                        })),
+                    };
+                    
+                    toast({
+                        title: 'Transferencia Procesada',
+                        description: `Se ha creado la Orden de Compra ${newPo.id} para el ingreso en ${finalOrder.destinationWarehouse}.`
+                    });
+                    return [...prevPOs, newPo];
+                }
+            });
         }
     }
     // --- END OF LOGIC ---
@@ -286,6 +282,16 @@ export default function DispatchesPage() {
   const confirmDelete = () => {
     if (deletingOrder) {
       setSalesOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id));
+      // Also delete the associated transfer PO if it exists
+      setPurchaseOrders(prevPOs => {
+        const transferPO = prevPOs.find(po => po.description?.includes(deletingOrder.id));
+        if (transferPO) {
+          toast({ variant: "destructive", title: 'O/C de Traspaso Eliminada', description: `La orden de compra ${transferPO.id} asociada ha sido eliminada.` });
+          return prevPOs.filter(po => po.id !== transferPO.id);
+        }
+        return prevPOs;
+      });
+
       toast({ variant: "destructive", title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
       setDeletingOrder(null);
     }
@@ -316,7 +322,7 @@ export default function DispatchesPage() {
 
       return {
         'Proveedor': 'Viña Negra',
-        'O/V': orderToExport.id,
+        'O/S': orderToExport.id,
         'Fecha': format(new Date(orderToExport.date), "dd-MM-yyyy"),
         'Cliente': client?.name,
         'Producto': item.product,
@@ -339,7 +345,7 @@ export default function DispatchesPage() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Packing List');
     XLSX.writeFile(workbook, `PackingList-${orderToExport.id}.xlsx`);
-    toast({ title: 'Exportación Exitosa', description: `Se ha generado el packing list para la O/V ${orderToExport.id}.` });
+    toast({ title: 'Exportación Exitosa', description: `Se ha generado el packing list para la O/S ${orderToExport.id}.` });
   };
   
   const handleExportAllCompleted = () => {
@@ -362,7 +368,7 @@ export default function DispatchesPage() {
         order.items.forEach(item => {
             allItems.push({
                 'Proveedor': 'Viña Negra',
-                'O/V': order.id,
+                'O/S': order.id,
                 'Fecha': format(new Date(order.date), "dd-MM-yyyy"),
                 'Cliente': client?.name,
                 'Producto': item.product,
@@ -591,5 +597,6 @@ export default function DispatchesPage() {
     </>
   );
 }
+
 
 

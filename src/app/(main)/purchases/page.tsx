@@ -518,8 +518,9 @@ export default function PurchasesPage() {
       toast({ title: 'Orden Actualizada', description: `La orden ${updatedOrder.id} ha sido actualizada.` });
     } else {
       const sortedOrders = [...purchaseOrders].sort((a,b) => {
-        const idA = a.id ? parseInt(a.id.split('-')[1]) : 0;
-        const idB = b.id ? parseInt(b.id.split('-')[1]) : 0;
+        if (!a.id || !b.id) return 0;
+        const idA = parseInt(a.id.split('-')[1]) || 0;
+        const idB = parseInt(b.id.split('-')[1]) || 0;
         return idA - idB;
       });
       const lastId = sortedOrders.length > 0 ? parseInt(sortedOrders[sortedOrders.length - 1].id.split('-')[1]) : 1000;
@@ -618,7 +619,7 @@ export default function PurchasesPage() {
         <Tabs defaultValue="list">
             <TabsList className="mb-4 grid w-full grid-cols-4">
                 <TabsTrigger value="list">Listado de O/C</TabsTrigger>
-                <TabsTrigger value="transfers">Traspasos Internos</TabsTrigger>
+                <TabsTrigger value="transfers">O/C Traspasos Internos</TabsTrigger>
                 <TabsTrigger value="lots">Generar Lotes</TabsTrigger>
                 <TabsTrigger value="created-lots">Lotes Creados</TabsTrigger>
             </TabsList>
@@ -760,5 +761,6 @@ export default function PurchasesPage() {
     </>
   );
 }
+
 
 
