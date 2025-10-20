@@ -53,7 +53,7 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
     }
     return {
         supplierId: '',
-        date: format(new Date(), 'yyyy-MM-dd'),
+        date: '',
         items: [],
         status: 'pending' as 'pending' | 'completed' | 'cancelled',
         warehouse: 'Bodega Principal',
