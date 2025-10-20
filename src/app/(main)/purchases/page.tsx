@@ -400,41 +400,7 @@ export default function PurchasesPage() {
       content: () => printComponentRef.current,
   });
 
-  const [isPrintingLot, setIsPrintingLot] = useState(false);
   const [isLotPreviewOpen, setIsLotPreviewOpen] = useState(false);
-
-  const printLotRef = useCallback((node: HTMLDivElement) => {
-    if (node !== null && isPrintingLot) {
-        handleLotPrint();
-        setIsPrintingLot(false); 
-    }
-  }, [isPrintingLot]);
-
-  const handleLotPrint = useReactToPrint({
-    content: () => printLotRef.current,
-  });
-
-
-  const handlePreviewLot = (lot: any) => {
-    const lotItem = {
-      lotId: lot.lotNumber,
-      orderId: lot.orderId,
-      productName: lot.product,
-      supplierName: lot.supplierName,
-      caliberName: lot.caliber,
-      caliberCode: lot.caliberCode,
-      totalKilos: lot.totalKilos,
-      totalPackages: lot.totalPackages,
-      avgWeight: lot.totalPackages > 0 ? lot.totalKilos / lot.totalPackages : 0,
-    };
-  
-    setPreviewLotData({
-      creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-      items: [lotItem],
-    });
-    setIsLotPreviewOpen(true);
-  }
-  
 
   useEffect(() => {
     setIsClient(true);
@@ -471,61 +437,6 @@ export default function PurchasesPage() {
     });
     return { regularPurchaseOrders: regular, internalTransferOrders: transfers };
   }, [ordersWithPaymentStatus]);
-
-  const groupedOrders = useMemo(() => {
-    const groups: Record<string, { monthName: string; orders: PurchaseOrder[]; subtotalAmount: number; subtotalKilos: number; subtotalPackages: number; }> = {};
-    
-    regularPurchaseOrders.forEach(order => {
-        const monthKey = format(parseISO(order.date), 'yyyy-MM');
-        const monthName = format(parseISO(order.date), 'MMMM yyyy', { locale: es });
-
-        if (!groups[monthKey]) {
-            groups[monthKey] = {
-                monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-                orders: [],
-                subtotalAmount: 0,
-                subtotalKilos: 0,
-                subtotalPackages: 0,
-            };
-        }
-        groups[monthKey].orders.push(order);
-        groups[monthKey].subtotalAmount += order.totalAmount;
-        groups[monthKey].subtotalKilos += order.totalKilos;
-        groups[monthKey].subtotalPackages += order.totalPackages;
-    });
-
-    const sortedMonthKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
-    return sortedMonthKeys.map(key => groups[key]);
-  }, [regularPurchaseOrders]);
-
-  const grandTotal = useMemo(() => {
-    return groupedOrders.reduce((sum, group) => sum + group.subtotalAmount, 0);
-  }, [groupedOrders]);
-
-  const filteredGroupedOrders = useMemo(() => {
-      if (!filter) return groupedOrders;
-      
-      const lowercasedFilter = filter.toLowerCase();
-      
-      return groupedOrders.map(group => {
-          const filteredOrders = group.orders.filter(order => {
-              const supplier = suppliers.find(s => s.id === order.supplierId);
-              return supplier?.name.toLowerCase().includes(lowercasedFilter);
-          });
-
-          if (filteredOrders.length > 0) {
-              return {
-                  ...group,
-                  orders: filteredOrders,
-                  subtotalAmount: filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0),
-                  subtotalKilos: filteredOrders.reduce((sum, o) => sum + o.totalKilos, 0),
-                  subtotalPackages: filteredOrders.reduce((sum, o) => sum + o.totalPackages, 0),
-              };
-          }
-          return null;
-      }).filter((g): g is { monthName: string; orders: PurchaseOrder[]; subtotalAmount: number; subtotalKilos: number; subtotalPackages: number; } => g !== null);
-  }, [groupedOrders, filter, suppliers]);
-
 
   const createdLots = useMemo(() => {
     const lotsMap = new Map<string, any>();
@@ -565,6 +476,25 @@ export default function PurchasesPage() {
       );
   }, [createdLots, lotFilter]);
 
+  const handlePreviewLot = (lot: any) => {
+    const lotItem = {
+      lotId: lot.lotNumber,
+      orderId: lot.orderId,
+      productName: lot.product,
+      supplierName: lot.supplierName,
+      caliberName: lot.caliber,
+      caliberCode: lot.caliberCode,
+      totalKilos: lot.totalKilos,
+      totalPackages: lot.totalPackages,
+      avgWeight: lot.totalPackages > 0 ? lot.totalKilos / lot.totalPackages : 0,
+    };
+  
+    setPreviewLotData({
+      creationDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
+      items: [lotItem],
+    });
+    setIsLotPreviewOpen(true);
+  }
 
   const handleSaveOrder = (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>, newItems: OrderItem[] = []) => {
     const allItems = 'id' in order
@@ -680,107 +610,8 @@ export default function PurchasesPage() {
     XLSX.writeFile(workbook, `Ordenes_de_Compra.xlsx`);
     toast({ title: 'Exportación Exitosa', description: 'Se han exportado todas las órdenes de compra.' });
   }
-
-  const toggleCollapsible = (monthKey: string) => {
-    setOpenCollapsibles(prev => ({...prev, [monthKey]: !prev[monthKey]}));
-  }
   
   const purchaseColumns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreviewRequest, suppliers });
-
-
-  const renderContent = () => {
-    if (!isClient) {
-      return (
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-96 w-full" />
-        </div>
-      )
-    }
-    return (
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className='w-[400px]'>Mes</TableHead>
-              <TableHead className='text-right'>Total Envases</TableHead>
-              <TableHead className='text-right'>Total Kilos</TableHead>
-              <TableHead className='text-right'>Monto Total</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredGroupedOrders.map(group => {
-              const monthKey = group.monthName.replace(' ', '-');
-              return (
-                <React.Fragment key={monthKey}>
-                  <TableRow className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggleCollapsible(monthKey)}>
-                    <TableCell className='font-bold'>
-                      <div className="flex items-center gap-2">
-                        <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[monthKey] && "rotate-180")} />
-                        {group.monthName}
-                      </div>
-                    </TableCell>
-                    <TableCell className='text-right font-bold'>{formatPackages(group.subtotalPackages)}</TableCell>
-                    <TableCell className='text-right font-bold'>{formatKilos(group.subtotalKilos)}</TableCell>
-                    <TableCell className='text-right font-bold'>{formatCurrency(group.subtotalAmount)}</TableCell>
-                  </TableRow>
-                  {openCollapsibles[monthKey] && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="p-0">
-                        <div className='p-4 bg-background'>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>O/C</TableHead>
-                                <TableHead>Fecha</TableHead>
-                                <TableHead>Proveedor</TableHead>
-                                <TableHead className="text-right">Monto</TableHead>
-                                <TableHead className="text-right">Kilos</TableHead>
-                                <TableHead className="text-right">Envases</TableHead>
-                                <TableHead className="text-center">Acciones</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {group.orders.map(order => {
-                                const supplier = suppliers.find(s => s.id === order.supplierId);
-                                return (
-                                  <TableRow key={order.id}>
-                                    <TableCell className="font-medium">{order.id}</TableCell>
-                                    <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy')}</TableCell>
-                                    <TableCell>{supplier?.name}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
-                                    <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')}</TableCell>
-                                    <TableCell className="text-right">{order.totalPackages.toLocaleString('es-CL')}</TableCell>
-                                    <TableCell className="text-center">
-                                      <div className="flex items-center justify-center gap-1">
-                                        <Button variant="ghost" size="icon" onClick={() => handlePreviewRequest(order)} title="Visualizar">
-                                          <Eye className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleEdit(order)} title="Editar">
-                                          <Edit className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleDelete(order)} title="Eliminar">
-                                          <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                )
-                              })}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -810,17 +641,9 @@ export default function PurchasesPage() {
                             </Button>
                         </div>
                     </div>
-                        <div className="py-4">
-                        <Input
-                            placeholder="Filtrar por proveedor..."
-                            value={filter}
-                            onChange={(event) => setFilter(event.target.value)}
-                            className="max-w-sm"
-                        />
-                        </div>
                     </CardHeader>
                     <CardContent>
-                    {renderContent()}
+                       <DataTable columns={purchaseColumns} data={regularPurchaseOrders} />
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -937,4 +760,5 @@ export default function PurchasesPage() {
     </>
   );
 }
+
 
