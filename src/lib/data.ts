@@ -14,6 +14,7 @@ export const contacts: Contact[] = [
   { id: '4', name: 'Transportes Rapido', rut: '77.555.444-K', address: 'Calle Larga 567', commune: 'Rancagua', email: 'fletes@transrapido.cl', contactPerson: 'Ana Gomez', type: ['supplier'], tags: ['Logística'] },
   { id: '5', name: 'Productor de Paltas de Quillota', rut: '79.111.222-3', address: 'Hijuela Larga s/n', commune: 'Quillota', email: 'palta.quillota@email.com', contactPerson: 'Miguel Angel', type: ['supplier'], tags: [] },
   { id: '6', name: 'Fruits & Co. SpA', rut: '81.222.333-4', address: 'Av. del Mar 4500', commune: 'La Serena', email: 'hello@fruits.co', contactPerson: 'Sofia Lopez', type: ['client'], tags: ['Exportación', 'Asia'] },
+  { id: 'internal-0', name: 'Viña Negra (Traslado Interno)', rut: '0-0', address: '-', commune: '-', email: '-', contactPerson: '-', type: ['supplier'], tags: ['Interno'] },
 ];
 
 const rawPurchaseOrders: Omit<PurchaseOrder, 'items'> & { items: Omit<PurchaseOrder['items'][0], 'lotNumber'>[] }[] = [
@@ -151,3 +152,4 @@ export const getInventory = (
 
   return inventory.sort((a,b) => a.key.localeCompare(b.key));
 };
+

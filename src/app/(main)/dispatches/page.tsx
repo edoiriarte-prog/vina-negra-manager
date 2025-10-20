@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -50,7 +51,7 @@ export default function DispatchesPage() {
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
   const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
-  const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+  const [contacts, setContacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [confirmingEditOrder, setConfirmingEditOrder] = useState<SalesOrder | null>(null);
@@ -109,12 +110,13 @@ export default function DispatchesPage() {
   const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, inventoryAdjustments, editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
 
   const nextOrderId = useMemo(() => {
-    const lastIdNumber = salesOrders
-      .filter(o => o.id.startsWith('O/SAL-'))
-      .reduce((max, order) => {
+    const lastIdNumber = salesOrders.reduce((max, order) => {
+      if (order.id.startsWith('O/SAL-')) {
         const idNum = parseInt(order.id.split('-')[1]);
         return idNum > max ? idNum : max;
-      }, 3000); 
+      }
+      return max;
+    }, 3000); 
     return `O/SAL-${lastIdNumber + 1}`;
   }, [salesOrders]);
 
@@ -518,3 +520,4 @@ export default function DispatchesPage() {
     </>
   );
 }
+

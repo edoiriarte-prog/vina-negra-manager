@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -51,7 +52,7 @@ export default function SalesPage() {
   const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
   const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
   const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
-  const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+  const [contacts, setContacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
   
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [confirmingEditOrder, setConfirmingEditOrder] = useState<SalesOrder | null>(null);
@@ -170,6 +171,44 @@ export default function SalesPage() {
       setSalesOrders(prev => [...prev, finalOrder]);
       toast({ title: 'Orden Creada', description: `La orden ${finalOrder.id} ha sido creada.` });
     }
+    
+    if (finalOrder.movementType === 'Traslado Bodega Interna' && finalOrder.destinationWarehouse) {
+        const internalSupplier = contacts.find(c => c.rut === '0-0');
+        if (internalSupplier) {
+            const lastPoId = purchaseOrders.reduce((max, o) => {
+                if (o.id.startsWith('OC-T-')) {
+                    const num = parseInt(o.id.split('-')[2]);
+                    return num > max ? num : max;
+                }
+                return max;
+            }, 0);
+            const newPoId = `OC-T-${lastPoId + 1}`;
+            
+            const newPo: PurchaseOrder = {
+                id: newPoId,
+                supplierId: internalSupplier.id,
+                date: finalOrder.date,
+                status: 'completed',
+                warehouse: finalOrder.destinationWarehouse,
+                items: finalOrder.items.map((item, index) => ({
+                    ...item,
+                    id: `po-item-${newPoId}-${index}`,
+                    price: 0,
+                    lotNumber: `LOTE-T-${format(parseISO(finalOrder.date), 'ddMMyy')}-${newPoId.split('-')[2]}-${index}`
+                })),
+                totalAmount: 0,
+                totalKilos: finalOrder.totalKilos,
+                totalPackages: finalOrder.totalPackages,
+            };
+            
+            setPurchaseOrders(prev => [...prev, newPo]);
+            toast({
+                title: 'Transferencia Procesada',
+                description: `Se ha creado la Orden de Compra ${newPo.id} para el ingreso en ${finalOrder.destinationWarehouse}.`
+            })
+        }
+    }
+
 
     const movementsForOrder = financialMovements.filter(m => m.relatedDocument?.id === finalOrder.id);
     const totalPaid = movementsForOrder.reduce((sum, m) => sum + m.amount, 0);
@@ -516,3 +555,4 @@ export default function SalesPage() {
     </>
   );
 }
+
