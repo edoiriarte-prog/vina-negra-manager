@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { SalesOrderPreview } from './components/sales-order-preview';
 import { getColumns } from './components/columns';
+import { DataTable } from './components/data-table';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -69,6 +70,8 @@ export default function SalesPage() {
   const clients = contacts.filter(c => c.type.includes('client'));
   const carriers = contacts.filter(c => c.type.includes('supplier'));
 
+  const nonDispatchOrders = useMemo(() => salesOrders.filter(o => o.orderType !== 'dispatch'), [salesOrders]);
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -76,7 +79,7 @@ export default function SalesPage() {
   const groupedOrders = useMemo(() => {
     const groups: Record<string, { clientName: string; orders: SalesOrder[]; subtotal: number; }> = {};
     
-    salesOrders.forEach(order => {
+    nonDispatchOrders.forEach(order => {
         const client = clients.find(s => s.id === order.clientId);
         if (!client) return;
 
@@ -92,7 +95,7 @@ export default function SalesPage() {
     });
 
     return Object.values(groups).sort((a,b) => a.clientName.localeCompare(b.clientName));
-  }, [salesOrders, clients]);
+  }, [nonDispatchOrders, clients]);
 
   const grandTotal = useMemo(() => {
     return groupedOrders.reduce((sum, group) => sum + group.subtotal, 0);
@@ -110,9 +113,10 @@ export default function SalesPage() {
 
   const nextOrderId = useMemo(() => {
     const lastIdNumber = salesOrders.reduce((max, order) => {
+        if (!order.id.startsWith('OV-')) return max;
         const idNum = parseInt(order.id.split('-')[1]);
         return idNum > max ? idNum : max;
-    }, 2000); // Start from 2000 to ensure next is 2001 if no higher ID exists
+    }, 2000);
     return `OV-${lastIdNumber + 1}`;
   }, [salesOrders]);
 
@@ -171,74 +175,6 @@ export default function SalesPage() {
       setSalesOrders(prev => [...prev, finalOrder]);
       toast({ title: 'Orden Creada', description: `La orden ${finalOrder.id} ha sido creada.` });
     }
-    
-    if (finalOrder.movementType === 'Traslado Bodega Interna' && finalOrder.destinationWarehouse) {
-        const internalSupplier = contacts.find(c => c.rut === '0-0');
-        if (internalSupplier) {
-            const existingTransferPo = purchaseOrders.find(po => po.description?.includes(finalOrder.id));
-
-            if (existingTransferPo) {
-                // Update existing transfer PO
-                const updatedPo: PurchaseOrder = {
-                    ...existingTransferPo,
-                    date: finalOrder.date,
-                    warehouse: finalOrder.destinationWarehouse,
-                    items: finalOrder.items.map((item, index) => {
-                        const existingItem = existingTransferPo.items.find(i => i.caliber === item.caliber && i.product === item.product);
-                        return {
-                            ...item,
-                            id: existingItem?.id || `po-item-${existingTransferPo.id}-${index}`,
-                            price: 0,
-                            lotNumber: existingItem?.lotNumber || `LOTE-T-${format(parseISO(finalOrder.date), 'ddMMyy')}-${existingTransferPo.id.split('-')[2]}-${index}`
-                        };
-                    }),
-                    totalAmount: 0,
-                    totalKilos: finalOrder.totalKilos,
-                    totalPackages: finalOrder.totalPackages,
-                };
-                setPurchaseOrders(prev => prev.map(po => po.id === updatedPo.id ? updatedPo : po));
-                toast({
-                    title: 'Transferencia Actualizada',
-                    description: `La Orden de Compra de traspaso ${updatedPo.id} ha sido actualizada.`
-                });
-            } else {
-                // Create new transfer PO
-                const lastPoId = purchaseOrders.reduce((max, o) => {
-                    if (o.id.startsWith('OC-T-')) {
-                        const num = parseInt(o.id.split('-')[2]);
-                        return num > max ? num : max;
-                    }
-                    return max;
-                }, 0);
-                const newPoId = `OC-T-${lastPoId + 1}`;
-                
-                const newPo: PurchaseOrder = {
-                    id: newPoId,
-                    supplierId: internalSupplier.id,
-                    date: finalOrder.date,
-                    status: 'completed',
-                    warehouse: finalOrder.destinationWarehouse,
-                    description: `Traspaso desde O/V ${finalOrder.id}`,
-                    items: finalOrder.items.map((item, index) => ({
-                        ...item,
-                        id: `po-item-${newPoId}-${index}`,
-                        price: 0,
-                        lotNumber: `LOTE-T-${format(parseISO(finalOrder.date), 'ddMMyy')}-${newPoId.split('-')[2]}-${index}`
-                    })),
-                    totalAmount: 0,
-                    totalKilos: finalOrder.totalKilos,
-                    totalPackages: finalOrder.totalPackages,
-                };
-                
-                setPurchaseOrders(prev => [...prev, newPo]);
-                toast({
-                    title: 'Transferencia Procesada',
-                    description: `Se ha creado la Orden de Compra ${newPo.id} para el ingreso en ${finalOrder.destinationWarehouse}.`
-                });
-            }
-        }
-    }
-
 
     const movementsForOrder = financialMovements.filter(m => m.relatedDocument?.id === finalOrder.id);
     const totalPaid = movementsForOrder.reduce((sum, m) => sum + m.amount, 0);
@@ -336,7 +272,7 @@ export default function SalesPage() {
   };
   
   const handleExportAllCompleted = () => {
-    const completedOrders = salesOrders.filter(o => o.status === 'completed');
+    const completedOrders = nonDispatchOrders.filter(o => o.status === 'completed');
     if (completedOrders.length === 0) {
         toast({
             variant: "destructive",
@@ -382,115 +318,17 @@ export default function SalesPage() {
     toast({ title: 'Exportación Exitosa', description: 'Se ha generado el packing list con todas las órdenes completadas.' });
   }
 
-  const handlePreviewRequest = (order: SalesOrder) => {
-    setPreviewingOrder(order);
-  }
+    const handlePreviewRequest = (order: SalesOrder) => {
+        setPreviewingOrder(order);
+    }
 
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreviewRequest, clients });
 
   const renderContent = () => {
     if (!isClient) {
-      return (
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      )
+      return <DataTable columns={columns} data={[]} />;
     }
-    return (
-      <div className="rounded-md border">
-          <Table>
-              <TableHeader>
-                  <TableRow>
-                      <TableHead className='w-[400px]'>Cliente</TableHead>
-                      <TableHead className='text-right'>Monto Total</TableHead>
-                  </TableRow>
-              </TableHeader>
-              <TableBody>
-                  {filteredGroupedOrders.map(group => {
-                      const clientId = clients.find(s => s.name === group.clientName)?.id || '';
-                      return (
-                          <React.Fragment key={clientId}>
-                              <TableRow className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggleCollapsible(clientId)}>
-                                  <TableCell className='font-bold'>
-                                       <div className="flex items-center gap-2">
-                                          <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[clientId] && "rotate-180")} />
-                                          {group.clientName}
-                                      </div>
-                                  </TableCell>
-                                  <TableCell className='text-right font-bold'>{formatCurrency(group.subtotal)}</TableCell>
-                              </TableRow>
-                              {openCollapsibles[clientId] && (
-                                  <TableRow>
-                                      <TableCell colSpan={2} className="p-0">
-                                          <div className='p-4 bg-background'>
-                                              <Table>
-                                                  <TableHeader>
-                                                      <TableRow>
-                                                          <TableHead>O/V</TableHead>
-                                                          <TableHead>Fecha</TableHead>
-                                                          <TableHead className="text-right">Kilos</TableHead>
-                                                          <TableHead className="text-right">Monto</TableHead>
-                                                          <TableHead className="w-[50px]"></TableHead>
-                                                      </TableRow>
-                                                  </TableHeader>
-                                                  <TableBody>
-                                                      {group.orders.map(order => (
-                                                          <TableRow key={order.id}>
-                                                              <TableCell className="font-medium">{order.id}</TableCell>
-                                                              <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
-                                                              <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')} kg</TableCell>
-                                                              <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
-                                                              <TableCell>
-                                                                   <DropdownMenu>
-                                                                    <DropdownMenuTrigger asChild>
-                                                                      <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                        <span className="sr-only">Abrir menú</span>
-                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                      </Button>
-                                                                    </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end">
-                                                                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                                        <DropdownMenuItem onClick={() => handlePreviewRequest(order)}>
-                                                                            <Eye className='mr-2 h-4 w-4' />
-                                                                            Visualizar
-                                                                        </DropdownMenuItem>
-                                                                      <DropdownMenuItem onClick={() => handleEdit(order)}>
-                                                                        <Edit className='mr-2 h-4 w-4' />
-                                                                        Editar
-                                                                      </DropdownMenuItem>
-                                                                      <DropdownMenuSeparator />
-                                                                      <DropdownMenuItem 
-                                                                        className="text-destructive focus:text-destructive"
-                                                                        onClick={() => handleDelete(order)}
-                                                                      >
-                                                                        <Trash2 className='mr-2 h-4 w-4' />
-                                                                        Eliminar
-                                                                      </DropdownMenuItem>
-                                                                    </DropdownMenuContent>
-                                                                  </DropdownMenu>
-                                                              </TableCell>
-                                                          </TableRow>
-                                                      ))}
-                                                  </TableBody>
-                                              </Table>
-                                          </div>
-                                      </TableCell>
-                                  </TableRow>
-                              )}
-                          </React.Fragment>
-                      );
-                  })}
-              </TableBody>
-              <TableFooter>
-                  <TableRow>
-                      <TableHead className='text-right font-bold text-lg'>Total General</TableHead>
-                      <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotal)}</TableHead>
-                  </TableRow>
-              </TableFooter>
-          </Table>
-      </div>
-    );
+    return <DataTable columns={columns} data={nonDispatchOrders} />;
   }
 
   return (
@@ -513,14 +351,6 @@ export default function SalesPage() {
               </Button>
             </div>
           </div>
-          <div className="py-4">
-              <Input
-                placeholder="Filtrar por cliente..."
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                className="max-w-sm"
-              />
-            </div>
         </CardHeader>
         <CardContent>
           {renderContent()}
@@ -585,4 +415,5 @@ export default function SalesPage() {
     </>
   );
 }
+
 
