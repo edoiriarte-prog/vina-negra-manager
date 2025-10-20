@@ -51,13 +51,6 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
 
     const totalPackages = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const totalKilos = order.items.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : 0, 0);
-    
-    // The total amount already includes VAT if the switch was on.
-    const grossTotal = order.totalAmount;
-    const netTotal = order.includeVat ? grossTotal / 1.19 : grossTotal;
-    const vatAmount = order.includeVat ? grossTotal - netTotal : 0;
-    
-    const docTitle = order.orderType === 'dispatch' ? 'ORDEN DE SALIDA' : 'ORDEN DE VENTA';
 
     const summarizedItems = React.useMemo(() => {
         const summary = new Map<string, { totalPackages: number, totalKilos: number, totalGrossValue: number, product: string, relatedPurchaseIds: Set<string>, lotNumbers: Set<string>, destinationLotNumber?: string }>();
@@ -117,6 +110,15 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
         });
 
     }, [order, calibers, purchaseOrders]);
+
+    const netTotal = React.useMemo(() => {
+        return summarizedItems.reduce((sum, item) => sum + item.netSubtotal, 0);
+    }, [summarizedItems]);
+
+    const vatAmount = order.includeVat ? netTotal * 0.19 : 0;
+    const grossTotal = netTotal + vatAmount;
+    
+    const docTitle = order.orderType === 'dispatch' ? 'ORDEN DE SALIDA' : 'ORDEN DE VENTA';
 
 
     return (
