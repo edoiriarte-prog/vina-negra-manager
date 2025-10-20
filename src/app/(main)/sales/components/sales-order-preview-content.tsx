@@ -29,7 +29,8 @@ type SummarizedItem = {
     caliberCode: string;
     totalPackages: number;
     totalKilos: number;
-    avgPrice: number;
+    avgNetPrice: number;
+    netSubtotal: number;
     relatedPurchaseIds?: string[];
     lotNumbers?: string[];
     destinationLotNumber?: string;
@@ -49,27 +50,28 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
     }
 
     const totalPackages = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
-    const totalKilos = order.items.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0);
+    const totalKilos = order.items.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : 0, 0);
     
-    const subtotal = order.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-    const iva = order.includeVat ? subtotal * 0.19 : 0;
-    const totalConIva = subtotal + iva;
+    // The total amount already includes VAT if the switch was on.
+    const grossTotal = order.totalAmount;
+    const netTotal = order.includeVat ? grossTotal / 1.19 : grossTotal;
+    const vatAmount = order.includeVat ? grossTotal - netTotal : 0;
     
     const docTitle = order.orderType === 'dispatch' ? 'ORDEN DE SALIDA' : 'ORDEN DE VENTA';
 
     const summarizedItems = React.useMemo(() => {
-        const summary = new Map<string, { totalPackages: number, totalKilos: number, totalValue: number, product: string, relatedPurchaseIds: Set<string>, lotNumbers: Set<string>, destinationLotNumber?: string }>();
+        const summary = new Map<string, { totalPackages: number, totalKilos: number, totalGrossValue: number, product: string, relatedPurchaseIds: Set<string>, lotNumbers: Set<string>, destinationLotNumber?: string }>();
         const transferPurchaseOrder = order.movementType === 'Traslado Bodega Interna' 
             ? purchaseOrders.find(po => po.description?.includes(order.id))
             : undefined;
 
         order.items.forEach(item => {
             const key = item.caliber;
-            const existing = summary.get(key) || { totalPackages: 0, totalKilos: 0, totalValue: 0, product: item.product, relatedPurchaseIds: new Set(), lotNumbers: new Set() };
+            const existing = summary.get(key) || { totalPackages: 0, totalKilos: 0, totalGrossValue: 0, product: item.product, relatedPurchaseIds: new Set(), lotNumbers: new Set() };
             
             existing.totalPackages += item.packagingQuantity || 0;
             existing.totalKilos += item.unit === 'Kilos' ? item.quantity : 0;
-            existing.totalValue += item.quantity * item.price;
+            existing.totalGrossValue += item.quantity * item.price;
             existing.product = item.product;
             if(order.relatedPurchaseIds) {
                 order.relatedPurchaseIds.forEach(id => existing.relatedPurchaseIds.add(id));
@@ -91,13 +93,17 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
 
         const result: SummarizedItem[] = [];
         summary.forEach((value, key) => {
+            const grossAvgPrice = value.totalKilos > 0 ? value.totalGrossValue / value.totalKilos : 0;
+            const netAvgPrice = order.includeVat ? grossAvgPrice / 1.19 : grossAvgPrice;
+
             result.push({
                 product: value.product,
                 caliber: key,
                 caliberCode: getCaliberCode(key),
                 totalPackages: value.totalPackages,
                 totalKilos: value.totalKilos,
-                avgPrice: value.totalKilos > 0 ? value.totalValue / value.totalKilos : 0,
+                avgNetPrice: netAvgPrice,
+                netSubtotal: netAvgPrice * value.totalKilos,
                 relatedPurchaseIds: Array.from(value.relatedPurchaseIds),
                 lotNumbers: Array.from(value.lotNumbers),
                 destinationLotNumber: value.destinationLotNumber
@@ -206,8 +212,8 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <TableHead className="text-black font-bold">Descripción</TableHead>
                         <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
                         <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
-                        <TableHead className="text-right text-black font-bold">Precio Unit.</TableHead>
-                        <TableHead className="text-right text-black font-bold">SUB TOTAL</TableHead>
+                        <TableHead className="text-right text-black font-bold">Precio Unit. (Neto)</TableHead>
+                        <TableHead className="text-right text-black font-bold">SUB TOTAL (Neto)</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -226,8 +232,8 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         </TableCell>
                         <TableCell className="text-right align-middle text-sm+">{formatPackages(item.totalPackages)}</TableCell>
                         <TableCell className="text-right align-middle text-sm+">{item.totalKilos.toLocaleString('es-CL')} kg</TableCell>
-                        <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgPrice)}</TableCell>
-                        <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.totalKilos * item.avgPrice)}</TableCell>
+                        <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgNetPrice)}</TableCell>
+                        <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.netSubtotal)}</TableCell>
                     </TableRow>
                 ))}
                 </TableBody>
@@ -240,18 +246,18 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                              <div className="flex justify-end mt-4">
                                 <div className="w-full max-w-sm space-y-2 text-sm">
                                     <div className="flex justify-between items-center">
-                                        <span className="font-normal text-gray-600">Subtotal:</span>
-                                        <span>{formatCurrency(subtotal)}</span>
+                                        <span className="font-normal text-gray-600">Subtotal Neto:</span>
+                                        <span>{formatCurrency(netTotal)}</span>
                                     </div>
                                     {order.includeVat && (
                                         <div className="flex justify-between items-center">
                                             <span className="font-normal text-gray-600">IVA (19%):</span>
-                                            <span>{formatCurrency(iva)}</span>
+                                            <span>{formatCurrency(vatAmount)}</span>
                                         </div>
                                     )}
                                      <div className="flex justify-between items-center text-base pt-1 border-t border-gray-400">
                                         <span className="font-bold">TOTAL A PAGAR:</span>
-                                        <span className="font-bold">{formatCurrency(totalConIva)}</span>
+                                        <span className="font-bold">{formatCurrency(grossTotal)}</span>
                                     </div>
                                 </div>
                             </div>
