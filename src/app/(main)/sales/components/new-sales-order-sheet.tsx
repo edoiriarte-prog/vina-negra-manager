@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -298,29 +297,6 @@ export function NewSalesOrderSheet({
             <div className="grid gap-6 py-4">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  {sheetType === 'sales' && (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="orderType" className="text-right">
-                        Tipo Doc.
-                      </Label>
-                      <RadioGroup 
-                          defaultValue="sales" 
-                          onValueChange={(value: 'sales' | 'dispatch') => handleSelectChange('orderType', value)} 
-                          className="col-span-3 flex items-center"
-                          value={formData.orderType}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="sales" id="r-sales" />
-                          <Label htmlFor="r-sales">Orden de Venta</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="dispatch" id="r-dispatch" />
-                          <Label htmlFor="r-dispatch">Orden de Salida</Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                  )}
-
                    <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="date" className="text-right">
                       Fecha
