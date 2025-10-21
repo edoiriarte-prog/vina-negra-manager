@@ -472,7 +472,7 @@ export default function InventoryPage() {
             return;
         }
 
-        const dataForSheet = filteredLotTraceabilityData.map(lot => ({
+        const summaryData = filteredLotTraceabilityData.map(lot => ({
             'Lote': lot.lotNumber,
             'O/C Origen': lot.purchaseOrderId,
             'Producto': lot.product,
@@ -484,11 +484,29 @@ export default function InventoryPage() {
             'Envases Disponibles': lot.currentAvailablePackages,
             'Kilos Disponibles': lot.currentAvailableKilos,
         }));
+        
+        const historyData = filteredLotTraceabilityData.flatMap(lot => 
+            lot.movements.map(mov => ({
+                'Lote': lot.lotNumber,
+                'Fecha Mov.': format(parseISO(mov.date), 'dd-MM-yyyy'),
+                'Tipo Mov.': mov.type,
+                'Documento/Motivo': mov.documentId,
+                'Bodega': mov.warehouse,
+                'Mov. Envases': mov.packages,
+                'Mov. Kilos': mov.kilos,
+                'Saldo Envases': mov.balancePackages,
+                'Saldo Kilos': mov.balanceKilos
+            }))
+        );
 
-        const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario Por Lote');
-        XLSX.writeFile(workbook, `Inventario_Por_Lote_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+        const wb = XLSX.utils.book_new();
+        const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen Lotes');
+        
+        const wsHistory = XLSX.utils.json_to_sheet(historyData);
+        XLSX.utils.book_append_sheet(wb, wsHistory, 'Historial Movimientos Lote');
+
+        XLSX.writeFile(wb, `Inventario_Por_Lote_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
         toast({ title: 'Exportación Exitosa'});
     }
     
