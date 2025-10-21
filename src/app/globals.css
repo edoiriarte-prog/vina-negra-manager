@@ -96,8 +96,23 @@
   }
   
   /* Ensure all text is black for contrast */
-  * {
+  h1, h2, h3, h4, h5, h6, p, span, div, th, td, label {
     color: black !important;
+  }
+
+  /* Make sure titles are bold */
+  .font-bold {
+    font-weight: bold !important;
+  }
+
+  /* Specific overrides for preview content */
+  .print-preview h1, .print-preview h2, .print-preview h3 {
+    font-weight: bold !important;
+    color: black !important;
+  }
+  
+  /* General print styles */
+  * {
     background-color: transparent !important;
     box-shadow: none !important;
     text-shadow: none !important;
