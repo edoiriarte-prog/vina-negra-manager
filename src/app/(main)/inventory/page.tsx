@@ -54,6 +54,7 @@ type LotMovement = {
     kilos: number;
     balancePackages: number;
     balanceKilos: number;
+    clientId?: string;
 };
 
 type LotTraceability = {
@@ -334,47 +335,49 @@ export default function InventoryPage() {
         });
     
         // 2. Process all sales and adjustments
-        const allOutflows = [...salesOrders, ...inventoryAdjustments];
+        const allOutflows: {item: OrderItem | InventoryAdjustment, movement: SalesOrder | InventoryAdjustment}[] = [
+            ...salesOrders.flatMap(so => so.items.map(i => ({item: i, movement: so}))),
+            ...inventoryAdjustments.map(adj => ({item: adj, movement: adj}))
+        ];
     
-        allOutflows.forEach(movement => {
-            const itemsToProcess = 'items' in movement ? movement.items : [movement as InventoryAdjustment];
-            
-            itemsToProcess.forEach(item => {
-                if (item.lotNumber && lots.has(item.lotNumber)) {
-                    const lotData = lots.get(item.lotNumber)!;
-                    const warehouse = 'warehouse' in movement ? movement.warehouse : '';
-                    const date = 'date' in movement ? movement.date : '';
-                    const kilos = item.quantity;
-                    const packages = item.packagingQuantity || 0;
-    
+        allOutflows.forEach(({item, movement}) => {
+            if (item.lotNumber && lots.has(item.lotNumber)) {
+                const lotData = lots.get(item.lotNumber)!;
+                const warehouse = 'warehouse' in movement ? movement.warehouse : '';
+                const date = 'date' in movement ? movement.date : '';
+                const kilos = item.quantity;
+                const packages = item.packagingQuantity || 0;
+                
+                if ('orderType' in movement) { // SalesOrder
                     lotData.currentAvailableKilos -= kilos;
                     lotData.currentAvailablePackages -= packages;
-    
-                    if ('orderType' in movement) { // SalesOrder
-                        lotData.movements.push({
-                            date,
-                            type: 'Salida',
-                            documentId: movement.id,
-                            warehouse: warehouse,
-                            packages: -packages,
-                            kilos: -kilos,
-                            balanceKilos: 0,
-                            balancePackages: 0,
-                        });
-                    } else if ('reason' in movement) { // InventoryAdjustment
-                        lotData.movements.push({
-                            date,
-                            type: 'Ajuste',
-                            documentId: (movement as InventoryAdjustment).reason,
-                            warehouse: warehouse,
-                            packages: (movement as InventoryAdjustment).type === 'increase' ? packages : -packages,
-                            kilos: (movement as InventoryAdjustment).type === 'increase' ? kilos : -kilos,
-                            balanceKilos: 0,
-                            balancePackages: 0,
-                        });
-                    }
+                    lotData.movements.push({
+                        date,
+                        type: 'Salida',
+                        documentId: movement.id,
+                        warehouse: warehouse,
+                        packages: -packages,
+                        kilos: -kilos,
+                        balanceKilos: 0,
+                        balancePackages: 0,
+                        clientId: movement.clientId,
+                    });
+                } else if ('reason' in movement) { // InventoryAdjustment
+                    const sign = movement.type === 'increase' ? 1 : -1;
+                    lotData.currentAvailableKilos += kilos * sign;
+                    lotData.currentAvailablePackages += packages * sign;
+                    lotData.movements.push({
+                        date,
+                        type: 'Ajuste',
+                        documentId: (movement as InventoryAdjustment).reason,
+                        warehouse: warehouse,
+                        packages: packages * sign,
+                        kilos: kilos * sign,
+                        balanceKilos: 0,
+                        balancePackages: 0,
+                    });
                 }
-            });
+            }
         });
     
         // 3. Sort movements and calculate running balance
@@ -488,6 +491,10 @@ export default function InventoryPage() {
         const historyData = filteredLotTraceabilityData.flatMap(lot => 
             lot.movements.map(mov => ({
                 'Lote': lot.lotNumber,
+                'Producto': lot.product,
+                'Calibre': lot.caliber,
+                'Proveedor': lot.supplierName,
+                'Cliente': mov.clientId ? contacts.find(c => c.id === mov.clientId)?.name || 'N/A' : '',
                 'Fecha Mov.': format(parseISO(mov.date), 'dd-MM-yyyy'),
                 'Tipo Mov.': mov.type,
                 'Documento/Motivo': mov.documentId,
@@ -871,4 +878,5 @@ export default function InventoryPage() {
         </>
     );
 }
+
 
