@@ -1,5 +1,7 @@
 
 
+import { BankAccount } from './types';
+
 export const initialProducts = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MANDARINAS"];
 
 // Updated to an array of objects to include code and name for proper sorting and display.
@@ -17,7 +19,7 @@ export const initialCalibers = [
 export const initialUnits = ["Kilos", "Cajas"];
 export const initialPackagingTypes = ["CAJAS", "BINS", "PALLETS", "SACOS"];
 export const initialWarehouses = ["Bodega Principal", "Cámara de Frío 1", "Campo A", "BODEGA CASA ACONCAGUA 80"];
-export const initialBankAccounts = [
+export const initialBankAccounts: BankAccount[] = [
     {
         id: 'acc-1',
         name: 'Cuenta Corriente Banco Estado',
@@ -27,6 +29,8 @@ export const initialBankAccounts = [
         initialBalance: 15000000,
         status: 'Activa' as const,
         owner: 'Viña Negra SpA',
+        ownerRUT: '78.261.683-8',
+        ownerEmail: 'contacto@vinanegra.cl'
     },
     {
         id: 'acc-2',
@@ -35,6 +39,8 @@ export const initialBankAccounts = [
         initialBalance: 500000,
         status: 'Activa' as const,
         owner: 'Viña Negra SpA',
+        ownerRUT: '78.261.683-8',
+        ownerEmail: 'contacto@vinanegra.cl'
     }
 ];
 
@@ -52,6 +58,7 @@ export const productCaliberMatrix: ProductMatrix = {
     "CLEMENTINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
     "MANDARINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
 };
+
 
 
 

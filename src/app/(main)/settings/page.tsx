@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { useMasterData, CaliberMaster } from '@/hooks/use-master-data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Trash2, PlusCircle, Download, Edit } from 'lucide-react';
+import { Trash2, PlusCircle, Download, Edit, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { BankAccount } from '@/lib/types';
@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 
 function MasterDataEditor({ title, data, setData }: { title: string, data: string[], setData: React.Dispatch<React.SetStateAction<string[]>> }) {
@@ -142,7 +144,7 @@ function CaliberMasterEditor() {
     );
 }
 
-const emptyAccount: Omit<BankAccount, 'id'> = { name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa', owner: '' };
+const emptyAccount: Omit<BankAccount, 'id'> = { name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa', owner: '', ownerRUT: '', ownerEmail: '', bankName: '', accountNumber: '' };
 
 function BankAccountsEditor() {
     const { bankAccounts, setBankAccounts } = useMasterData();
@@ -203,24 +205,35 @@ function BankAccountsEditor() {
                 <CardDescription>Configure las cuentas bancarias y de efectivo de la empresa.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 mb-4 items-end p-4 border rounded-md">
-                    <div className='lg:col-span-5 text-sm font-medium mb-2'>{editingAccountId ? `Editando: ${formData.name}` : 'Nueva Cuenta'}</div>
-                    <Input placeholder="Nombre de la Cuenta" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))}/>
-                    <Input placeholder="Titular" value={formData.owner || ''} onChange={e => setFormData(p => ({...p, owner: e.target.value}))}/>
-                    <Select value={formData.accountType} onValueChange={(value: BankAccount['accountType']) => setFormData(p => ({...p, accountType: value}))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Cuenta Corriente">Cuenta Corriente</SelectItem>
-                            <SelectItem value="Cuenta Vista">Cuenta Vista</SelectItem>
-                            <SelectItem value="Línea de Crédito">Línea de Crédito</SelectItem>
-                            <SelectItem value="Efectivo">Efectivo</SelectItem>
-                        </SelectContent>
-                    </Select>
-                     <Input type="number" placeholder="Saldo Inicial" value={formData.initialBalance || ''} onChange={e => setFormData(p => ({...p, initialBalance: Number(e.target.value)}))}/>
-                    <div className="flex gap-2">
-                        {editingAccountId && <Button variant="outline" onClick={handleCancelEdit}>Cancelar</Button>}
-                        <Button onClick={handleSaveAccount} className="flex-1">
-                            {editingAccountId ? 'Guardar' : <><PlusCircle className="mr-2 h-4 w-4" /> Agregar</>}
+                <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 items-end p-4 border rounded-md", editingAccountId ? "bg-muted/30" : "bg-muted/10")}>
+                    <div className='lg:col-span-4 text-sm font-medium mb-2 flex justify-between items-center'>
+                        <span>{editingAccountId ? `Editando: ${formData.name}` : 'Nueva Cuenta'}</span>
+                        {editingAccountId && <Button size="sm" variant="ghost" onClick={handleCancelEdit}><X className="h-4 w-4 mr-2" /> Cancelar Edición</Button>}
+                    </div>
+                    <div><Label>Nombre Cuenta</Label><Input placeholder="Nombre de la Cuenta" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))}/></div>
+                    <div><Label>Titular</Label><Input placeholder="Nombre Titular" value={formData.owner || ''} onChange={e => setFormData(p => ({...p, owner: e.target.value}))}/></div>
+                    <div><Label>RUT Titular</Label><Input placeholder="RUT Titular" value={formData.ownerRUT || ''} onChange={e => setFormData(p => ({...p, ownerRUT: e.target.value}))}/></div>
+                    <div><Label>Email Titular</Label><Input type="email" placeholder="Email Titular" value={formData.ownerEmail || ''} onChange={e => setFormData(p => ({...p, ownerEmail: e.target.value}))}/></div>
+                    
+                    <div>
+                        <Label>Tipo de Cuenta</Label>
+                        <Select value={formData.accountType} onValueChange={(value: BankAccount['accountType']) => setFormData(p => ({...p, accountType: value}))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Cuenta Corriente">Cuenta Corriente</SelectItem>
+                                <SelectItem value="Cuenta Vista">Cuenta Vista</SelectItem>
+                                <SelectItem value="Línea de Crédito">Línea de Crédito</SelectItem>
+                                <SelectItem value="Efectivo">Efectivo</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div><Label>Banco</Label><Input placeholder="Nombre del Banco" value={formData.bankName || ''} onChange={e => setFormData(p => ({...p, bankName: e.target.value}))}/></div>
+                     <div><Label>Número de Cuenta</Label><Input placeholder="Número de Cuenta" value={formData.accountNumber || ''} onChange={e => setFormData(p => ({...p, accountNumber: e.target.value}))}/></div>
+                     <div><Label>Saldo Inicial</Label><Input type="number" placeholder="Saldo Inicial" value={formData.initialBalance || ''} onChange={e => setFormData(p => ({...p, initialBalance: Number(e.target.value)}))}/></div>
+                    
+                    <div className="lg:col-start-4">
+                        <Button onClick={handleSaveAccount} className="w-full">
+                            {editingAccountId ? 'Guardar Cambios' : <><PlusCircle className="mr-2 h-4 w-4" /> Agregar</>}
                         </Button>
                     </div>
                 </div>

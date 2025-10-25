@@ -165,8 +165,11 @@ export type BankAccount = {
     initialBalance: number;
     status: 'Activa' | 'Inactiva';
     owner?: string;
+    ownerRUT?: string;
+    ownerEmail?: string;
 }
 
     
 
     
+
