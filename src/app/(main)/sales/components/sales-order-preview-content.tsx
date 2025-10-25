@@ -195,9 +195,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <span className="col-span-2">{order.saleType || 'N/A'}</span>
                         <span className="font-semibold text-gray-600 col-span-1">Modalidad Pago:</span>
                         <span className="col-span-2">{order.paymentMethod}</span>
-                         <span className="font-semibold text-gray-600 col-span-1">Cuenta Destino:</span>
-                        <span className="col-span-2">{destinationAccount?.name || 'N/A'}</span>
-
+                        
                         {order.paymentMethod === 'Crédito' && order.creditDays && (
                             <>
                                 <span className="font-semibold text-gray-600 col-span-1">Plazo Crédito (días):</span>
@@ -284,6 +282,31 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                 </TableFooter>
             </Table>
             
+            {destinationAccount && (
+                 <div className="mt-8 pt-6 border-t-2 border-gray-900 text-xs">
+                    <h3 className="text-sm font-bold text-gray-800 mb-2">DATOS DE TRANSFERENCIA</h3>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-1 bg-gray-50 p-4 rounded-lg border">
+                        <span className="font-semibold text-gray-600">Nombre:</span>
+                        <span>{destinationAccount.owner || 'N/A'}</span>
+                        
+                        <span className="font-semibold text-gray-600">RUT:</span>
+                        <span>{destinationAccount.ownerRUT || 'N/A'}</span>
+
+                        <span className="font-semibold text-gray-600">Banco:</span>
+                        <span>{destinationAccount.bankName || 'N/A'}</span>
+                        
+                        <span className="font-semibold text-gray-600">Tipo Cuenta:</span>
+                        <span>{destinationAccount.accountType || 'N/A'}</span>
+
+                        <span className="font-semibold text-gray-600">Nº Cuenta:</span>
+                        <span className="font-mono">{destinationAccount.accountNumber || 'N/A'}</span>
+
+                        <span className="font-semibold text-gray-600">Email:</span>
+                        <span>{destinationAccount.ownerEmail || 'N/A'}</span>
+                    </div>
+                </div>
+            )}
+
             <div className="text-center text-xs text-gray-500 pt-8 mt-8 border-t border-dashed">
                 <p>Documento generado por Viña Negra Manager</p>
             </div>
