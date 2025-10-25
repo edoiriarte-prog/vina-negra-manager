@@ -30,7 +30,9 @@ type SummarizedItem = {
     totalPackages: number;
     totalKilos: number;
     avgNetPrice: number;
+    avgGrossPrice: number;
     netSubtotal: number;
+    grossSubtotal: number;
     relatedPurchaseIds?: string[];
     lotNumbers?: string[];
     destinationLotNumber?: string;
@@ -96,7 +98,9 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                 totalPackages: value.totalPackages,
                 totalKilos: value.totalKilos,
                 avgNetPrice: netAvgPrice,
+                avgGrossPrice: grossAvgPrice,
                 netSubtotal: netAvgPrice * value.totalKilos,
+                grossSubtotal: grossAvgPrice * value.totalKilos,
                 relatedPurchaseIds: Array.from(value.relatedPurchaseIds),
                 lotNumbers: Array.from(value.lotNumbers),
                 destinationLotNumber: value.destinationLotNumber
@@ -214,8 +218,8 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <TableHead className="text-black font-bold">Descripción</TableHead>
                         <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
                         <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
-                        <TableHead className="text-right text-black font-bold">Precio Unit. (Neto)</TableHead>
-                        <TableHead className="text-right text-black font-bold">SUB TOTAL (Neto)</TableHead>
+                        <TableHead className="text-right text-black font-bold">Precio Unit. (IVA incl.)</TableHead>
+                        <TableHead className="text-right text-black font-bold">SUB TOTAL (IVA incl.)</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -234,8 +238,8 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         </TableCell>
                         <TableCell className="text-right align-middle text-sm+">{formatPackages(item.totalPackages)}</TableCell>
                         <TableCell className="text-right align-middle text-sm+">{item.totalKilos.toLocaleString('es-CL')} kg</TableCell>
-                        <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgNetPrice)}</TableCell>
-                        <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.netSubtotal)}</TableCell>
+                        <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgGrossPrice)}</TableCell>
+                        <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.grossSubtotal)}</TableCell>
                     </TableRow>
                 ))}
                 </TableBody>
