@@ -218,8 +218,9 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <TableHead className="text-black font-bold">Descripción</TableHead>
                         <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
                         <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
-                        <TableHead className="text-right text-black font-bold">Precio Unit. (IVA incl.)</TableHead>
-                        <TableHead className="text-right text-black font-bold">SUB TOTAL (IVA incl.)</TableHead>
+                        <TableHead className="text-right text-black font-bold">P. Unitario Neto</TableHead>
+                        <TableHead className="text-right text-black font-bold">P. Unitario Total</TableHead>
+                        <TableHead className="text-right text-black font-bold">SUB TOTAL</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -238,6 +239,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         </TableCell>
                         <TableCell className="text-right align-middle text-sm+">{formatPackages(item.totalPackages)}</TableCell>
                         <TableCell className="text-right align-middle text-sm+">{item.totalKilos.toLocaleString('es-CL')} kg</TableCell>
+                        <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgNetPrice)}</TableCell>
                         <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgGrossPrice)}</TableCell>
                         <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.grossSubtotal)}</TableCell>
                     </TableRow>
@@ -248,7 +250,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <TableHead className="text-right text-black font-bold text-base">TOTALES</TableHead>
                         <TableHead className="text-right text-black font-bold text-base">{formatPackages(totalPackages)}</TableHead>
                         <TableHead className="text-right text-black font-bold text-base">{totalKilos.toLocaleString('es-CL')} kg</TableHead>
-                        <TableHead colSpan={2} className="text-right text-black font-bold text-base">
+                        <TableHead colSpan={3} className="text-right text-black font-bold text-base">
                              <div className="flex justify-end mt-4">
                                 <div className="w-full max-w-sm space-y-2 text-sm">
                                     <div className="flex justify-between items-center">
@@ -280,5 +282,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
 });
 
 SalesOrderPreviewContent.displayName = 'SalesOrderPreviewContent';
+
+    
 
     
