@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -42,6 +43,7 @@ import { es } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 
 type NewSalesOrderSheetProps = {
   isOpen: boolean;
@@ -90,6 +92,8 @@ const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dis
         licensePlate: '',
         orderType: 'sales', // Always 'sales' now
         includeVat: !isDispatch,
+        notes: '',
+        destinationAccountId: '',
     };
 };
 
@@ -101,7 +105,7 @@ export function NewSalesOrderSheet({
   const [formData, setFormData] = useState(() => getInitialFormData(order, sheetType));
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [isLotSelectionOpen, setIsLotSelectionOpen] = useState(false);
-  const { products, calibers, units, packagingTypes, warehouses } = useMasterData();
+  const { products, calibers, units, packagingTypes, warehouses, bankAccounts } = useMasterData();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -226,7 +230,7 @@ export function NewSalesOrderSheet({
     onSave(finalOrderData);
   };
   
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = event.target;
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
@@ -600,7 +604,7 @@ export function NewSalesOrderSheet({
             {sheetType === 'sales' && (
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-lg font-headline">Condiciones de Pago</CardTitle>
+                        <CardTitle className="text-lg font-headline">Condiciones y Resumen</CardTitle>
                     </CardHeader>
                     <CardContent className="grid md:grid-cols-2 gap-6">
                         <div className="space-y-4">
@@ -620,6 +624,24 @@ export function NewSalesOrderSheet({
                                         <SelectItem value="Contado">Contado</SelectItem>
                                         <SelectItem value="Crédito">Crédito</SelectItem>
                                         <SelectItem value="Pago con Anticipo y Saldo">Pago con Anticipo y Saldo</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="destinationAccountId" className="text-right">
+                                    Cta. Destino
+                                </Label>
+                                <Select
+                                    onValueChange={(value) => handleSelectChange('destinationAccountId', value)}
+                                    value={formData.destinationAccountId}
+                                >
+                                    <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Seleccione cuenta" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {bankAccounts.filter(acc => acc.status === 'Activa').map(acc => (
+                                        <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -680,23 +702,32 @@ export function NewSalesOrderSheet({
                                     </Popover>
                                 </div>
                             )}
-
-                            <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="includeVat" className="text-right">
-                                IVA
-                            </Label>
-                            <div className="col-span-3 flex items-center space-x-2">
-                                <Switch
-                                id="includeVat"
-                                checked={formData.includeVat}
-                                onCheckedChange={(checked) => handleSelectChange('includeVat', checked)}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="notes" className="text-right pt-2">
+                                    Notas
+                                </Label>
+                                <Textarea
+                                    id="notes"
+                                    name="notes"
+                                    value={formData.notes || ''}
+                                    onChange={handleInputChange}
+                                    className="col-span-3"
+                                    placeholder="Agregue notas o detalles adicionales aquí..."
                                 />
-                                <Label htmlFor="includeVat">Desglosar IVA (19%)</Label>
-                            </div>
                             </div>
                         </div>
                         <div className="bg-muted p-4 rounded-lg">
-                            <h4 className="font-semibold mb-3">Resumen</h4>
+                            <div className='flex justify-between items-center mb-4'>
+                                <h4 className="font-semibold">Resumen</h4>
+                                <div className="flex items-center space-x-2">
+                                    <Switch
+                                    id="includeVat"
+                                    checked={formData.includeVat}
+                                    onCheckedChange={(checked) => handleSelectChange('includeVat', checked)}
+                                    />
+                                    <Label htmlFor="includeVat">Incluir IVA</Label>
+                                </div>
+                            </div>
                             <div className='text-sm space-y-2'>
                             {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
                                     <>

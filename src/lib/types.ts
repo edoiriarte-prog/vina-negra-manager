@@ -79,6 +79,8 @@ export type SalesOrder = {
   licensePlate?: string;
   orderType: 'sales' | 'dispatch';
   includeVat: boolean;
+  notes?: string;
+  destinationAccountId?: string;
 };
 
 export type PurchaseOrder = {
@@ -168,4 +170,3 @@ export type BankAccount = {
     
 
     
-

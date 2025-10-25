@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -42,9 +43,10 @@ type SummarizedItem = {
 export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order }, ref) => {
     const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
     const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
-    const { calibers } = useMasterData();
+    const { calibers, bankAccounts } = useMasterData();
     const client = contacts.find(c => c.id === order.clientId);
     const carrier = contacts.find(c => c.id === order.carrierId);
+    const destinationAccount = bankAccounts.find(acc => acc.id === order.destinationAccountId);
 
     const getCaliberCode = (caliberName: string) => {
         const caliber = calibers.find(c => c.name === caliberName);
@@ -193,6 +195,8 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <span className="col-span-2">{order.saleType || 'N/A'}</span>
                         <span className="font-semibold text-gray-600 col-span-1">Modalidad Pago:</span>
                         <span className="col-span-2">{order.paymentMethod}</span>
+                         <span className="font-semibold text-gray-600 col-span-1">Cuenta Destino:</span>
+                        <span className="col-span-2">{destinationAccount?.name || 'N/A'}</span>
 
                         {order.paymentMethod === 'Crédito' && order.creditDays && (
                             <>
@@ -206,6 +210,12 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                                 <span className="col-span-2">{format(parseISO(order.balanceDueDate), "dd-MM-yyyy", { locale: es })}</span>
                             </>
                         )}
+                         {order.notes && (
+                            <>
+                                <span className="font-semibold text-gray-600 col-span-1">Notas:</span>
+                                <span className="col-span-2 whitespace-pre-wrap">{order.notes}</span>
+                            </>
+                         )}
                     </div>
                 </div>
             </div>
