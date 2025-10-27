@@ -83,8 +83,31 @@ export function NewFinancialMovementSheet({
   const { bankAccounts, products } = useMasterData();
   const [pendingBalance, setPendingBalance] = useState<number | null>(null);
 
+  const calculatePendingBalance = (docType: 'OV' | 'OC' | 'OS', docId: string) => {
+    let orderAmount = 0;
+    let paymentsMade = 0;
+
+    const otherPayments = allMovements
+        .filter(m => m.relatedDocument?.id === docId && m.id !== movement?.id); // Exclude current movement if editing
+
+    paymentsMade = otherPayments.reduce((sum, m) => sum + m.amount, 0);
+
+    if (docType === 'OC') {
+        const order = purchaseOrders.find(o => o.id === docId);
+        if (order) orderAmount = order.totalAmount;
+    } else if (docType === 'OV') {
+        const order = salesOrders.find(o => o.id === docId);
+        if (order) orderAmount = order.totalAmount;
+    } else if (docType === 'OS') {
+        const order = serviceOrders.find(o => o.id === docId);
+        if (order) orderAmount = order.cost;
+    }
+
+    setPendingBalance(orderAmount - paymentsMade);
+  };
+
   useEffect(() => {
-    if (movement) {
+    if (movement) { // Editing mode
         setIsBatchMode(false);
         setFormData({
             ...movement,
@@ -93,12 +116,13 @@ export function NewFinancialMovementSheet({
         if (movement.relatedDocument) {
             setAssociationType('document');
             setRelatedOrderType(movement.relatedDocument.type);
+            calculatePendingBalance(movement.relatedDocument.type, movement.relatedDocument.id);
         } else if (movement.contactId) {
             setAssociationType('anticipo');
         } else {
             setAssociationType('concept');
         }
-    } else {
+    } else { // Creating mode
       setFormData(getInitialFormData());
       setRelatedOrderType('');
       setAssociationType('document');
@@ -122,9 +146,11 @@ export function NewFinancialMovementSheet({
   
   useEffect(() => {
     if (paymentType === 'total' && pendingBalance !== null) {
-      setFormData(prev => ({...prev, amount: pendingBalance}));
+      // When editing, the pending balance should include the current movement's amount
+      const balanceForTotal = movement ? (pendingBalance || 0) + movement.amount : (pendingBalance || 0);
+      setFormData(prev => ({...prev, amount: balanceForTotal}));
     }
-  }, [paymentType, pendingBalance]);
+  }, [paymentType, pendingBalance, movement]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -149,38 +175,17 @@ export function NewFinancialMovementSheet({
   const handleRelatedOrderSelect = (orderId: string) => {
     if (!relatedOrderType) return;
     
-    let orderAmount = 0;
     let contactId: string | undefined = undefined;
 
     if (relatedOrderType === 'OC') {
         const order = purchaseOrders.find(o => o.id === orderId);
-        if (order) {
-            const paymentsMade = allMovements
-                .filter(m => m.relatedDocument?.id === orderId && m.type === 'expense')
-                .reduce((sum, m) => sum + m.amount, 0);
-            orderAmount = order.totalAmount - paymentsMade;
-            contactId = order.supplierId;
-        }
+        if (order) contactId = order.supplierId;
     } else if (relatedOrderType === 'OV') {
         const order = salesOrders.find(o => o.id === orderId);
-        if (order) {
-            const paymentsMade = allMovements
-                .filter(m => m.relatedDocument?.id === orderId && m.type === 'income')
-                .reduce((sum, m) => sum + m.amount, 0);
-            orderAmount = order.totalAmount - paymentsMade;
-            contactId = order.clientId;
-        }
-    } else if (relatedOrderType === 'OS') {
-        const order = serviceOrders.find(o => o.id === orderId);
-        if (order) {
-            const paymentsMade = allMovements
-                .filter(m => m.relatedDocument?.id === orderId && m.type === 'expense')
-                .reduce((sum, m) => sum + m.amount, 0);
-            orderAmount = order.cost - paymentsMade;
-        }
+        if (order) contactId = order.clientId;
     }
 
-    setPendingBalance(orderAmount);
+    calculatePendingBalance(relatedOrderType, orderId);
     setPaymentType('abono');
     setFormData(prev => ({ 
         ...prev, 
@@ -221,9 +226,9 @@ export function NewFinancialMovementSheet({
     
     setIsSuggesting(true);
     try {
-        if (isOrderRelated) {
-            const paymentsMade = allMovements
-                .filter(m => m.relatedDocument?.id === formData.relatedDocument?.id)
+        if (isOrderRelated && formData.relatedDocument) {
+             const paymentsMade = allMovements
+                .filter(m => m.relatedDocument?.id === formData.relatedDocument?.id && m.id !== movement?.id)
                 .reduce((sum, m) => sum + m.amount, 0);
             
             const newTotalPaid = paymentsMade + formData.amount;
@@ -713,5 +718,3 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
-
-    
