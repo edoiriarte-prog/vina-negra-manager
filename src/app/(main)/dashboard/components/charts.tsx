@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { FinancialMovement, PurchaseOrder, SalesOrder, InventoryItem } from '@/lib/types';
 import { format, getWeek, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useMasterData } from '@/hooks/use-master-data';
 
 const formatCurrency = (value: number) =>
@@ -35,7 +36,7 @@ export function WeeklyPurchasesChart({ data }: { data: PurchaseOrder[] }) {
   const weeklyData = data
     .filter((order) => order.status === 'completed')
     .reduce((acc, order) => {
-      const week = getWeek(parseISO(order.date));
+      const week = getWeek(parseISO(order.date), { locale: es });
       acc[week] = (acc[week] || 0) + order.totalAmount;
       return acc;
     }, {} as { [week: number]: number });
@@ -69,7 +70,7 @@ export function WeeklySalesChart({ data }: { data: SalesOrder[] }) {
   const weeklyData = data
     .filter((order) => order.status === 'completed')
     .reduce((acc, order) => {
-      const week = getWeek(parseISO(order.date));
+      const week = getWeek(parseISO(order.date), { locale: es });
       acc[week] = (acc[week] || 0) + order.totalAmount;
       return acc;
     }, {} as { [week: number]: number });
@@ -155,7 +156,7 @@ export function IncomeVsExpenseChart({ data }: { data: FinancialMovement[] }) {
     const weeklyData: { [week: number]: { income: number; expense: number } } = {};
 
     data.forEach(mov => {
-        const week = getWeek(parseISO(mov.date));
+        const week = getWeek(parseISO(mov.date), { locale: es });
         if(!weeklyData[week]) weeklyData[week] = { income: 0, expense: 0 };
         
         if (mov.type === 'income') {
