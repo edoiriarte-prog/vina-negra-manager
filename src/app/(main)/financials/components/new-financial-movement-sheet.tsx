@@ -150,7 +150,6 @@ export function NewFinancialMovementSheet({
     if (!relatedOrderType) return;
     
     let orderAmount = 0;
-    let newDescription = '';
     let contactId: string | undefined = undefined;
 
     if (relatedOrderType === 'OC') {
@@ -160,7 +159,6 @@ export function NewFinancialMovementSheet({
                 .filter(m => m.relatedDocument?.id === orderId && m.type === 'expense')
                 .reduce((sum, m) => sum + m.amount, 0);
             orderAmount = order.totalAmount - paymentsMade;
-            newDescription = `Pago O/C ${order.id}`;
             contactId = order.supplierId;
         }
     } else if (relatedOrderType === 'OV') {
@@ -170,7 +168,6 @@ export function NewFinancialMovementSheet({
                 .filter(m => m.relatedDocument?.id === orderId && m.type === 'income')
                 .reduce((sum, m) => sum + m.amount, 0);
             orderAmount = order.totalAmount - paymentsMade;
-            newDescription = `Pago O/V ${order.id}`;
             contactId = order.clientId;
         }
     } else if (relatedOrderType === 'OS') {
@@ -180,7 +177,6 @@ export function NewFinancialMovementSheet({
                 .filter(m => m.relatedDocument?.id === orderId && m.type === 'expense')
                 .reduce((sum, m) => sum + m.amount, 0);
             orderAmount = order.cost - paymentsMade;
-            newDescription = `Pago O/S ${order.id} - ${order.description}`;
         }
     }
 
@@ -348,7 +344,7 @@ export function NewFinancialMovementSheet({
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-6xl">
+      <SheetContent className="sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -365,7 +361,7 @@ export function NewFinancialMovementSheet({
                  {!movement && formData.type !== 'traspaso' && (
                     <div className="flex items-center space-x-2">
                         <Switch id="batch-mode" checked={isBatchMode} onCheckedChange={setIsBatchMode} />
-                        <Label htmlFor="batch-mode">Registro Múltiple</Label>
+                        <Label htmlFor="batch-mode">Múltiple</Label>
                     </div>
                 )}
             </div>
@@ -389,11 +385,11 @@ export function NewFinancialMovementSheet({
                         </Select>
                     </div>
                     <div>
-                         <Label>{formData.type === 'income' ? 'Cuenta Destino Lote' : 'Cuenta Origen Lote'}</Label>
+                         <Label>{formData.type === 'income' ? 'Cta. Destino Lote' : 'Cta. Origen Lote'}</Label>
                          <Select 
                             onValueChange={(value) => handleSelectChange(formData.type === 'income' ? 'destinationAccountId' : 'sourceAccountId', value)} 
                             value={formData.type === 'income' ? formData.destinationAccountId : formData.sourceAccountId}>
-                            <SelectTrigger><SelectValue placeholder="Seleccione cuenta para el lote"/></SelectTrigger>
+                            <SelectTrigger><SelectValue placeholder="Seleccione cuenta"/></SelectTrigger>
                             <SelectContent>
                             {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
                                 <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
@@ -403,14 +399,13 @@ export function NewFinancialMovementSheet({
                     </div>
                 </div>
 
-                <div className="rounded-md border">
+                <div className="rounded-md border max-h-64 overflow-y-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="w-[180px]">Fecha</TableHead>
-                                <TableHead>Centro de Costo / Descripción</TableHead>
+                                <TableHead>Centro de Costo</TableHead>
                                 <TableHead className="w-[150px]">Monto</TableHead>
-                                <TableHead className="w-[180px]">Forma Pago</TableHead>
                                 <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
                         </TableHeader>
@@ -420,16 +415,16 @@ export function NewFinancialMovementSheet({
                                     <TableCell>
                                         <Popover>
                                             <PopoverTrigger asChild>
-                                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !bm.date && "text-muted-foreground")}>
+                                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal text-xs", !bm.date && "text-muted-foreground")}>
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {bm.date ? format(parseISO(bm.date), "PPP", { locale: es }) : <span>Seleccione</span>}
+                                                {bm.date ? format(parseISO(bm.date), "dd-MM-yy", { locale: es }) : <span>Seleccione</span>}
                                             </Button>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={bm.date ? parseISO(bm.date) : undefined} onSelect={(date) => date && handleBatchChange(bm.batchId, 'date', format(date, 'yyyy-MM-dd'))} initialFocus /></PopoverContent>
                                         </Popover>
                                     </TableCell>
                                     <TableCell>
-                                        <Input placeholder="Descripción del movimiento" value={bm.description} onChange={(e) => handleBatchChange(bm.batchId, 'description', e.target.value)} />
+                                        <Input placeholder="Descripción" value={bm.description} onChange={(e) => handleBatchChange(bm.batchId, 'description', e.target.value)} />
                                     </TableCell>
                                     <TableCell>
                                         <Input 
@@ -438,17 +433,6 @@ export function NewFinancialMovementSheet({
                                             value={new Intl.NumberFormat('es-CL').format(bm.amount)}
                                             onChange={(e) => handleBatchAmountChange(bm.batchId, e.target.value)}
                                         />
-                                    </TableCell>
-                                    <TableCell>
-                                         <Select onValueChange={(value) => handleBatchChange(bm.batchId, 'paymentMethod', value)} value={bm.paymentMethod}>
-                                            <SelectTrigger><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Transferencia">Transferencia</SelectItem>
-                                                <SelectItem value="Efectivo">Efectivo</SelectItem>
-                                                <SelectItem value="Depósito Bancario">Depósito</SelectItem>
-                                                <SelectItem value="Cheque">Cheque</SelectItem>
-                                            </SelectContent>
-                                        </Select>
                                     </TableCell>
                                     <TableCell>
                                         <Button type="button" variant="ghost" size="icon" onClick={() => removeBatchMovement(bm.batchId)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -464,7 +448,7 @@ export function NewFinancialMovementSheet({
                 </Button>
             </div>
             ) : (
-            <div className="grid gap-4">
+            <div className="space-y-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="date" className="text-right">
                         Fecha
@@ -523,17 +507,16 @@ export function NewFinancialMovementSheet({
                         </div>
                     </div>
                 ) : (
-                    <>
                     <div className="space-y-4 p-3 border rounded-md">
                         <Label className="font-medium">Asociación del Movimiento</Label>
                         <RadioGroup value={associationType} onValueChange={onAssociationChange} className="flex gap-4">
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="document" id="r-doc" />
-                                <Label htmlFor="r-doc">Asociar a Documento</Label>
+                                <Label htmlFor="r-doc">A Documento</Label>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="abono" id="r-abono" />
-                                <Label htmlFor="r-abono">Abono sin Documento</Label>
+                                <Label htmlFor="r-abono">Abono sin Doc.</Label>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="concept" id="r-concept" />
@@ -622,90 +605,87 @@ export function NewFinancialMovementSheet({
                             </div>
                         )}
                     </div>
-                    </>
                 )}
 
 
-                <div className="grid grid-cols-4 items-start gap-4">
-                    <Label htmlFor="description" className="text-right pt-2">
-                        Centro de Costo
-                    </Label>
-                    <div className='col-span-3'>
-                        <Select
-                            onValueChange={(value) => handleSelectChange('description', value)}
-                            value={formData.description}
-                            required
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Seleccione un producto como centro de costo" />
-                            </SelectTrigger>
+                <div className="space-y-4">
+                    <div className="grid grid-cols-4 items-start gap-4">
+                        <Label htmlFor="description" className="text-right pt-2">
+                            Centro de Costo
+                        </Label>
+                        <div className='col-span-3'>
+                            <Select
+                                onValueChange={(value) => handleSelectChange('description', value)}
+                                value={formData.description}
+                                required
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione un producto como centro de costo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {products.map(p => (
+                                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Button type="button" size="sm" variant="outline" className="mt-2" onClick={handleSuggestDescription} disabled={isSuggesting || formData.type === 'traspaso'}>
+                                {isSuggesting ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Sparkles className='mr-2 h-4 w-4'/>}
+                                Sugerir con IA
+                            </Button>
+                        </div>
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">
+                            {formData.type === 'income' ? 'Cta. Destino' : formData.type === 'traspaso' ? '' : 'Cta. Origen'}
+                        </Label>
+                        <Select 
+                            required 
+                            onValueChange={(value) => handleSelectChange(formData.type === 'income' ? 'destinationAccountId' : 'sourceAccountId', value)} 
+                            value={formData.type === 'income' ? formData.destinationAccountId : formData.sourceAccountId}>
+                            <SelectTrigger className="col-span-3"><SelectValue placeholder="Seleccione una cuenta"/></SelectTrigger>
                             <SelectContent>
-                                {products.map(p => (
-                                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                                ))}
+                            {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
+                                <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                            ))}
                             </SelectContent>
                         </Select>
-                        <Button type="button" size="sm" variant="outline" className="mt-2" onClick={handleSuggestDescription} disabled={isSuggesting || formData.type === 'traspaso'}>
-                            {isSuggesting ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Sparkles className='mr-2 h-4 w-4'/>}
-                            Sugerir con IA
-                        </Button>
                     </div>
-                </div>
-
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">
-                        {formData.type === 'income' ? 'Cta. Destino' : 'Cta. Origen'}
-                    </Label>
-                    <Select 
-                        required 
-                        onValueChange={(value) => handleSelectChange(formData.type === 'income' ? 'destinationAccountId' : 'sourceAccountId', value)} 
-                        value={formData.type === 'income' ? formData.destinationAccountId : formData.sourceAccountId}>
-                        <SelectTrigger className="col-span-3"><SelectValue placeholder="Seleccione una cuenta"/></SelectTrigger>
-                        <SelectContent>
-                        {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
-                            <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="paymentMethod" className="text-right">
-                        Forma Pago
-                    </Label>
-                    <Select required onValueChange={(value) => handleSelectChange('paymentMethod', value)} value={formData.paymentMethod}>
-                        <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                        <SelectItem value="Transferencia">Transferencia</SelectItem>
-                        <SelectItem value="Efectivo">Efectivo</SelectItem>
-                        <SelectItem value="Depósito Bancario">Depósito Bancario</SelectItem>
-                        <SelectItem value="Cheque">Cheque</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                
-                <div className="grid grid-cols-4 items-start gap-4">
-                    <Label htmlFor="reference" className="text-right pt-2">
-                        Referencia
-                    </Label>
-                    <Input id="reference" name="reference" value={formData.reference || ''} onChange={handleInputChange} className="col-span-3" placeholder='Ej: Nro. Factura, Nro. Cheque'/>
-                </div>
-
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="amount" className="text-right font-bold text-lg">
-                        Monto
-                    </Label>
-                    <Input 
-                        id="amount"
-                        name="amount"
-                        type="text"
-                        value={new Intl.NumberFormat('es-CL').format(formData.amount)}
-                        onChange={(e) => handleAmountChange(e.target.value)}
-                        className="col-span-3 text-lg font-bold"
-                        required
-                        placeholder="$"
-                        disabled={paymentType === 'total'}
-                    />
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="paymentMethod" className="text-right">
+                            Forma Pago
+                        </Label>
+                        <Select required onValueChange={(value) => handleSelectChange('paymentMethod', value)} value={formData.paymentMethod}>
+                            <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                            <SelectItem value="Transferencia">Transferencia</SelectItem>
+                            <SelectItem value="Efectivo">Efectivo</SelectItem>
+                            <SelectItem value="Depósito Bancario">Depósito Bancario</SelectItem>
+                            <SelectItem value="Cheque">Cheque</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-start gap-4">
+                        <Label htmlFor="reference" className="text-right pt-2">
+                            Referencia
+                        </Label>
+                        <Input id="reference" name="reference" value={formData.reference || ''} onChange={handleInputChange} className="col-span-3" placeholder='Ej: Nro. Factura, Nro. Cheque'/>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="amount" className="text-right font-bold text-lg">
+                            Monto
+                        </Label>
+                        <Input 
+                            id="amount"
+                            name="amount"
+                            type="text"
+                            value={new Intl.NumberFormat('es-CL').format(formData.amount)}
+                            onChange={(e) => handleAmountChange(e.target.value)}
+                            className="col-span-3 text-lg font-bold"
+                            required
+                            placeholder="$"
+                            disabled={paymentType === 'total'}
+                        />
+                    </div>
                 </div>
             </div>
             )}
@@ -733,3 +713,5 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
+
+    
