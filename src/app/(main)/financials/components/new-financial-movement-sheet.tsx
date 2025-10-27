@@ -73,7 +73,7 @@ export function NewFinancialMovementSheet({
     purchaseOrders, salesOrders, serviceOrders, contacts 
 }: NewFinancialMovementSheetProps) {
   const [formData, setFormData] = useState<Omit<FinancialMovement, 'id'>>(getInitialFormData());
-  const [associationType, setAssociationType] = useState<'document' | 'abono' | 'concept'>('document');
+  const [associationType, setAssociationType] = useState<'document' | 'anticipo' | 'concept'>('document');
   const [relatedOrderType, setRelatedOrderType] = useState<'OV' | 'OC' | 'OS' | ''>('');
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -94,7 +94,7 @@ export function NewFinancialMovementSheet({
             setAssociationType('document');
             setRelatedOrderType(movement.relatedDocument.type);
         } else if (movement.contactId) {
-            setAssociationType('abono');
+            setAssociationType('anticipo');
         } else {
             setAssociationType('concept');
         }
@@ -111,7 +111,7 @@ export function NewFinancialMovementSheet({
   
   useEffect(() => {
       if (isBatchMode) {
-          setAssociationType('abono');
+          setAssociationType('anticipo');
       } else if (formData.type !== 'traspaso') {
           setAssociationType('document');
       } else {
@@ -209,7 +209,7 @@ export function NewFinancialMovementSheet({
             const order = serviceOrders.find(o => o.id === formData.relatedDocument?.id);
             if (order) { details = `Orden de Servicio ${order?.id} (${order.description})`; totalAmount = order.cost; }
         }
-    } else if (associationType === 'abono' && formData.contactId) {
+    } else if (associationType === 'anticipo' && formData.contactId) {
         const contact = contacts.find(c => c.id === formData.contactId);
         details = `Movimiento para ${contact?.name}`;
     } else if (associationType === 'concept' && formData.internalConcept) {
@@ -315,7 +315,7 @@ export function NewFinancialMovementSheet({
     ? contacts.filter(c => c.type.includes('client') || c.type.includes('other_income')) 
     : contacts.filter(c => c.type.includes('supplier') || c.type.includes('other_expense'));
 
-  const onAssociationChange = (value: 'document' | 'abono' | 'concept') => {
+  const onAssociationChange = (value: 'document' | 'anticipo' | 'concept') => {
       setAssociationType(value);
       setFormData(prev => ({
           ...prev,
@@ -515,8 +515,8 @@ export function NewFinancialMovementSheet({
                                 <Label htmlFor="r-doc">A Documento</Label>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="abono" id="r-abono" />
-                                <Label htmlFor="r-abono">Abono sin Doc.</Label>
+                                <RadioGroupItem value="anticipo" id="r-anticipo" />
+                                <Label htmlFor="r-anticipo">Anticipo a Contacto</Label>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="concept" id="r-concept" />
@@ -552,7 +552,7 @@ export function NewFinancialMovementSheet({
                                 </Select>
                             </div>
                         )}
-                        {associationType === 'abono' && (
+                        {associationType === 'anticipo' && (
                             <Select
                                 onValueChange={(value) => handleSelectChange('contactId', value)}
                                 value={formData.contactId}
