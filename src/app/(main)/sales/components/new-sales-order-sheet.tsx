@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -226,11 +225,8 @@ export function NewSalesOrderSheet({
       }
     }
     // --- VALIDATION END ---
-    
-    const grossAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    const finalTotalAmount = formData.includeVat ? grossAmount * 1.19 : grossAmount;
 
-    onSave({ ...formData, totalAmount: finalTotalAmount });
+    onSave(formData);
   };
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -286,6 +282,7 @@ export function NewSalesOrderSheet({
     if (!formData.includeVat) {
         return { netTotal: grossTotal, vatAmount: 0, finalTotal: grossTotal };
     }
+    // If VAT is included, the grossTotal is the final total. We need to calculate net and VAT from it.
     const net = grossTotal / 1.19;
     const vat = grossTotal - net;
     return { netTotal: net, vatAmount: vat, finalTotal: grossTotal };
@@ -728,7 +725,7 @@ export function NewSalesOrderSheet({
                                     checked={formData.includeVat}
                                     onCheckedChange={(checked) => handleSelectChange('includeVat', checked)}
                                     />
-                                    <Label htmlFor="includeVat">Incluir IVA</Label>
+                                    <Label htmlFor="includeVat">Precios con IVA</Label>
                                 </div>
                             </div>
                             <div className='text-sm space-y-2'>
