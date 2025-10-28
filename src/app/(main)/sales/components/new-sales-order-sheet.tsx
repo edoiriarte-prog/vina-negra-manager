@@ -225,10 +225,8 @@ export function NewSalesOrderSheet({
       }
     }
     // --- VALIDATION END ---
-    const grossTotal = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    const finalAmount = formData.includeVat ? grossTotal : grossTotal * 1.19;
-
-    onSave({ ...formData, totalAmount: finalAmount });
+    
+    onSave(formData);
   };
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -282,16 +280,15 @@ export function NewSalesOrderSheet({
   
   const { netTotal, vatAmount, finalTotal } = useMemo(() => {
     if (formData.includeVat) {
-        // If VAT is included, the prices are gross. `grossTotal` is the final total.
         const net = grossTotal / 1.19;
         const vat = grossTotal - net;
         return { netTotal: net, vatAmount: vat, finalTotal: grossTotal };
     }
     // If VAT is NOT included, the prices are net. `grossTotal` is the net total.
     const vat = grossTotal * 0.19;
-    const final = grossTotal + vat;
+    const final = grossTotal + vat; // This is for display, the saved amount will be `grossTotal` (net)
     return { netTotal: grossTotal, vatAmount: vat, finalTotal: final };
-  }, [grossTotal, formData.includeVat]);
+}, [grossTotal, formData.includeVat]);
 
 
   const advanceAmount = useMemo(() => {
@@ -761,16 +758,14 @@ export function NewSalesOrderSheet({
                                     <span>Subtotal Neto:</span>
                                     <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(netTotal)}</span>
                                 </div>
-                                {formData.includeVat && (
-                                    <div className='flex justify-between text-xs'>
-                                        <span>IVA (19%):</span>
-                                        <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(vatAmount)}</span>
-                                    </div>
-                                )}
+                                <div className='flex justify-between text-xs'>
+                                    <span>IVA (19%):</span>
+                                    <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(vatAmount)}</span>
+                                </div>
                                 
                                 <div className='flex justify-between text-lg'>
                                     <span className="font-bold">Total:</span>
-                                    <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(finalTotal)}</span>
+                                    <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(formData.includeVat ? finalTotal : netTotal)}</span>
                                 </div>
                             </div>
                         </div>
@@ -811,3 +806,5 @@ export function NewSalesOrderSheet({
     </>
   );
 }
+
+    
