@@ -169,12 +169,11 @@ export default function MercantileAccountPage() {
         if (totalBilled > 0) {
             if (overallPending <= 1) {
                 overallStatus = 'Pagado';
-            } else if (totalPaid > 0) {
-                overallStatus = 'Abono';
             }
         } else if (totalPaid > 0) {
              overallStatus = 'Abono';
         }
+
 
         return {
           contactId: client.id,
@@ -242,8 +241,6 @@ export default function MercantileAccountPage() {
         if (totalBilled > 0) {
             if (pendingBalance <= 1) {
               status = 'Pagado';
-            } else if (totalPaid > 0) {
-              status = 'Abono';
             }
         }
 
