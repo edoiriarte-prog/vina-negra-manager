@@ -279,13 +279,16 @@ export function NewSalesOrderSheet({
   }, [formData.items]);
   
   const { netTotal, vatAmount, finalTotal } = useMemo(() => {
-    if (!formData.includeVat) {
-        return { netTotal: grossTotal, vatAmount: 0, finalTotal: grossTotal };
+    if (formData.includeVat) {
+        // If VAT is included, the prices are gross. `grossTotal` is the final total.
+        const net = grossTotal / 1.19;
+        const vat = grossTotal - net;
+        return { netTotal: net, vatAmount: vat, finalTotal: grossTotal };
     }
-    // If VAT is included, the grossTotal is the final total. We need to calculate net and VAT from it.
-    const net = grossTotal / 1.19;
-    const vat = grossTotal - net;
-    return { netTotal: net, vatAmount: vat, finalTotal: grossTotal };
+    // If VAT is NOT included, the prices are net. `grossTotal` is the net total.
+    const vat = grossTotal * 0.19;
+    const final = grossTotal + vat;
+    return { netTotal: grossTotal, vatAmount: vat, finalTotal: final };
   }, [grossTotal, formData.includeVat]);
 
 
@@ -751,18 +754,18 @@ export function NewSalesOrderSheet({
                                         <Separator className="my-2 bg-foreground" />
                                     </>
                                 )}
+                                
+                                <div className='flex justify-between text-xs'>
+                                    <span>Subtotal Neto:</span>
+                                    <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(netTotal)}</span>
+                                </div>
                                 {formData.includeVat && (
-                                    <>
-                                        <div className='flex justify-between text-xs'>
-                                            <span>Neto:</span>
-                                            <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(netTotal)}</span>
-                                        </div>
-                                        <div className='flex justify-between text-xs'>
-                                            <span>IVA (19%):</span>
-                                            <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(vatAmount)}</span>
-                                        </div>
-                                    </>
+                                    <div className='flex justify-between text-xs'>
+                                        <span>IVA (19%):</span>
+                                        <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(vatAmount)}</span>
+                                    </div>
                                 )}
+                                
                                 <div className='flex justify-between text-lg'>
                                     <span className="font-bold">Total:</span>
                                     <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(finalTotal)}</span>

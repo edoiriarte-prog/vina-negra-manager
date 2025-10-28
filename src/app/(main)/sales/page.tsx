@@ -138,7 +138,9 @@ export default function SalesPage() {
     }
     
     const grossTotal = allItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    const totalAmount = orderData.includeVat ? grossTotal : grossTotal / 1.19;
+    // If includeVat is true, the prices ALREADY include VAT, so the grossTotal is the final total.
+    // If includeVat is false, the prices are NET, so the final total is net + 19%
+    const totalAmount = orderData.includeVat ? grossTotal : grossTotal * 1.19;
 
     const totalKilos = allItems.reduce((sum, item) => {
       if (item.unit === 'Kilos') {
