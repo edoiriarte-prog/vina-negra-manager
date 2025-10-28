@@ -225,8 +225,10 @@ export function NewSalesOrderSheet({
       }
     }
     // --- VALIDATION END ---
+    const grossTotal = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
+    const finalAmount = formData.includeVat ? grossTotal : grossTotal * 1.19;
 
-    onSave(formData);
+    onSave({ ...formData, totalAmount: finalAmount });
   };
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

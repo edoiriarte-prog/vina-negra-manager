@@ -137,11 +137,6 @@ export default function SalesPage() {
         }
     }
     
-    const grossTotal = allItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    // If includeVat is true, the prices ALREADY include VAT, so the grossTotal is the final total.
-    // If includeVat is false, the prices are NET, so the final total is net + 19%
-    const totalAmount = orderData.includeVat ? grossTotal : grossTotal * 1.19;
-
     const totalKilos = allItems.reduce((sum, item) => {
       if (item.unit === 'Kilos') {
         return sum + Number(item.quantity || 0);
@@ -153,7 +148,7 @@ export default function SalesPage() {
     let finalOrder: SalesOrder;
 
     if ('id' in orderData) {
-      finalOrder = { ...orderData, items: allItems, totalKilos, totalPackages, totalAmount, paymentStatus: orderData.paymentStatus || 'Pendiente' } as SalesOrder;
+      finalOrder = { ...orderData, items: allItems, totalKilos, totalPackages, paymentStatus: orderData.paymentStatus || 'Pendiente' } as SalesOrder;
       setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
       toast({ title: 'Orden Actualizada', description: `La orden ${finalOrder.id} ha sido actualizada.` });
     } else {
@@ -163,7 +158,6 @@ export default function SalesPage() {
         items: allItems,
         totalKilos, 
         totalPackages,
-        totalAmount,
         paymentStatus: 'Pendiente'
       } as SalesOrder;
       setSalesOrders(prev => [...prev, finalOrder]);
