@@ -170,27 +170,25 @@ export function NewFinancialMovementSheet({
 
   const handleSelectChange = (name: keyof typeof formData, value: any) => {
     setFormData(prev => ({ ...prev, [name]: value }));
+
+    if (name === 'contactId' && associationType === 'document') {
+        // Reset doc type and doc id if contact changes
+        setRelatedOrderType('');
+        setFormData(p => ({...p, relatedDocument: undefined}));
+        setPendingBalance(null);
+    }
   };
 
   const handleRelatedOrderSelect = (orderId: string) => {
     if (!relatedOrderType) return;
     
-    let contactId: string | undefined = undefined;
-
-    if (relatedOrderType === 'OC') {
-        const order = purchaseOrders.find(o => o.id === orderId);
-        if (order) contactId = order.supplierId;
-    } else if (relatedOrderType === 'OV') {
-        const order = salesOrders.find(o => o.id === orderId);
-        if (order) contactId = order.clientId;
-    }
+    let contactId: string | undefined = formData.contactId; // Keep the already selected contactId
 
     calculatePendingBalance(relatedOrderType, orderId);
     setPaymentType('abono');
     setFormData(prev => ({ 
         ...prev, 
         relatedDocument: { type: relatedOrderType, id: orderId },
-        contactId: contactId,
         amount: 0, 
         internalConcept: undefined,
         productId: undefined,
@@ -303,10 +301,15 @@ export function NewFinancialMovementSheet({
   };
   
   const getOrderOptions = () => {
+    if (!formData.contactId || !relatedOrderType) return [];
+    
     switch (relatedOrderType) {
-        case 'OC': return purchaseOrders.map(o => ({ value: o.id, label: `${o.id}` }));
-        case 'OV': return salesOrders.map(o => ({ value: o.id, label: `${o.id}` }));
-        case 'OS': return serviceOrders.map(o => ({ value: o.id, label: `${o.id} - ${o.description}`}));
+        case 'OC': return purchaseOrders.filter(o => o.supplierId === formData.contactId).map(o => ({ value: o.id, label: `${o.id}` }));
+        case 'OV': return salesOrders.filter(o => o.clientId === formData.contactId).map(o => ({ value: o.id, label: `${o.id}` }));
+        case 'OS': 
+          const contact = contacts.find(c => c.id === formData.contactId);
+          if (!contact) return [];
+          return serviceOrders.filter(o => o.provider === contact.name).map(o => ({ value: o.id, label: `${o.id} - ${o.description}`}));
         default: return [];
     }
   }
@@ -529,33 +532,44 @@ export function NewFinancialMovementSheet({
                             </div>
                         </RadioGroup>
                         
-                        <div className='pt-2'>
+                        <div className='pt-2 space-y-2'>
                         {associationType === 'document' && (
-                            <div className='grid grid-cols-2 gap-2'>
-                                <Select 
-                                    onValueChange={(value: 'OV' | 'OC' | 'OS' | '') => {
-                                        setRelatedOrderType(value);
-                                        setFormData(prev => ({...prev, relatedDocument: undefined, contactId: undefined}));
-                                        setPendingBalance(null);
-                                    }} 
-                                    value={relatedOrderType}
-                                >
-                                    <SelectTrigger><SelectValue placeholder="Tipo de Documento" /></SelectTrigger>
+                            <>
+                                <Select onValueChange={(value) => handleSelectChange('contactId', value)} value={formData.contactId} required>
+                                    <SelectTrigger><SelectValue placeholder="Paso 1: Seleccione Contacto" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="OV">Venta (O/V)</SelectItem>
-                                        <SelectItem value="OC">Compra (O/C)</SelectItem>
-                                        <SelectItem value="OS">Servicio (O/S)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Select onValueChange={handleRelatedOrderSelect} value={formData.relatedDocument?.id} disabled={!relatedOrderType}>
-                                    <SelectTrigger><SelectValue placeholder="ID Documento" /></SelectTrigger>
-                                    <SelectContent>
-                                        {getOrderOptions().map(opt => (
-                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                        {filteredContacts.map(c => (
+                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                            </div>
+                                <div className='grid grid-cols-2 gap-2'>
+                                    <Select 
+                                        disabled={!formData.contactId}
+                                        onValueChange={(value: 'OV' | 'OC' | 'OS' | '') => {
+                                            setRelatedOrderType(value);
+                                            setFormData(prev => ({...prev, relatedDocument: undefined}));
+                                            setPendingBalance(null);
+                                        }} 
+                                        value={relatedOrderType}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="Paso 2: Tipo Doc." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="OV">Venta (O/V)</SelectItem>
+                                            <SelectItem value="OC">Compra (O/C)</SelectItem>
+                                            <SelectItem value="OS">Servicio (O/S)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Select onValueChange={handleRelatedOrderSelect} value={formData.relatedDocument?.id} disabled={!relatedOrderType}>
+                                        <SelectTrigger><SelectValue placeholder="Paso 3: ID Doc." /></SelectTrigger>
+                                        <SelectContent>
+                                            {getOrderOptions().map(opt => (
+                                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </>
                         )}
                         {associationType === 'anticipo' && (
                             <Select
