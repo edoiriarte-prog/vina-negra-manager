@@ -279,16 +279,14 @@ export function NewSalesOrderSheet({
   }, [formData.items]);
   
   const { netTotal, vatAmount, finalTotal } = useMemo(() => {
-    if (formData.includeVat) {
-        const net = grossTotal / 1.19;
-        const vat = grossTotal - net;
-        return { netTotal: net, vatAmount: vat, finalTotal: grossTotal };
-    }
-    // If VAT is NOT included, the prices are net. `grossTotal` is the net total.
-    const vat = grossTotal * 0.19;
-    const final = grossTotal + vat; // This is for display, the saved amount will be `grossTotal` (net)
-    return { netTotal: grossTotal, vatAmount: vat, finalTotal: final };
-}, [grossTotal, formData.includeVat]);
+      if (formData.includeVat) {
+          const net = grossTotal / 1.19;
+          const vat = grossTotal - net;
+          return { netTotal: net, vatAmount: vat, finalTotal: grossTotal };
+      }
+      // If VAT is NOT included, the prices are net. `grossTotal` is the net total.
+      return { netTotal: grossTotal, vatAmount: 0, finalTotal: grossTotal };
+  }, [grossTotal, formData.includeVat]);
 
 
   const advanceAmount = useMemo(() => {
@@ -758,14 +756,16 @@ export function NewSalesOrderSheet({
                                     <span>Subtotal Neto:</span>
                                     <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(netTotal)}</span>
                                 </div>
-                                <div className='flex justify-between text-xs'>
-                                    <span>IVA (19%):</span>
-                                    <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(vatAmount)}</span>
-                                </div>
+                                {formData.includeVat && (
+                                    <div className='flex justify-between text-xs'>
+                                        <span>IVA (19%):</span>
+                                        <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(vatAmount)}</span>
+                                    </div>
+                                )}
                                 
                                 <div className='flex justify-between text-lg'>
                                     <span className="font-bold">Total:</span>
-                                    <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(formData.includeVat ? finalTotal : netTotal)}</span>
+                                    <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(finalTotal)}</span>
                                 </div>
                             </div>
                         </div>
@@ -806,5 +806,3 @@ export function NewSalesOrderSheet({
     </>
   );
 }
-
-    
