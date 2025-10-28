@@ -122,17 +122,9 @@ export default function SalesPage() {
 
 
   const handleSaveOrder = (orderData: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
-    let orderToSave: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>;
-
-    const allItems = [...orderData.items, ...newItems];
+    const allItems = [...orderData.items, ...newItems.map(item => ({ ...item, id: `temp-${Date.now()}-${Math.random()}` }))];
     
-    if ('id' in orderData) {
-        orderToSave = { ...orderData, items: allItems };
-    } else {
-        orderToSave = { ...orderData, items: allItems };
-    }
-
-    for (const item of orderToSave.items) {
+    for (const item of allItems) {
         const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === orderData.warehouse);
         const currentStock = inventoryItem ? inventoryItem.stock : 0;
         
@@ -146,9 +138,6 @@ export default function SalesPage() {
         }
     }
     
-    const subtotal = allItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    const totalAmount = orderToSave.includeVat ? subtotal * 1.19 : subtotal;
-    
     const totalKilos = allItems.reduce((sum, item) => {
       if (item.unit === 'Kilos') {
         return sum + Number(item.quantity || 0);
@@ -159,15 +148,15 @@ export default function SalesPage() {
 
     let finalOrder: SalesOrder;
 
-    if ('id' in orderToSave) {
-      finalOrder = { ...orderToSave, totalAmount, totalKilos, totalPackages, paymentStatus: orderToSave.paymentStatus || 'Pendiente' } as SalesOrder;
+    if ('id' in orderData) {
+      finalOrder = { ...orderData, items: allItems, totalKilos, totalPackages, paymentStatus: orderData.paymentStatus || 'Pendiente' } as SalesOrder;
       setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
       toast({ title: 'Orden Actualizada', description: `La orden ${finalOrder.id} ha sido actualizada.` });
     } else {
       finalOrder = {
-        ...orderToSave,
+        ...orderData,
         id: nextOrderId,
-        totalAmount, 
+        items: allItems,
         totalKilos, 
         totalPackages,
         paymentStatus: 'Pendiente'

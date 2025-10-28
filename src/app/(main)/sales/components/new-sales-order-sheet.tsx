@@ -62,7 +62,7 @@ type NewSalesOrderSheetProps = {
 };
 
 
-const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dispatch'): Omit<SalesOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'> => {
+const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dispatch'): Omit<SalesOrder, 'id' | 'totalPackages'> => {
     const isDispatch = sheetType === 'dispatch';
     if (order) {
         return {
@@ -76,6 +76,8 @@ const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dis
         clientId: '',
         date: '',
         items: [],
+        totalAmount: 0,
+        totalKilos: 0,
         relatedPurchaseIds: [],
         status: 'pending',
         paymentMethod: isDispatch ? 'Contado' : 'Contado',
@@ -122,7 +124,7 @@ export function NewSalesOrderSheet({
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalAmount' | 'totalKilos' | 'totalPackages' > | `items.${number}.${keyof OrderItem}`, value: any) => {
+  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalPackages' > | `items.${number}.${keyof OrderItem}`, value: any) => {
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
@@ -224,10 +226,11 @@ export function NewSalesOrderSheet({
       }
     }
     // --- VALIDATION END ---
-    const grossAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0)
-    const finalOrderData = {...formData, totalAmount: grossAmount};
+    
+    const grossAmount = formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
+    const finalTotalAmount = formData.includeVat ? grossAmount * 1.19 : grossAmount;
 
-    onSave(finalOrderData);
+    onSave({ ...formData, totalAmount: finalTotalAmount });
   };
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -279,25 +282,25 @@ export function NewSalesOrderSheet({
     return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
   }, [formData.items]);
   
-  const { netTotal, vatAmount } = useMemo(() => {
+  const { netTotal, vatAmount, finalTotal } = useMemo(() => {
     if (!formData.includeVat) {
-        return { netTotal: grossTotal, vatAmount: 0 };
+        return { netTotal: grossTotal, vatAmount: 0, finalTotal: grossTotal };
     }
     const net = grossTotal / 1.19;
     const vat = grossTotal - net;
-    return { netTotal: net, vatAmount: vat };
+    return { netTotal: net, vatAmount: vat, finalTotal: grossTotal };
   }, [grossTotal, formData.includeVat]);
 
 
   const advanceAmount = useMemo(() => {
     if (formData.paymentMethod !== 'Pago con Anticipo y Saldo' || !formData.advancePercentage) return 0;
-    return grossTotal * (formData.advancePercentage / 100);
-  }, [grossTotal, formData.paymentMethod, formData.advancePercentage]);
+    return finalTotal * (formData.advancePercentage / 100);
+  }, [finalTotal, formData.paymentMethod, formData.advancePercentage]);
 
   const balanceAmount = useMemo(() => {
      if (formData.paymentMethod !== 'Pago con Anticipo y Saldo') return 0;
-     return grossTotal - advanceAmount;
-  }, [grossTotal, advanceAmount, formData.paymentMethod]);
+     return finalTotal - advanceAmount;
+  }, [finalTotal, advanceAmount, formData.paymentMethod]);
 
 
   if (!formData) return null;
@@ -765,7 +768,7 @@ export function NewSalesOrderSheet({
                                 )}
                                 <div className='flex justify-between text-lg'>
                                     <span className="font-bold">Total:</span>
-                                    <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(grossTotal)}</span>
+                                    <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(finalTotal)}</span>
                                 </div>
                             </div>
                         </div>
