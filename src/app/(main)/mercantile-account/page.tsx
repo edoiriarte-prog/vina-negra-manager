@@ -87,7 +87,6 @@ export default function MercantileAccountPage() {
   const [isClient, setIsClient] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   
-  const printRef = useRef<HTMLDivElement>(null);
   const dueDatePrintRef = useRef<HTMLDivElement>(null);
 
   const handleDueDatePrint = useReactToPrint({
@@ -101,53 +100,72 @@ export default function MercantileAccountPage() {
 
   const handleDownloadPdf = async (report: ReportData) => {
     if (!report) return;
-
+  
     // Create a temporary div to render the component into
     const tempDiv = document.createElement('div');
     tempDiv.style.position = 'absolute';
     tempDiv.style.left = '-9999px';
+    tempDiv.style.width = '210mm'; // A4 width
     document.body.appendChild(tempDiv);
     
-    // Define the printable component
     const PrintableContent = React.forwardRef<HTMLDivElement>((props, ref) => (
-      <div ref={ref} className="print-only">
+      <div ref={ref}>
         <div className="p-8 font-sans text-black bg-white">
           {getPrintableContent(report)}
         </div>
       </div>
     ));
     PrintableContent.displayName = 'PrintableContent';
-
-    // Use the new createRoot API
+  
+    // Use createRoot to render the component
     const root = createRoot(tempDiv);
-    root.render(<PrintableContent ref={printRef} />);
-
-    // Allow time for rendering
+    root.render(<PrintableContent />);
+  
+    // Allow time for rendering before capturing
     setTimeout(async () => {
-        if (!printRef.current) {
-            console.error("Printable content ref is not available.");
-            document.body.removeChild(tempDiv);
-            return;
-        }
-        const canvas = await html2canvas(printRef.current, { scale: 2 });
+      try {
+        const canvas = await html2canvas(tempDiv, {
+          scale: 2, // Increase resolution
+          useCORS: true,
+          logging: true,
+          width: tempDiv.scrollWidth,
+          height: tempDiv.scrollHeight,
+          windowWidth: tempDiv.scrollWidth,
+          windowHeight: tempDiv.scrollHeight,
+        });
+  
         const imgData = canvas.toDataURL('image/png');
-
-        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdf = new jsPDF('p', 'mm', 'a4'); // A4 size page of PDF
+  
         const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
         const imgWidth = canvas.width;
         const imgHeight = canvas.height;
-        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-        const imgX = (pdfWidth - imgWidth * ratio) / 2;
-        const imgY = 0;
-
-        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+        const ratio = imgWidth / pdfWidth;
+        const pdfHeight = imgHeight / ratio;
+  
+        let position = 0;
+        let pageHeight = pdf.internal.pageSize.getHeight();
+  
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        let heightLeft = pdfHeight - pageHeight;
+  
+        while (heightLeft >= 0) {
+          position = heightLeft - pdfHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+          heightLeft -= pageHeight;
+        }
+  
         pdf.save(`Estado_de_Cuenta_${report.contactName}.pdf`);
-
+  
+      } catch (error) {
+        console.error("Error generating PDF:", error);
+      } finally {
         // Cleanup
         root.unmount();
         document.body.removeChild(tempDiv);
-    }, 500);
+      }
+    }, 500); // Increased timeout for complex rendering
   };
 
 
@@ -869,10 +887,6 @@ export default function MercantileAccountPage() {
             </div>
         </Card>
 
-        {/* This div is only used for the PDF generation and is not visible */}
-        <div style={{ position: 'absolute', left: '-9999px' }}>
-          <div ref={printRef} />
-        </div>
     </div>
   );
 }
