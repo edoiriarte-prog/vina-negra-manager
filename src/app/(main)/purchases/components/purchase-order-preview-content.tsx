@@ -15,6 +15,7 @@ import {
     TableRow,
     TableFooter,
   } from '@/components/ui/table';
+import { ViñaNegraLogo } from '@/components/viña-negra-logo';
 import { useMasterData } from '@/hooks/use-master-data';
 
 
@@ -48,10 +49,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentPro
             {/* Header */}
             <div className="flex justify-between items-start pb-4 border-b-2 border-neutral-800">
                 <div className="w-48">
-                    <div className="flex flex-col items-start">
-                        <span className="font-bold text-xl tracking-tight">Viña Negra</span>
-                        <span className="text-sm text-neutral-500">Manager</span>
-                    </div>
+                    <ViñaNegraLogo className="w-full h-auto" />
                 </div>
                 <div className='text-right'>
                     <h1 className="text-3xl font-bold text-neutral-900">ORDEN DE COMPRA</h1>

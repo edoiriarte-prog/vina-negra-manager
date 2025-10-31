@@ -603,8 +603,8 @@ export default function MercantileAccountPage() {
         </Card>
 
         {/* Hidden container for printing */}
-        <div className="hidden print-only">
-          <div ref={printRef}>
+        <div className="hidden">
+            <div ref={printRef} className="print-only">
               {printingReport && (
                   <div className="p-8 font-sans text-black">
                       <div className="grid grid-cols-2 gap-8 mb-8">
@@ -827,7 +827,7 @@ export default function MercantileAccountPage() {
                       )}
                   </div>
               )}
-          </div>
+            </div>
         </div>
     </div>
   );
