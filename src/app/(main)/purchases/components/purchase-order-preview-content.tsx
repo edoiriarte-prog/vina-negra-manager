@@ -15,8 +15,8 @@ import {
     TableRow,
     TableFooter,
   } from '@/components/ui/table';
-import { ViñaNegraLogo } from '@/components/viña-negra-logo';
 import { useMasterData } from '@/hooks/use-master-data';
+import { ViñaNegraLogo } from '@/components/viña-negra-logo';
 
 
 interface PreviewContentProps {
@@ -55,7 +55,7 @@ export const PreviewContent = React.forwardRef<HTMLDivElement, PreviewContentPro
                     <h1 className="text-3xl font-bold text-neutral-900">ORDEN DE COMPRA</h1>
                     <div className="mt-2 space-y-1 text-sm">
                         <p><span className="font-bold">Nº de OC:</span> {order.id}</p>
-                        <p><span className="font-bold">Fecha de Emisión:</span> {format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</p>
+                        <p><span className="font-bold">Fecha de Emisión:</span> {order.date ? format(parseISO(order.date), "dd-MM-yyyy", { locale: es }) : 'N/A'}</p>
                     </div>
                 </div>
             </div>

@@ -33,6 +33,7 @@ import { DueDatesReport } from '../reports/components/due-dates-report';
 import { useReactToPrint } from 'react-to-print';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { createRoot } from 'react-dom/client';
 
 type DocumentDetail = {
   id: string;
@@ -99,32 +100,36 @@ export default function MercantileAccountPage() {
   }, []);
 
   const handleDownloadPdf = async (report: ReportData) => {
-    const element = printRef.current;
-    if (!element || !report) return;
+    if (!report) return;
 
-    // This component will be temporarily rendered for PDF generation
-    const PrintComponent = () => (
-      <div ref={printRef} className="print-only">
-        <div className="p-8 font-sans text-black bg-white">
-          {getPrintableContent(report)}
-        </div>
-      </div>
-    );
-
-    // We need to render the component to get its content for html2canvas
+    // Create a temporary div to render the component into
     const tempDiv = document.createElement('div');
     tempDiv.style.position = 'absolute';
     tempDiv.style.left = '-9999px';
     document.body.appendChild(tempDiv);
     
-    // Dynamically render using React's capabilities if available, otherwise plain HTML
-    const { render } = await import('react-dom');
-    render(<PrintComponent />, tempDiv);
+    // Define the printable component
+    const PrintableContent = React.forwardRef<HTMLDivElement>((props, ref) => (
+      <div ref={ref} className="print-only">
+        <div className="p-8 font-sans text-black bg-white">
+          {getPrintableContent(report)}
+        </div>
+      </div>
+    ));
+    PrintableContent.displayName = 'PrintableContent';
 
+    // Use the new createRoot API
+    const root = createRoot(tempDiv);
+    root.render(<PrintableContent ref={printRef} />);
 
     // Allow time for rendering
     setTimeout(async () => {
-        const canvas = await html2canvas(printRef.current!, { scale: 2 });
+        if (!printRef.current) {
+            console.error("Printable content ref is not available.");
+            document.body.removeChild(tempDiv);
+            return;
+        }
+        const canvas = await html2canvas(printRef.current, { scale: 2 });
         const imgData = canvas.toDataURL('image/png');
 
         const pdf = new jsPDF('p', 'mm', 'a4');
@@ -140,6 +145,7 @@ export default function MercantileAccountPage() {
         pdf.save(`Estado_de_Cuenta_${report.contactName}.pdf`);
 
         // Cleanup
+        root.unmount();
         document.body.removeChild(tempDiv);
     }, 500);
   };
@@ -863,9 +869,9 @@ export default function MercantileAccountPage() {
             </div>
         </Card>
 
-        {/* Hidden container for printing */}
+        {/* This div is only used for the PDF generation and is not visible */}
         <div style={{ position: 'absolute', left: '-9999px' }}>
-            <div ref={printRef} />
+          <div ref={printRef} />
         </div>
     </div>
   );
