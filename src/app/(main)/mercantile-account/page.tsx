@@ -141,7 +141,7 @@ export default function MercantileAccountPage() {
         const imgWidth = canvas.width;
         const imgHeight = canvas.height;
         const ratio = imgWidth / pdfWidth;
-        const pdfHeight = imgHeight / ratio;
+        let pdfHeight = imgHeight / ratio;
   
         let position = 0;
         let pageHeight = pdf.internal.pageSize.getHeight();
@@ -671,6 +671,15 @@ export default function MercantileAccountPage() {
                                     </TableRow>
                                 ))}
                             </TableBody>
+                             <TableFooter>
+                                <TableRow>
+                                    <TableCell colSpan={2} className="text-right font-bold">Totales</TableCell>
+                                    <TableCell className="font-bold">{formatCurrency(item.totalBilled)}</TableCell>
+                                    <TableCell className="font-bold text-green-600">{formatCurrency(item.totalPaid)}</TableCell>
+                                    <TableCell className="font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
+                                    <TableCell colSpan={2}></TableCell>
+                                </TableRow>
+                            </TableFooter>
                         </Table>
                     </div>
                 </div>
