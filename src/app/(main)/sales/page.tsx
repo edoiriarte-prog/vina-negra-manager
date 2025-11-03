@@ -305,9 +305,107 @@ export default function SalesPage() {
 
   const renderContent = () => {
     if (!isClient) {
-      return <DataTable columns={columns} data={[]} />;
+      return (
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      )
     }
-    return <DataTable columns={columns} data={nonDispatchOrders} />;
+    return (
+      <div className="rounded-md border">
+          <Table>
+              <TableHeader>
+                  <TableRow>
+                      <TableHead className='w-[400px]'>Cliente</TableHead>
+                      <TableHead className='text-right'>Monto Total</TableHead>
+                  </TableRow>
+              </TableHeader>
+              <TableBody>
+                  {filteredGroupedOrders.map(group => {
+                      const clientId = clients.find(s => s.name === group.clientName)?.id || '';
+                      return (
+                          <React.Fragment key={clientId}>
+                              <TableRow className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggleCollapsible(clientId)}>
+                                  <TableCell className='font-bold'>
+                                       <div className="flex items-center gap-2">
+                                          <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[clientId] && "rotate-180")} />
+                                          {group.clientName}
+                                      </div>
+                                  </TableCell>
+                                  <TableCell className='text-right font-bold'>{formatCurrency(group.subtotal)}</TableCell>
+                              </TableRow>
+                              {openCollapsibles[clientId] && (
+                                  <TableRow>
+                                      <TableCell colSpan={2} className="p-0">
+                                          <div className='p-4 bg-background'>
+                                              <Table>
+                                                  <TableHeader>
+                                                      <TableRow>
+                                                          <TableHead>O/V</TableHead>
+                                                          <TableHead>Fecha</TableHead>
+                                                          <TableHead className="text-right">Kilos</TableHead>
+                                                          <TableHead className="text-right">Monto</TableHead>
+                                                          <TableHead className="w-[50px]"></TableHead>
+                                                      </TableRow>
+                                                  </TableHeader>
+                                                  <TableBody>
+                                                      {group.orders.map(order => (
+                                                          <TableRow key={order.id}>
+                                                              <TableCell className="font-medium">{order.id}</TableCell>
+                                                              <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
+                                                              <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')} kg</TableCell>
+                                                              <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
+                                                              <TableCell>
+                                                                   <DropdownMenu>
+                                                                    <DropdownMenuTrigger asChild>
+                                                                      <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                        <span className="sr-only">Abrir menú</span>
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                      </Button>
+                                                                    </DropdownMenuTrigger>
+                                                                    <DropdownMenuContent align="end">
+                                                                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                                                      <DropdownMenuItem onClick={() => handlePreviewRequest(order)}>
+                                                                            <Eye className='mr-2 h-4 w-4' />
+                                                                            Visualizar
+                                                                        </DropdownMenuItem>
+                                                                      <DropdownMenuItem onClick={() => handleEdit(order)}>
+                                                                        <Edit className='mr-2 h-4 w-4' />
+                                                                        Editar
+                                                                      </DropdownMenuItem>
+                                                                      <DropdownMenuSeparator />
+                                                                      <DropdownMenuItem 
+                                                                        className="text-destructive focus:text-destructive"
+                                                                        onClick={() => handleDelete(order)}
+                                                                      >
+                                                                        <Trash2 className='mr-2 h-4 w-4' />
+                                                                        Eliminar
+                                                                      </DropdownMenuItem>
+                                                                    </DropdownMenuContent>
+                                                                  </DropdownMenu>
+                                                              </TableCell>
+                                                          </TableRow>
+                                                      ))}
+                                                  </TableBody>
+                                              </Table>
+                                          </div>
+                                      </TableCell>
+                                  </TableRow>
+                              )}
+                          </React.Fragment>
+                      );
+                  })}
+              </TableBody>
+              <TableFooter>
+                  <TableRow>
+                      <TableHead className='text-right font-bold text-lg'>Total General</TableHead>
+                      <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotal)}</TableHead>
+                  </TableRow>
+              </TableFooter>
+          </Table>
+      </div>
+    );
   }
 
   return (
@@ -330,6 +428,14 @@ export default function SalesPage() {
               </Button>
             </div>
           </div>
+          <div className="py-4">
+              <Input
+                placeholder="Filtrar por cliente..."
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                className="max-w-sm"
+              />
+            </div>
         </CardHeader>
         <CardContent>
           {renderContent()}
@@ -395,5 +501,3 @@ export default function SalesPage() {
     </>
   );
 }
-
-    
