@@ -116,16 +116,6 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     }
   },
   {
-    accessorKey: 'status',
-    header: 'Estado Orden',
-    cell: ({ row }) => {
-        const status = row.getValue('status') as string;
-        const variant = status === 'completed' ? 'default' : status === 'pending' ? 'secondary' : 'destructive';
-        const text = status === 'completed' ? 'Completada' : status === 'pending' ? 'Pendiente' : 'Cancelada';
-        return <Badge variant={variant}>{text}</Badge>
-    }
-  },
-  {
     id: 'actions',
     cell: ({ row }) => {
       const order = row.original;
