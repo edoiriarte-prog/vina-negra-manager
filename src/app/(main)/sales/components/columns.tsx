@@ -89,6 +89,23 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
       },
     cell: ({ row }) => <div className='text-right'>{formatCurrency(row.getValue('totalAmount'))}</div>,
   },
+  {
+    accessorKey: 'totalKilos',
+    header: ({ column }) => {
+        return (
+          <div className="text-right">
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            >
+              Total Kilos
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    cell: ({ row }) => <div className='text-right'>{formatKilos(row.getValue('totalKilos'))}</div>,
+  },
    {
     accessorKey: 'paymentStatus',
     header: 'Estado Pago',
