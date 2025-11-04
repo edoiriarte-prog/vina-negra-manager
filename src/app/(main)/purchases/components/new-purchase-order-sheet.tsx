@@ -44,11 +44,12 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
         const { totalAmount, totalKilos, totalPackages, ...rest } = order;
         // The date from the order is already a 'yyyy-MM-dd' string from local storage.
         // To avoid timezone issues, parse it as UTC.
-        const date = parseISO(order.date);
+        const date = order.date ? parseISO(order.date) : new Date();
 
         return {
             ...rest,
             date: format(date, 'yyyy-MM-dd'),
+            destinationWarehouse: rest.destinationWarehouse || undefined,
         };
     }
     return {
@@ -57,7 +58,7 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
         items: [],
         status: 'pending' as 'pending' | 'completed' | 'cancelled',
         warehouse: 'Bodega Principal',
-        destinationWarehouse: '',
+        destinationWarehouse: undefined,
     };
 };
 
@@ -94,6 +95,8 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     } else if (name.startsWith('newItem.')) {
         const field = name.split('.')[1] as keyof typeof newItem;
         setNewItem(prev => ({ ...prev, [field]: value }));
+    } else if (name === 'destinationWarehouse') {
+        setFormData(prev => ({ ...prev, destinationWarehouse: value === 'none' ? undefined : value }));
     } else {
         setFormData(prev => ({ ...prev, [name as keyof typeof formData]: value }));
     }
@@ -356,13 +359,13 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                 </Label>
                 <Select
                   onValueChange={(value) => handleSelectChange('destinationWarehouse', value)}
-                  value={formData.destinationWarehouse}
+                  value={formData.destinationWarehouse || 'none'}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Opcional (para traslados)" />
                   </SelectTrigger>
                   <SelectContent>
-                     <SelectItem value="">Ninguna</SelectItem>
+                     <SelectItem value="none">Ninguna</SelectItem>
                     {warehouses.filter(w => w !== formData.warehouse).map(w => (
                       <SelectItem key={w} value={w}>{w}</SelectItem>
                     ))}
