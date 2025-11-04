@@ -70,7 +70,12 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   const { toast } = useToast();
 
   useEffect(() => {
-    setFormData(getInitialFormData(order));
+    const initialData = getInitialFormData(order);
+    if (!order && isOpen) {
+        // If creating a new order, set date on client side to avoid hydration errors
+        initialData.date = format(new Date(), 'yyyy-MM-dd');
+    }
+    setFormData(initialData);
   }, [order, isOpen]);
   
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
