@@ -116,7 +116,7 @@ export default function InventoryPage() {
 
     useEffect(() => {
         if (isClient && selectedProduct) {
-            const getStockAsOf = (date: Date) => {
+            const getStockAsOf = (date: Date, product: string) => {
                 const stockMap = new Map<string, { kg: number, packages: number }>();
 
                 // Process Purchases
@@ -126,7 +126,7 @@ export default function InventoryPage() {
                         const warehouse = po.destinationWarehouse || po.warehouse;
                          if (selectedWarehouse === 'All' || warehouse === selectedWarehouse) {
                             po.items.forEach(item => {
-                                if (item.product === selectedProduct && item.unit === 'Kilos') {
+                                if (item.product === product && item.unit === 'Kilos') {
                                     const key = `${item.product}-${item.caliber}`;
                                     const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
                                     currentStock.kg += item.quantity;
@@ -142,7 +142,7 @@ export default function InventoryPage() {
                     .filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), date))
                     .forEach(so => {
                          so.items.forEach(item => {
-                            if (item.product === selectedProduct && item.unit === 'Kilos') {
+                            if (item.product === product && item.unit === 'Kilos') {
                                 // Decrease from source warehouse
                                 if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
                                     const key = `${item.product}-${item.caliber}`;
@@ -168,7 +168,7 @@ export default function InventoryPage() {
 
                 // Process Adjustments
                 inventoryAdjustments
-                    .filter(adj => adj.product === selectedProduct && !isAfter(parseISO(adj.date), date))
+                    .filter(adj => adj.product === product && !isAfter(parseISO(adj.date), date))
                     .forEach(adj => {
                         if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
                             const key = `${adj.product}-${adj.caliber}`;
@@ -183,7 +183,7 @@ export default function InventoryPage() {
                 return stockMap;
             };
 
-            const initialStockMap = getStockAsOf(new Date(dateRange.from.getTime() - 86400000));
+            const initialStockMap = getStockAsOf(new Date(dateRange.from.getTime() - 86400000), selectedProduct);
             const filterByDate = (dateStr: string) => !isBefore(parseISO(dateStr), dateRange.from) && !isAfter(parseISO(dateStr), dateRange.to);
 
             const inflowsMap = new Map<string, { kg: number, packages: number }>();
@@ -467,6 +467,63 @@ export default function InventoryPage() {
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario');
       XLSX.writeFile(workbook, `Reporte_Inventario_${selectedProduct}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
       toast({ title: 'Exportación Exitosa'});
+    };
+
+    const handleExportAll = () => {
+        if (masterProducts.length === 0) {
+            toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay productos configurados para exportar.' });
+            return;
+        }
+
+        const allProductsData: any[] = [];
+        const filterByDate = (dateStr: string) => !isBefore(parseISO(dateStr), dateRange.from) && !isAfter(parseISO(dateStr), dateRange.to);
+
+        masterProducts.forEach(product => {
+            const productCalibers = new Set<string>();
+            const productInitialStock = new Map<string, { kg: number, packages: number }>();
+            const productInflows = new Map<string, { kg: number, packages: number }>();
+            const productOutflows = new Map<string, { kg: number, packages: number }>();
+            const productAdjustments = new Map<string, { kg: number, packages: number }>();
+
+            // Simplified getStockAsOf logic for each product
+            const initialDate = new Date(dateRange.from.getTime() - 86400000);
+            purchaseOrders.filter(po => po.status === 'completed' && !isAfter(parseISO(po.date), initialDate)).forEach(po => po.items.forEach(item => { if (item.product === product) { const key = item.caliber; const curr = productInitialStock.get(key) || { kg: 0, packages: 0 }; curr.kg += item.quantity; curr.packages += (item.packagingQuantity || 0); productInitialStock.set(key, curr); productCalibers.add(key); } }));
+            salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), initialDate)).forEach(so => so.items.forEach(item => { if (item.product === product) { const key = item.caliber; const curr = productInitialStock.get(key) || { kg: 0, packages: 0 }; curr.kg -= item.quantity; curr.packages -= (item.packagingQuantity || 0); productInitialStock.set(key, curr); productCalibers.add(key); } }));
+            inventoryAdjustments.filter(adj => adj.product === product && !isAfter(parseISO(adj.date), initialDate)).forEach(adj => { const key = adj.caliber; const curr = productInitialStock.get(key) || { kg: 0, packages: 0 }; const sign = adj.type === 'increase' ? 1 : -1; curr.kg += adj.quantity * sign; curr.packages += (adj.packagingQuantity || 0) * sign; productInitialStock.set(key, curr); productCalibers.add(key); });
+
+            // Inflows, Outflows, Adjustments for the period
+            purchaseOrders.filter(po => po.status === 'completed' && filterByDate(po.date) && po.items.some(i => i.product === product)).forEach(po => po.items.forEach(item => { if (item.product === product) { const key = item.caliber; const curr = productInflows.get(key) || { kg: 0, packages: 0 }; curr.kg += item.quantity; curr.packages += (item.packagingQuantity || 0); productInflows.set(key, curr); productCalibers.add(key); } }));
+            salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && filterByDate(so.date) && so.items.some(i => i.product === product)).forEach(so => so.items.forEach(item => { if (item.product === product) { const key = item.caliber; const curr = productOutflows.get(key) || { kg: 0, packages: 0 }; curr.kg += item.quantity; curr.packages += (item.packagingQuantity || 0); productOutflows.set(key, curr); productCalibers.add(key); } }));
+            inventoryAdjustments.filter(adj => filterByDate(adj.date) && adj.product === product).forEach(adj => { const key = adj.caliber; const curr = productAdjustments.get(key) || { kg: 0, packages: 0 }; const sign = adj.type === 'increase' ? 1 : -1; curr.kg += adj.quantity * sign; curr.packages += (adj.packagingQuantity || 0) * sign; productAdjustments.set(key, curr); productCalibers.add(key); });
+
+            Array.from(productCalibers).forEach(caliber => {
+                const initial = productInitialStock.get(caliber) || { kg: 0, packages: 0 };
+                const inflows = productInflows.get(caliber) || { kg: 0, packages: 0 };
+                const outflows = productOutflows.get(caliber) || { kg: 0, packages: 0 };
+                const adjustments = productAdjustments.get(caliber) || { kg: 0, packages: 0 };
+
+                allProductsData.push({
+                    'Producto': product,
+                    'Calibre': caliber,
+                    'Stock Inicial (kg)': initial.kg,
+                    'Entradas (kg)': inflows.kg,
+                    'Salidas (kg)': outflows.kg,
+                    'Ajustes (kg)': adjustments.kg,
+                    'Stock Final (kg)': initial.kg + inflows.kg - outflows.kg + adjustments.kg,
+                    'Stock Inicial (envases)': initial.packages,
+                    'Entradas (envases)': inflows.packages,
+                    'Salidas (envases)': outflows.packages,
+                    'Ajustes (envases)': adjustments.packages,
+                    'Stock Final (envases)': initial.packages + inflows.packages - outflows.packages + adjustments.packages,
+                });
+            });
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(allProductsData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario General');
+        XLSX.writeFile(workbook, `Reporte_Inventario_General_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+        toast({ title: 'Exportación General Exitosa' });
     };
 
     const handleExportLots = () => {
@@ -755,7 +812,8 @@ export default function InventoryPage() {
                                     <CardDescription>Consulta el movimiento de stock por producto en un rango de fechas.</CardDescription>
                                 </div>
                                 <div className="flex gap-2 no-print">
-                                <Button variant="outline" onClick={() => setIsPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Vista Previa</Button>
+                                    <Button variant="outline" onClick={handleExportAll}><Download className="mr-2 h-4 w-4" />Exportar Todo</Button>
+                                    <Button variant="outline" onClick={() => setIsPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Vista Previa</Button>
                                 </div>
                             </div>
                         </CardHeader>
@@ -878,6 +936,7 @@ export default function InventoryPage() {
         </>
     );
 }
+
 
 
 
