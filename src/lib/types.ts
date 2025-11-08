@@ -96,6 +96,8 @@ export type PurchaseOrder = {
   destinationWarehouse?: string;
   paymentStatus?: 'Pendiente' | 'Abonado' | 'Pagado';
   description?: string;
+  paymentMethod?: 'Contado' | 'Crédito' | 'Cheque';
+  paymentDueDate?: string;
 };
 
 export type ServiceOrder = {
@@ -172,4 +174,3 @@ export type BankAccount = {
     
 
     
-

@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, Wand2 } from 'lucide-react';
+import { PlusCircle, Trash2, Wand2, CalendarIcon } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -29,6 +29,10 @@ import { useMasterData } from '@/hooks/use-master-data';
 import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 import { productCaliberMatrix } from '@/lib/master-data';
 import { useToast } from '@/hooks/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { es } from 'date-fns/locale';
 
 type NewPurchaseOrderSheetProps = {
   isOpen: boolean;
@@ -49,6 +53,7 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
         return {
             ...rest,
             date: format(date, 'yyyy-MM-dd'),
+            paymentDueDate: order.paymentDueDate ? format(parseISO(order.paymentDueDate), 'yyyy-MM-dd') : undefined,
             destinationWarehouse: rest.destinationWarehouse || undefined,
         };
     }
@@ -59,6 +64,8 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
         status: 'pending' as 'pending' | 'completed' | 'cancelled',
         warehouse: 'Bodega Principal',
         destinationWarehouse: undefined,
+        paymentMethod: 'Contado',
+        paymentDueDate: undefined,
     };
 };
 
@@ -319,7 +326,54 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
             </div>
 
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-4 mt-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="paymentMethod" className="text-right">
+                  Cond. Pago
+                </Label>
+                <Select
+                  onValueChange={(value: 'Contado' | 'Crédito' | 'Cheque') => handleSelectChange('paymentMethod', value)}
+                  value={formData.paymentMethod}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Contado">Contado</SelectItem>
+                    <SelectItem value="Crédito">Crédito</SelectItem>
+                    <SelectItem value="Cheque">Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+               <div className="grid grid-cols-4 items-center gap-4">
+                 <Label htmlFor="paymentDueDate" className="text-right">
+                    Vencimiento
+                </Label>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        variant={"outline"}
+                        className={cn(
+                        "col-span-3 justify-start text-left font-normal",
+                        !formData.paymentDueDate && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.paymentDueDate ? format(parseISO(formData.paymentDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                    <Calendar
+                        mode="single"
+                        selected={formData.paymentDueDate ? parseISO(formData.paymentDueDate) : undefined}
+                        onSelect={(date) => date && handleSelectChange('paymentDueDate', format(date, 'yyyy-MM-dd'))}
+                        initialFocus
+                    />
+                    </PopoverContent>
+                </Popover>
+              </div>
+              
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="status" className="text-right">
                   Estado
