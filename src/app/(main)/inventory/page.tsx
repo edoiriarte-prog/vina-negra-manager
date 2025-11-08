@@ -470,60 +470,98 @@ export default function InventoryPage() {
     };
 
     const handleExportAll = () => {
-        if (masterProducts.length === 0) {
-            toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay productos configurados para exportar.' });
-            return;
-        }
+        if (!isClient) return;
 
-        const allProductsData: any[] = [];
-        const filterByDate = (dateStr: string) => !isBefore(parseISO(dateStr), dateRange.from) && !isAfter(parseISO(dateStr), dateRange.to);
+        type Transaction = {
+            'ID Producto': string,
+            'Producto': string,
+            'Calibre': string,
+            'Bodega': string,
+            'Fecha': string,
+            'Tipo Movimiento': 'Entrada' | 'Salida' | 'Ajuste Aumento' | 'Ajuste Disminución',
+            'Documento/Motivo': string,
+            'Contacto': string,
+            'Lote': string,
+            'Mov. Envases': number,
+            'Mov. Kilos': number,
+            'Saldo Envases'?: number,
+            'Saldo Kilos'?: number
+        };
 
-        masterProducts.forEach(product => {
-            const productCalibers = new Set<string>();
-            const productInitialStock = new Map<string, { kg: number, packages: number }>();
-            const productInflows = new Map<string, { kg: number, packages: number }>();
-            const productOutflows = new Map<string, { kg: number, packages: number }>();
-            const productAdjustments = new Map<string, { kg: number, packages: number }>();
+        let allTransactions: Transaction[] = [];
+        const inventoryMap = new Map<string, { balancePackages: number, balanceKilos: number }>();
 
-            // Simplified getStockAsOf logic for each product
-            const initialDate = new Date(dateRange.from.getTime() - 86400000);
-            purchaseOrders.filter(po => po.status === 'completed' && !isAfter(parseISO(po.date), initialDate)).forEach(po => po.items.forEach(item => { if (item.product === product) { const key = item.caliber; const curr = productInitialStock.get(key) || { kg: 0, packages: 0 }; curr.kg += item.quantity; curr.packages += (item.packagingQuantity || 0); productInitialStock.set(key, curr); productCalibers.add(key); } }));
-            salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && !isAfter(parseISO(so.date), initialDate)).forEach(so => so.items.forEach(item => { if (item.product === product) { const key = item.caliber; const curr = productInitialStock.get(key) || { kg: 0, packages: 0 }; curr.kg -= item.quantity; curr.packages -= (item.packagingQuantity || 0); productInitialStock.set(key, curr); productCalibers.add(key); } }));
-            inventoryAdjustments.filter(adj => adj.product === product && !isAfter(parseISO(adj.date), initialDate)).forEach(adj => { const key = adj.caliber; const curr = productInitialStock.get(key) || { kg: 0, packages: 0 }; const sign = adj.type === 'increase' ? 1 : -1; curr.kg += adj.quantity * sign; curr.packages += (adj.packagingQuantity || 0) * sign; productInitialStock.set(key, curr); productCalibers.add(key); });
-
-            // Inflows, Outflows, Adjustments for the period
-            purchaseOrders.filter(po => po.status === 'completed' && filterByDate(po.date) && po.items.some(i => i.product === product)).forEach(po => po.items.forEach(item => { if (item.product === product) { const key = item.caliber; const curr = productInflows.get(key) || { kg: 0, packages: 0 }; curr.kg += item.quantity; curr.packages += (item.packagingQuantity || 0); productInflows.set(key, curr); productCalibers.add(key); } }));
-            salesOrders.filter(so => (so.status === 'completed' || so.status === 'pending') && filterByDate(so.date) && so.items.some(i => i.product === product)).forEach(so => so.items.forEach(item => { if (item.product === product) { const key = item.caliber; const curr = productOutflows.get(key) || { kg: 0, packages: 0 }; curr.kg += item.quantity; curr.packages += (item.packagingQuantity || 0); productOutflows.set(key, curr); productCalibers.add(key); } }));
-            inventoryAdjustments.filter(adj => filterByDate(adj.date) && adj.product === product).forEach(adj => { const key = adj.caliber; const curr = productAdjustments.get(key) || { kg: 0, packages: 0 }; const sign = adj.type === 'increase' ? 1 : -1; curr.kg += adj.quantity * sign; curr.packages += (adj.packagingQuantity || 0) * sign; productAdjustments.set(key, curr); productCalibers.add(key); });
-
-            Array.from(productCalibers).forEach(caliber => {
-                const initial = productInitialStock.get(caliber) || { kg: 0, packages: 0 };
-                const inflows = productInflows.get(caliber) || { kg: 0, packages: 0 };
-                const outflows = productOutflows.get(caliber) || { kg: 0, packages: 0 };
-                const adjustments = productAdjustments.get(caliber) || { kg: 0, packages: 0 };
-
-                allProductsData.push({
-                    'Producto': product,
-                    'Calibre': caliber,
-                    'Stock Inicial (kg)': initial.kg,
-                    'Entradas (kg)': inflows.kg,
-                    'Salidas (kg)': outflows.kg,
-                    'Ajustes (kg)': adjustments.kg,
-                    'Stock Final (kg)': initial.kg + inflows.kg - outflows.kg + adjustments.kg,
-                    'Stock Inicial (envases)': initial.packages,
-                    'Entradas (envases)': inflows.packages,
-                    'Salidas (envases)': outflows.packages,
-                    'Ajustes (envases)': adjustments.packages,
-                    'Stock Final (envases)': initial.packages + inflows.packages - outflows.packages + adjustments.packages,
+        // Aggregate all movements
+        purchaseOrders.filter(po => po.status === 'completed').forEach(po => {
+            po.items.forEach(item => {
+                allTransactions.push({
+                    'ID Producto': `${item.product}-${item.caliber}-${po.warehouse}`,
+                    'Producto': item.product, 'Calibre': item.caliber, 'Bodega': po.warehouse, 'Fecha': po.date,
+                    'Tipo Movimiento': 'Entrada', 'Documento/Motivo': po.id,
+                    'Contacto': contacts.find(c => c.id === po.supplierId)?.name || 'N/A', 'Lote': item.lotNumber || '',
+                    'Mov. Envases': item.packagingQuantity || 0, 'Mov. Kilos': item.quantity
                 });
             });
         });
 
-        const worksheet = XLSX.utils.json_to_sheet(allProductsData);
+        salesOrders.filter(so => so.status !== 'cancelled').forEach(so => {
+            so.items.forEach(item => {
+                // Outflow from source warehouse
+                allTransactions.push({
+                    'ID Producto': `${item.product}-${item.caliber}-${so.warehouse}`,
+                    'Producto': item.product, 'Calibre': item.caliber, 'Bodega': so.warehouse!, 'Fecha': so.date,
+                    'Tipo Movimiento': 'Salida', 'Documento/Motivo': so.id,
+                    'Contacto': contacts.find(c => c.id === so.clientId)?.name || 'N/A', 'Lote': item.lotNumber || '',
+                    'Mov. Envases': -(item.packagingQuantity || 0), 'Mov. Kilos': -item.quantity
+                });
+                // Inflow for transfers
+                if (so.movementType === 'Traslado Bodega Interna' && so.destinationWarehouse) {
+                    allTransactions.push({
+                        'ID Producto': `${item.product}-${item.caliber}-${so.destinationWarehouse}`,
+                        'Producto': item.product, 'Calibre': item.caliber, 'Bodega': so.destinationWarehouse, 'Fecha': so.date,
+                        'Tipo Movimiento': 'Entrada', 'Documento/Motivo': `Traspaso desde ${so.id}`,
+                        'Contacto': 'Interno', 'Lote': item.lotNumber || '',
+                        'Mov. Envases': item.packagingQuantity || 0, 'Mov. Kilos': item.quantity
+                    });
+                }
+            });
+        });
+
+        inventoryAdjustments.forEach(adj => {
+            allTransactions.push({
+                'ID Producto': `${adj.product}-${adj.caliber}-${adj.warehouse}`,
+                'Producto': adj.product, 'Calibre': adj.caliber, 'Bodega': adj.warehouse, 'Fecha': adj.date,
+                'Tipo Movimiento': adj.type === 'increase' ? 'Ajuste Aumento' : 'Ajuste Disminución',
+                'Documento/Motivo': adj.reason, 'Contacto': 'Interno', 'Lote': adj.lotNumber || '',
+                'Mov. Envases': adj.type === 'increase' ? (adj.packagingQuantity || 0) : -(adj.packagingQuantity || 0),
+                'Mov. Kilos': adj.type === 'increase' ? adj.quantity : -adj.quantity
+            });
+        });
+
+        // Sort all transactions chronologically
+        allTransactions.sort((a, b) => new Date(a.Fecha).getTime() - new Date(b.Fecha).getTime());
+
+        // Calculate running balance
+        allTransactions.forEach(tx => {
+            const key = tx['ID Producto'];
+            const currentBalance = inventoryMap.get(key) || { balancePackages: 0, balanceKilos: 0 };
+            currentBalance.balancePackages += tx['Mov. Envases'];
+            currentBalance.balanceKilos += tx['Mov. Kilos'];
+            tx['Saldo Envases'] = currentBalance.balancePackages;
+            tx['Saldo Kilos'] = currentBalance.balanceKilos;
+            inventoryMap.set(key, currentBalance);
+        });
+
+        if (allTransactions.length === 0) {
+            toast({ variant: 'destructive', title: 'Sin Datos', description: 'No hay movimientos de inventario para exportar.' });
+            return;
+        }
+
+        const worksheet = XLSX.utils.json_to_sheet(allTransactions);
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario General');
-        XLSX.writeFile(workbook, `Reporte_Inventario_General_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-        toast({ title: 'Exportación General Exitosa' });
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Historial General');
+        XLSX.writeFile(workbook, `Historial_Inventario_General_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+        toast({ title: 'Exportación Exitosa', description: 'El historial completo del inventario ha sido exportado.' });
     };
 
     const handleExportLots = () => {
@@ -812,7 +850,7 @@ export default function InventoryPage() {
                                     <CardDescription>Consulta el movimiento de stock por producto en un rango de fechas.</CardDescription>
                                 </div>
                                 <div className="flex gap-2 no-print">
-                                    <Button variant="outline" onClick={handleExportAll}><Download className="mr-2 h-4 w-4" />Exportar Todo</Button>
+                                    <Button variant="outline" onClick={handleExportAll}><Download className="mr-2 h-4 w-4" />Exportar Historial</Button>
                                     <Button variant="outline" onClick={() => setIsPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Vista Previa</Button>
                                 </div>
                             </div>
@@ -936,6 +974,7 @@ export default function InventoryPage() {
         </>
     );
 }
+
 
 
 
