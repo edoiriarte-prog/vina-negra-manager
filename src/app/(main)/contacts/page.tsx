@@ -1,10 +1,8 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useLocalStorage } from '@/hooks/use-local-storage';
-import { contacts as initialContacts } from '@/lib/data';
+import { useCollection, useFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { Contact, Interaction } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
@@ -24,56 +22,55 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { collection, doc } from 'firebase/firestore';
 
 
 export default function ContactsPage() {
-  const [contacts, setContacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+  const { firestore } = useFirebase();
+  const { data: contacts, isLoading } = useCollection<Contact>(firestore ? collection(firestore, 'contacts') : null);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const { toast } = useToast();
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const handleSaveContact = (contactData: Contact | Omit<Contact, 'id'>, newInteraction?: Omit<Interaction, 'id'>) => {
+    if (!firestore) return;
 
-
-  const handleSaveContact = (contact: Contact | Omit<Contact, 'id'>, newInteraction?: Omit<Interaction, 'id'>) => {
-    if ('id' in contact) {
+    if ('id' in contactData) {
       // Update
-      const contactToUpdate = { ...contact };
+      const contactToUpdate = { ...contactData };
       if (newInteraction) {
         const interaction: Interaction = { ...newInteraction, id: `int-${Date.now()}` };
         contactToUpdate.interactions = [...(contactToUpdate.interactions || []), interaction].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       }
-      setContacts(prev => prev.map(c => c.id === contact.id ? contactToUpdate : c));
-       toast({ title: "Contacto Actualizado", description: `El contacto ${contact.name} ha sido actualizado.` });
+      const docRef = doc(firestore, 'contacts', contactData.id);
+      setDocumentNonBlocking(docRef, contactToUpdate, { merge: true });
+      toast({ title: "Contacto Actualizado", description: `El contacto ${contactData.name} ha sido actualizado.` });
     } else {
       // Add
+      const newContactId = `contact-${Date.now()}`;
       const newContact: Contact = {
-        ...contact,
-        id: `contact-${Date.now()}`,
+        ...contactData,
+        id: newContactId,
         interactions: [],
-        tags: contact.tags || [],
-        type: contact.type || [],
+        tags: contactData.tags || [],
+        type: contactData.type || [],
       };
       if (newInteraction) {
          const interaction: Interaction = { ...newInteraction, id: `int-${Date.now()}` };
          newContact.interactions = [interaction];
       }
-      setContacts(prev => [...prev, newContact]);
-       toast({ title: "Contacto Creado", description: `El contacto ${contact.name} ha sido creado.` });
+      const docRef = doc(firestore, 'contacts', newContactId);
+      setDocumentNonBlocking(docRef, newContact, { merge: false });
+      toast({ title: "Contacto Creado", description: `El contacto ${contactData.name} ha sido creado.` });
     }
-    // We don't close the sheet here to allow adding multiple interactions
-    // but if it's a new contact, we should probably close it to avoid confusion
-    if (!('id' in contact)) {
+    
+    if (!('id' in contactData)) {
       setIsSheetOpen(false); 
       setEditingContact(null);
     } else {
-      // If editing, find the updated contact and set it to refresh the sheet's state
-      const updatedContact = contacts.find(c => c.id === contact.id);
+      const updatedContact = contacts?.find(c => c.id === contactData.id);
       if (updatedContact) {
         const contactWithNewInteraction = { ...updatedContact };
          if (newInteraction) {
@@ -86,20 +83,19 @@ export default function ContactsPage() {
   };
   
   const handleDeleteInteraction = (contactId: string, interactionId: string) => {
-    setContacts(prev => prev.map(c => {
-        if (c.id === contactId) {
-            const updatedInteractions = c.interactions?.filter(i => i.id !== interactionId);
-            const updatedContact = { ...c, interactions: updatedInteractions };
-            
-            // If we are currently editing this contact, update the editingContact state
-            if (editingContact?.id === contactId) {
-                setEditingContact(updatedContact);
-            }
-            return updatedContact;
-        }
-        return c;
-    }));
-    toast({ variant: "destructive", title: "Interacción Eliminada" });
+    if (!firestore) return;
+    const contact = contacts?.find(c => c.id === contactId);
+    if (contact) {
+      const updatedInteractions = contact.interactions?.filter(i => i.id !== interactionId);
+      const updatedContact = { ...contact, interactions: updatedInteractions };
+      const docRef = doc(firestore, 'contacts', contactId);
+      setDocumentNonBlocking(docRef, updatedContact, { merge: true });
+
+      if (editingContact?.id === contactId) {
+          setEditingContact(updatedContact);
+      }
+      toast({ variant: "destructive", title: "Interacción Eliminada" });
+    }
   };
 
 
@@ -120,8 +116,9 @@ export default function ContactsPage() {
   };
   
   const confirmDelete = () => {
-    if (deletingContact) {
-      setContacts((prev) => prev.filter((c) => c.id !== deletingContact.id));
+    if (deletingContact && firestore) {
+      const docRef = doc(firestore, 'contacts', deletingContact.id);
+      deleteDocumentNonBlocking(docRef);
       toast({ variant: "destructive", title: "Contacto Eliminado", description: `El contacto ${deletingContact.name} ha sido eliminado.` });
       setDeletingContact(null);
     }
@@ -143,7 +140,7 @@ export default function ContactsPage() {
   }
 
   const renderContent = () => {
-    if (!isClient) {
+    if (isLoading) {
       return (
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
@@ -151,7 +148,7 @@ export default function ContactsPage() {
         </div>
       );
     }
-    return <DataTable columns={columns} data={contacts} onRowClick={handleRowClick} />;
+    return <DataTable columns={columns} data={contacts || []} onRowClick={handleRowClick} />;
   };
 
   return (

@@ -1,8 +1,7 @@
-
-"use client";
+'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useLocalStorage } from '@/hooks/use-local-storage';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import {
   Card,
   CardContent,
@@ -18,169 +17,248 @@ import {
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu';
+
 import {
-  purchaseOrders as initialPurchaseOrders,
-  salesOrders as initialSalesOrders,
-  serviceOrders as initialServiceOrders,
-  financialMovements as initialFinancialMovements,
-  getInventory,
-  contacts as initialContacts
-} from '@/lib/data';
-import { PurchaseOrder, SalesOrder, ServiceOrder, FinancialMovement, BankAccount, InventoryItem, Contact } from '@/lib/types';
+  PurchaseOrder,
+  SalesOrder,
+  ServiceOrder,
+  FinancialMovement,
+  BankAccount,
+  InventoryItem,
+  Contact,
+} from '@/lib/types';
 import KpiCard from './components/kpi-card';
-import { Boxes, DollarSign, MinusCircle, PlusCircle, ShoppingBag, ShoppingCart, TrendingUp, Wallet, Scale, Users, FileWarning } from 'lucide-react';
-import { WeeklyPurchasesChart, CaliberDistributionChart, IncomeVsExpenseChart, WeeklySalesChart, PurchasesBySupplierChart, PurchasesByProductCaliberChart, SalesByOrderChart } from './components/charts';
+import {
+  Boxes,
+  DollarSign,
+  MinusCircle,
+  PlusCircle,
+  ShoppingBag,
+  ShoppingCart,
+  TrendingUp,
+  Wallet,
+  Scale,
+  Users,
+  FileWarning,
+} from 'lucide-react';
+import {
+  WeeklyPurchasesChart,
+  CaliberDistributionChart,
+  IncomeVsExpenseChart,
+  WeeklySalesChart,
+  PurchasesBySupplierChart,
+  PurchasesByProductCaliberChart,
+  SalesByOrderChart,
+} from './components/charts';
 import AiSummary from './components/ai-summary';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { collection } from 'firebase/firestore';
+import { getInventory } from '@/lib/data';
 
 export default function DashboardPage() {
-  const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
-  const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
-  const [serviceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
-  const [financialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
-  const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
-  const [inventory, setInventory] = useLocalStorage<InventoryItem[]>('inventory', []);
+  const { firestore } = useFirebase();
+
+  const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
+  const { data: purchaseOrders, isLoading: loadingPurchases } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
+  
+  const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
+  const { data: salesOrders, isLoading: loadingSales } = useCollection<SalesOrder>(salesOrdersQuery);
+
+  const serviceOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'serviceOrders') : null, [firestore]);
+  const { data: serviceOrders, isLoading: loadingServices } = useCollection<ServiceOrder>(serviceOrdersQuery);
+
+  const financialMovementsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financialMovements') : null, [firestore]);
+  const { data: financialMovements, isLoading: loadingFinancials } = useCollection<FinancialMovement>(financialMovementsQuery);
+
+  const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
+  const { data: contacts, isLoading: loadingContacts } = useCollection<Contact>(contactsQuery);
+
+
   const { bankAccounts } = useMasterData();
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  
+  const isLoading = loadingPurchases || loadingSales || loadingServices || loadingFinancials || loadingContacts;
 
   useEffect(() => {
     setIsClient(true);
-    // Note: getInventory might be computationally expensive.
-    // For a real app, this should be calculated on the backend or memoized more heavily.
-    setInventory(getInventory(purchaseOrders, salesOrders));
-  }, [purchaseOrders, salesOrders, isClient, setInventory]);
-  
-  const totalKilosPurchased = useMemo(() =>
-    purchaseOrders
-      .filter(po => po.status === 'completed')
-      .reduce((sum, po) => sum + po.totalKilos, 0),
+    if (purchaseOrders && salesOrders) {
+      setInventory(getInventory(purchaseOrders, salesOrders));
+    }
+  }, [purchaseOrders, salesOrders, isClient]);
+
+  const totalKilosPurchased = useMemo(
+    () =>
+      purchaseOrders
+        ?.filter(po => po.status === 'completed')
+        .reduce((sum, po) => sum + po.totalKilos, 0) || 0,
     [purchaseOrders]
   );
 
-  const totalKilosSold = useMemo(() =>
-    salesOrders
-      .filter(so => so.status === 'completed' && so.orderType !== 'dispatch')
-      .reduce((sum, so) => sum + so.totalKilos, 0),
+  const totalKilosSold = useMemo(
+    () =>
+      salesOrders
+        ?.filter(so => so.status === 'completed' && so.orderType !== 'dispatch')
+        .reduce((sum, so) => sum + so.totalKilos, 0) || 0,
     [salesOrders]
   );
-  
-  const totalIncome = useMemo(() => 
-    financialMovements
-        .filter((m) => m.type === 'income')
-        .reduce((sum, m) => sum + m.amount, 0),
+
+  const totalIncome = useMemo(
+    () =>
+      financialMovements
+        ?.filter(m => m.type === 'income')
+        .reduce((sum, m) => sum + m.amount, 0) || 0,
     [financialMovements]
   );
-  
-  const totalExpense = useMemo(() =>
-    financialMovements
-        .filter((m) => m.type === 'expense')
-        .reduce((sum, m) => sum + m.amount, 0),
+
+  const totalExpense = useMemo(
+    () =>
+      financialMovements
+        ?.filter(m => m.type === 'expense')
+        .reduce((sum, m) => sum + m.amount, 0) || 0,
     [financialMovements]
   );
-  
+
   const grossProfit = totalIncome - totalExpense;
 
-  const totalSalesAmount = useMemo(() =>
-    salesOrders
-      .filter(so => so.status === 'completed' && so.orderType !== 'dispatch')
-      .reduce((sum, order) => sum + order.totalAmount, 0),
+  const totalSalesAmount = useMemo(
+    () =>
+      salesOrders
+        ?.filter(so => so.status === 'completed' && so.orderType !== 'dispatch')
+        .reduce((sum, order) => sum + order.totalAmount, 0) || 0,
     [salesOrders]
   );
-  
-  const totalPurchasesAmount = useMemo(() =>
-    purchaseOrders
-      .filter(po => po.status === 'completed')
-      .reduce((sum, order) => sum + order.totalAmount, 0),
+
+  const totalPurchasesAmount = useMemo(
+    () =>
+      purchaseOrders
+        ?.filter(po => po.status === 'completed')
+        .reduce((sum, order) => sum + order.totalAmount, 0) || 0,
     [purchaseOrders]
   );
-  
-  const totalServicesAmount = useMemo(() =>
-    serviceOrders.reduce((sum, order) => sum + order.cost, 0),
+
+  const totalServicesAmount = useMemo(
+    () => serviceOrders?.reduce((sum, order) => sum + order.cost, 0) || 0,
     [serviceOrders]
   );
-  
-  const totalPurchasesAndServicesAmount = totalPurchasesAmount + totalServicesAmount;
+
+  const totalPurchasesAndServicesAmount =
+    totalPurchasesAmount + totalServicesAmount;
 
   const totalPaidToSuppliers = useMemo(() => {
-    const supplierIds = new Set(contacts.filter(c => c.type.includes('supplier')).map(c => c.id));
-    return financialMovements
-      .filter(fm => fm.type === 'expense' && fm.contactId && supplierIds.has(fm.contactId))
-      .reduce((sum, fm) => sum + fm.amount, 0);
+    if (!financialMovements || !contacts) return 0;
+    const supplierIds = new Set(
+      contacts.filter(c => Array.isArray(c.type) && c.type.includes('supplier')).map(c => c.id)
+    );
+    return (
+      financialMovements
+        .filter(
+          fm =>
+            fm.type === 'expense' &&
+            fm.contactId &&
+            supplierIds.has(fm.contactId)
+        )
+        .reduce((sum, fm) => sum + fm.amount, 0)
+    );
   }, [financialMovements, contacts]);
 
   const supplierBalance = totalPurchasesAndServicesAmount - totalPaidToSuppliers;
 
   const supplierCount = useMemo(() => {
-    return new Set(contacts.filter(c => c.type.includes('supplier')).map(c => c.id)).size;
+    if (!contacts) return 0;
+    return new Set(contacts.filter(c => Array.isArray(c.type) && c.type.includes('supplier')).map(c => c.id)).size;
   }, [contacts]);
 
   // --- Sales KPIs based on filter ---
   const filteredSalesOrders = useMemo(() => {
+    if (!salesOrders) return [];
     let relevantOrders = salesOrders.filter(o => o.orderType !== 'dispatch');
     if (selectedClientIds.length === 0) {
       return relevantOrders;
     }
-    return relevantOrders.filter(order => selectedClientIds.includes(order.clientId));
+    return relevantOrders.filter(order =>
+      selectedClientIds.includes(order.clientId)
+    );
   }, [salesOrders, selectedClientIds]);
 
-  const filteredTotalSalesAmount = useMemo(() =>
-    filteredSalesOrders
-      .filter(so => so.status === 'completed')
-      .reduce((sum, order) => sum + order.totalAmount, 0),
+  const filteredTotalSalesAmount = useMemo(
+    () =>
+      filteredSalesOrders
+        .filter(so => so.status === 'completed')
+        .reduce((sum, order) => sum + order.totalAmount, 0),
     [filteredSalesOrders]
   );
 
   const filteredTotalCollected = useMemo(() => {
-    const clientIds = new Set(contacts.filter(c => c.type.includes('client')).map(c => c.id));
-    return financialMovements
-      .filter(fm => fm.type === 'income' && fm.contactId && clientIds.has(fm.contactId) && (selectedClientIds.length === 0 || selectedClientIds.includes(fm.contactId)))
-      .reduce((sum, fm) => sum + fm.amount, 0);
+    if (!financialMovements || !contacts) return 0;
+    const clientIds = new Set(
+      contacts.filter(c => Array.isArray(c.type) && c.type.includes('client')).map(c => c.id)
+    );
+    return (
+      financialMovements
+        .filter(
+          fm =>
+            fm.type === 'income' &&
+            fm.contactId &&
+            clientIds.has(fm.contactId) &&
+            (selectedClientIds.length === 0 ||
+              selectedClientIds.includes(fm.contactId))
+        )
+        .reduce((sum, fm) => sum + fm.amount, 0)
+    );
   }, [financialMovements, contacts, selectedClientIds]);
 
-  const filteredClientBalance = filteredTotalSalesAmount - filteredTotalCollected;
+  const filteredClientBalance =
+    filteredTotalSalesAmount - filteredTotalCollected;
 
   const clientCount = useMemo(() => {
     if (selectedClientIds.length > 0) return selectedClientIds.length;
-    return new Set(contacts.filter(c => c.type.includes('client')).map(c => c.id)).size;
+    if (!contacts) return 0;
+    return new Set(contacts.filter(c => Array.isArray(c.type) && c.type.includes('client')).map(c => c.id)).size;
   }, [contacts, selectedClientIds]);
-  
-  const clientOptions = useMemo(() => 
-    contacts.filter(c => c.type.includes('client')),
-  [contacts]);
 
+  const clientOptions = useMemo(
+    () => contacts?.filter(c => Array.isArray(c.type) && c.type.includes('client')) || [],
+    [contacts]
+  );
 
   const totalAccountBalance = useMemo(() => {
+    if (!financialMovements) return 0;
     const balanceByAccount: Record<string, number> = {};
 
     bankAccounts.forEach(acc => {
-        balanceByAccount[acc.id] = acc.initialBalance;
+      balanceByAccount[acc.id] = acc.initialBalance;
     });
 
     financialMovements.forEach(mov => {
-        if(mov.destinationAccountId && balanceByAccount[mov.destinationAccountId]) {
-             if (mov.type === 'income' || mov.type === 'traspaso') {
-                balanceByAccount[mov.destinationAccountId] += mov.amount;
-            }
+      if (mov.destinationAccountId && balanceByAccount[mov.destinationAccountId]) {
+        if (mov.type === 'income' || mov.type === 'traspaso') {
+          balanceByAccount[mov.destinationAccountId] += mov.amount;
         }
-        if(mov.sourceAccountId && balanceByAccount[mov.sourceAccountId]) {
-            if (mov.type === 'expense' || mov.type === 'traspaso') {
-                balanceByAccount[mov.sourceAccountId] -= mov.amount;
-            }
+      }
+      if (mov.sourceAccountId && balanceByAccount[mov.sourceAccountId]) {
+        if (mov.type === 'expense' || mov.type === 'traspaso') {
+          balanceByAccount[mov.sourceAccountId] -= mov.amount;
         }
+      }
     });
 
-    return Object.values(balanceByAccount).reduce((sum, balance) => sum + balance, 0);
+    return Object.values(balanceByAccount).reduce(
+      (sum, balance) => sum + balance,
+      0
+    );
   }, [financialMovements, bankAccounts]);
-  
-  const totalStockKilos = useMemo(() => 
-    inventory.reduce((sum, item) => sum + item.stock, 0),
-  [inventory]);
-  
+
+  const totalStockKilos = useMemo(
+    () => inventory.reduce((sum, item) => sum + item.stock, 0),
+    [inventory]
+  );
+
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('es-CL', {
       style: 'currency',
@@ -190,7 +268,6 @@ export default function DashboardPage() {
 
   const formatKilos = (value: number) =>
     `${new Intl.NumberFormat('es-CL').format(value)} kg`;
-
 
   const financialDataString = `
     Ingresos Totales: ${formatCurrency(totalIncome)}
@@ -203,21 +280,32 @@ export default function DashboardPage() {
     Total O/C: ${formatCurrency(totalPurchasesAmount)}
   `;
 
-
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-headline text-3xl">Dashboard</h1>
-      
+
       <Tabs defaultValue="general">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="purchases">Compras</TabsTrigger>
           <TabsTrigger value="sales">Ventas</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="general" className="mt-6">
-           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {isClient ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-5 w-24" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-32" />
+                    <Skeleton className="h-3 w-48 mt-2" />
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
               <>
                 <KpiCard
                   title="Ingresos (Pagos)"
@@ -231,7 +319,7 @@ export default function DashboardPage() {
                   icon={<MinusCircle className="h-5 w-5 text-red-500" />}
                   description={`Suma de todos los pagos de egresos.`}
                 />
-                 <KpiCard
+                <KpiCard
                   title="Utilidad Bruta"
                   value={formatCurrency(grossProfit)}
                   icon={<TrendingUp className="h-5 w-5 text-blue-500" />}
@@ -244,192 +332,258 @@ export default function DashboardPage() {
                   description="Suma de saldos de todas las cuentas."
                 />
               </>
-            ) : (
-              Array.from({ length: 4 }).map((_, i) => (
-                 <Card key={i}><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
-              ))
             )}
           </div>
           <div className="grid gap-6 lg:grid-cols-3 mt-6">
             <Card className="lg:col-span-1">
               <CardHeader>
-                <CardTitle className='font-headline text-xl'>Resumen Ejecutivo IA</CardTitle>
+                <CardTitle className="font-headline text-xl">
+                  Resumen Ejecutivo IA
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                {isClient ? <AiSummary financialData={financialDataString} /> : <Skeleton className="h-24 w-full" />}
+                {isLoading ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : (
+                  <AiSummary financialData={financialDataString} />
+                )}
               </CardContent>
             </Card>
             <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle className='font-headline text-xl'>Ingresos vs Egresos (Semanal)</CardTitle>
+                <CardTitle className="font-headline text-xl">
+                  Ingresos vs Egresos (Semanal)
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                {isClient ? <IncomeVsExpenseChart data={financialMovements} /> : <Skeleton className="h-[300px] w-full" />}
+                {isLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <IncomeVsExpenseChart data={financialMovements || []} />
+                )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
-        
+
         <TabsContent value="purchases" className="mt-6">
-           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {isClient ? (
-                <>
-                  <KpiCard
-                    title="Total Comprado/Servicios"
-                    value={formatCurrency(totalPurchasesAndServicesAmount)}
-                    icon={<ShoppingBag className="h-5 w-5 text-cyan-500" />}
-                    description="Suma de O/C completadas y O/S"
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Card key={`sk-p-${i}`}>
+                  <CardHeader>
+                    <Skeleton className="h-5 w-24" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-32" />
+                    <Skeleton className="h-3 w-48 mt-2" />
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <>
+                <KpiCard
+                  title="Total Comprado/Servicios"
+                  value={formatCurrency(totalPurchasesAndServicesAmount)}
+                  icon={<ShoppingBag className="h-5 w-5 text-cyan-500" />}
+                  description="Suma de O/C completadas y O/S"
+                />
+                <KpiCard
+                  title="Total Pagado (Proveedores)"
+                  value={formatCurrency(totalPaidToSuppliers)}
+                  icon={<DollarSign className="h-5 w-5 text-green-500" />}
+                  description="Suma de pagos a proveedores"
+                />
+                <KpiCard
+                  title="Saldo por Pagar"
+                  value={formatCurrency(supplierBalance)}
+                  icon={<FileWarning className="h-5 w-5 text-red-500" />}
+                  description="Balance pendiente con proveedores"
+                />
+                <KpiCard
+                  title="Total Kilos Comprados"
+                  value={formatKilos(totalKilosPurchased)}
+                  icon={<Scale className="h-5 w-5 text-cyan-500" />}
+                  description="Kilos de O/C completadas"
+                />
+              </>
+            )}
+          </div>
+          <div className="grid gap-6 mt-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-headline text-xl">
+                  Compras Semanales
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <WeeklyPurchasesChart data={purchaseOrders || []} />
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-headline text-xl">
+                  Kilos Comprados por Proveedor
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <PurchasesBySupplierChart
+                    data={purchaseOrders || []}
+                    suppliers={contacts || []}
                   />
-                  <KpiCard
-                    title="Total Pagado (Proveedores)"
-                    value={formatCurrency(totalPaidToSuppliers)}
-                    icon={<DollarSign className="h-5 w-5 text-green-500" />}
-                    description="Suma de pagos a proveedores"
-                  />
-                   <KpiCard
-                    title="Saldo por Pagar"
-                    value={formatCurrency(supplierBalance)}
-                    icon={<FileWarning className="h-5 w-5 text-red-500" />}
-                    description="Balance pendiente con proveedores"
-                  />
-                  <KpiCard
-                    title="Total Kilos Comprados"
-                    value={formatKilos(totalKilosPurchased)}
-                    icon={<Scale className="h-5 w-5 text-cyan-500" />}
-                    description="Kilos de O/C completadas"
-                  />
-                </>
-              ) : (
-                 Array.from({ length: 4 }).map((_, i) => (
-                   <Card key={`sk-p-${i}`}><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
-                ))
-              )}
-           </div>
-           <div className="grid gap-6 mt-6 lg:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className='font-headline text-xl'>Compras Semanales</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isClient ? <WeeklyPurchasesChart data={purchaseOrders} /> : <Skeleton className="h-[300px] w-full" />}
-                </CardContent>
-              </Card>
-               <Card>
-                <CardHeader>
-                  <CardTitle className='font-headline text-xl'>Kilos Comprados por Proveedor</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isClient ? <PurchasesBySupplierChart data={purchaseOrders} suppliers={contacts} /> : <Skeleton className="h-[300px] w-full" />}
-                </CardContent>
-              </Card>
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className='font-headline text-xl'>Monto de Compra por Producto y Calibre</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isClient ? <PurchasesByProductCaliberChart data={purchaseOrders} /> : <Skeleton className="h-[400px] w-full" />}
-                </CardContent>
-              </Card>
-           </div>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="font-headline text-xl">
+                  Monto de Compra por Producto y Calibre
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-[400px] w-full" />
+                ) : (
+                  <PurchasesByProductCaliberChart data={purchaseOrders || []} />
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
-        
+
         <TabsContent value="sales" className="mt-6">
-             <div className="mb-4">
-                <Label htmlFor="client-filter">Filtrar por Cliente</Label>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="w-full max-w-sm justify-between">
-                            <span>
-                                {selectedClientIds.length === 0
-                                ? 'Todos los Clientes'
-                                : selectedClientIds.length === 1
-                                ? contacts.find(c => c.id === selectedClientIds[0])?.name
-                                : `${selectedClientIds.length} clientes seleccionados`}
-                            </span>
-                             <Users className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-full max-w-sm">
-                        <DropdownMenuLabel>Seleccionar Clientes</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuCheckboxItem
-                            checked={selectedClientIds.length === 0}
-                            onCheckedChange={(checked) => {
-                                if (checked) setSelectedClientIds([]);
-                            }}
-                        >
-                            Todos los Clientes
-                        </DropdownMenuCheckboxItem>
-                        {clientOptions.map(client => (
-                            <DropdownMenuCheckboxItem
-                                key={client.id}
-                                checked={selectedClientIds.includes(client.id)}
-                                onCheckedChange={(checked) => {
-                                    setSelectedClientIds(prev => 
-                                        checked 
-                                            ? [...prev, client.id] 
-                                            : prev.filter(id => id !== client.id)
-                                    );
-                                }}
-                            >
-                                {client.name}
-                            </DropdownMenuCheckboxItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {isClient ? (
-                <>
-                  <KpiCard
-                    title="Monto Total Vendido"
-                    value={formatCurrency(filteredTotalSalesAmount)}
-                    icon={<ShoppingCart className="h-5 w-5 text-lime-500" />}
-                    description="Suma de todas las O/V completadas"
-                  />
-                  <KpiCard
-                    title="Total Cobrado (Clientes)"
-                    value={formatCurrency(filteredTotalCollected)}
-                    icon={<DollarSign className="h-5 w-5 text-green-500" />}
-                    description="Total de ingresos de clientes"
-                  />
-                  <KpiCard
-                    title="Saldo por Cobrar"
-                    value={formatCurrency(filteredClientBalance)}
-                    icon={<FileWarning className="h-5 w-5 text-orange-500" />}
-                    description="Balance pendiente de clientes"
-                  />
-                  <KpiCard
-                    title="Nº de Clientes"
-                    value={clientCount.toString()}
-                    icon={<Users className="h-5 w-5 text-lime-500" />}
-                    description={selectedClientIds.length === 0 ? "Total de clientes activos" : selectedClientIds.length === 1 ? "Cliente seleccionado" : "Clientes seleccionados"}
-                  />
-                </>
-              ) : (
-                 Array.from({ length: 4 }).map((_, i) => (
-                   <Card key={`sk-s-${i}`}><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-32" /><Skeleton className="h-3 w-48 mt-2" /></CardContent></Card>
-                ))
-              )}
-           </div>
-           <div className="grid gap-6 mt-6 grid-cols-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle className='font-headline text-xl'>Ventas Semanales</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isClient ? <WeeklySalesChart data={filteredSalesOrders} /> : <Skeleton className="h-[300px] w-full" />}
-                </CardContent>
-              </Card>
-               <Card>
-                <CardHeader>
-                  <CardTitle className='font-headline text-xl'>Distribución por Kilos en O/V</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isClient ? <SalesByOrderChart data={filteredSalesOrders} /> : <Skeleton className="h-[300px] w-full" />}
-                </CardContent>
-              </Card>
-           </div>
+          <div className="mb-4">
+            <Label htmlFor="client-filter">Filtrar por Cliente</Label>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full max-w-sm justify-between"
+                >
+                  <span>
+                    {selectedClientIds.length === 0
+                      ? 'Todos los Clientes'
+                      : selectedClientIds.length === 1
+                      ? contacts?.find(c => c.id === selectedClientIds[0])?.name
+                      : `${selectedClientIds.length} clientes seleccionados`}
+                  </span>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-full max-w-sm">
+                <DropdownMenuLabel>Seleccionar Clientes</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  checked={selectedClientIds.length === 0}
+                  onCheckedChange={checked => {
+                    if (checked) setSelectedClientIds([]);
+                  }}
+                >
+                  Todos los Clientes
+                </DropdownMenuCheckboxItem>
+                {clientOptions.map(client => (
+                  <DropdownMenuCheckboxItem
+                    key={client.id}
+                    checked={selectedClientIds.includes(client.id)}
+                    onCheckedChange={checked => {
+                      setSelectedClientIds(prev =>
+                        checked
+                          ? [...prev, client.id]
+                          : prev.filter(id => id !== client.id)
+                      );
+                    }}
+                  >
+                    {client.name}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Card key={`sk-s-${i}`}>
+                  <CardHeader>
+                    <Skeleton className="h-5 w-24" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-32" />
+                    <Skeleton className="h-3 w-48 mt-2" />
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <>
+                <KpiCard
+                  title="Monto Total Vendido"
+                  value={formatCurrency(filteredTotalSalesAmount)}
+                  icon={<ShoppingCart className="h-5 w-5 text-lime-500" />}
+                  description="Suma de todas las O/V completadas"
+                />
+                <KpiCard
+                  title="Total Cobrado (Clientes)"
+                  value={formatCurrency(filteredTotalCollected)}
+                  icon={<DollarSign className="h-5 w-5 text-green-500" />}
+                  description="Total de ingresos de clientes"
+                />
+                <KpiCard
+                  title="Saldo por Cobrar"
+                  value={formatCurrency(filteredClientBalance)}
+                  icon={<FileWarning className="h-5 w-5 text-orange-500" />}
+                  description="Balance pendiente de clientes"
+                />
+                <KpiCard
+                  title="Nº de Clientes"
+                  value={clientCount.toString()}
+                  icon={<Users className="h-5 w-5 text-lime-500" />}
+                  description={
+                    selectedClientIds.length === 0
+                      ? 'Total de clientes activos'
+                      : selectedClientIds.length === 1
+                      ? 'Cliente seleccionado'
+                      : 'Clientes seleccionados'
+                  }
+                />
+              </>
+            )}
+          </div>
+          <div className="grid gap-6 mt-6 grid-cols-1">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-headline text-xl">
+                  Ventas Semanales
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <WeeklySalesChart data={filteredSalesOrders} />
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-headline text-xl">
+                  Distribución por Kilos en O/V
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <SalesByOrderChart data={filteredSalesOrders} />
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

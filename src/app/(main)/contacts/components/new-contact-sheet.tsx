@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, KeyboardEvent } from 'react';
@@ -25,12 +24,13 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useFirebase } from '@/firebase';
 
 
 type NewContactSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (contact: Contact | Omit<Contact, 'id' | 'interactions'>, newInteraction?: Omit<Interaction, 'id'>) => void;
+  onSave: (contact: Contact | Omit<Contact, 'id'>, newInteraction?: Omit<Interaction, 'id'>) => void;
   contact: Contact | null;
   defaultTab?: string;
   onDeleteInteraction: (contactId: string, interactionId: string) => void;
@@ -48,7 +48,7 @@ const getInitialFormData = (contact: Contact | null): Omit<Contact, 'id' | 'inte
     // Backward compatibility: if type is a string, convert to array
     const contactType = Array.isArray(contact.type) 
         ? contact.type 
-        : (contact.type === 'both' ? ['client', 'supplier'] : [contact.type]);
+        : (contact.type === 'both' ? ['client', 'supplier'] : (contact.type ? [contact.type] : []));
       
     return {
       name: contact.name,
@@ -347,5 +347,3 @@ export function NewContactSheet({ isOpen, onOpenChange, onSave, contact, default
     </Sheet>
   );
 }
-
-    

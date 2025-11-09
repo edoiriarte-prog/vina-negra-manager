@@ -1,5 +1,3 @@
-
-
 import { BankAccount } from './types';
 
 export const initialProducts = ["PALTAS", "UVAS", "DURAZNOS", "CLEMENTINAS", "MANDARINAS"];
@@ -19,6 +17,9 @@ export const initialCalibers = [
 export const initialUnits = ["Kilos", "Cajas"];
 export const initialPackagingTypes = ["CAJAS", "BINS", "PALLETS", "SACOS"];
 export const initialWarehouses = ["Bodega Principal", "Cámara de Frío 1", "Campo A", "BODEGA CASA ACONCAGUA 80"];
+export const initialInternalConcepts = ["Retiro de Socios", "Pago de Impuestos", "Comisión Bancaria", "Préstamo Interno", "Otro"];
+export const initialCostCenters = ["Administración", "Producción", "Ventas", "Logística"];
+
 export const initialBankAccounts: BankAccount[] = [
     {
         id: 'acc-1',
@@ -58,10 +59,3 @@ export const productCaliberMatrix: ProductMatrix = {
     "CLEMENTINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
     "MANDARINAS": ["EXTRA", "PRIMERA", "SEGUNDA", "TERCERA", "CUARTA", "QUINTA", "DESCARTES", "ETIOLADAS"],
 };
-
-
-
-
-
-
-

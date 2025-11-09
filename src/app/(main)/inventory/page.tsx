@@ -3,9 +3,9 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useLocalStorage } from '@/hooks/use-local-storage';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 import { PurchaseOrder, SalesOrder, InventoryAdjustment, Contact } from '@/lib/types';
-import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, inventoryAdjustments as initialInventoryAdjustments, contacts as initialContacts } from '@/lib/data';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -76,10 +76,17 @@ const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(
 
 
 export default function InventoryPage() {
-    const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
-    const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
-    const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
-    const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+    const { firestore } = useFirebase();
+    const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
+    const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
+    const inventoryAdjustmentsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'inventoryAdjustments') : null, [firestore]);
+    const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
+
+    const { data: purchaseOrders, isLoading: isLoadingPO } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
+    const { data: salesOrders, isLoading: isLoadingSO } = useCollection<SalesOrder>(salesOrdersQuery);
+    const { data: inventoryAdjustments, isLoading: isLoadingIA } = useCollection<InventoryAdjustment>(inventoryAdjustmentsQuery);
+    const { data: contacts, isLoading: isLoadingContacts } = useCollection<Contact>(contactsQuery);
+    
     const { calibers: masterCalibers, warehouses, products: masterProducts } = useMasterData();
 
     const [isClient, setIsClient] = useState(false);
@@ -113,9 +120,10 @@ export default function InventoryPage() {
         }
     }, [isClient, masterProducts, selectedProduct]);
 
+    const isLoading = isLoadingPO || isLoadingSO || isLoadingIA || isLoadingContacts;
 
     useEffect(() => {
-        if (isClient && selectedProduct) {
+        if (isClient && !isLoading && selectedProduct && purchaseOrders && salesOrders && inventoryAdjustments) {
             const getStockAsOf = (date: Date, product: string) => {
                 const stockMap = new Map<string, { kg: number, packages: number }>();
 
@@ -286,10 +294,10 @@ export default function InventoryPage() {
             
             setInventoryData(reportData);
         }
-    }, [isClient, dateRange, selectedWarehouse, selectedProduct, purchaseOrders, salesOrders, inventoryAdjustments, masterCalibers, masterProducts]);
+    }, [isClient, isLoading, dateRange, selectedWarehouse, selectedProduct, purchaseOrders, salesOrders, inventoryAdjustments, masterCalibers, masterProducts]);
     
     const lotTraceabilityData = useMemo(() => {
-        if (!isClient) return [];
+        if (!isClient || !purchaseOrders || !salesOrders || !inventoryAdjustments || !contacts) return [];
     
         const lots = new Map<string, LotTraceability>();
     
@@ -335,15 +343,15 @@ export default function InventoryPage() {
         });
     
         // 2. Process all sales and adjustments
-        const allOutflows: {item: OrderItem | InventoryAdjustment, movement: SalesOrder | InventoryAdjustment}[] = [
-            ...salesOrders.flatMap(so => so.items.map(i => ({item: i, movement: so}))),
+        const allOutflows: {item: (SalesOrder['items'][0] & {warehouse: string}) | InventoryAdjustment, movement: SalesOrder | InventoryAdjustment}[] = [
+            ...salesOrders.flatMap(so => so.items.map(i => ({item: {...i, warehouse: so.warehouse!}, movement: so}))),
             ...inventoryAdjustments.map(adj => ({item: adj, movement: adj}))
         ];
     
         allOutflows.forEach(({item, movement}) => {
-            if (item.lotNumber && lots.has(item.lotNumber)) {
+            if ('lotNumber' in item && item.lotNumber && lots.has(item.lotNumber)) {
                 const lotData = lots.get(item.lotNumber)!;
-                const warehouse = 'warehouse' in movement ? movement.warehouse : '';
+                const warehouse = item.warehouse;
                 const date = 'date' in movement ? movement.date : '';
                 const kilos = item.quantity;
                 const packages = item.packagingQuantity || 0;
@@ -395,7 +403,7 @@ export default function InventoryPage() {
         
         return Array.from(lots.values()).sort((a,b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
     
-    }, [isClient, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
+    }, [isClient, isLoading, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
 
     const filteredLotTraceabilityData = useMemo(() => {
         let filtered = lotTraceabilityData;
@@ -470,7 +478,10 @@ export default function InventoryPage() {
     };
 
     const handleExportAll = () => {
-        if (!isClient) return;
+        if (!isClient || isLoading || !purchaseOrders || !salesOrders || !inventoryAdjustments) {
+            toast({ variant: 'destructive', title: 'Datos no listos', description: 'Espere a que los datos se carguen completamente.' });
+            return;
+        }
 
         type Transaction = {
             'ID Producto': string,
@@ -498,7 +509,7 @@ export default function InventoryPage() {
                     'ID Producto': `${item.product}-${item.caliber}-${po.warehouse}`,
                     'Producto': item.product, 'Calibre': item.caliber, 'Bodega': po.warehouse, 'Fecha': po.date,
                     'Tipo Movimiento': 'Entrada', 'Documento/Motivo': po.id,
-                    'Contacto': contacts.find(c => c.id === po.supplierId)?.name || 'N/A', 'Lote': item.lotNumber || '',
+                    'Contacto': contacts?.find(c => c.id === po.supplierId)?.name || 'N/A', 'Lote': item.lotNumber || '',
                     'Mov. Envases': item.packagingQuantity || 0, 'Mov. Kilos': item.quantity
                 });
             });
@@ -511,7 +522,7 @@ export default function InventoryPage() {
                     'ID Producto': `${item.product}-${item.caliber}-${so.warehouse}`,
                     'Producto': item.product, 'Calibre': item.caliber, 'Bodega': so.warehouse!, 'Fecha': so.date,
                     'Tipo Movimiento': 'Salida', 'Documento/Motivo': so.id,
-                    'Contacto': contacts.find(c => c.id === so.clientId)?.name || 'N/A', 'Lote': item.lotNumber || '',
+                    'Contacto': contacts?.find(c => c.id === so.clientId)?.name || 'N/A', 'Lote': item.lotNumber || '',
                     'Mov. Envases': -(item.packagingQuantity || 0), 'Mov. Kilos': -item.quantity
                 });
                 // Inflow for transfers
@@ -589,7 +600,7 @@ export default function InventoryPage() {
                 'Producto': lot.product,
                 'Calibre': lot.caliber,
                 'Proveedor': lot.supplierName,
-                'Cliente': mov.clientId ? contacts.find(c => c.id === mov.clientId)?.name || 'N/A' : '',
+                'Cliente': mov.clientId && contacts ? contacts.find(c => c.id === mov.clientId)?.name || 'N/A' : '',
                 'Fecha Mov.': format(parseISO(mov.date), 'dd-MM-yyyy'),
                 'Tipo Mov.': mov.type,
                 'Documento/Motivo': mov.documentId,
@@ -629,7 +640,7 @@ export default function InventoryPage() {
     }, [inventoryData]);
 
     const renderReportContent = (isPrint = false) => {
-        if (!isClient) {
+        if (!isClient || isLoading) {
             return <Skeleton className="h-96 w-full" />;
         }
 
@@ -709,7 +720,7 @@ export default function InventoryPage() {
     }
     
      const renderLotInventoryContent = () => {
-        if (!isClient) return <Skeleton className="h-96 w-full" />;
+        if (!isClient || isLoading) return <Skeleton className="h-96 w-full" />;
     
         return (
             <>
@@ -974,8 +985,3 @@ export default function InventoryPage() {
         </>
     );
 }
-
-
-
-
-

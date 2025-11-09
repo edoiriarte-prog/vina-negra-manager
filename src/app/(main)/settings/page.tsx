@@ -1,13 +1,17 @@
-
-
-"use client";
+'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/card';
 import { useMasterData, CaliberMaster } from '@/hooks/use-master-data';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Trash2, PlusCircle, Download, Edit, X } from 'lucide-react';
+import { Trash2, PlusCircle, Download, Edit, X, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { BankAccount } from '@/lib/types';
@@ -21,30 +25,36 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { useFirebase, useCollection } from '@/firebase';
+import { collection, doc, setDoc } from 'firebase/firestore';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import {
+  addDocumentNonBlocking,
+  updateDocumentNonBlocking,
+  deleteDocumentNonBlocking,
+} from '@/firebase';
 
 
-function MasterDataEditor({ title, data, setData }: { title: string, data: string[], setData: React.Dispatch<React.SetStateAction<string[]>> }) {
+function MasterDataEditor({ title, data, collectionName }: { title: string, data: {id: string, name: string}[], collectionName: string }) {
+    const { firestore } = useFirebase();
     const [newItem, setNewItem] = useState('');
-    const [isClient, setIsClient] = useState(false);
     const { toast } = useToast();
 
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
-
     const handleAddItem = () => {
-        if (newItem && !data.includes(newItem)) {
-            setData(prev => [...prev, newItem]);
+        if (!firestore) return;
+        if (newItem && !data.find(d => d.name === newItem)) {
+            addDocumentNonBlocking(collection(firestore, collectionName), { name: newItem });
             setNewItem('');
             toast({ title: `${title} - Ítem Agregado`, description: `Se agregó "${newItem}".` });
-        } else if (data.includes(newItem)) {
+        } else if (data.find(d => d.name === newItem)) {
              toast({ variant: "destructive", title: 'Error', description: 'Este ítem ya existe.' });
         }
     };
 
-    const handleRemoveItem = (itemToRemove: string) => {
-        setData(prev => prev.filter(item => item !== itemToRemove));
-        toast({ title: `${title} - Ítem Eliminado`, description: `Se eliminó "${itemToRemove}".` });
+    const handleRemoveItem = (itemToRemove: {id: string, name: string}) => {
+        if (!firestore) return;
+        deleteDocumentNonBlocking(doc(firestore, collectionName, itemToRemove.id));
+        toast({ title: `${title} - Ítem Eliminado`, description: `Se eliminó "${itemToRemove.name}".` });
     };
 
     return (
@@ -67,9 +77,9 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
                     </Button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {isClient && data.map(item => (
-                        <div key={item} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
-                            <span>{item}</span>
+                    {data.map(item => (
+                        <div key={item.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                            <span>{item.name}</span>
                             <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -82,27 +92,25 @@ function MasterDataEditor({ title, data, setData }: { title: string, data: strin
 }
 
 function CaliberMasterEditor() {
-    const { calibers, setCalibers } = useMasterData();
+    const { firestore } = useFirebase();
+    const { data: calibers } = useCollection<{name: string, code: string}>(firestore ? collection(firestore, 'calibers') : null);
     const [newItem, setNewItem] = useState({ name: '', code: '' });
-    const [isClient, setIsClient] = useState(false);
     const { toast } = useToast();
 
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
-
     const handleAddItem = () => {
-        if (newItem.name && newItem.code && !calibers.find(c => c.name === newItem.name)) {
-            setCalibers(prev => [...prev, newItem]);
+        if (!firestore) return;
+        if (newItem.name && newItem.code && !calibers?.find(c => c.name === newItem.name)) {
+            addDocumentNonBlocking(collection(firestore, 'calibers'), newItem);
             setNewItem({ name: '', code: '' });
             toast({ title: `Calibre Agregado`, description: `Se agregó "${newItem.name} (${newItem.code})".` });
-        } else if (calibers.find(c => c.name === newItem.name)) {
+        } else if (calibers?.find(c => c.name === newItem.name)) {
              toast({ variant: "destructive", title: 'Error', description: 'Este calibre ya existe.' });
         }
     };
 
-    const handleRemoveItem = (itemToRemove: CaliberMaster) => {
-        setCalibers(prev => prev.filter(item => item.name !== itemToRemove.name));
+    const handleRemoveItem = (itemToRemove: {id: string, name: string}) => {
+        if (!firestore) return;
+        deleteDocumentNonBlocking(doc(firestore, 'calibers', itemToRemove.id));
         toast({ title: `Calibre Eliminado`, description: `Se eliminó "${itemToRemove.name}".` });
     };
 
@@ -130,7 +138,7 @@ function CaliberMasterEditor() {
                     </Button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {isClient && calibers.map((item, index) => (
+                    {calibers?.map((item, index) => (
                         <div key={`caliber-${item.name}-${item.code}-${index}`} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                             <span>{`${item.name} (${item.code})`}</span>
                             <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item)}>
@@ -147,19 +155,15 @@ function CaliberMasterEditor() {
 const emptyAccount: Omit<BankAccount, 'id'> = { name: '', accountType: 'Cuenta Corriente', initialBalance: 0, status: 'Activa', owner: '', ownerRUT: '', ownerEmail: '', bankName: '', accountNumber: '' };
 
 function BankAccountsEditor() {
-    const { bankAccounts, setBankAccounts } = useMasterData();
+    const { firestore } = useFirebase();
+    const { data: bankAccounts } = useCollection<BankAccount>(firestore ? collection(firestore, 'bankAccounts') : null);
     const [formData, setFormData] = useState<Omit<BankAccount, 'id'>>(emptyAccount);
     const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
-    const [isClient, setIsClient] = useState(false);
     const { toast } = useToast();
 
     useEffect(() => {
-        setIsClient(true);
-    }, []);
-
-    useEffect(() => {
         if (editingAccountId) {
-            const accountToEdit = bankAccounts.find(acc => acc.id === editingAccountId);
+            const accountToEdit = bankAccounts?.find(acc => acc.id === editingAccountId);
             if (accountToEdit) {
                 setFormData(accountToEdit);
             }
@@ -169,18 +173,17 @@ function BankAccountsEditor() {
     }, [editingAccountId, bankAccounts]);
 
     const handleSaveAccount = () => {
+        if (!firestore) return;
         if (!formData.name) {
              toast({ variant: "destructive", title: 'Error', description: 'El nombre de la cuenta es requerido.' });
             return;
         }
 
         if (editingAccountId) {
-            // Update
-            setBankAccounts(prev => prev.map(acc => acc.id === editingAccountId ? { ...formData, id: editingAccountId } : acc));
+            updateDocumentNonBlocking(doc(firestore, 'bankAccounts', editingAccountId), formData);
             toast({ title: 'Cuenta Actualizada', description: `Se actualizó la cuenta "${formData.name}".` });
         } else {
-            // Add
-            setBankAccounts(prev => [...prev, { ...formData, id: `acc-${Date.now()}` }]);
+            addDocumentNonBlocking(collection(firestore, 'bankAccounts'), formData);
             toast({ title: 'Cuenta Agregada', description: `Se agregó la cuenta "${formData.name}".` });
         }
         
@@ -189,7 +192,8 @@ function BankAccountsEditor() {
     };
 
     const handleRemoveAccount = (id: string) => {
-        setBankAccounts(prev => prev.filter(acc => acc.id !== id));
+        if (!firestore) return;
+        deleteDocumentNonBlocking(doc(firestore, 'bankAccounts', id));
         toast({ title: 'Cuenta Eliminada' });
     };
 
@@ -238,7 +242,7 @@ function BankAccountsEditor() {
                     </div>
                 </div>
                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {isClient && bankAccounts.map(acc => (
+                    {bankAccounts?.map(acc => (
                         <div key={acc.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                             <div>
                                 <span className='font-semibold'>{acc.name}</span>
@@ -262,76 +266,77 @@ function BankAccountsEditor() {
     )
 }
 
-function DataExport() {
+function DataManagement() {
     const { toast } = useToast();
+    const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
     const handleExport = () => {
-        try {
-            const keys = ['contacts', 'purchaseOrders', 'salesOrders', 'serviceOrders', 'financialMovements', 'master-products', 'master-calibers', 'master-units', 'master-packaging-types', 'master-warehouses', 'master-bank-accounts'];
-            const workbook = XLSX.utils.book_new();
+        // This functionality needs to be adapted for Firestore
+        toast({
+            title: 'Funcionalidad en Desarrollo',
+            description: 'La exportación de datos desde Firestore se implementará próximamente.',
+        });
+    };
 
-            keys.forEach(key => {
-                const data = localStorage.getItem(key);
-                if (data) {
-                    const parsedData = JSON.parse(data);
-                    
-                    const dataToSheet = Array.isArray(parsedData) 
-                        ? parsedData.map((row: any) => {
-                            const newRow = {...row};
-                            if (row.items) newRow.items = JSON.stringify(row.items);
-                            if (row.packaging) newRow.packaging = JSON.stringify(row.packaging);
-                            if (row.relatedOrder) newRow.relatedOrder = `${row.relatedOrder.type}-${row.relatedOrder.id}`;
-                            if (row.relatedDocument) newRow.relatedDocument = `${row.relatedDocument.type}-${row.relatedDocument.id}`;
-                            if (row.relatedPurchaseIds) newRow.relatedPurchaseIds = row.relatedPurchaseIds.join(', ');
-                            return newRow;
-                          })
-                        : [parsedData];
-                    
-                    const worksheet = XLSX.utils.json_to_sheet(dataToSheet);
-                    XLSX.utils.book_append_sheet(workbook, worksheet, key.replace('master-',''));
-                }
-            });
-
-            XLSX.writeFile(workbook, 'vina-negra-data.xlsx');
-            toast({ title: 'Exportación Exitosa', description: 'Los datos han sido exportados a Excel.' });
-
-        } catch (error) {
-            console.error("Failed to export data:", error);
-            toast({ variant: 'destructive', title: 'Error de Exportación', description: 'No se pudo exportar los datos.' });
-        }
+    const handleReset = () => {
+         // This functionality needs to be adapted for Firestore
+        toast({
+            title: 'Funcionalidad en Desarrollo',
+            description: 'El reseteo de datos en Firestore se implementará próximamente.',
+        });
+        setIsResetDialogOpen(false);
     };
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="font-headline text-lg">Exportar Datos</CardTitle>
-                <CardDescription>Descarga toda la información de la aplicación como un archivo de Excel.</CardDescription>
+                <CardTitle className="font-headline text-lg">Gestión de Datos</CardTitle>
+                <CardDescription>Realiza copias de seguridad o restablece los datos de la aplicación.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <Button onClick={handleExport}>
+            <CardContent className="flex gap-4">
+                 <Button onClick={handleExport} disabled>
                     <Download className="mr-2 h-4 w-4" />
                     Descargar Base de Datos
                 </Button>
+                <Button variant="destructive" onClick={() => setIsResetDialogOpen(true)} disabled>
+                     <AlertTriangle className="mr-2 h-4 w-4" />
+                    Restablecer Datos
+                </Button>
                 <p className="text-xs text-muted-foreground mt-2">
-                    Esto creará un archivo .xlsx con hojas para cada tipo de dato en la aplicación.
+                    La exportación crea un archivo .xlsx. El restablecimiento borrará todos los datos actuales y los reemplazará con los datos de demostración originales.
                 </p>
+                 <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Esta acción es irreversible. Se borrarán todos los datos actuales y se restaurarán los datos de demostración iniciales.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleReset} className={cn(buttonVariants({ variant: "destructive" }))}>Sí, Restablecer</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </CardContent>
         </Card>
     );
 }
 
-
 export default function SettingsPage() {
-    const { products, setProducts, units, setUnits, packagingTypes, setPackagingTypes, warehouses, setWarehouses } = useMasterData();
-    
+    const { firestore } = useFirebase();
+    const { data: products } = useCollection<{name: string}>(firestore ? collection(firestore, 'products') : null);
+    const { data: units } = useCollection<{name: string}>(firestore ? collection(firestore, 'units') : null);
+    const { data: packagingTypes } = useCollection<{name: string}>(firestore ? collection(firestore, 'packagingTypes') : null);
+    const { data: warehouses } = useCollection<{name: string}>(firestore ? collection(firestore, 'warehouses') : null);
+
     return (
         <div className="flex flex-col gap-6">
              <div>
                 <h1 className="font-headline text-3xl">Configuración</h1>
                 <p className="text-muted-foreground">Administra los datos maestros y otras configuraciones de la aplicación.</p>
             </div>
-
-            <DataExport />
             
             <Tabs defaultValue="masters" className="mt-6">
                 <TabsList className="grid w-full grid-cols-2">
@@ -340,11 +345,11 @@ export default function SettingsPage() {
                 </TabsList>
                 <TabsContent value="masters">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                        <MasterDataEditor title="Productos" data={products} setData={setProducts} />
+                        <MasterDataEditor title="Productos" data={products?.map(p => ({id: p.id, name: p.name})) || []} collectionName="products" />
                         <CaliberMasterEditor />
-                        <MasterDataEditor title="Unidades" data={units} setData={setUnits} />
-                        <MasterDataEditor title="Tipos de Envase" data={packagingTypes} setData={setPackagingTypes} />
-                        <MasterDataEditor title="Bodegas" data={warehouses} setData={setWarehouses} />
+                        <MasterDataEditor title="Unidades" data={units?.map(u => ({id: u.id, name: u.name})) || []} collectionName="units" />
+                        <MasterDataEditor title="Tipos de Envase" data={packagingTypes?.map(pt => ({id: pt.id, name: pt.name})) || []} collectionName="packagingTypes" />
+                        <MasterDataEditor title="Bodegas" data={warehouses?.map(w => ({id: w.id, name: w.name})) || []} collectionName="warehouses" />
                     </div>
                 </TabsContent>
                 <TabsContent value="accounts">
