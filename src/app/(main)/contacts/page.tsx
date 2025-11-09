@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useCollection, useFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useState, useMemo } from 'react';
+import { useCollection, useFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { Contact, Interaction } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
@@ -27,7 +27,9 @@ import { collection, doc } from 'firebase/firestore';
 
 export default function ContactsPage() {
   const { firestore } = useFirebase();
-  const { data: contacts, isLoading } = useCollection<Contact>(firestore ? collection(firestore, 'contacts') : null);
+  const contactsQuery = useMemo(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
+  const { data: contacts, isLoading } = useCollection<Contact>(contactsQuery);
+
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -45,24 +47,21 @@ export default function ContactsPage() {
         contactToUpdate.interactions = [...(contactToUpdate.interactions || []), interaction].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       }
       const docRef = doc(firestore, 'contacts', contactData.id);
-      setDocumentNonBlocking(docRef, contactToUpdate, { merge: true });
+      updateDocumentNonBlocking(docRef, contactToUpdate);
       toast({ title: "Contacto Actualizado", description: `El contacto ${contactData.name} ha sido actualizado.` });
     } else {
       // Add
-      const newContactId = `contact-${Date.now()}`;
-      const newContact: Contact = {
+      const newContact: Omit<Contact, 'id'> = {
         ...contactData,
-        id: newContactId,
         interactions: [],
         tags: contactData.tags || [],
         type: contactData.type || [],
       };
       if (newInteraction) {
          const interaction: Interaction = { ...newInteraction, id: `int-${Date.now()}` };
-         newContact.interactions = [interaction];
+         (newContact.interactions as Interaction[]).push(interaction);
       }
-      const docRef = doc(firestore, 'contacts', newContactId);
-      setDocumentNonBlocking(docRef, newContact, { merge: false });
+      addDocumentNonBlocking(collection(firestore, 'contacts'), newContact);
       toast({ title: "Contacto Creado", description: `El contacto ${contactData.name} ha sido creado.` });
     }
     
@@ -70,6 +69,7 @@ export default function ContactsPage() {
       setIsSheetOpen(false); 
       setEditingContact(null);
     } else {
+      // For updates, especially with new interactions, we need to refresh the editingContact state
       const updatedContact = contacts?.find(c => c.id === contactData.id);
       if (updatedContact) {
         const contactWithNewInteraction = { ...updatedContact };
@@ -89,7 +89,7 @@ export default function ContactsPage() {
       const updatedInteractions = contact.interactions?.filter(i => i.id !== interactionId);
       const updatedContact = { ...contact, interactions: updatedInteractions };
       const docRef = doc(firestore, 'contacts', contactId);
-      setDocumentNonBlocking(docRef, updatedContact, { merge: true });
+      updateDocumentNonBlocking(docRef, { interactions: updatedInteractions });
 
       if (editingContact?.id === contactId) {
           setEditingContact(updatedContact);
@@ -196,5 +196,3 @@ export default function ContactsPage() {
     </>
   );
 }
-
-    

@@ -1,12 +1,10 @@
 
-
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useLocalStorage } from '@/hooks/use-local-storage';
-import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory, serviceOrders as initialServiceOrders, financialMovements as initialFinancialMovements, inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
-import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem, ServiceOrder, FinancialMovement, InventoryAdjustment } from '@/lib/types';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem, InventoryAdjustment } from '@/lib/types';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { NewSalesOrderSheet } from '../sales/components/new-sales-order-sheet';
 import {
   AlertDialog,
@@ -20,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Download, MoreHorizontal, Eye, ChevronDown, Edit, Trash2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
@@ -30,13 +28,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { SalesOrderPreview } from '../sales/components/sales-order-preview';
+import { getInventory } from '@/lib/data';
+import { collection, doc } from 'firebase/firestore';
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -47,34 +47,39 @@ const formatCurrency = (value: number) =>
 
 
 export default function DispatchesPage() {
-  const [salesOrders, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
-  const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
-  const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
-  const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
-  const [contacts, setContacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+  const { firestore } = useFirebase();
+
+  const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
+  const { data: salesOrders, isLoading: loadingSales } = useCollection<SalesOrder>(salesOrdersQuery);
   
+  const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
+  const { data: purchaseOrders, isLoading: loadingPurchases } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
+
+  const inventoryAdjustmentsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'inventoryAdjustments') : null, [firestore]);
+  const { data: inventoryAdjustments, isLoading: loadingAdjustments } = useCollection<InventoryAdjustment>(inventoryAdjustmentsQuery);
+
+  const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
+  const { data: contacts, isLoading: loadingContacts } = useCollection<Contact>(contactsQuery);
+
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [confirmingEditOrder, setConfirmingEditOrder] = useState<SalesOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
   const [previewingOrder, setPreviewingOrder] = useState<SalesOrder | null>(null);
-
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
 
+  const isLoading = loadingSales || loadingPurchases || loadingAdjustments || loadingContacts;
+
   const { toast } = useToast();
   
-  const clients = contacts.filter(c => c.type.includes('client'));
-  const carriers = contacts.filter(c => c.type.includes('supplier'));
-
-  const dispatchOrders = useMemo(() => salesOrders.filter(o => o.orderType === 'dispatch'), [salesOrders]);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const clients = useMemo(() => contacts?.filter(c => Array.isArray(c.type) && c.type.includes('client')) || [], [contacts]);
+  const carriers = useMemo(() => contacts?.filter(c => Array.isArray(c.type) && c.type.includes('supplier')) || [], [contacts]);
+  
+  const dispatchOrders = useMemo(() => salesOrders?.filter(o => o.orderType === 'dispatch') || [], [salesOrders]);
 
   const groupedOrders = useMemo(() => {
+    if (!dispatchOrders || !clients) return [];
     const groups: Record<string, { clientName: string; orders: SalesOrder[]; subtotal: number; }> = {};
     
     dispatchOrders.forEach(order => {
@@ -107,21 +112,10 @@ export default function DispatchesPage() {
   }, [groupedOrders, filter]);
 
   
-  const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, inventoryAdjustments, editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
-
-  const nextOrderId = useMemo(() => {
-    const lastIdNumber = salesOrders.reduce((max, order) => {
-      if (order.id.startsWith('O/S-')) { // Changed from O/SAL-
-        const idNum = parseInt(order.id.split('-')[1]);
-        return idNum > max ? idNum : max;
-      }
-      return max;
-    }, 3000); 
-    return `O/S-${lastIdNumber + 1}`; // Changed from O/SAL-
-  }, [salesOrders]);
-
+  const inventory = useMemo(() => getInventory(purchaseOrders || [], salesOrders || [], inventoryAdjustments || [], editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
 
   const handleSaveOrder = (orderData: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
+    if (!firestore) return;
     let orderToSave: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>;
 
     const allItems = [...orderData.items, ...newItems];
@@ -157,110 +151,29 @@ export default function DispatchesPage() {
     }, 0);
     const totalPackages = allItems.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
-    let finalOrder: SalesOrder;
-
-    if ('id' in orderToSave) {
-      finalOrder = { ...orderToSave, totalAmount, totalKilos, totalPackages, paymentStatus: orderToSave.paymentStatus || 'Pendiente' } as SalesOrder;
-      setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
-      toast({ title: 'Orden Actualizada', description: `La orden ${finalOrder.id} ha sido actualizada.` });
-    } else {
-      finalOrder = {
-        ...orderToSave,
-        id: nextOrderId,
+    let finalOrderData: Omit<SalesOrder, 'id'> = {
+        ...(orderToSave as Omit<SalesOrder, 'id'>), 
         totalAmount, 
         totalKilos, 
         totalPackages,
         paymentStatus: 'Pendiente'
-      } as SalesOrder;
-      setSalesOrders(prev => [...prev, finalOrder]);
-      toast({ title: 'Orden Creada', description: `La orden ${finalOrder.id} ha sido creada.` });
-    }
+    };
 
-    // --- LOGIC FOR INTERNAL TRANSFER PURCHASE ORDER ---
-    if (finalOrder.movementType === 'Traslado Bodega Interna' && finalOrder.destinationWarehouse) {
-        const internalSupplier = contacts.find(c => c.rut === '0-0');
-        if (internalSupplier) {
-            setPurchaseOrders(prevPOs => {
-                let existingTransferPo = prevPOs.find(po => po.description?.includes(finalOrder.id));
-
-                const poData = {
-                    supplierId: internalSupplier.id,
-                    date: finalOrder.date,
-                    status: 'completed' as 'completed',
-                    warehouse: finalOrder.destinationWarehouse,
-                    description: `Traspaso desde O/S ${finalOrder.id}`,
-                    items: finalOrder.items.map(item => ({...item})), // create a copy
-                    totalAmount: 0, // Transfers have no cost
-                    totalKilos: finalOrder.totalKilos,
-                    totalPackages: finalOrder.totalPackages,
-                };
-
-                if (existingTransferPo) {
-                    // Update existing transfer PO
-                    const updatedPo: PurchaseOrder = {
-                        ...existingTransferPo,
-                        ...poData,
-                        items: poData.items.map((item, index) => {
-                            const newLotId = existingTransferPo?.items[index]?.lotNumber || `LOTE-T-${format(parseISO(finalOrder.date), 'ddMMyy')}-${existingTransferPo.id.split('-')[2]}-${index}`;
-                            return { ...item, price: 0, id: `po-item-${existingTransferPo.id}-${index}`, lotNumber: newLotId };
-                        })
-                    };
-                    toast({
-                        title: 'Transferencia Actualizada',
-                        description: `La Orden de Compra de traspaso ${updatedPo.id} ha sido actualizada.`
-                    });
-                    return prevPOs.map(po => po.id === updatedPo.id ? updatedPo : po);
-                } else {
-                    // Create new transfer PO
-                    const lastPoId = prevPOs.reduce((max, o) => {
-                        if (o.id.startsWith('OC-T-')) {
-                            const num = parseInt(o.id.split('-')[2]);
-                            return num > max ? num : max;
-                        }
-                        return max;
-                    }, 0);
-                    const newPoId = `OC-T-${lastPoId + 1}`;
-                    
-                    const newPo: PurchaseOrder = {
-                        ...poData,
-                        id: newPoId,
-                        items: poData.items.map((item, index) => ({
-                            ...item,
-                            price: 0, // No cost for internal transfers
-                            id: `po-item-${newPoId}-${index}`,
-                            lotNumber: `LOTE-T-${format(parseISO(finalOrder.date), 'ddMMyy')}-${newPoId.split('-')[2]}-${index}`
-                        })),
-                    };
-                    
-                    toast({
-                        title: 'Transferencia Procesada',
-                        description: `Se ha creado la Orden de Compra ${newPo.id} para el ingreso en ${finalOrder.destinationWarehouse}.`
-                    });
-                    return [...prevPOs, newPo];
-                }
-            });
-        }
-    }
-    // --- END OF LOGIC ---
-
-    const movementsForOrder = financialMovements.filter(m => m.relatedDocument?.id === finalOrder.id);
-    const totalPaid = movementsForOrder.reduce((sum, m) => sum + m.amount, 0);
-    
-    let newPaymentStatus: 'Pendiente' | 'Abonado' | 'Pagado' = 'Pendiente';
-    if (totalPaid >= finalOrder.totalAmount) {
-        newPaymentStatus = 'Pagado';
-    } else if (totalPaid > 0) {
-        newPaymentStatus = 'Abonado';
-    }
-    
-    if (finalOrder.paymentStatus !== newPaymentStatus) {
-        finalOrder.paymentStatus = newPaymentStatus;
-        setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
+    if ('id' in orderToSave) {
+        updateDocumentNonBlocking(doc(firestore, 'salesOrders', orderToSave.id), finalOrderData);
+        toast({ title: 'Orden Actualizada', description: `La orden ${orderToSave.id} ha sido actualizada.` });
+        setPreviewingOrder({ ...finalOrderData, id: orderToSave.id, totalPackages });
+    } else {
+        addDocumentNonBlocking(collection(firestore, 'salesOrders'), finalOrderData).then(docRef => {
+            if (docRef) {
+                toast({ title: 'Orden Creada', description: `La orden ${docRef.id} ha sido creada.` });
+                 setPreviewingOrder({ ...finalOrderData, id: docRef.id, totalPackages });
+            }
+        });
     }
 
     setIsSheetOpen(false);
     setEditingOrder(null);
-    setPreviewingOrder(finalOrder);
   };
 
   const handleEdit = (order: SalesOrder) => {
@@ -280,18 +193,8 @@ export default function DispatchesPage() {
   };
   
   const confirmDelete = () => {
-    if (deletingOrder) {
-      setSalesOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id));
-      // Also delete the associated transfer PO if it exists
-      setPurchaseOrders(prevPOs => {
-        const transferPO = prevPOs.find(po => po.description?.includes(deletingOrder.id));
-        if (transferPO) {
-          toast({ variant: "destructive", title: 'O/C de Traspaso Eliminada', description: `La orden de compra ${transferPO.id} asociada ha sido eliminada.` });
-          return prevPOs.filter(po => po.id !== transferPO.id);
-        }
-        return prevPOs;
-      });
-
+    if (deletingOrder && firestore) {
+      deleteDocumentNonBlocking(doc(firestore, 'salesOrders', deletingOrder.id));
       toast({ variant: "destructive", title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
       setDeletingOrder(null);
     }
@@ -315,12 +218,7 @@ export default function DispatchesPage() {
 
   const handleExport = (orderToExport: SalesOrder) => {
     const client = clients.find(c => c.id === orderToExport.clientId);
-    const dataForSheet = orderToExport.items.map(item => {
-      
-      const advanceAmount = orderToExport.paymentMethod === 'Pago con Anticipo y Saldo' ? orderToExport.totalAmount * ((orderToExport.advancePercentage || 0) / 100) : 0;
-      const balanceAmount = orderToExport.paymentMethod === 'Pago con Anticipo y Saldo' ? orderToExport.totalAmount - advanceAmount : 0;
-
-      return {
+    const dataForSheet = orderToExport.items.map(item => ({
         'Proveedor': 'Viña Negra',
         'O/S': orderToExport.id,
         'Fecha': format(new Date(orderToExport.date), "dd-MM-yyyy"),
@@ -333,13 +231,7 @@ export default function DispatchesPage() {
         'Precio Unitario': item.price,
         'Subtotal': item.quantity * item.price,
         'Lote': item.lotNumber,
-        'Modalidad de Pago': orderToExport.paymentMethod,
-        'Monto Anticipo': advanceAmount > 0 ? advanceAmount : '',
-        'Venc. Anticipo': orderToExport.advanceDueDate ? format(parseISO(orderToExport.advanceDueDate), 'dd-MM-yyyy') : '',
-        'Monto Saldo': balanceAmount > 0 ? balanceAmount : '',
-        'Venc. Saldo': orderToExport.balanceDueDate ? format(parseISO(orderToExport.balanceDueDate), 'dd-MM-yyyy') : '',
-      }
-    });
+    }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
     const workbook = XLSX.utils.book_new();
@@ -349,6 +241,7 @@ export default function DispatchesPage() {
   };
   
   const handleExportAllCompleted = () => {
+    if (!dispatchOrders) return;
     const completedOrders = dispatchOrders.filter(o => o.status === 'completed');
     if (completedOrders.length === 0) {
         toast({
@@ -362,9 +255,6 @@ export default function DispatchesPage() {
     const allItems: any[] = [];
     completedOrders.forEach(order => {
         const client = clients.find(c => c.id === order.clientId);
-        const advanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount * ((order.advancePercentage || 0) / 100) : 0;
-        const balanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount - advanceAmount : 0;
-
         order.items.forEach(item => {
             allItems.push({
                 'Proveedor': 'Viña Negra',
@@ -379,11 +269,6 @@ export default function DispatchesPage() {
                 'Precio Unitario': item.price,
                 'Subtotal': item.quantity * item.price,
                 'Lote': item.lotNumber,
-                'Modalidad de Pago': order.paymentMethod,
-                'Monto Anticipo': advanceAmount > 0 ? advanceAmount : '',
-                'Venc. Anticipo': order.advanceDueDate ? format(parseISO(order.advanceDueDate), 'dd-MM-yyyy') : '',
-                'Monto Saldo': balanceAmount > 0 ? balanceAmount : '',
-                'Venc. Saldo': order.balanceDueDate ? format(parseISO(order.balanceDueDate), 'dd-MM-yyyy') : '',
             });
         });
     });
@@ -400,7 +285,7 @@ export default function DispatchesPage() {
     }
 
   const renderContent = () => {
-    if (!isClient) {
+    if (isLoading) {
       return (
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
@@ -510,8 +395,8 @@ export default function DispatchesPage() {
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
             <div>
-                <CardTitle className="font-headline text-2xl">Gestión de Órdenes de Salida</CardTitle>
-                <CardDescription>Crea y administra tus órdenes de salida y traslados.</CardDescription>
+                <CardTitle className="font-headline text-2xl">Traspaso de Bodega</CardTitle>
+                <CardDescription>Crea y administra tus órdenes de traspaso entre bodegas.</CardDescription>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleExportAllCompleted}>
@@ -520,7 +405,7 @@ export default function DispatchesPage() {
               </Button>
               <Button onClick={openNewOrderSheet}>
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Nueva Orden de Salida
+                Nuevo Traspaso
               </Button>
             </div>
           </div>
@@ -547,11 +432,11 @@ export default function DispatchesPage() {
             clients={clients}
             carriers={carriers}
             inventory={inventory}
-            nextOrderId={nextOrderId}
-            purchaseOrders={purchaseOrders}
-            salesOrders={salesOrders}
-            inventoryAdjustments={inventoryAdjustments}
-            contacts={contacts}
+            nextOrderId="" // Not used for dispatches in this setup
+            purchaseOrders={purchaseOrders || []}
+            salesOrders={salesOrders || []}
+            inventoryAdjustments={inventoryAdjustments || []}
+            contacts={contacts || []}
             sheetType="dispatch"
         />
       )}
