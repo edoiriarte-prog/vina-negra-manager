@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
@@ -33,11 +34,20 @@ export function useMasterData() {
   const bankAccountsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'bankAccounts') : null, [firestore]);
   const { data: bankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
 
+  const internalConceptsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'internalConcepts') : null, [firestore]);
+  const { data: internalConceptsData } = useCollection<{name: string}>(internalConceptsQuery);
+  
+  const costCentersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'costCenters') : null, [firestore]);
+  const { data: costCentersData } = useCollection<{name: string}>(costCentersQuery);
+
   const products = useMemo(() => productsData?.map(p => p.name) || [], [productsData]);
   const calibers = useMemo(() => calibersData || [], [calibersData]);
   const units = useMemo(() => unitsData?.map(u => u.name) || [], [unitsData]);
   const packagingTypes = useMemo(() => packagingTypesData?.map(p => p.name) || [], [packagingTypesData]);
   const warehouses = useMemo(() => warehousesData?.map(w => w.name) || [], [warehousesData]);
+  const internalConcepts = useMemo(() => internalConceptsData?.map(i => i.name) || [], [internalConceptsData]);
+  const costCenters = useMemo(() => costCentersData?.map(c => c.name) || [], [costCentersData]);
+
 
   return {
     products,
@@ -45,6 +55,8 @@ export function useMasterData() {
     units,
     packagingTypes,
     warehouses,
-    bankAccounts: bankAccounts || [], 
+    bankAccounts: bankAccounts || [],
+    internalConcepts,
+    costCenters,
   };
 }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -14,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Trash2, PlusCircle, Download, Edit, X, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
-import { BankAccount } from '@/lib/types';
+import { BankAccount, Contact, FinancialMovement, InventoryAdjustment, PurchaseOrder, SalesOrder, ServiceOrder } from '@/lib/types';
 import {
   Select,
   SelectContent,
@@ -26,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useFirebase, useCollection } from '@/firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import {
   addDocumentNonBlocking,
@@ -268,6 +269,7 @@ function BankAccountsEditor() {
 
 function DataManagement() {
     const { toast } = useToast();
+    const { firestore } = useFirebase();
     const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
     const handleExport = () => {
@@ -278,12 +280,36 @@ function DataManagement() {
         });
     };
 
-    const handleReset = () => {
-         // This functionality needs to be adapted for Firestore
-        toast({
-            title: 'Funcionalidad en Desarrollo',
-            description: 'El reseteo de datos en Firestore se implementará próximamente.',
-        });
+    const handleReset = async () => {
+        if (!firestore) {
+            toast({ variant: "destructive", title: 'Error', description: 'No se pudo conectar a la base de datos.' });
+            return;
+        }
+
+        const collectionsToDelete = [
+            'contacts', 
+            'purchaseOrders', 
+            'salesOrders', 
+            'serviceOrders', 
+            'financialMovements',
+            'inventoryAdjustments'
+        ];
+
+        try {
+            const batch = writeBatch(firestore);
+            for (const collectionName of collectionsToDelete) {
+                const querySnapshot = await getDocs(collection(firestore, collectionName));
+                querySnapshot.forEach((doc) => {
+                    batch.delete(doc.ref);
+                });
+            }
+            await batch.commit();
+            toast({ title: 'Datos Restablecidos', description: 'Todos los datos transaccionales han sido eliminados.' });
+        } catch (error) {
+            console.error("Error resetting data: ", error);
+            toast({ variant: "destructive", title: 'Error', description: 'No se pudieron restablecer los datos.' });
+        }
+
         setIsResetDialogOpen(false);
     };
 
@@ -293,29 +319,31 @@ function DataManagement() {
                 <CardTitle className="font-headline text-lg">Gestión de Datos</CardTitle>
                 <CardDescription>Realiza copias de seguridad o restablece los datos de la aplicación.</CardDescription>
             </CardHeader>
-            <CardContent className="flex gap-4">
-                 <Button onClick={handleExport} disabled>
-                    <Download className="mr-2 h-4 w-4" />
-                    Descargar Base de Datos
-                </Button>
-                <Button variant="destructive" onClick={() => setIsResetDialogOpen(true)} disabled>
-                     <AlertTriangle className="mr-2 h-4 w-4" />
-                    Restablecer Datos
-                </Button>
+            <CardContent className="flex flex-col gap-4">
+                 <div className="flex gap-4">
+                    <Button onClick={handleExport} disabled>
+                        <Download className="mr-2 h-4 w-4" />
+                        Descargar Base de Datos
+                    </Button>
+                    <Button variant="destructive" onClick={() => setIsResetDialogOpen(true)}>
+                        <AlertTriangle className="mr-2 h-4 w-4" />
+                        Restablecer Datos
+                    </Button>
+                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                    La exportación crea un archivo .xlsx. El restablecimiento borrará todos los datos actuales y los reemplazará con los datos de demostración originales.
+                    La exportación crea un archivo .xlsx. El restablecimiento borrará todos los datos transaccionales (contactos, órdenes, etc.). Los datos maestros (productos, calibres) no se verán afectados.
                 </p>
                  <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+                            <AlertDialogTitle>¿Está absolutamente seguro?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Esta acción es irreversible. Se borrarán todos los datos actuales y se restaurarán los datos de demostración iniciales.
+                                Esta acción es irreversible. Se borrarán todos los datos transaccionales de la base de datos, incluyendo contactos, órdenes y movimientos financieros.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleReset} className={cn(buttonVariants({ variant: "destructive" }))}>Sí, Restablecer</AlertDialogAction>
+                            <AlertDialogAction onClick={handleReset} className={cn(buttonVariants({ variant: "destructive" }))}>Sí, Borrar Todo</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
@@ -330,6 +358,8 @@ export default function SettingsPage() {
     const { data: units } = useCollection<{name: string}>(firestore ? collection(firestore, 'units') : null);
     const { data: packagingTypes } = useCollection<{name: string}>(firestore ? collection(firestore, 'packagingTypes') : null);
     const { data: warehouses } = useCollection<{name: string}>(firestore ? collection(firestore, 'warehouses') : null);
+    const { data: internalConcepts } = useCollection<{name: string}>(firestore ? collection(firestore, 'internalConcepts') : null);
+    const { data: costCenters } = useCollection<{name: string}>(firestore ? collection(firestore, 'costCenters') : null);
 
     return (
         <div className="flex flex-col gap-6">
@@ -337,6 +367,8 @@ export default function SettingsPage() {
                 <h1 className="font-headline text-3xl">Configuración</h1>
                 <p className="text-muted-foreground">Administra los datos maestros y otras configuraciones de la aplicación.</p>
             </div>
+
+            <DataManagement />
             
             <Tabs defaultValue="masters" className="mt-6">
                 <TabsList className="grid w-full grid-cols-2">
@@ -350,6 +382,8 @@ export default function SettingsPage() {
                         <MasterDataEditor title="Unidades" data={units?.map(u => ({id: u.id, name: u.name})) || []} collectionName="units" />
                         <MasterDataEditor title="Tipos de Envase" data={packagingTypes?.map(pt => ({id: pt.id, name: pt.name})) || []} collectionName="packagingTypes" />
                         <MasterDataEditor title="Bodegas" data={warehouses?.map(w => ({id: w.id, name: w.name})) || []} collectionName="warehouses" />
+                        <MasterDataEditor title="Conceptos Internos" data={internalConcepts?.map(ic => ({id: ic.id, name: ic.name})) || []} collectionName="internalConcepts" />
+                        <MasterDataEditor title="Centros de Costos" data={costCenters?.map(cc => ({id: cc.id, name: cc.name})) || []} collectionName="costCenters" />
                     </div>
                 </TabsContent>
                 <TabsContent value="accounts">

@@ -80,7 +80,7 @@ export function NewFinancialMovementSheet({
   const [paymentType, setPaymentType] = useState<PaymentType>('abono');
   const [batchMovements, setBatchMovements] = useState<BatchMovement[]>([]);
   const { toast } = useToast();
-  const { bankAccounts, products } = useMasterData();
+  const { bankAccounts, internalConcepts, costCenters } = useMasterData();
   const [pendingBalance, setPendingBalance] = useState<number | null>(null);
 
   const calculatePendingBalance = (docType: 'OV' | 'OC' | 'OS', docId: string) => {
@@ -597,11 +597,9 @@ export function NewFinancialMovementSheet({
                                     <SelectValue placeholder="Seleccione un concepto" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Retiro de Socios">Retiro de Socios</SelectItem>
-                                    <SelectItem value="Pago de Impuestos">Pago de Impuestos</SelectItem>
-                                    <SelectItem value="Comisión Bancaria">Comisión Bancaria</SelectItem>
-                                    <SelectItem value="Préstamo Interno">Préstamo Interno</SelectItem>
-                                    <SelectItem value="Otro">Otro</SelectItem>
+                                    {internalConcepts.map(c => (
+                                        <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         )}
@@ -639,18 +637,14 @@ export function NewFinancialMovementSheet({
                                 required
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Seleccione un producto como centro de costo" />
+                                    <SelectValue placeholder="Seleccione un centro de costo" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {products.map(p => (
-                                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                                    {costCenters.map(p => (
+                                        <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <Button type="button" size="sm" variant="outline" className="mt-2" onClick={handleSuggestDescription} disabled={isSuggesting || formData.type === 'traspaso'}>
-                                {isSuggesting ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Sparkles className='mr-2 h-4 w-4'/>}
-                                Sugerir con IA
-                            </Button>
                         </div>
                     </div>
                      <div className="grid grid-cols-4 items-center gap-4">
