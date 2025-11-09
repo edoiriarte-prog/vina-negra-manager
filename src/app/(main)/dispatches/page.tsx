@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem, InventoryAdjustment } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { NewSalesOrderSheet } from '../sales/components/new-sales-order-sheet';
@@ -36,7 +35,7 @@ import { es } from 'date-fns/locale';
 import { SalesOrderPreview } from '../sales/components/sales-order-preview';
 import { getInventory } from '@/lib/data';
 import { collection, doc } from 'firebase/firestore';
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {

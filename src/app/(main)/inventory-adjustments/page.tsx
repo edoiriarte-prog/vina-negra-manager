@@ -1,9 +1,8 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useLocalStorage } from '@/hooks/use-local-storage';
-import { inventoryAdjustments as initialInventoryAdjustments, purchaseOrders as initialPurchaseOrders } from '@/lib/data';
 import { InventoryAdjustment, PurchaseOrder } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
@@ -28,11 +27,17 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { format } from 'date-fns';
+import { useCollection, useFirebase, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+
 
 type LotAdjustment = Omit<InventoryAdjustment, 'id' | 'product' | 'caliber'>;
 
 function LotAdjustmentForm({ onSave }: { onSave: (adjustment: LotAdjustment) => void }) {
-    const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+    const { firestore } = useFirebase();
+    const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
+    const { data: purchaseOrders } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
+    
     const [formData, setFormData] = useState<Omit<LotAdjustment, 'id'>>({
         date: format(new Date(), 'yyyy-MM-dd'),
         warehouse: '',
@@ -44,6 +49,7 @@ function LotAdjustmentForm({ onSave }: { onSave: (adjustment: LotAdjustment) => 
     });
 
     const allLotNumbers = useMemo(() => {
+        if (!purchaseOrders) return [];
         const lots = new Set<string>();
         purchaseOrders.forEach(po => po.items.forEach(item => {
             if (item.lotNumber) lots.add(item.lotNumber);
@@ -122,40 +128,38 @@ function LotAdjustmentForm({ onSave }: { onSave: (adjustment: LotAdjustment) => 
 }
 
 export default function InventoryAdjustmentsPage() {
-  const [adjustments, setAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
-  const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
+  const { firestore } = useFirebase();
+
+  const adjustmentsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'inventoryAdjustments') : null, [firestore]);
+  const { data: adjustments, isLoading: loadingAdjustments } = useCollection<InventoryAdjustment>(adjustmentsQuery);
+
+  const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
+  const { data: purchaseOrders, isLoading: loadingPurchases } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
   
   const [editingAdjustment, setEditingAdjustment] = useState<InventoryAdjustment | null>(null);
   const [deletingAdjustment, setDeletingAdjustment] = useState<InventoryAdjustment | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const isLoading = loadingAdjustments || loadingPurchases;
 
   const handleSaveAdjustment = (data: (InventoryAdjustment | Omit<InventoryAdjustment, 'id'>)[] | InventoryAdjustment | Omit<InventoryAdjustment, 'id'>) => {
-    let lastId = adjustments.reduce((max, a) => {
-        const num = parseInt(a.id.split('-')[1]);
-        return num > max ? num : max;
-      }, 0);
+    if (!firestore) return;
 
     if (Array.isArray(data)) {
         // Batch creation from matrix
-        const newAdjustments = data.map((adj, index) => ({
-            ...(adj as Omit<InventoryAdjustment, 'id'>),
-            id: `ADJ-${lastId + 1 + index}`,
-        }));
-        setAdjustments(prev => [...prev, ...newAdjustments]);
-        toast({ title: `${newAdjustments.length} Ajustes Creados` });
+        data.forEach(adj => {
+            addDocumentNonBlocking(collection(firestore, 'inventoryAdjustments'), adj);
+        });
+        toast({ title: `${data.length} Ajustes Creados` });
 
     } else if ('id' in data) {
       // Single update
-      setAdjustments(prev => prev.map(a => a.id === data.id ? data : a));
+      updateDocumentNonBlocking(doc(firestore, 'inventoryAdjustments', data.id), data);
       toast({ title: "Ajuste Actualizado" });
     } else {
       // Single creation (from lot form)
+      if (!purchaseOrders) return;
       const lotAdjustmentData = data as Omit<InventoryAdjustment, 'id'>;
       
       const poItem = purchaseOrders.flatMap(po => po.items).find(item => item.lotNumber === lotAdjustmentData.lotNumber);
@@ -168,9 +172,8 @@ export default function InventoryAdjustmentsPage() {
         ...lotAdjustmentData,
         product: poItem.product,
         caliber: poItem.caliber,
-        id: `ADJ-${lastId + 1}`,
       };
-      setAdjustments(prev => [...prev, newAdjustment]);
+      addDocumentNonBlocking(collection(firestore, 'inventoryAdjustments'), newAdjustment);
       toast({ title: "Ajuste de Lote Creado" });
     }
     
@@ -188,8 +191,8 @@ export default function InventoryAdjustmentsPage() {
   };
   
   const confirmDelete = () => {
-    if (deletingAdjustment) {
-      setAdjustments((prev) => prev.filter((a) => a.id !== deletingAdjustment.id));
+    if (deletingAdjustment && firestore) {
+      deleteDocumentNonBlocking(doc(firestore, 'inventoryAdjustments', deletingAdjustment.id));
       toast({ variant: "destructive", title: "Ajuste Eliminado" });
       setDeletingAdjustment(null);
     }
@@ -210,6 +213,7 @@ export default function InventoryAdjustmentsPage() {
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete });
 
   const { lotAdjustments, generalAdjustments } = useMemo(() => {
+    if (!adjustments) return { lotAdjustments: [], generalAdjustments: [] };
     return adjustments.reduce((acc, adj) => {
       if (adj.lotNumber) {
         acc.lotAdjustments.push(adj);
@@ -249,7 +253,7 @@ export default function InventoryAdjustmentsPage() {
                     </div>
                     </CardHeader>
                     <CardContent>
-                      {isClient ? <DataTable columns={columns} data={generalAdjustments} /> : <Skeleton className="h-64 w-full" />}
+                      {isLoading ? <Skeleton className="h-64 w-full" /> : <DataTable columns={columns} data={generalAdjustments} />}
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -261,7 +265,7 @@ export default function InventoryAdjustmentsPage() {
                             <CardTitle>Historial de Ajustes de Lote</CardTitle>
                         </CardHeader>
                         <CardContent>
-                           {isClient ? <DataTable columns={columns} data={lotAdjustments} /> : <Skeleton className="h-64 w-full" />}
+                           {isLoading ? <Skeleton className="h-64 w-full" /> : <DataTable columns={columns} data={lotAdjustments} />}
                         </CardContent>
                     </Card>
                  </div>

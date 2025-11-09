@@ -3,18 +3,10 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useLocalStorage } from '@/hooks/use-local-storage';
 import { Contact, SalesOrder, PurchaseOrder, FinancialMovement, ServiceOrder } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  contacts as initialContacts,
-  salesOrders as initialSalesOrders,
-  purchaseOrders as initialPurchaseOrders,
-  financialMovements as initialFinancialMovements,
-  serviceOrders as initialServiceOrders,
-} from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Printer, ChevronDown, MoreHorizontal, Download } from 'lucide-react';
@@ -34,6 +26,8 @@ import { useReactToPrint } from 'react-to-print';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { createRoot } from 'react-dom/client';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 type DocumentDetail = {
   id: string;
@@ -74,17 +68,24 @@ const formatCurrency = (value: number) =>
 
 
 export default function MercantileAccountPage() {
-  const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
-  const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
-  const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
-  const [serviceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
-  const [financialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
+  const { firestore } = useFirebase();
+
+  const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
+  const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
+  const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
+  const serviceOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'serviceOrders') : null, [firestore]);
+  const financialMovementsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financialMovements') : null, [firestore]);
+
+  const { data: contacts } = useCollection<Contact>(contactsQuery);
+  const { data: salesOrders } = useCollection<SalesOrder>(salesOrdersQuery);
+  const { data: purchaseOrders } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
+  const { data: serviceOrders } = useCollection<ServiceOrder>(serviceOrdersQuery);
+  const { data: financialMovements } = useCollection<FinancialMovement>(financialMovementsQuery);
   
   const [clientReports, setClientReports] = useState<ReportData[]>([]);
   const [supplierReports, setSupplierReports] = useState<ReportData[]>([]);
   const [clientFilter, setClientFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
-  const [isClient, setIsClient] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   
   const dueDatePrintRef = useRef<HTMLDivElement>(null);
@@ -93,10 +94,6 @@ export default function MercantileAccountPage() {
     content: () => dueDatePrintRef.current,
   });
 
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   const handleDownloadPdf = async (report: ReportData) => {
     if (!report) return;
@@ -170,8 +167,8 @@ export default function MercantileAccountPage() {
 
 
   useEffect(() => {
-    if (isClient) {
-      const clients = contacts.filter(c => c.type.includes('client'));
+    if (contacts && salesOrders && purchaseOrders && serviceOrders && financialMovements) {
+      const clients = contacts.filter(c => Array.isArray(c.type) && c.type.includes('client'));
       const clientReportData = clients.map(client => {
         const clientSalesOrders = salesOrders
           .filter(so => so.orderType !== 'dispatch' && so.clientId === client.id && (so.status === 'completed' || so.status === 'pending'))
@@ -248,7 +245,7 @@ export default function MercantileAccountPage() {
       setClientReports(clientReportData);
 
       // --- Supplier Reports ---
-      const suppliers = contacts.filter(c => c.type.includes('supplier'));
+      const suppliers = contacts.filter(c => Array.isArray(c.type) && c.type.includes('supplier'));
       const supplierReportData = suppliers.map(supplier => {
         const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && (po.status === 'completed' || po.status === 'pending'));
         const supplierServiceOrders = serviceOrders.filter(so => {
@@ -316,7 +313,7 @@ export default function MercantileAccountPage() {
       }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
       setSupplierReports(supplierReportData);
     }
-  }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements, isClient]);
+  }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements]);
 
   const clientTotals = useMemo(() => {
     return clientReports.reduce((acc, report) => {
@@ -371,9 +368,9 @@ export default function MercantileAccountPage() {
                       <h2 className="font-bold text-lg mb-2">{report.documents.some(d => d.type === 'O/C') ? 'PROVEEDOR' : 'CLIENTE'}</h2>
                       <div className="text-sm">
                           <p className="font-semibold text-base">{report.contactName}</p>
-                          <p>RUT: {contacts.find(c=>c.id === report.contactId)?.rut}</p>
-                          <p>{contacts.find(c=>c.id === report.contactId)?.address}</p>
-                          <p>{contacts.find(c=>c.id === report.contactId)?.commune}</p>
+                          <p>RUT: {contacts?.find(c=>c.id === report.contactId)?.rut}</p>
+                          <p>{contacts?.find(c=>c.id === report.contactId)?.address}</p>
+                          <p>{contacts?.find(c=>c.id === report.contactId)?.commune}</p>
                       </div>
                   </div>
                   <div className='text-right'>
@@ -591,7 +588,7 @@ export default function MercantileAccountPage() {
   const renderClientReportRows = (data: ReportData[], filter: string) => {
     const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
     
-    if (!isClient) {
+    if (!contacts) {
         return (
             <TableRow>
               <TableCell colSpan={6} className="h-24 text-center">
@@ -693,7 +690,7 @@ export default function MercantileAccountPage() {
    const renderSupplierReportRows = (data: ReportData[], filter: string) => {
     const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
     
-    if (!isClient) {
+    if (!contacts) {
         return (
             <TableRow>
               <TableCell colSpan={6} className="h-24 text-center">
@@ -888,9 +885,9 @@ export default function MercantileAccountPage() {
          <Card>
             <div ref={dueDatePrintRef} className="print-container">
                 <DueDatesReport 
-                    salesOrders={salesOrders} 
-                    financialMovements={financialMovements} 
-                    contacts={contacts}
+                    salesOrders={salesOrders || []} 
+                    financialMovements={financialMovements || []} 
+                    contacts={contacts || []}
                     onPrint={handleDueDatePrint}
                 />
             </div>

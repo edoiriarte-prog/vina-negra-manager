@@ -1,16 +1,16 @@
 
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { SalesOrder, PurchaseOrder } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
-type PerformanceReportProps = {
-    salesOrders: SalesOrder[];
-    purchaseOrders: PurchaseOrder[];
-}
+type PerformanceReportProps = {}
 
 type PerformanceItem = {
     key: string;
@@ -30,18 +30,22 @@ const formatCurrency = (value: number) =>
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 
-export function PerformanceReports({ salesOrders, purchaseOrders }: PerformanceReportProps) {
+export function PerformanceReports({}: PerformanceReportProps) {
+    const { firestore } = useFirebase();
+
+    const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
+    const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
+
+    const { data: salesOrders, isLoading: loadingSales } = useCollection<SalesOrder>(salesOrdersQuery);
+    const { data: purchaseOrders, isLoading: loadingPurchases } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
+
     const [salesPerformance, setSalesPerformance] = useState<PerformanceItem[]>([]);
     const [purchasePerformance, setPurchasePerformance] = useState<PerformanceItem[]>([]);
-    const [isClient, setIsClient] = useState(false);
+    
+    const isLoading = loadingSales || loadingPurchases;
 
     useEffect(() => {
-        setIsClient(true);
-    }, []);
-
-    useEffect(() => {
-        if (isClient) {
-            // Sales Performance
+        if (salesOrders) {
             const salesMap = new Map<string, { totalKilos: number, totalValue: number }>();
             salesOrders.forEach(order => {
                 if (order.status === 'completed') {
@@ -70,8 +74,9 @@ export function PerformanceReports({ salesOrders, purchaseOrders }: PerformanceR
                 });
             });
             setSalesPerformance(salesData.sort((a,b) => b.totalValue - a.totalValue));
+        }
 
-            // Purchase Performance
+        if (purchaseOrders) {
             const purchaseMap = new Map<string, { totalKilos: number, totalValue: number }>();
             purchaseOrders.forEach(order => {
                  if (order.status === 'completed') {
@@ -101,10 +106,10 @@ export function PerformanceReports({ salesOrders, purchaseOrders }: PerformanceR
             });
             setPurchasePerformance(purchaseData.sort((a,b) => b.totalValue - a.totalValue));
         }
-    }, [salesOrders, purchaseOrders, isClient]);
+    }, [salesOrders, purchaseOrders]);
     
     const renderPerformanceRows = (data: PerformanceItem[]) => {
-        if (!isClient) {
+        if (isLoading) {
             return Array.from({ length: 3 }).map((_, index) => (
                 <TableRow key={`skeleton-perf-${index}`}>
                     <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
@@ -177,6 +182,3 @@ export function PerformanceReports({ salesOrders, purchaseOrders }: PerformanceR
         </div>
     )
 }
-
-    
-

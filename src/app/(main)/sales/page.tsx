@@ -2,8 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useLocalStorage } from '@/hooks/use-local-storage';
-import { salesOrders as initialSalesOrders, contacts as initialContacts, purchaseOrders as initialPurchaseOrders, getInventory, serviceOrders as initialServiceOrders, financialMovements as initialFinancialMovements, inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
 import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem, ServiceOrder, FinancialMovement, InventoryAdjustment } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { NewSalesOrderSheet } from './components/new-sales-order-sheet';
@@ -38,6 +36,10 @@ import { es } from 'date-fns/locale';
 import { SalesOrderPreview } from './components/sales-order-preview';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
+import { useCollection, useFirebase, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { getInventory } from '@/lib/data';
+
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -48,34 +50,40 @@ const formatCurrency = (value: number) =>
 
 
 export default function SalesPage() {
-  const [salesOrders, setSalesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
-  const [purchaseOrders, setPurchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
-  const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
-  const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
-  const [contacts, setContacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
-  
+  const { firestore } = useFirebase();
+
+  const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
+  const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
+  const inventoryAdjustmentsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'inventoryAdjustments') : null, [firestore]);
+  const financialMovementsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financialMovements') : null, [firestore]);
+  const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
+
+  const { data: salesOrders, isLoading: loadingSales } = useCollection<SalesOrder>(salesOrdersQuery);
+  const { data: purchaseOrders, isLoading: loadingPurchases } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
+  const { data: inventoryAdjustments, isLoading: loadingAdjustments } = useCollection<InventoryAdjustment>(inventoryAdjustmentsQuery);
+  const { data: financialMovements, isLoading: loadingFinancials } = useCollection<FinancialMovement>(financialMovementsQuery);
+  const { data: contacts, isLoading: loadingContacts } = useCollection<Contact>(contactsQuery);
+
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [confirmingEditOrder, setConfirmingEditOrder] = useState<SalesOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
   const [previewingOrder, setPreviewingOrder] = useState<SalesOrder | null>(null);
 
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
 
   const { toast } = useToast();
+
+  const isLoading = loadingSales || loadingPurchases || loadingAdjustments || loadingFinancials || loadingContacts;
   
-  const clients = contacts.filter(c => c.type.includes('client'));
-  const carriers = contacts.filter(c => c.type.includes('supplier'));
+  const clients = useMemo(() => contacts?.filter(c => Array.isArray(c.type) && c.type.includes('client')) || [], [contacts]);
+  const carriers = useMemo(() => contacts?.filter(c => Array.isArray(c.type) && c.type.includes('supplier')) || [], [contacts]);
 
-  const nonDispatchOrders = useMemo(() => salesOrders.filter(o => o.orderType !== 'dispatch'), [salesOrders]);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const nonDispatchOrders = useMemo(() => salesOrders?.filter(o => o.orderType !== 'dispatch') || [], [salesOrders]);
 
   const groupedOrders = useMemo(() => {
+    if (!nonDispatchOrders || !clients) return [];
     const groups: Record<string, { clientName: string; orders: SalesOrder[]; subtotal: number; }> = {};
     
     nonDispatchOrders.forEach(order => {
@@ -108,19 +116,10 @@ export default function SalesPage() {
   }, [groupedOrders, filter]);
 
   
-  const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, inventoryAdjustments, editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
-
-  const nextOrderId = useMemo(() => {
-    const lastIdNumber = salesOrders.reduce((max, order) => {
-        if (!order.id.startsWith('OV-')) return max;
-        const idNum = parseInt(order.id.split('-')[1]);
-        return idNum > max ? idNum : max;
-    }, 2000);
-    return `OV-${lastIdNumber + 1}`;
-  }, [salesOrders]);
-
+  const inventory = useMemo(() => getInventory(purchaseOrders || [], salesOrders || [], inventoryAdjustments || [], editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
 
   const handleSaveOrder = (orderData: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
+    if (!firestore) return;
     const allItems = [...orderData.items, ...newItems.map(item => ({ ...item, id: `temp-${Date.now()}-${Math.random()}` }))];
     
     // This is the definitive calculation logic
@@ -135,44 +134,30 @@ export default function SalesPage() {
     }, 0);
     const totalPackages = allItems.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
 
-    let finalOrder: SalesOrder;
+    let finalOrderData = {
+      ...(orderData as Omit<SalesOrder, 'id'>),
+      items: allItems,
+      totalAmount: finalAmount,
+      totalKilos,
+      totalPackages,
+      paymentStatus: orderData.paymentStatus || 'Pendiente'
+    };
 
     if ('id' in orderData) {
-      finalOrder = { ...orderData, items: allItems, totalAmount: finalAmount, totalKilos, totalPackages, paymentStatus: orderData.paymentStatus || 'Pendiente' } as SalesOrder;
-      setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
-      toast({ title: 'Orden Actualizada', description: `La orden ${finalOrder.id} ha sido actualizada.` });
+      updateDocumentNonBlocking(doc(firestore, 'salesOrders', orderData.id), finalOrderData);
+      toast({ title: 'Orden Actualizada', description: `La orden ${orderData.id} ha sido actualizada.` });
+      setPreviewingOrder({ ...finalOrderData, id: orderData.id, totalPackages });
     } else {
-      finalOrder = {
-        ...orderData,
-        id: nextOrderId,
-        items: allItems,
-        totalAmount: finalAmount,
-        totalKilos, 
-        totalPackages,
-        paymentStatus: 'Pendiente'
-      } as SalesOrder;
-      setSalesOrders(prev => [...prev, finalOrder]);
-      toast({ title: 'Orden Creada', description: `La orden ${finalOrder.id} ha sido creada.` });
-    }
-
-    const movementsForOrder = financialMovements.filter(m => m.relatedDocument?.id === finalOrder.id);
-    const totalPaid = movementsForOrder.reduce((sum, m) => sum + m.amount, 0);
-    
-    let newPaymentStatus: 'Pendiente' | 'Abonado' | 'Pagado' = 'Pendiente';
-    if (totalPaid >= finalOrder.totalAmount) {
-        newPaymentStatus = 'Pagado';
-    } else if (totalPaid > 0) {
-        newPaymentStatus = 'Abonado';
+      addDocumentNonBlocking(collection(firestore, 'salesOrders'), finalOrderData).then(docRef => {
+        if(docRef) {
+          toast({ title: 'Orden Creada', description: `La orden ${docRef.id} ha sido creada.` });
+          setPreviewingOrder({ ...finalOrderData, id: docRef.id, totalPackages });
+        }
+      });
     }
     
-    if (finalOrder.paymentStatus !== newPaymentStatus) {
-        finalOrder.paymentStatus = newPaymentStatus;
-        setSalesOrders(prev => prev.map(o => o.id === finalOrder.id ? finalOrder : o));
-    }
-
     setIsSheetOpen(false);
     setEditingOrder(null);
-    setPreviewingOrder(finalOrder);
   };
 
   const handleEdit = (order: SalesOrder) => {
@@ -192,8 +177,8 @@ export default function SalesPage() {
   };
   
   const confirmDelete = () => {
-    if (deletingOrder) {
-      setSalesOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id));
+    if (deletingOrder && firestore) {
+      deleteDocumentNonBlocking(doc(firestore, 'salesOrders', deletingOrder.id));
       toast({ variant: "destructive", title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
       setDeletingOrder(null);
     }
@@ -251,6 +236,7 @@ export default function SalesPage() {
   };
   
   const handleExportAllCompleted = () => {
+    if (!nonDispatchOrders) return;
     const completedOrders = nonDispatchOrders.filter(o => o.status === 'completed');
     if (completedOrders.length === 0) {
         toast({
@@ -304,7 +290,7 @@ export default function SalesPage() {
   const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreviewRequest, clients });
 
   const renderContent = () => {
-    if (!isClient) {
+    if (isLoading) {
       return (
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
@@ -451,11 +437,11 @@ export default function SalesPage() {
             clients={clients}
             carriers={carriers}
             inventory={inventory}
-            nextOrderId={nextOrderId}
-            purchaseOrders={purchaseOrders}
-            salesOrders={salesOrders}
-            inventoryAdjustments={inventoryAdjustments}
-            contacts={contacts}
+            nextOrderId={""}
+            purchaseOrders={purchaseOrders || []}
+            salesOrders={salesOrders || []}
+            inventoryAdjustments={inventoryAdjustments || []}
+            contacts={contacts || []}
         />
       )}
 

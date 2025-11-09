@@ -1,9 +1,8 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useLocalStorage } from '@/hooks/use-local-storage';
-import { financialMovements as initialFinancialMovements, purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, serviceOrders as initialServiceOrders, contacts as initialContacts } from '@/lib/data';
 import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact, BankAccount } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { NewFinancialMovementSheet } from './components/new-financial-movement-sheet';
@@ -28,6 +27,9 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCollection, useFirebase, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+
 
 type AccountSummary = {
     id: string;
@@ -49,27 +51,33 @@ type GroupedMovement = {
 
 
 export default function FinancialsPage() {
-  const [financialMovements, setFinancialMovements] = useLocalStorage<FinancialMovement[]>('financialMovements', initialFinancialMovements);
-  const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
-  const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
-  const [serviceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', initialServiceOrders);
-  const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
+  const { firestore } = useFirebase();
+
+  const financialMovementsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financialMovements') : null, [firestore]);
+  const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
+  const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
+  const serviceOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'serviceOrders') : null, [firestore]);
+  const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
+
+  const { data: financialMovements, isLoading: loadingFinancials } = useCollection<FinancialMovement>(financialMovementsQuery);
+  const { data: purchaseOrders, isLoading: loadingPurchases } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
+  const { data: salesOrders, isLoading: loadingSales } = useCollection<SalesOrder>(salesOrdersQuery);
+  const { data: serviceOrders, isLoading: loadingServices } = useCollection<ServiceOrder>(serviceOrdersQuery);
+  const { data: contacts, isLoading: loadingContacts } = useCollection<Contact>(contactsQuery);
+
   const { bankAccounts } = useMasterData();
   
   const [editingMovement, setEditingMovement] = useState<FinancialMovement | null>(null);
   const [deletingMovement, setDeletingMovement] = useState<FinancialMovement | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
   const [filter, setFilter] = useState<{ type: 'income' | 'expense' | 'traspaso_in' | 'traspaso_out', accountId: string } | null>(null);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const isLoading = loadingFinancials || loadingPurchases || loadingSales || loadingServices || loadingContacts;
 
   const { accountSummariesByOwner } = useMemo(() => {
-    if (!isClient) return { accountSummariesByOwner: {} };
+    if (!financialMovements) return { accountSummariesByOwner: {} };
     
     const summaries = bankAccounts.map(account => {
         const totalIncome = financialMovements
@@ -114,32 +122,23 @@ export default function FinancialsPage() {
 
     return { accountSummariesByOwner: groupedByOwner };
 
-  }, [financialMovements, bankAccounts, isClient]);
+  }, [financialMovements, bankAccounts]);
 
 
   const handleSaveMovement = (data: FinancialMovement | Omit<FinancialMovement, 'id'> | Omit<FinancialMovement, 'id'>[]) => {
-    const lastId = financialMovements.reduce((max, m) => Math.max(max, parseInt(m.id.split('-')[1])), 0);
-    let nextId = lastId + 1;
+    if (!firestore) return;
 
     if (Array.isArray(data)) {
-        const newMovements: FinancialMovement[] = data.map((movement, index) => ({
-            ...(movement as Omit<FinancialMovement, 'id'>),
-            id: `M-${nextId + index}`,
-        }));
-        setFinancialMovements(prev => [...prev, ...newMovements]);
-        toast({ title: `${newMovements.length} Movimientos Creados` });
+        data.forEach(movement => {
+             addDocumentNonBlocking(collection(firestore, 'financialMovements'), movement);
+        });
+        toast({ title: `${data.length} Movimientos Creados` });
 
     } else if ('id' in data) {
-      // Update
-      setFinancialMovements(prev => prev.map(m => m.id === data.id ? data : m));
+      updateDocumentNonBlocking(doc(firestore, 'financialMovements', data.id), data);
       toast({ title: "Movimiento Actualizado" });
     } else {
-      // Add single
-      const newMovement = {
-        ...data,
-        id: `M-${nextId}`,
-      };
-      setFinancialMovements(prev => [...prev, newMovement]);
+      addDocumentNonBlocking(collection(firestore, 'financialMovements'), data);
       toast({ title: "Movimiento Creado" });
     }
 
@@ -157,8 +156,8 @@ export default function FinancialsPage() {
   };
   
   const confirmDelete = () => {
-    if (deletingMovement) {
-      setFinancialMovements((prev) => prev.filter((m) => m.id !== deletingMovement.id));
+    if (deletingMovement && firestore) {
+      deleteDocumentNonBlocking(doc(firestore, 'financialMovements', deletingMovement.id));
       toast({ variant: "destructive", title: "Movimiento Eliminado" });
       setDeletingMovement(null);
       setIsSheetOpen(false);
@@ -179,6 +178,7 @@ export default function FinancialsPage() {
   }
 
   const dataWithContactNames = useMemo(() => {
+    if (!financialMovements || !contacts) return [];
     return financialMovements.map(m => ({
       ...m,
       contactName: contacts.find(c => c.id === m.contactId)?.name || 'Sin Contacto Asociado'
@@ -354,7 +354,7 @@ export default function FinancialsPage() {
                 <CardDescription>Saldos y movimientos totales para cada cuenta. Haga clic en un total para filtrar los movimientos.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                {!isClient ? Array.from({length: 2}).map((_, i) => <Skeleton key={i} className="h-48" />) :
+                {isLoading ? Array.from({length: 2}).map((_, i) => <Skeleton key={i} className="h-48" />) :
                 <>
                     {Object.entries(accountSummariesByOwner).map(([owner, summaries]) => (
                         <div key={owner}>
@@ -433,7 +433,7 @@ export default function FinancialsPage() {
                 </div>
             </CardHeader>
             <CardContent>
-            {!isClient ? <Skeleton className="h-64 w-full" /> : (
+            {isLoading ? <Skeleton className="h-64 w-full" /> : (
                 <div className="space-y-8">
                     {/* Income Table */}
                     <div>
@@ -541,11 +541,11 @@ export default function FinancialsPage() {
         onOpenChange={handleSheetOpenChange}
         onSave={handleSaveMovement}
         movement={editingMovement}
-        allMovements={financialMovements}
-        purchaseOrders={purchaseOrders}
-        salesOrders={salesOrders}
-        serviceOrders={serviceOrders}
-        contacts={contacts}
+        allMovements={financialMovements || []}
+        purchaseOrders={purchaseOrders || []}
+        salesOrders={salesOrders || []}
+        serviceOrders={serviceOrders || []}
+        contacts={contacts || []}
         onDelete={handleDelete}
       />
 

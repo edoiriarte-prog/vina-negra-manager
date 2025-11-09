@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -7,11 +8,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
-type ProfitabilityReportProps = {
-    salesOrders: SalesOrder[];
-    purchaseOrders: PurchaseOrder[];
-}
+type ProfitabilityReportProps = {}
 
 type PerformanceData = {
     totalKilos: number;
@@ -37,16 +37,21 @@ const formatCurrency = (value: number) =>
 
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 
-export function ProfitabilityReport({ salesOrders, purchaseOrders }: ProfitabilityReportProps) {
+export function ProfitabilityReport({}: ProfitabilityReportProps) {
+    const { firestore } = useFirebase();
+
+    const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
+    const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
+
+    const { data: salesOrders, isLoading: loadingSales } = useCollection<SalesOrder>(salesOrdersQuery);
+    const { data: purchaseOrders, isLoading: loadingPurchases } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
+
     const [reportData, setReportData] = useState<ProfitabilityItem[]>([]);
-    const [isClient, setIsClient] = useState(false);
+    
+    const isLoading = loadingSales || loadingPurchases;
 
     useEffect(() => {
-        setIsClient(true);
-    }, []);
-
-    useEffect(() => {
-        if (isClient) {
+        if (salesOrders && purchaseOrders) {
             const salesMap = new Map<string, { totalKilos: number, totalValue: number }>();
             salesOrders.forEach(order => {
                 if (order.status === 'completed') {
@@ -114,10 +119,10 @@ export function ProfitabilityReport({ salesOrders, purchaseOrders }: Profitabili
 
             setReportData(profitabilityData.sort((a,b) => a.key.localeCompare(b.key)));
         }
-    }, [salesOrders, purchaseOrders, isClient]);
+    }, [salesOrders, purchaseOrders]);
     
     const renderReportRows = (data: ProfitabilityItem[]) => {
-        if (!isClient) {
+        if (isLoading) {
             return Array.from({ length: 5 }).map((_, index) => (
                 <TableRow key={`skeleton-profit-${index}`}>
                     <TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell>

@@ -1,7 +1,8 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useCollection, useFirebase } from '@/firebase';
+import { useState, useMemo } from 'react';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import { ServiceOrder } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
@@ -27,12 +28,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { collection, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc } from 'firebase/firestore';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 
 export default function ServicesPage() {
   const { firestore } = useFirebase();
-  const serviceOrdersRef = useMemo(
+  const serviceOrdersRef = useMemoFirebase(
     () => (firestore ? collection(firestore, 'serviceOrders') : null),
     [firestore]
   );

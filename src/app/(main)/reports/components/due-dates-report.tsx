@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -18,11 +19,10 @@ import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 type DueDatesReportProps = {
-    salesOrders: SalesOrder[];
-    financialMovements: FinancialMovement[];
-    contacts: Contact[];
     onPrint: () => void;
 }
 
@@ -46,27 +46,36 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-export function DueDatesReport({ salesOrders, financialMovements, contacts, onPrint }: DueDatesReportProps) {
-    const [isClient, setIsClient] = useState(false);
+export function DueDatesReport({ onPrint }: DueDatesReportProps) {
+    const { firestore } = useFirebase();
+
+    const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
+    const financialMovementsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financialMovements') : null, [firestore]);
+    const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
+
+    const { data: salesOrders, isLoading: loadingSales } = useCollection<SalesOrder>(salesOrdersQuery);
+    const { data: financialMovements, isLoading: loadingFinancials } = useCollection<FinancialMovement>(financialMovementsQuery);
+    const { data: contacts, isLoading: loadingContacts } = useCollection<Contact>(contactsQuery);
+    
     const [filterDate, setFilterDate] = useState<Date | undefined>(new Date());
     const [selectedClientId, setSelectedClientId] = useState<string>('all');
     const { toast } = useToast();
     
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
+    const isLoading = loadingSales || loadingFinancials || loadingContacts;
 
     const clientOptions = useMemo(() => {
-        return contacts.filter(c => c.type.includes('client'));
+        return contacts?.filter(c => Array.isArray(c.type) && c.type.includes('client')) || [];
     }, [contacts]);
     
     const selectedClient = useMemo(() => {
-        if (selectedClientId === 'all') return null;
+        if (selectedClientId === 'all' || !contacts) return null;
         return contacts.find(c => c.id === selectedClientId);
     }, [selectedClientId, contacts]);
 
     const { pendingItems, paidItems, upcomingItems, totalPending, totalPaidInPeriod, totalUpcoming, totalBilled, totalPaid } = useMemo(() => {
-        if (!isClient) return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaidInPeriod: 0, totalUpcoming: 0, totalBilled: 0, totalPaid: 0 };
+        if (isLoading || !salesOrders || !financialMovements || !contacts) {
+            return { pendingItems: [], paidItems: [], upcomingItems: [], totalPending: 0, totalPaidInPeriod: 0, totalUpcoming: 0, totalBilled: 0, totalPaid: 0 };
+        }
 
         const isAllClients = selectedClientId === 'all';
         const endDate = filterDate ? startOfDay(filterDate) : new Date(9999, 11, 31);
@@ -111,21 +120,16 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
             }
         });
         
-        // Chronological sort of all dues to be paid
         const sortedDues = allDueItems.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
         
-        // Get all relevant payments
         const clientMovements = financialMovements
             .filter(fm => fm.type === 'income' && (isAllClients || fm.contactId === selectedClientId))
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             
-        // Create a mutable pool of payments
         const paymentPool = clientMovements.map(p => ({ ...p, remaining: p.amount }));
 
-        // Apply payments chronologically to dues
         sortedDues.forEach(due => {
             for (const payment of paymentPool) {
-                // Ensure payment is for the correct client and has money left
                 if (payment.remaining > 0 && payment.contactId === due.clientId) {
                     const remainingOnDue = due.pendingAmount;
                     if (remainingOnDue > 0) {
@@ -136,7 +140,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                         payment.remaining -= amountToApply;
                     }
                 }
-                if (due.pendingAmount <= 1) break; // Move to next due if this one is paid
+                if (due.pendingAmount <= 1) break; 
             }
         });
         
@@ -149,9 +153,9 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
         const totalUpcoming = upcoming.reduce((sum, item) => sum + item.pendingAmount, 0);
 
         pastAndPresentItems.forEach(due => {
-            if (due.pendingAmount <= 1) { // Use a small epsilon for float comparison
+            if (due.pendingAmount <= 1) { 
                 due.status = 'Pagado';
-                due.pendingAmount = 0; // Ensure it's exactly zero
+                due.pendingAmount = 0; 
             } else if (due.paidAmount > 0) {
                 due.status = 'Abonado';
             } else if (isAfter(startOfDay(new Date()), parseISO(due.dueDate)) && !isEqual(startOfDay(new Date()), parseISO(due.dueDate))) {
@@ -177,7 +181,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
         return { pendingItems: pending, paidItems: paid, upcomingItems: upcoming, totalPending, totalPaidInPeriod, totalUpcoming, totalBilled, totalPaid };
 
-    }, [salesOrders, financialMovements, contacts, isClient, filterDate, selectedClientId]);
+    }, [salesOrders, financialMovements, contacts, isLoading, filterDate, selectedClientId]);
 
 
     const handleExport = () => {
@@ -192,7 +196,6 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
         const workbook = XLSX.utils.book_new();
         
-        // Summary Sheet
         const summaryData = [
             ["Informe de Vencimientos"],
             ["Balance al:", filterDate ? format(filterDate, "PPP", { locale: es }) : "N/A"],
@@ -240,7 +243,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
     };
 
     const renderReportRows = (data: DueDateItem[]) => {
-        if (!isClient) {
+        if (isLoading) {
             return Array.from({ length: 5 }).map((_, index) => (
                 <TableRow key={`skeleton-due-${index}`}><TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
             ));
@@ -285,7 +288,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                 <TableBody>
                     {renderReportRows(items)}
                 </TableBody>
-                {isClient && items.length > 0 && (
+                {items.length > 0 && (
                     <TableFooter>
                         <TableRow>
                             <TableCell colSpan={7} className="text-right font-bold text-lg print:text-base">{caption}</TableCell>
@@ -385,7 +388,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                     <FileText className="h-4 w-4 text-muted-foreground" />
                                 </CardHeader>
                                 <CardContent>
-                                    {isClient ? <div className="text-2xl font-bold">{formatCurrency(totalBilled)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                    {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{formatCurrency(totalBilled)}</div>}
                                     <p className="text-xs text-muted-foreground">total para el cliente</p>
                                 </CardContent>
                             </Card>
@@ -395,7 +398,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                                 </CardHeader>
                                 <CardContent>
-                                    {isClient ? <div className="text-2xl font-bold text-green-500">{formatCurrency(totalPaid)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                    {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold text-green-500">{formatCurrency(totalPaid)}</div>}
                                     <p className="text-xs text-muted-foreground">total para el cliente</p>
                                 </CardContent>
                             </Card>
@@ -405,7 +408,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                     <Clock className="h-4 w-4 text-muted-foreground" />
                                 </CardHeader>
                                 <CardContent>
-                                    {isClient ? <div className="text-2xl font-bold text-destructive">{formatCurrency(totalPending)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                    {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold text-destructive">{formatCurrency(totalPending)}</div>}
                                     <p className="text-xs text-muted-foreground">en el periodo</p>
                                 </CardContent>
                             </Card>
@@ -415,7 +418,7 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
                                     <Forward className="h-4 w-4 text-muted-foreground" />
                                 </CardHeader>
                                 <CardContent>
-                                    {isClient ? <div className="text-2xl font-bold text-blue-500">{formatCurrency(totalUpcoming)}</div> : <Skeleton className="h-8 w-3/4" />}
+                                    {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold text-blue-500">{formatCurrency(totalUpcoming)}</div>}
                                     <p className="text-xs text-muted-foreground">fuera del periodo</p>
                                 </CardContent>
                             </Card>
@@ -435,5 +438,3 @@ export function DueDatesReport({ salesOrders, financialMovements, contacts, onPr
 
     
 }
-
-    
