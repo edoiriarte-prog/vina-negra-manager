@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { useCollection, useFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking, useMemoFirebase } from '@/firebase';
 import { Contact, Interaction } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
@@ -27,7 +27,7 @@ import { collection, doc } from 'firebase/firestore';
 
 export default function ContactsPage() {
   const { firestore } = useFirebase();
-  const contactsQuery = useMemo(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
+  const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
   const { data: contacts, isLoading } = useCollection<Contact>(contactsQuery);
 
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
