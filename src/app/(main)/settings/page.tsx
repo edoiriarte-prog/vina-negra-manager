@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardHeader,
@@ -26,7 +26,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { useFirebase, useCollection } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import {
@@ -94,7 +94,8 @@ function MasterDataEditor({ title, data, collectionName }: { title: string, data
 
 function CaliberMasterEditor() {
     const { firestore } = useFirebase();
-    const { data: calibers } = useCollection<{name: string, code: string}>(firestore ? collection(firestore, 'calibers') : null);
+    const calibersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'calibers') : null, [firestore]);
+    const { data: calibers } = useCollection<CaliberMaster>(calibersQuery);
     const [newItem, setNewItem] = useState({ name: '', code: '' });
     const { toast } = useToast();
 
@@ -157,7 +158,8 @@ const emptyAccount: Omit<BankAccount, 'id'> = { name: '', accountType: 'Cuenta C
 
 function BankAccountsEditor() {
     const { firestore } = useFirebase();
-    const { data: bankAccounts } = useCollection<BankAccount>(firestore ? collection(firestore, 'bankAccounts') : null);
+    const bankAccountsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'bankAccounts') : null, [firestore]);
+    const { data: bankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
     const [formData, setFormData] = useState<Omit<BankAccount, 'id'>>(emptyAccount);
     const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
     const { toast } = useToast();
@@ -354,12 +356,23 @@ function DataManagement() {
 
 export default function SettingsPage() {
     const { firestore } = useFirebase();
-    const { data: products } = useCollection<{name: string}>(firestore ? collection(firestore, 'products') : null);
-    const { data: units } = useCollection<{name: string}>(firestore ? collection(firestore, 'units') : null);
-    const { data: packagingTypes } = useCollection<{name: string}>(firestore ? collection(firestore, 'packagingTypes') : null);
-    const { data: warehouses } = useCollection<{name: string}>(firestore ? collection(firestore, 'warehouses') : null);
-    const { data: internalConcepts } = useCollection<{name: string}>(firestore ? collection(firestore, 'internalConcepts') : null);
-    const { data: costCenters } = useCollection<{name: string}>(firestore ? collection(firestore, 'costCenters') : null);
+    const productsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'products') : null, [firestore]);
+    const { data: products } = useCollection<{name: string}>(productsQuery);
+
+    const unitsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'units') : null, [firestore]);
+    const { data: units } = useCollection<{name: string}>(unitsQuery);
+
+    const packagingTypesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'packagingTypes') : null, [firestore]);
+    const { data: packagingTypes } = useCollection<{name: string}>(packagingTypesQuery);
+
+    const warehousesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'warehouses') : null, [firestore]);
+    const { data: warehouses } = useCollection<{name: string}>(warehousesQuery);
+    
+    const internalConceptsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'internalConcepts') : null, [firestore]);
+    const { data: internalConcepts } = useCollection<{name: string}>(internalConceptsQuery);
+    
+    const costCentersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'costCenters') : null, [firestore]);
+    const { data: costCenters } = useCollection<{name: string}>(costCentersQuery);
 
     return (
         <div className="flex flex-col gap-6">
@@ -396,3 +409,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
