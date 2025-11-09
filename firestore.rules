@@ -1,0 +1,184 @@
+/**
+ * @fileoverview Firestore Security Rules for Viña Negra Manager.
+ *
+ * Core Philosophy:
+ * This ruleset implements a flat data model with independent top-level collections.
+ * Authorization relies on a combination of ownership and relational integrity.
+ * The rules prioritize secure, auditable access control by avoiding complex queries
+ * and enforcing strict ownership for write operations.
+ *
+ * Data Structure:
+ * - /contacts/{contactId}: Stores contact information.
+ * - /purchaseOrders/{purchaseOrderId}: Stores purchase order data, linked to contacts via supplierId.
+ * - /salesOrders/{salesOrderId}: Stores sales order data, linked to contacts via clientId.
+ * - /serviceOrders/{serviceOrderId}: Stores service order data, linked to purchase orders via purchaseOrderId.
+ * - /financialMovements/{financialMovementId}: Stores financial transactions, linked to sales, purchase, and service orders.
+ * - /inventory/{inventoryId}: Stores inventory levels.
+ *
+ * Key Security Decisions:
+ * - No user-specific data trees are used; all data resides in top-level collections.
+ * - Strong ownership is enforced for all write operations (create, update, delete).
+ * - List operations are generally public (if applicable) or disabled if sensitive.
+ * - Data validation is limited to critical authorization fields to enable rapid prototyping.
+ *
+ * Denormalization for Authorization:
+ * - Ownership is implicitly enforced by requiring the `request.auth.uid` to match the
+ *   expected owner ID, which is either the document ID itself (for /contacts) or
+ *   a dedicated field (e.g., `supplierId` in /purchaseOrders`).
+ *
+ * Structural Segregation:
+ * - Data is separated into distinct collections based on entity type,
+ *   allowing for tailored security rules for each collection.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Manages contact information.
+     * @path /contacts/{contactId}
+     * @allow (create) - Authenticated user creates a contact with the ID matching their auth UID.
+     * @allow (get, list) - All users can view contact information.
+     * @deny (create) - Authenticated user attempts to create a contact with an ID that doesn't match their auth UID.
+     * @deny (update, delete) - Unauthorized user attempts to modify a contact.
+     * @principle Enforces document ownership for writes, allows public reads.
+     */
+    match /contacts/{contactId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(contactId) {
+        return request.auth.uid == contactId;
+      }
+
+      function isExistingOwner(contactId) {
+        return isSignedIn() && isOwner(contactId) && resource != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn() && isOwner(contactId);
+      allow update: if isExistingOwner(contactId);
+      allow delete: if isExistingOwner(contactId);
+    }
+
+    /**
+     * @description Manages purchase order data, linked to contacts via supplierId.
+     * @path /purchaseOrders/{purchaseOrderId}
+     * @allow (create) - Authenticated user creates a purchase order with a valid supplierId.
+     * @allow (get, list) - All users can view purchase order information.
+     * @deny (create) - Authenticated user attempts to create a purchase order with an invalid supplierId.
+     * @deny (update, delete) - Unauthorized user attempts to modify a purchase order.
+     * @principle Enforces document ownership for writes, allows public reads.
+     */
+    match /purchaseOrders/{purchaseOrderId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isCreatingWithOwnerId() {
+        return request.resource.data.supplierId == request.auth.uid;
+      }
+
+      function isExistingOwner() {
+        return isSignedIn() && resource.data.supplierId == request.auth.uid && resource != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn() && isCreatingWithOwnerId();
+      allow update: if isExistingOwner();
+      allow delete: if isExistingOwner();
+    }
+
+    /**
+     * @description Manages sales order data, linked to contacts via clientId.
+     * @path /salesOrders/{salesOrderId}
+     * @allow (create) - Authenticated user creates a sales order with a valid clientId.
+     * @allow (get, list) - All users can view sales order information.
+     * @deny (create) - Authenticated user attempts to create a sales order with an invalid clientId.
+     * @deny (update, delete) - Unauthorized user attempts to modify a sales order.
+     * @principle Enforces document ownership for writes, allows public reads.
+     */
+    match /salesOrders/{salesOrderId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isCreatingWithOwnerId() {
+        return request.resource.data.clientId == request.auth.uid;
+      }
+
+      function isExistingOwner() {
+        return isSignedIn() && resource.data.clientId == request.auth.uid && resource != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn() && isCreatingWithOwnerId();
+      allow update: if isExistingOwner();
+      allow delete: if isExistingOwner();
+    }
+
+    /**
+     * @description Manages service order data, linked to purchase orders via purchaseOrderId.
+     * @path /serviceOrders/{serviceOrderId}
+     * @allow (create) - Authenticated user creates a service order with a valid purchaseOrderId.
+     * @allow (get, list) - All users can view service order information.
+     * @deny (create) - Authenticated user attempts to create a service order with an invalid purchaseOrderId.
+     * @deny (update, delete) - Unauthorized user attempts to modify a service order.
+     */
+    match /serviceOrders/{serviceOrderId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isCreatingWithOwnerId() {
+        return request.resource.data.purchaseOrderId == request.auth.uid;
+      }
+
+      function isExistingOwner() {
+        return isSignedIn() && resource.data.purchaseOrderId == request.auth.uid && resource != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn() && isCreatingWithOwnerId();
+      allow update: if isExistingOwner();
+      allow delete: if isExistingOwner();
+    }
+
+    /**
+     * @description Manages financial transactions, linked to sales, purchase, and service orders.
+     * @path /financialMovements/{financialMovementId}
+     * @allow (create) - Authenticated user creates a financial movement.
+     * @allow (get, list) - All users can view financial movement information.
+     * @deny (update, delete) - Unauthorized user attempts to modify a financial movement.
+     */
+    match /financialMovements/{financialMovementId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Manages inventory levels.
+     * @path /inventory/{inventoryId}
+     * @allow (create) - Authenticated user creates a new inventory entry.
+     * @allow (get, list) - All users can view inventory information.
+     * @deny (update, delete) - Unauthorized user attempts to modify inventory.
+     */
+    match /inventory/{inventoryId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

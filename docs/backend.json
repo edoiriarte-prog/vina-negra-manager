@@ -1,0 +1,364 @@
+{
+  "entities": {
+    "Contact": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Contact",
+      "type": "object",
+      "description": "Represents a client or supplier contact.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the contact."
+        },
+        "rut": {
+          "type": "string",
+          "description": "Tax identifier for the contact (RUT)."
+        },
+        "address": {
+          "type": "string",
+          "description": "Physical address of the contact."
+        },
+        "commune": {
+          "type": "string",
+          "description": "Commune or locality of the contact."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the contact.",
+          "format": "email"
+        },
+        "contactPerson": {
+          "type": "string",
+          "description": "Name of the contact person."
+        },
+        "isClient": {
+          "type": "boolean",
+          "description": "Indicates if the contact is a client."
+        },
+        "isSupplier": {
+          "type": "boolean",
+          "description": "Indicates if the contact is a supplier."
+        }
+      },
+      "required": [
+        "id",
+        "rut",
+        "address",
+        "commune",
+        "email",
+        "contactPerson",
+        "isClient",
+        "isSupplier"
+      ]
+    },
+    "PurchaseOrder": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PurchaseOrder",
+      "type": "object",
+      "description": "Represents a purchase order.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the purchase order."
+        },
+        "supplierId": {
+          "type": "string",
+          "description": "Reference to the supplier Contact. (Relationship: Contact 1:N PurchaseOrder)"
+        },
+        "orderDate": {
+          "type": "string",
+          "description": "Date when the purchase order was created.",
+          "format": "date-time"
+        },
+        "items": {
+          "type": "array",
+          "description": "List of items in the purchase order.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total amount of the purchase order."
+        }
+      },
+      "required": [
+        "id",
+        "supplierId",
+        "orderDate",
+        "items",
+        "totalAmount"
+      ]
+    },
+    "SalesOrder": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SalesOrder",
+      "type": "object",
+      "description": "Represents a sales order.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the sales order."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to the client Contact. (Relationship: Contact 1:N SalesOrder)"
+        },
+        "orderDate": {
+          "type": "string",
+          "description": "Date when the sales order was created.",
+          "format": "date-time"
+        },
+        "items": {
+          "type": "array",
+          "description": "List of items in the sales order.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total amount of the sales order."
+        }
+      },
+      "required": [
+        "id",
+        "clientId",
+        "orderDate",
+        "items",
+        "totalAmount"
+      ]
+    },
+    "ServiceOrder": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ServiceOrder",
+      "type": "object",
+      "description": "Represents a service order.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the service order."
+        },
+        "purchaseOrderId": {
+          "type": "string",
+          "description": "Reference to the PurchaseOrder. (Relationship: PurchaseOrder 1:N ServiceOrder)"
+        },
+        "serviceType": {
+          "type": "string",
+          "description": "Type of service provided (e.g., freight, labor)."
+        },
+        "cost": {
+          "type": "number",
+          "description": "Cost of the service."
+        },
+        "serviceDate": {
+          "type": "string",
+          "description": "Date when the service was performed.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "purchaseOrderId",
+        "serviceType",
+        "cost",
+        "serviceDate"
+      ]
+    },
+    "FinancialMovement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FinancialMovement",
+      "type": "object",
+      "description": "Represents a financial transaction (income or expense).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the financial movement."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of financial movement (income or expense)."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount of the financial movement."
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the financial movement.",
+          "format": "date-time"
+        },
+        "salesOrderId": {
+          "type": "string",
+          "description": "Reference to the SalesOrder, if applicable. (Relationship: SalesOrder 1:N FinancialMovement)"
+        },
+        "purchaseOrderId": {
+          "type": "string",
+          "description": "Reference to the PurchaseOrder, if applicable. (Relationship: PurchaseOrder 1:N FinancialMovement)"
+        },
+        "serviceOrderId": {
+          "type": "string",
+          "description": "Reference to the ServiceOrder, if applicable. (Relationship: ServiceOrder 1:N FinancialMovement)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the financial movement."
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "amount",
+        "date",
+        "description"
+      ]
+    },
+    "Inventory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Inventory",
+      "type": "object",
+      "description": "Represents the current inventory levels.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the inventory item."
+        },
+        "productName": {
+          "type": "string",
+          "description": "Name of the product."
+        },
+        "caliber": {
+          "type": "string",
+          "description": "Caliber or grade of the product."
+        },
+        "kilosPurchased": {
+          "type": "number",
+          "description": "Total kilos purchased of this product."
+        },
+        "kilosSold": {
+          "type": "number",
+          "description": "Total kilos sold of this product."
+        },
+        "kilosAvailable": {
+          "type": "number",
+          "description": "Total kilos currently available in inventory."
+        }
+      },
+      "required": [
+        "id",
+        "productName",
+        "caliber",
+        "kilosPurchased",
+        "kilosSold",
+        "kilosAvailable"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/contacts/{contactId}",
+        "definition": {
+          "entityName": "Contact",
+          "schema": {
+            "$ref": "#/backend/entities/Contact"
+          },
+          "description": "Stores contact information. Each contact is independently accessible, and authorization depends on the user's access rights.",
+          "params": [
+            {
+              "name": "contactId",
+              "description": "Unique identifier for the contact."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/purchaseOrders/{purchaseOrderId}",
+        "definition": {
+          "entityName": "PurchaseOrder",
+          "schema": {
+            "$ref": "#/backend/entities/PurchaseOrder"
+          },
+          "description": "Stores purchase order data. Includes a 'supplierId' field referencing the Contact, enabling efficient querying and joins.",
+          "params": [
+            {
+              "name": "purchaseOrderId",
+              "description": "Unique identifier for the purchase order."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/salesOrders/{salesOrderId}",
+        "definition": {
+          "entityName": "SalesOrder",
+          "schema": {
+            "$ref": "#/backend/entities/SalesOrder"
+          },
+          "description": "Stores sales order data. Includes a 'clientId' field referencing the Contact for easy access and management.",
+          "params": [
+            {
+              "name": "salesOrderId",
+              "description": "Unique identifier for the sales order."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/serviceOrders/{serviceOrderId}",
+        "definition": {
+          "entityName": "ServiceOrder",
+          "schema": {
+            "$ref": "#/backend/entities/ServiceOrder"
+          },
+          "description": "Stores service order data, linked to a PurchaseOrder using the 'purchaseOrderId' field.",
+          "params": [
+            {
+              "name": "serviceOrderId",
+              "description": "Unique identifier for the service order."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/financialMovements/{financialMovementId}",
+        "definition": {
+          "entityName": "FinancialMovement",
+          "schema": {
+            "$ref": "#/backend/entities/FinancialMovement"
+          },
+          "description": "Records financial transactions. Includes references to SalesOrder, PurchaseOrder, and ServiceOrder as applicable.",
+          "params": [
+            {
+              "name": "financialMovementId",
+              "description": "Unique identifier for the financial movement."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/inventory/{inventoryId}",
+        "definition": {
+          "entityName": "Inventory",
+          "schema": {
+            "$ref": "#/backend/entities/Inventory"
+          },
+          "description": "Maintains inventory levels. Tracks product names, caliber, and quantities.",
+          "params": [
+            {
+              "name": "inventoryId",
+              "description": "Unique identifier for the inventory item."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to manage contacts, purchase orders, sales orders, service orders, financial movements, and inventory for Viña Negra Manager. User authentication is handled by Firebase Auth, and access control is implemented through Firestore security rules based on user ownership and role-based access. The structure prioritizes Authorization Independence by denormalizing access control information, which eliminates the need for `get()` calls in security rules, ensuring atomic operations and easier debugging. Segregation is achieved by creating separate collections for different entities, each with its own security needs, simplifying rules. Path-based ownership is used for user-specific data. The structure ensures that all documents within a collection share the same security requirements.\n\n**Authorization Independence**: Achieved through path-based ownership for Contacts and by storing the owner's ID directly within each document. This avoids complex `get()` calls to parent documents in security rules, simplifying rule logic and ensuring atomic operations.\n\n**QAPs Support**: Supported by structural segregation. Each top-level collection can have its own security rules, which ensure that listing operations (`list` queries) are secure and that users can only access the data they are authorized to view."
+  }
+}
