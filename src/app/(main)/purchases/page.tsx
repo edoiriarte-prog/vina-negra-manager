@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useCollection, useFirebase } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import {
   PurchaseOrder,
   Contact,
@@ -61,9 +61,6 @@ import { DataTable } from './components/data-table';
 import {
   collection,
   doc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
 } from 'firebase/firestore';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 
@@ -499,17 +496,14 @@ function LotGenerationTab({
 export default function PurchasesPage() {
   const { firestore } = useFirebase();
 
-  const { data: purchaseOrders, isLoading: loadingPurchases } =
-    useCollection<PurchaseOrder>(
-      firestore ? collection(firestore, 'purchaseOrders') : null
-    );
-  const { data: contacts, isLoading: loadingContacts } = useCollection<Contact>(
-    firestore ? collection(firestore, 'contacts') : null
-  );
-  const { data: financialMovements, isLoading: loadingFinancials } =
-    useCollection<FinancialMovement>(
-      firestore ? collection(firestore, 'financialMovements') : null
-    );
+  const purchaseOrdersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'purchaseOrders') : null), [firestore]);
+  const { data: purchaseOrders, isLoading: loadingPurchases } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
+  
+  const contactsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'contacts') : null), [firestore]);
+  const { data: contacts, isLoading: loadingContacts } = useCollection<Contact>(contactsQuery);
+
+  const financialMovementsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'financialMovements') : null), [firestore]);
+  const { data: financialMovements, isLoading: loadingFinancials } = useCollection<FinancialMovement>(financialMovementsQuery);
 
   const { calibers } = useMasterData();
 
