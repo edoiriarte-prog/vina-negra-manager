@@ -12,7 +12,7 @@ import { Logo } from '@/components/logo';
 import { MainNav } from './main-nav';
 import { UserNav } from '@/components/user-nav';
 import { Separator } from '@/components/ui/separator';
-import { FirebaseClientProvider } from '@/firebase';
+import { AuthGuard } from '@/app/auth-guard';
 
 export default function MainLayout({
   children,
@@ -20,7 +20,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <FirebaseClientProvider>
+    <AuthGuard>
       <SidebarProvider>
         <Sidebar className="print:hidden">
           <SidebarHeader className="p-0">
@@ -46,6 +46,6 @@ export default function MainLayout({
           <main className="flex-1 overflow-auto p-4 md:p-6 print:p-0">{children}</main>
         </SidebarInset>
       </SidebarProvider>
-    </FirebaseClientProvider>
+    </AuthGuard>
   );
 }

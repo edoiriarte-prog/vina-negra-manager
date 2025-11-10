@@ -1,75 +1,44 @@
 
-/**
- * @fileoverview Firestore Security Rules for Viña Negra Manager.
- *
- * Core Philosophy:
- * This ruleset implements a flat data model with independent top-level collections.
- * Authorization relies on a combination of ownership and relational integrity.
- * The rules prioritize secure, auditable access control by avoiding complex queries
- * and enforcing strict ownership for write operations.
- *
- * Data Structure:
- * - /contacts/{contactId}: Stores contact information.
- * - /purchaseOrders/{purchaseOrderId}: Stores purchase order data, linked to contacts via supplierId.
- * - /salesOrders/{salesOrderId}: Stores sales order data, linked to contacts via clientId.
- * - /serviceOrders/{serviceOrderId}: Stores service order data, linked to purchase orders via purchaseOrderId.
- * - /financialMovements/{financialMovementId}: Stores financial transactions, linked to sales, purchase, and service orders.
- * - /inventory/{inventoryId}: Stores inventory levels.
- *
- * Key Security Decisions:
- * - No user-specific data trees are used; all data resides in top-level collections.
- * - Strong ownership is enforced for all write operations (create, update, delete).
- * - List operations are generally public (if applicable) or disabled if sensitive.
- * - Data validation is limited to critical authorization fields to enable rapid prototyping.
- *
- * Denormalization for Authorization:
- * - Ownership is implicitly enforced by requiring the `request.auth.uid` to match the
- *   expected owner ID, which is either the document ID itself (for /contacts) or
- *   a dedicated field (e.g., `supplierId` in /purchaseOrders`).
- *
- * Structural Segregation:
- * - Data is separated into distinct collections based on entity type,
- *   allowing for tailored security rules for each collection.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
+    // Default deny all reads and writes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Allow authenticated users to read/write their own data
     match /contacts/{contactId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     match /purchaseOrders/{purchaseOrderId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     match /salesOrders/{salesOrderId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     match /serviceOrders/{serviceOrderId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     match /financialMovements/{movementId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
-
+    
     match /inventoryAdjustments/{adjustmentId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+        allow read, write: if isSignedIn();
     }
 
-    // Master Data Collections
+    // Master Data Collections: Public read, restricted write
     match /products/{productId} {
       allow get, list: if true;
       allow create, update, delete: if isSignedIn();

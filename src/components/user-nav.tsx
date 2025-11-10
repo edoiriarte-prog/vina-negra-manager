@@ -14,30 +14,23 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronRight, LogIn, LogOut } from 'lucide-react';
 import { useSidebar } from './ui/sidebar';
 import { useUser, useAuth } from '@/firebase';
-import { signInAnonymously, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 export function UserNav() {
   const { state } = useSidebar();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
-
-  const handleSignIn = async () => {
-    try {
-      await signInAnonymously(auth);
-      toast({ title: 'Sesión Iniciada', description: 'Has iniciado sesión como usuario anónimo.' });
-    } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo iniciar sesión.' });
-    }
-  }
 
   const handleSignOut = async () => {
      try {
       await signOut(auth);
       toast({ title: 'Sesión Cerrada' });
+      router.push('/login');
     } catch (error) {
       console.error(error);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cerrar la sesión.' });
@@ -51,16 +44,17 @@ export function UserNav() {
 
   if (!user) {
     return (
+      <Link href="/login" className="w-full">
        <Button
           variant="outline"
           className="h-14 w-full justify-start px-2 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-          onClick={handleSignIn}
         >
           <LogIn className="h-5 w-5" />
            <span className="ml-2 flex-1 text-left group-data-[collapsible=icon]:hidden">
               Iniciar Sesión
             </span>
        </Button>
+      </Link>
     )
   }
 
@@ -76,8 +70,8 @@ export function UserNav() {
             <AvatarFallback>{user.isAnonymous ? 'AN' : (user.email?.charAt(0)?.toUpperCase() || 'U')}</AvatarFallback>
           </Avatar>
           <div className="ml-2 flex-1 text-left group-data-[collapsible=icon]:hidden">
-            <p className="text-sm font-medium">{user.displayName || (user.isAnonymous ? 'Usuario Anónimo' : 'Usuario')}</p>
-            <p className="text-xs text-muted-foreground">{user.email || user.uid}</p>
+            <p className="text-sm font-medium">{user.displayName || (user.isAnonymous ? 'Usuario Anónimo' : (user.email || 'Usuario'))}</p>
+            {!user.isAnonymous && <p className="text-xs text-muted-foreground">{user.uid}</p>}
           </div>
           <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
         </Button>
