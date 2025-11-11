@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -106,7 +107,7 @@ export function NewSalesOrderSheet({
   const [formData, setFormData] = useState(() => getInitialFormData(order, sheetType));
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [isLotSelectionOpen, setIsLotSelectionOpen] = useState(false);
-  const { products, calibers, units, packagingTypes, warehouses, bankAccounts } = useMasterData();
+  const { products, calibers, units, packagingTypes, warehouses, bankAccounts, productCaliberAssociations } = useMasterData();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -515,6 +516,8 @@ export function NewSalesOrderSheet({
                         const subtotal = (item.quantity || 0) * (item.price || 0);
                         const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === formData.warehouse);
                         const stock = inventoryItem ? inventoryItem.stock : 0;
+                        const availableCaliberNames = productCaliberAssociations.find(a => a.id === item.product)?.calibers || [];
+                        const sortedAvailableCalibers = calibers.filter(c => availableCaliberNames.includes(c.name)).sort((a,b) => calibers.findIndex(c => c.name === a.name) - calibers.findIndex(c => c.name === b.name));
                         
                         return (
                         <div key={item.id} className="grid grid-cols-12 gap-2 items-end mb-2 p-3 border rounded-md relative">
@@ -531,10 +534,10 @@ export function NewSalesOrderSheet({
                             {/* Caliber */}
                             <div className="col-span-6 md:col-span-2">
                                 <Label>Calibre</Label>
-                                <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber}>
+                                <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber} disabled={!item.product}>
                                     <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
                                     <SelectContent>
-                                        {calibers.map(c => <SelectItem key={c.name} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
+                                      {sortedAvailableCalibers.map(c => <SelectItem key={`${item.id}-${c.name}-${c.code}`} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>

@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,10 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { useMasterData } from '@/hooks/use-master-data';
 import { OrderItem, InventoryItem } from '@/lib/types';
-import { productCaliberMatrix } from '@/lib/master-data';
 import { Badge } from '@/components/ui/badge';
 
 type ItemMatrixDialogProps = {
@@ -46,36 +46,50 @@ type MatrixRow = {
   stock: number;
 };
 
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
+const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
+
 export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inventory = [] }: ItemMatrixDialogProps) {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [matrixData, setMatrixData] = useState<MatrixRow[]>([]);
-  const { products, units, packagingTypes, calibers } = useMasterData();
+  const { products, units, packagingTypes, calibers, productCaliberAssociations } = useMasterData();
 
-  const handleProductSelect = (product: string) => {
-    setSelectedProduct(product);
-    const calibersForProduct = productCaliberMatrix[product] || [];
-    
-    // Sort calibers according to master data order
-    const sortedCalibers = calibersForProduct.sort((a, b) => {
-        const indexA = calibers.findIndex(c => c.name === a);
-        const indexB = calibers.findIndex(c => c.name === b);
+  useEffect(() => {
+    if (selectedProduct) {
+      const associatedCaliberNames = productCaliberAssociations.find(a => a.id === selectedProduct)?.calibers || [];
+      const calibersForProduct = calibers.filter(c => associatedCaliberNames.includes(c.name));
+
+      const sortedCalibers = calibersForProduct.sort((a, b) => {
+        const indexA = calibers.findIndex(c => c.name === a.name);
+        const indexB = calibers.findIndex(c => c.name === b.name);
         return indexA - indexB;
-    });
+      });
 
-    setMatrixData(sortedCalibers.map(caliberName => {
-        const inventoryItem = inventory.find(i => i.caliber === caliberName && i.product === product);
-        return {
-            product: product,
-            caliber: caliberName,
-            quantity: 0,
-            price: 0,
-            unit: 'Kilos',
-            packagingType: '',
-            packagingQuantity: 0,
-            stock: inventoryItem?.stock || 0,
-        }
-    }));
-  };
+      setMatrixData(sortedCalibers.map(caliber => {
+          const inventoryItem = inventory.find(i => i.caliber === caliber.name && i.product === selectedProduct);
+          return {
+              product: selectedProduct,
+              caliber: caliber.name,
+              quantity: 0,
+              price: 0,
+              unit: 'Kilos',
+              packagingType: '',
+              packagingQuantity: 0,
+              stock: inventoryItem?.stock || 0,
+          }
+      }));
+    } else {
+        setMatrixData([]);
+    }
+  }, [selectedProduct, productCaliberAssociations, calibers, inventory]);
+
 
   const handleMatrixChange = (index: number, field: keyof MatrixRow, value: string | number) => {
     const newData = [...matrixData];
@@ -115,10 +129,19 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
     const caliber = calibers.find(c => c.name === caliberName);
     return caliber ? `${caliber.name} (${caliber.code})` : caliberName;
   }
+  
+  const totals = useMemo(() => {
+    return matrixData.reduce((acc, row) => {
+        acc.totalKilos += row.unit === 'Kilos' ? Number(row.quantity || 0) : 0;
+        acc.totalPackages += Number(row.packagingQuantity || 0);
+        acc.totalAmount += (Number(row.quantity || 0) * Number(row.price || 0));
+        return acc;
+    }, { totalKilos: 0, totalPackages: 0, totalAmount: 0});
+  }, [matrixData]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>Agregar Ítems por Matriz de Calibres</DialogTitle>
           <DialogDescription>
@@ -130,7 +153,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
             <Label htmlFor="product-matrix" className="text-right">
                 Producto
             </Label>
-            <Select onValueChange={handleProductSelect} value={selectedProduct}>
+            <Select onValueChange={setSelectedProduct} value={selectedProduct}>
                 <SelectTrigger id="product-matrix" className="col-span-3">
                 <SelectValue placeholder="Seleccione un producto" />
                 </SelectTrigger>
@@ -217,6 +240,17 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                   </TableRow>
                 ))}
               </TableBody>
+              <TableFooter>
+                  <TableRow>
+                      <TableCell colSpan={orderType === 'sale' ? 5 : 4} className="text-right font-bold">Subtotales:</TableCell>
+                      <TableCell className="text-right font-bold">{formatPackages(totals.totalPackages)}</TableCell>
+                      <TableCell colSpan={1} className="text-right font-bold">{formatKilos(totals.totalKilos)}</TableCell>
+                  </TableRow>
+                   <TableRow>
+                      <TableCell colSpan={orderType === 'sale' ? 6 : 5} className="text-right font-bold text-lg">Monto Total</TableCell>
+                      <TableCell colSpan={1} className="text-right font-bold text-lg">{formatCurrency(totals.totalAmount)}</TableCell>
+                  </TableRow>
+              </TableFooter>
             </Table>
           </div>
         )}
