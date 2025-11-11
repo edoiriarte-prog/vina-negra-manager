@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -26,7 +27,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { InventoryAdjustment } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
-import { productCaliberMatrix } from '@/lib/master-data';
 
 type NewAdjustmentSheetProps = {
   isOpen: boolean;
@@ -63,7 +63,7 @@ const getInitialFormData = (adjustment: InventoryAdjustment | null): Omit<Invent
 
 export function NewAdjustmentSheet({ isOpen, onOpenChange, onSave, adjustment }: NewAdjustmentSheetProps) {
   const [formData, setFormData] = useState<Omit<InventoryAdjustment, 'id'>>(getInitialFormData(adjustment));
-  const { products, calibers, warehouses } = useMasterData();
+  const { products, calibers, warehouses, productCaliberAssociations } = useMasterData();
   const [matrixData, setMatrixData] = useState<MatrixRow[]>([]);
   const [selectedProduct, setSelectedProduct] = useState('');
 
@@ -80,26 +80,27 @@ export function NewAdjustmentSheet({ isOpen, onOpenChange, onSave, adjustment }:
     }
   }, [adjustment, isOpen]);
   
-  const handleProductSelect = (product: string) => {
-    setSelectedProduct(product);
-    setFormData(prev => ({...prev, product}));
-    
-    if (adjustment) return; // Don't build matrix if editing
+  useEffect(() => {
+    if (selectedProduct) {
+        if (adjustment) return; // Don't build matrix if editing
 
-    const calibersForProduct = productCaliberMatrix[product] || [];
-    
-    const sortedCalibers = calibersForProduct.sort((a, b) => {
-        const indexA = calibers.findIndex(c => c.name === a);
-        const indexB = calibers.findIndex(c => c.name === b);
-        return indexA - indexB;
-    });
+        const associatedCaliberNames = productCaliberAssociations.find(a => a.id === selectedProduct)?.calibers || [];
+        const calibersForProduct = calibers.filter(c => associatedCaliberNames.includes(c.name));
+        
+        const sortedCalibers = calibersForProduct.sort((a, b) => {
+            const indexA = calibers.findIndex(c => c.name === a.name);
+            const indexB = calibers.findIndex(c => c.name === b.name);
+            return indexA - indexB;
+        });
 
-    setMatrixData(sortedCalibers.map(caliberName => ({
-        caliber: caliberName,
-        quantity: 0,
-        packagingQuantity: 0,
-    })));
-  };
+        setMatrixData(sortedCalibers.map(caliber => ({
+            caliber: caliber.name,
+            quantity: 0,
+            packagingQuantity: 0,
+        })));
+    }
+  }, [selectedProduct, productCaliberAssociations, calibers, adjustment]);
+
 
   const handleMatrixChange = (index: number, field: keyof MatrixRow, value: string | number) => {
     const newData = [...matrixData];
@@ -114,6 +115,9 @@ export function NewAdjustmentSheet({ isOpen, onOpenChange, onSave, adjustment }:
   };
 
   const handleSelectChange = (name: keyof typeof formData, value: any) => {
+    if (name === 'product') {
+        setSelectedProduct(value);
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -227,7 +231,7 @@ export function NewAdjustmentSheet({ isOpen, onOpenChange, onSave, adjustment }:
                 <div className="border p-4 rounded-md">
                   <div className="mb-4">
                     <Label htmlFor="product-matrix">Producto</Label>
-                    <Select onValueChange={handleProductSelect} value={selectedProduct}>
+                    <Select onValueChange={setSelectedProduct} value={selectedProduct}>
                         <SelectTrigger id="product-matrix">
                         <SelectValue placeholder="Seleccione un producto para ver sus calibres" />
                         </SelectTrigger>

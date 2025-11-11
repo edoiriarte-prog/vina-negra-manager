@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
@@ -11,6 +12,11 @@ export type CaliberMaster = {
   id: string;
   code: string;
   name: string;
+}
+
+export type ProductCaliberAssociation = {
+    id: string; // productName
+    calibers: string[]; // array of caliber names
 }
 
 export function useMasterData() {
@@ -40,6 +46,9 @@ export function useMasterData() {
   const costCentersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'costCenters') : null, [firestore]);
   const { data: costCentersData } = useCollection<{name: string}>(costCentersQuery);
 
+  const associationsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'productCaliberAssociations') : null, [firestore]);
+  const { data: associations } = useCollection<ProductCaliberAssociation>(associationsQuery);
+
   const products = useMemo(() => productsData?.map(p => p.name) || [], [productsData]);
   const calibers = useMemo(() => calibersData || [], [calibersData]);
   const units = useMemo(() => unitsData?.map(u => u.name) || [], [unitsData]);
@@ -58,5 +67,6 @@ export function useMasterData() {
     bankAccounts: bankAccounts || [],
     internalConcepts,
     costCenters,
+    productCaliberAssociations: associations || [],
   };
 }

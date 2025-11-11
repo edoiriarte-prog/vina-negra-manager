@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,6 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { useMasterData } from '@/hooks/use-master-data';
 import { OrderItem, InventoryItem } from '@/lib/types';
-import { productCaliberMatrix } from '@/lib/master-data';
 import { Badge } from '@/components/ui/badge';
 
 type ItemMatrixDialogProps = {
@@ -59,33 +59,37 @@ const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(
 export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inventory = [] }: ItemMatrixDialogProps) {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [matrixData, setMatrixData] = useState<MatrixRow[]>([]);
-  const { products, units, packagingTypes, calibers } = useMasterData();
+  const { products, units, packagingTypes, calibers, productCaliberAssociations } = useMasterData();
 
-  const handleProductSelect = (product: string) => {
-    setSelectedProduct(product);
-    const calibersForProduct = productCaliberMatrix[product] || [];
-    
-    // Sort calibers according to master data order
-    const sortedCalibers = calibersForProduct.sort((a, b) => {
-        const indexA = calibers.findIndex(c => c.name === a);
-        const indexB = calibers.findIndex(c => c.name === b);
+  useEffect(() => {
+    if (selectedProduct) {
+      const associatedCaliberNames = productCaliberAssociations.find(a => a.id === selectedProduct)?.calibers || [];
+      const calibersForProduct = calibers.filter(c => associatedCaliberNames.includes(c.name));
+
+      const sortedCalibers = calibersForProduct.sort((a, b) => {
+        const indexA = calibers.findIndex(c => c.name === a.name);
+        const indexB = calibers.findIndex(c => c.name === b.name);
         return indexA - indexB;
-    });
+      });
 
-    setMatrixData(sortedCalibers.map(caliberName => {
-        const inventoryItem = inventory.find(i => i.caliber === caliberName && i.product === product);
-        return {
-            product: product,
-            caliber: caliberName,
-            quantity: 0,
-            price: 0,
-            unit: 'Kilos',
-            packagingType: '',
-            packagingQuantity: 0,
-            stock: inventoryItem?.stock || 0,
-        }
-    }));
-  };
+      setMatrixData(sortedCalibers.map(caliber => {
+          const inventoryItem = inventory.find(i => i.caliber === caliber.name && i.product === selectedProduct);
+          return {
+              product: selectedProduct,
+              caliber: caliber.name,
+              quantity: 0,
+              price: 0,
+              unit: 'Kilos',
+              packagingType: '',
+              packagingQuantity: 0,
+              stock: inventoryItem?.stock || 0,
+          }
+      }));
+    } else {
+        setMatrixData([]);
+    }
+  }, [selectedProduct, productCaliberAssociations, calibers, inventory]);
+
 
   const handleMatrixChange = (index: number, field: keyof MatrixRow, value: string | number) => {
     const newData = [...matrixData];
@@ -149,7 +153,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
             <Label htmlFor="product-matrix" className="text-right">
                 Producto
             </Label>
-            <Select onValueChange={handleProductSelect} value={selectedProduct}>
+            <Select onValueChange={setSelectedProduct} value={selectedProduct}>
                 <SelectTrigger id="product-matrix" className="col-span-3">
                 <SelectValue placeholder="Seleccione un producto" />
                 </SelectTrigger>

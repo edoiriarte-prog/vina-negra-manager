@@ -27,7 +27,6 @@ import { PurchaseOrder, OrderItem, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
-import { productCaliberMatrix } from '@/lib/master-data';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -71,9 +70,8 @@ const getInitialFormData = (order: PurchaseOrder | null): Omit<PurchaseOrder, 'i
 
 export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, suppliers }: NewPurchaseOrderSheetProps) {
   const [formData, setFormData] = useState<Omit<PurchaseOrder, 'id' | 'totalAmount' | 'totalKilos' | 'totalPackages'>>(getInitialFormData(order));
-  const [newItem, setNewItem] = useState<Omit<OrderItem, 'id'>>({ product: '', caliber: '', quantity: 0, unit: 'Kilos', price: 0 });
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const { products, calibers, units, warehouses, packagingTypes } = useMasterData();
+  const { products, calibers, units, warehouses, packagingTypes, productCaliberAssociations } = useMasterData();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -99,14 +97,11 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const handleSelectChange = (name: keyof typeof formData | `items.${number}.${keyof OrderItem}` | `newItem.${keyof typeof newItem}`, value: any) => {
+  const handleSelectChange = (name: keyof typeof formData | `items.${number}.${keyof OrderItem}`, value: any) => {
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, value);
-    } else if (name.startsWith('newItem.')) {
-        const field = name.split('.')[1] as keyof typeof newItem;
-        setNewItem(prev => ({ ...prev, [field]: value }));
     } else if (name === 'destinationWarehouse') {
         setFormData(prev => ({ ...prev, destinationWarehouse: value === 'none' ? undefined : value }));
     } else {
@@ -132,9 +127,6 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'packagingQuantity'].includes(field) ? Number(value) : value);
-    } else if (name.startsWith('newItem.')) {
-        const field = name.split('.')[1] as keyof typeof newItem;
-        setNewItem(prev => ({ ...prev, [field]: field === 'quantity' || field === 'price' || field === 'packagingQuantity' ? Number(value) : value }));
     } else {
         setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -178,16 +170,6 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
   const description = order 
     ? 'Actualice la información de la orden.'
     : 'Complete la información para registrar una nueva orden de compra.';
-
-  const getCaliberDisplayName = (caliberName: string) => {
-    const caliber = calibers.find(c => c.name === caliberName);
-    return caliber ? `${caliber.name} (${caliber.code})` : caliberName;
-  }
-  
-  const getCaliberCode = (caliberName: string) => {
-    const caliber = calibers.find(c => c.name === caliberName);
-    return caliber ? caliber.code : 'N/A';
-  }
 
   return (
     <>
@@ -238,7 +220,7 @@ export function NewPurchaseOrderSheet({ isOpen, onOpenChange, onSave, order, sup
                 
                 {formData.items.map((item, index) => {
                   const subtotal = (item.quantity || 0) * (item.price || 0);
-                  const availableCaliberNames = productCaliberMatrix[item.product] || [];
+                  const availableCaliberNames = productCaliberAssociations.find(a => a.id === item.product)?.calibers || [];
                   const sortedAvailableCalibers = calibers
                     .filter(c => availableCaliberNames.includes(c.name))
                     .sort((a,b) => calibers.findIndex(cal => cal.name === a.name) - calibers.findIndex(cal => cal.name === b.name));
