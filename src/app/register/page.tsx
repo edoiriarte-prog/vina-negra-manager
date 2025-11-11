@@ -40,6 +40,7 @@ export default function RegisterPage() {
     }
     setIsLoading(true);
     try {
+      if (!auth) throw new Error('Auth service not available');
       await createUserWithEmailAndPassword(auth, email, password);
       toast({ title: 'Cuenta creada exitosamente' });
       router.push('/dashboard');

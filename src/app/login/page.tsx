@@ -31,6 +31,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
+      if (!auth) throw new Error('Auth service not available');
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: 'Inicio de sesión exitoso' });
       router.push('/dashboard');
