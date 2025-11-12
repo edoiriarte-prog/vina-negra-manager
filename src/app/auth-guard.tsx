@@ -18,7 +18,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, isUserLoading, router, pathname]);
 
-  if (isUserLoading) {
+  if (isUserLoading || (!user && pathname !== '/login' && pathname !== '/register')) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="space-y-4 p-8">
@@ -29,6 +29,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     );
+  }
+  
+  if (user && (pathname === '/login' || pathname === '/register')) {
+    router.push('/dashboard');
+    return null;
   }
   
   if (!user && (pathname !== '/login' && pathname !== '/register')) {

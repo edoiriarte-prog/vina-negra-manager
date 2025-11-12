@@ -58,6 +58,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { collection } from 'firebase/firestore';
 import { getInventory } from '@/lib/data';
+import { AuthGuard } from '@/app/auth-guard';
 
 export default function DashboardPage() {
   const { firestore } = useFirebase();

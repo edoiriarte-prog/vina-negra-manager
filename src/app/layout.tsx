@@ -1,6 +1,7 @@
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
+import { AuthGuard } from './auth-guard';
 
 export const metadata = {
   title: 'Viña Negra Manager',
@@ -16,7 +17,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <FirebaseClientProvider>
-          {children}
+          <AuthGuard>{children}</AuthGuard>
         </FirebaseClientProvider>
         <Toaster />
       </body>
