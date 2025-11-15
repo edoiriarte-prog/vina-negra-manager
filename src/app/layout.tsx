@@ -12,10 +12,10 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
-import { MainNav } from './main-nav';
 import { UserNav } from '@/components/user-nav';
 import { Separator } from '@/components/ui/separator';
 import { AuthGuard } from '@/app/auth-guard';
+import { MainNav } from '@/app/main-nav';
 
 
 export const metadata = {
