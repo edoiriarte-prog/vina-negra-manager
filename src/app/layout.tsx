@@ -15,7 +15,7 @@ import { Logo } from '@/components/logo';
 import { UserNav } from '@/components/user-nav';
 import { Separator } from '@/components/ui/separator';
 import { AuthGuard } from '@/app/auth-guard';
-import { MainNav } from '@/app/main-nav';
+import { MainNav } from './main-nav';
 
 
 export const metadata = {
