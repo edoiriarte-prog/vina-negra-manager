@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
@@ -128,5 +127,3 @@ export const getColumns = ({ onEdit, onDelete }: GetColumnsProps): ColumnDef<Con
     },
   },
 ];
-
-    
