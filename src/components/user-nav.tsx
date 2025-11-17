@@ -1,22 +1,10 @@
 'use client';
 
-import Link from 'next/link';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronRight, User } from 'lucide-react';
-import { useSidebar } from './ui/sidebar';
+import { User } from 'lucide-react';
 import { useUser } from '@/firebase';
 
 export function UserNav() {
-  const { state } = useSidebar();
   const { user, isUserLoading } = useUser();
 
   if (isUserLoading || !user) {
@@ -38,7 +26,7 @@ export function UserNav() {
         </Avatar>
         <div className="ml-2 flex-1 text-left group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-medium">Usuario Anónimo</p>
-            <p className="text-xs text-muted-foreground">{user.uid}</p>
+            <p className="text-xs text-muted-foreground truncate">{user.uid}</p>
         </div>
     </div>
   );

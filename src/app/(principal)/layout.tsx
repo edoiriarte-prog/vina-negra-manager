@@ -11,7 +11,6 @@ import {
 import { Logo } from '@/components/logo';
 import { UserNav } from '@/components/user-nav';
 import { Separator } from '@/components/ui/separator';
-import { AuthGuard } from '@/app/auth-guard';
 import { MainNav } from './main-nav';
 
 export default function PrincipalLayout({
@@ -20,8 +19,6 @@ export default function PrincipalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AuthGuard>
-      {/* defaultOpen={true} fuerza a que el menú aparezca abierto */}
       <SidebarProvider defaultOpen={true}>
         <Sidebar className="print:hidden" side="left" variant="sidebar" collapsible="icon">
           <SidebarHeader className="p-0">
@@ -29,7 +26,6 @@ export default function PrincipalLayout({
           </SidebarHeader>
           <SidebarContent className="p-0">
             <div className="flex flex-col h-full p-3">
-              {/* Aquí cargamos tu menú de navegación */}
               <MainNav />
             </div>
           </SidebarContent>
@@ -50,6 +46,5 @@ export default function PrincipalLayout({
           </main>
         </SidebarInset>
       </SidebarProvider>
-    </AuthGuard>
   );
 }
