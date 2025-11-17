@@ -8,9 +8,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Default deny all reads and writes
+  // Default deny all reads and writes
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if isSignedIn();
+    }
     }
 
     // Allow authenticated users to read/write their own data
@@ -45,6 +46,11 @@ service cloud.firestore {
     }
 
     match /calibers/{caliberId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSignedIn();
+    }
+    
+    match /productCaliberAssociations/{associationId} {
       allow get, list: if true;
       allow create, update, delete: if isSignedIn();
     }
