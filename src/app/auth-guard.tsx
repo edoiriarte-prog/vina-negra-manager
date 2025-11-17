@@ -4,21 +4,22 @@ import { useUser } from '@/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { signInAnonymously } from 'firebase/auth';
+import { useAuth } from '@/firebase';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
-  const router = useRouter();
-  const pathname = usePathname();
+  const auth = useAuth();
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
-        if (pathname !== '/login' && pathname !== '/register') {
-             router.push('/login');
-        }
+    if (auth && !user && !isUserLoading) {
+      signInAnonymously(auth).catch((error) => {
+        console.error("Anonymous sign-in failed:", error);
+      });
     }
-  }, [user, isUserLoading, router, pathname]);
+  }, [auth, user, isUserLoading]);
 
-  if (isUserLoading || (!user && pathname !== '/login' && pathname !== '/register')) {
+  if (isUserLoading || !user) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="space-y-4 p-8">
@@ -29,15 +30,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     );
-  }
-  
-  if (user && (pathname === '/login' || pathname === '/register')) {
-    router.push('/dashboard');
-    return null;
-  }
-  
-  if (!user && (pathname !== '/login' && pathname !== '/register')) {
-      return null;
   }
 
   return <>{children}</>;
