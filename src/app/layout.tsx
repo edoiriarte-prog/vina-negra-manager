@@ -1,3 +1,4 @@
+
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
@@ -52,7 +53,7 @@ export default function RootLayout({
                   <header className="flex h-14 items-center gap-4 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 sticky top-0 z-30 print:hidden">
                     <SidebarTrigger className="md:hidden" />
                     <div className="flex-1">
-                      <h1 className="text-lg font-semibold md:text-xl"></h1>
+                      {/* Page titles will be managed by individual pages */}
                     </div>
                   </header>
                   <main className="flex-1 overflow-auto p-4 md:p-6 print:p-0">{children}</main>

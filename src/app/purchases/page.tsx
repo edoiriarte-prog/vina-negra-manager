@@ -82,12 +82,10 @@ function LotGenerationTab({
   allOrders,
   suppliers,
   calibers,
-  setAllOrders,
 }: {
   allOrders: PurchaseOrder[];
   suppliers: Contact[];
   calibers: any[];
-  setAllOrders: (orders: PurchaseOrder[]) => void;
 }) {
     const { firestore } = useFirebase();
   const [selectedOCs, setSelectedOCs] = useState<Record<string, boolean>>({});
@@ -849,7 +847,6 @@ export default function PurchasesPage() {
             allOrders={purchaseOrders || []}
             suppliers={suppliers}
             calibers={calibers}
-            setAllOrders={() => {}}
           />
         </TabsContent>
         <TabsContent value="created-lots">
