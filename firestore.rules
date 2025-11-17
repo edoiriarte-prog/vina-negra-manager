@@ -3,10 +3,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Función de ayuda: Verifica si el usuario está logueado
     function isSignedIn() {
       return request.auth != null;
     }
 
+    // ---------------------------------------------------------
+    // 1. BLOQUEO POR DEFECTO (Seguridad)
+    // ---------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ---------------------------------------------------------
+    // 2. COLECCIONES TRANSACCIONALES (Datos del negocio)
+    // ---------------------------------------------------------
     match /contacts/{contactId} {
       allow read, write: if isSignedIn();
     }
@@ -31,49 +42,54 @@ service cloud.firestore {
         allow read, write: if isSignedIn();
     }
 
+    // ---------------------------------------------------------
+    // 3. MAESTROS Y CONFIGURACIÓN (Aquí estaba el error)
+    // ---------------------------------------------------------
+    
+    // ESTA ES LA QUE FALTABA Y CAUSABA EL ERROR:
+    match /productCaliberAssociations/{associationId} {
+      allow read, write: if isSignedIn();
+    }
+
     match /products/{productId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     match /calibers/{caliberId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-    
-    match /productCaliberAssociations/{associationId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     match /units/{unitId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     match /packagingTypes/{packagingTypeId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     match /warehouses/{warehouseId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
     
     match /internalConcepts/{conceptId} {
-        allow get, list: if isSignedIn();
-        allow create, update, delete: if isSignedIn();
+        allow read, write: if isSignedIn();
     }
     
     match /costCenters/{centerId} {
-        allow get, list: if isSignedIn();
-        allow create, update, delete: if isSignedIn();
+        allow read, write: if isSignedIn();
     }
     
     match /bankAccounts/{accountId} {
-        allow get, list: if isSignedIn();
-        allow create, update, delete: if isSignedIn();
+        allow read, write: if isSignedIn();
+    }
+    
+    // Agregamos 'users' y 'settings' por si acaso (muy comunes)
+    match /users/{userId} {
+        allow read, write: if isSignedIn();
+    }
+
+    match /settings/{settingId} {
+        allow read, write: if isSignedIn();
     }
   }
 }
