@@ -3,18 +3,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-  // Default deny all reads and writes
-    match /{document=**} {
-      allow read, write: if isSignedIn();
-    }
-    }
-
-    // Allow authenticated users to read/write their own data
     match /contacts/{contactId} {
       allow read, write: if isSignedIn();
     }
@@ -39,49 +31,48 @@ service cloud.firestore {
         allow read, write: if isSignedIn();
     }
 
-    // Master Data Collections: Public read, restricted write
     match /products/{productId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     match /calibers/{caliberId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
     
     match /productCaliberAssociations/{associationId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     match /units/{unitId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     match /packagingTypes/{packagingTypeId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     match /warehouses/{warehouseId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
     
     match /internalConcepts/{conceptId} {
-        allow get, list: if true;
+        allow get, list: if isSignedIn();
         allow create, update, delete: if isSignedIn();
     }
     
     match /costCenters/{centerId} {
-        allow get, list: if true;
+        allow get, list: if isSignedIn();
         allow create, update, delete: if isSignedIn();
     }
     
     match /bankAccounts/{accountId} {
-        allow get, list: if true;
+        allow get, list: if isSignedIn();
         allow create, update, delete: if isSignedIn();
     }
   }
