@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -282,7 +283,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-headline text-3xl">Dashboard</h1>
+      <h1 className="font-headline text-2xl md:text-3xl">Dashboard</h1>
 
       <Tabs defaultValue="general">
         <TabsList className="grid w-full grid-cols-3">
@@ -292,7 +293,7 @@ export default function DashboardPage() {
         </TabsList>
 
         <TabsContent value="general" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <Card key={i}>
@@ -367,7 +368,7 @@ export default function DashboardPage() {
         </TabsContent>
 
         <TabsContent value="purchases" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <Card key={`sk-p-${i}`}>
@@ -409,7 +410,7 @@ export default function DashboardPage() {
               </>
             )}
           </div>
-          <div className="grid gap-6 mt-6 lg:grid-cols-2">
+          <div className="grid gap-6 mt-6 grid-cols-1 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="font-headline text-xl">
@@ -506,7 +507,7 @@ export default function DashboardPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <Card key={`sk-s-${i}`}>
@@ -554,7 +555,7 @@ export default function DashboardPage() {
               </>
             )}
           </div>
-          <div className="grid gap-6 mt-6 grid-cols-1">
+          <div className="grid grid-cols-1 gap-6 mt-6">
             <Card>
               <CardHeader>
                 <CardTitle className="font-headline text-xl">

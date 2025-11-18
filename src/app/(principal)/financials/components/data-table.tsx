@@ -58,14 +58,14 @@ export function DataTable<TData, TValue>({
 
   return (
     <div>
-      <div className="flex items-center py-4 gap-4">
+      <div className="flex flex-col md:flex-row items-center py-4 gap-4">
         <Input
           placeholder={filterPlaceholder}
           value={(table.getColumn('description')?.getFilterValue() as string) ?? ''}
           onChange={(event) =>
             table.getColumn('description')?.setFilterValue(event.target.value)
           }
-          className="max-w-sm"
+          className="max-w-sm w-full"
         />
         <Input
           placeholder="Filtrar por contacto..."
@@ -73,10 +73,10 @@ export function DataTable<TData, TValue>({
           onChange={(event) =>
             table.getColumn('contactName')?.setFilterValue(event.target.value)
           }
-          className="max-w-sm"
+          className="max-w-sm w-full"
         />
       </div>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

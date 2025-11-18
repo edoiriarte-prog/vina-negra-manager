@@ -645,7 +645,7 @@ export default function InventoryPage() {
         }
 
         return (
-            <div className={cn("rounded-md border", isPrint && "border-none")}>
+            <div className={cn("rounded-md border overflow-x-auto", isPrint && "border-none")}>
                 <Table className={cn(isPrint && "text-base")}>
                     <TableHeader>
                         <TableRow>
@@ -724,16 +724,16 @@ export default function InventoryPage() {
     
         return (
             <>
-                <div className="py-4 flex justify-between items-center">
-                    <div className="flex gap-4">
+                <div className="py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
                         <Input
                             placeholder="Filtrar por lote, producto, calibre, O/C o proveedor..."
                             value={lotFilter}
                             onChange={(e) => setLotFilter(e.target.value)}
-                            className="max-w-md"
+                            className="max-w-md w-full"
                         />
                          <Select value={selectedLotWarehouse} onValueChange={setSelectedLotWarehouse}>
-                            <SelectTrigger className="w-[250px]">
+                            <SelectTrigger className="w-full md:w-[250px]">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -744,12 +744,12 @@ export default function InventoryPage() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <Button onClick={handleExportLots} variant="outline">
+                    <Button onClick={handleExportLots} variant="outline" className="w-full md:w-auto">
                         <Download className="mr-2 h-4 w-4" />
                         Exportar a Excel
                     </Button>
                 </div>
-                <div className="rounded-md border">
+                <div className="rounded-md border overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -783,7 +783,7 @@ export default function InventoryPage() {
                                     {openLotGroups[lot.lotNumber] && (
                                         <TableRow>
                                             <TableCell colSpan={4} className="p-2 bg-background">
-                                                <div className="p-2 border rounded-md">
+                                                <div className="p-2 border rounded-md overflow-x-auto">
                                                     <h4 className="font-semibold text-sm mb-2">Historial de Movimientos del Lote</h4>
                                                     <Table>
                                                          <TableHeader>
@@ -842,7 +842,7 @@ export default function InventoryPage() {
         <>
             <div className="flex justify-between items-start mb-6">
                 <div>
-                    <h1 className="font-headline text-3xl">Inventario</h1>
+                    <h1 className="font-headline text-2xl md:text-3xl">Inventario</h1>
                     <p className="text-muted-foreground">Consulta el stock por producto y calibre en un rango de fechas.</p>
                 </div>
             </div>
@@ -855,12 +855,12 @@ export default function InventoryPage() {
                 <TabsContent value="report">
                     <Card className="mt-6">
                         <CardHeader>
-                             <div className="flex justify-between items-start">
+                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                 <div>
                                     <CardTitle className="font-headline text-2xl">Reporte de Inventario por Calibre</CardTitle>
                                     <CardDescription>Consulta el movimiento de stock por producto en un rango de fechas.</CardDescription>
                                 </div>
-                                <div className="flex gap-2 no-print">
+                                <div className="flex gap-2 no-print self-start md:self-center">
                                     <Button variant="outline" onClick={handleExportAll}><Download className="mr-2 h-4 w-4" />Exportar Historial</Button>
                                     <Button variant="outline" onClick={() => setIsPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Vista Previa</Button>
                                 </div>
