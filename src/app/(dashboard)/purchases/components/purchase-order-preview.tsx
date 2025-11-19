@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React from 'react';
@@ -11,24 +9,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { PurchaseOrder, Contact } from '@/lib/types';
-import { PreviewContent } from './purchase-order-preview-content';
+import { PreviewContent } from './purchase-order-preview-content'; // Importa el diseño
 import { useReactToPrint } from 'react-to-print';
 import { Printer } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 type PurchaseOrderPreviewProps = {
   order: PurchaseOrder | null;
   supplier: Contact | null;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onPrintRequest: () => void;
+  onPrintRequest?: () => void; // Opcional si lo manejas dentro
 };
 
-
-export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, onPrintRequest }: PurchaseOrderPreviewProps) {
+export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange }: PurchaseOrderPreviewProps) {
   const componentRef = React.useRef<HTMLDivElement>(null);
+  
   const handlePrint = useReactToPrint({
       content: () => componentRef.current,
   });
@@ -43,7 +40,9 @@ export function PurchaseOrderPreview({ order, supplier, isOpen, onOpenChange, on
         <DialogHeader className="p-6 pb-0 no-print">
           <DialogTitle>Orden de Compra: {order.id}</DialogTitle>
         </DialogHeader>
+        
         <div className="max-h-[70vh] overflow-y-auto">
+            {/* Aquí se renderiza el contenido que diseñamos en el paso anterior */}
             <PreviewContent
                 ref={componentRef}
                 order={order} 

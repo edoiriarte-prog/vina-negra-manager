@@ -1,14 +1,10 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // --- LLAVE MAESTRA PARA DESARROLLO ---
-    // Esto permite acceso total a TODAS las colecciones (products, warehouses, costCenters, etc.)
-    // Sin esto, tendrás que agregar una regla por cada tabla nueva que crees.
-    
     match /{document=**} {
+      // PERMITIR TODO (Solo para desarrollo)
       allow read, write: if true;
     }
-    
   }
 }

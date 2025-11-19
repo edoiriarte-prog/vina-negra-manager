@@ -1,72 +1,138 @@
+"use client";
 
-
-'use client';
-
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { useState, useEffect } from 'react';
 import { BankAccount } from '@/lib/types';
-import { collection, doc, setDoc } from 'firebase/firestore';
-import { useMemo } from 'react';
-
-
-export type CaliberMaster = {
-  id: string;
-  code: string;
-  name: string;
-}
 
 export type ProductCaliberAssociation = {
-    id: string; // productName
-    calibers: string[]; // array of caliber names
-}
+  id: string; 
+  calibers: string[];
+};
 
 export function useMasterData() {
-  const { firestore } = useFirebase();
+  // --- 1. PRODUCTOS ---
+  const [products, setProducts] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('products');
+        return saved ? JSON.parse(saved) : []; 
+    }
+    return [];
+  });
 
-  const productsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'products') : null, [firestore]);
-  const { data: productsData } = useCollection<{name: string}>(productsQuery);
+  // --- 2. CALIBRES ---
+  const [calibers, setCalibers] = useState<{ name: string; code: string }[]>(() => {
+     if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('calibers');
+        return saved ? JSON.parse(saved) : []; 
+    }
+    return [];
+  });
 
-  const calibersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'calibers') : null, [firestore]);
-  const { data: calibersData } = useCollection<CaliberMaster>(calibersQuery);
+  // --- 3. BODEGAS ---
+  const [warehouses, setWarehouses] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+       const saved = localStorage.getItem('warehouses');
+       return saved ? JSON.parse(saved) : ['Bodega Central', 'Patio 1']; 
+   }
+   return ['Bodega Central']; 
+ });
 
-  const unitsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'units') : null, [firestore]);
-  const { data: unitsData } = useCollection<{name: string}>(unitsQuery);
+  // --- 4. UNIDADES (Ahora editable) ---
+  const [units, setUnits] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+       const saved = localStorage.getItem('units');
+       return saved ? JSON.parse(saved) : ['Kilos', 'Cajas']; 
+   }
+   return ['Kilos', 'Cajas']; 
+ });
 
-  const packagingTypesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'packagingTypes') : null, [firestore]);
-  const { data: packagingTypesData } = useCollection<{name: string}>(packagingTypesQuery);
+  // --- 5. ENVASES (Ahora editable) ---
+  const [packagingTypes, setPackagingTypes] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+       const saved = localStorage.getItem('packagingTypes');
+       return saved ? JSON.parse(saved) : ['TORITO PLASTICO 15K', 'CAJA PLASTICA 10K', 'BIN']; 
+   }
+   return ['TORITO PLASTICO 15K', 'CAJA PLASTICA 10K', 'BIN']; 
+ });
 
-  const warehousesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'warehouses') : null, [firestore]);
-  const { data: warehousesData } = useCollection<{name: string}>(warehousesQuery);
+  // --- 6. ASOCIACIONES ---
+  const [productCaliberAssociations, setProductCaliberAssociations] = useState<ProductCaliberAssociation[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('productCaliberAssociations');
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+
+  // --- 7. CUENTAS BANCARIAS ---
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bankAccounts');
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+
+  // --- DATOS ESTÁTICOS DE REFERENCIA ---
+  const internalConcepts = [
+    { name: 'Retiro de Socios' }, { name: 'Pago de Impuestos' }, { name: 'Comisión Bancaria' },
+    { name: 'Préstamo Interno' }, { name: 'Gastos Generales' }, { name: 'Mantención' }, 
+    { name: 'Combustible' }, { name: 'Remuneraciones' }, { name: 'Leyes Sociales' }
+  ];
   
-  const bankAccountsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'bankAccounts') : null, [firestore]);
-  const { data: bankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
+  const costCenters = [
+      { name: 'Administración' }, { name: 'Campo' }, { name: 'Packing' }, { name: 'Comercial' }, { name: 'Logística' }
+  ];
 
-  const internalConceptsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'internalConcepts') : null, [firestore]);
-  const { data: internalConceptsData } = useCollection<{name: string}>(internalConceptsQuery);
+  // --- PERSISTENCIA ---
+  useEffect(() => { localStorage.setItem('products', JSON.stringify(products)); }, [products]);
+  useEffect(() => { localStorage.setItem('calibers', JSON.stringify(calibers)); }, [calibers]);
+  useEffect(() => { localStorage.setItem('warehouses', JSON.stringify(warehouses)); }, [warehouses]);
+  useEffect(() => { localStorage.setItem('units', JSON.stringify(units)); }, [units]);
+  useEffect(() => { localStorage.setItem('packagingTypes', JSON.stringify(packagingTypes)); }, [packagingTypes]);
+  useEffect(() => { localStorage.setItem('productCaliberAssociations', JSON.stringify(productCaliberAssociations)); }, [productCaliberAssociations]);
+  useEffect(() => { localStorage.setItem('bankAccounts', JSON.stringify(bankAccounts)); }, [bankAccounts]);
+
+  // --- FUNCIONES ---
+  const addProduct = (p: string) => setProducts([...products, p]);
+  const removeProduct = (p: string) => setProducts(products.filter(item => item !== p));
   
-  const costCentersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'costCenters') : null, [firestore]);
-  const { data: costCentersData } = useCollection<{name: string}>(costCentersQuery);
+  const addCaliber = (c: {name: string, code: string}) => setCalibers([...calibers, c]);
+  const removeCaliber = (n: string) => setCalibers(calibers.filter(item => item.name !== n));
 
-  const associationsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'productCaliberAssociations') : null, [firestore]);
-  const { data: associations } = useCollection<ProductCaliberAssociation>(associationsQuery);
+  const addWarehouse = (w: string) => setWarehouses([...warehouses, w]);
+  const removeWarehouse = (w: string) => setWarehouses(warehouses.filter(item => item !== w));
 
-  const products = useMemo(() => productsData?.map(p => p.name) || [], [productsData]);
-  const calibers = useMemo(() => calibersData || [], [calibersData]);
-  const units = useMemo(() => unitsData?.map(u => u.name) || [], [unitsData]);
-  const packagingTypes = useMemo(() => packagingTypesData?.map(p => p.name) || [], [packagingTypesData]);
-  const warehouses = useMemo(() => warehousesData?.map(w => w.name) || [], [warehousesData]);
-  const internalConcepts = useMemo(() => internalConceptsData?.map(i => i.name) || [], [internalConceptsData]);
-  const costCenters = useMemo(() => costCentersData?.map(c => c.name) || [], [costCentersData]);
+  const addUnit = (u: string) => setUnits([...units, u]);
+  const removeUnit = (u: string) => setUnits(units.filter(item => item !== u));
 
+  const addPackagingType = (p: string) => setPackagingTypes([...packagingTypes, p]);
+  const removePackagingType = (p: string) => setPackagingTypes(packagingTypes.filter(item => item !== p));
+
+  const addBankAccount = (account: BankAccount) => setBankAccounts([...bankAccounts, account]);
+  const updateBankAccount = (account: BankAccount) => setBankAccounts(bankAccounts.map(a => a.id === account.id ? account : a));
+  const removeBankAccount = (id: string) => setBankAccounts(bankAccounts.filter(a => a.id !== id));
+
+  const updateProductCalibers = (productName: string, caliberNames: string[]) => {
+    setProductCaliberAssociations(prev => {
+      const index = prev.findIndex(a => a.id === productName);
+      let newAssociations = [...prev];
+      if (index >= 0) {
+        newAssociations[index] = { ...newAssociations[index], calibers: caliberNames };
+      } else {
+        newAssociations.push({ id: productName, calibers: caliberNames });
+      }
+      return newAssociations;
+    });
+  };
 
   return {
-    products,
-    calibers,
-    units,
-    packagingTypes,
-    warehouses,
-    bankAccounts: bankAccounts || [],
-    internalConcepts,
-    costCenters,
-    productCaliberAssociations: associations || [],
+    products, addProduct, removeProduct,
+    calibers, addCaliber, removeCaliber,
+    warehouses, addWarehouse, removeWarehouse,
+    units, addUnit, removeUnit,
+    packagingTypes, addPackagingType, removePackagingType,
+    bankAccounts, addBankAccount, updateBankAccount, removeBankAccount,
+    productCaliberAssociations, updateProductCalibers,
+    internalConcepts, costCenters
   };
 }

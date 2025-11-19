@@ -84,12 +84,10 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
           }
       }));
     } else {
-        // CORRECCIÓN IMPORTANTE: Evitar actualización de estado si ya está vacío
+        // CORRECCIÓN: Evitar loop si ya está vacío
         setMatrixData((prev) => (prev.length > 0 ? [] : prev));
     }
-    
-  // CORRECCIÓN IMPORTANTE: Usamos JSON.stringify para comparar el contenido de los arrays y no su referencia
-  // Esto detiene el bucle infinito.
+  // CORRECCIÓN: Usamos JSON.stringify para dependencias complejas
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     selectedProduct, 
@@ -227,7 +225,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                       />
                     </TableCell>
                     <TableCell>
-                        <Select
+                       <Select
                             value={row.packagingType}
                             onValueChange={(value) => handleMatrixChange(index, 'packagingType', value)}
                         >
