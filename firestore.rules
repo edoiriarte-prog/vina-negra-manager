@@ -1,95 +1,14 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Función de ayuda: Verifica si el usuario está logueado
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    // ---------------------------------------------------------
-    // 1. BLOQUEO POR DEFECTO (Seguridad)
-    // ---------------------------------------------------------
+    
+    // --- LLAVE MAESTRA PARA DESARROLLO ---
+    // Esto permite acceso total a TODAS las colecciones (products, warehouses, costCenters, etc.)
+    // Sin esto, tendrás que agregar una regla por cada tabla nueva que crees.
+    
     match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // ---------------------------------------------------------
-    // 2. COLECCIONES TRANSACCIONALES (Datos del negocio)
-    // ---------------------------------------------------------
-    match /contacts/{contactId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /purchaseOrders/{purchaseOrderId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /salesOrders/{salesOrderId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /serviceOrders/{serviceOrderId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /financialMovements/{movementId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
     
-    match /inventoryAdjustments/{adjustmentId} {
-        allow read, write: if isSignedIn();
-    }
-
-    // ---------------------------------------------------------
-    // 3. MAESTROS Y CONFIGURACIÓN (Aquí estaba el error)
-    // ---------------------------------------------------------
-    
-    // ESTA ES LA QUE FALTABA Y CAUSABA EL ERROR:
-    match /productCaliberAssociations/{associationId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /products/{productId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /calibers/{caliberId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /units/{unitId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /packagingTypes/{packagingTypeId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /warehouses/{warehouseId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    match /internalConcepts/{conceptId} {
-        allow read, write: if isSignedIn();
-    }
-    
-    match /costCenters/{centerId} {
-        allow read, write: if isSignedIn();
-    }
-    
-    match /bankAccounts/{accountId} {
-        allow read, write: if isSignedIn();
-    }
-    
-    // Agregamos 'users' y 'settings' por si acaso (muy comunes)
-    match /users/{userId} {
-        allow read, write: if isSignedIn();
-    }
-
-    match /settings/{settingId} {
-        allow read, write: if isSignedIn();
-    }
   }
 }

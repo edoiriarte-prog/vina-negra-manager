@@ -3,28 +3,12 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  Boxes,
-  LayoutDashboard,
-  Landmark,
-  ShoppingCart,
-  ShoppingBag,
-  Truck,
-  Users,
-  BarChart,
-  HelpCircle,
-  FileSliders,
-  Settings,
-  PackageCheck,
+  Boxes, LayoutDashboard, Landmark, ShoppingCart, ShoppingBag, Truck,
+  Users, BarChart, HelpCircle, FileSliders, Settings, PackageCheck,
 } from "lucide-react"
-
-import {
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-} from "@/components/ui/sidebar"
+import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 
-// RUTAS CORREGIDAS: Enlaces directos sin /principal
 const menuItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contacts", label: "Contactos", icon: Users },
@@ -48,12 +32,13 @@ export function MainNav({ className }: { className?: string }) {
       <SidebarMenu>
         {menuItems.map((item) => (
           <SidebarMenuItem key={item.href}>
-            <Link href={item.href}>
+            <Link href={item.href} className="w-full">
+              {/* FIX: Sin propiedad 'tooltip' para evitar bucles infinitos */}
               <SidebarMenuButton
                 isActive={pathname.startsWith(item.href)}
-                tooltip={item.label}
+                className="w-full justify-start"
               >
-                <item.icon className="h-5 w-5" />
+                <item.icon className="mr-2 h-4 w-4" />
                 <span>{item.label}</span>
               </SidebarMenuButton>
             </Link>

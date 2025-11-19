@@ -36,6 +36,7 @@ import {
   deleteDocumentNonBlocking,
 } from '@/firebase';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ProductCaliberManager } from '@/components/settings/product-caliber-manager';
 
 
 function MasterDataEditor({ title, data, collectionName }: { title: string, data: {id: string, name: string}[], collectionName: string }) {
@@ -356,97 +357,6 @@ function DataManagement() {
     );
 }
 
-type Association = {
-    id: string;
-    calibers: string[];
-}
-function ProductCaliberAssociation() {
-    const { firestore } = useFirebase();
-    const { products, calibers } = useMasterData();
-    const associationsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'productCaliberAssociations') : null, [firestore]);
-    const { data: associations, isLoading } = useCollection<Association>(associationsQuery);
-
-    const [selectedProduct, setSelectedProduct] = useState('');
-    
-    const handleAssociationChange = (productName: string, caliberName: string, isChecked: boolean) => {
-        if (!firestore) return;
-
-        const currentAssociation = associations?.find(a => a.id === productName) || { id: productName, calibers: [] };
-        let updatedCalibers;
-
-        if (isChecked) {
-            updatedCalibers = [...currentAssociation.calibers, caliberName];
-        } else {
-            updatedCalibers = currentAssociation.calibers.filter(c => c !== caliberName);
-        }
-
-        const docRef = doc(firestore, 'productCaliberAssociations', productName);
-        setDoc(docRef, { calibers: updatedCalibers }, { merge: true });
-    };
-
-    const currentAssociatedCalibers = useMemo(() => {
-        if (!selectedProduct || !associations) return [];
-        return associations.find(a => a.id === selectedProduct)?.calibers || [];
-    }, [selectedProduct, associations]);
-    
-    const sortedCalibers = useMemo(() => {
-        return [...calibers].sort((a,b) => a.name.localeCompare(b.name));
-    }, [calibers]);
-
-
-    if (isLoading) {
-        return <p>Cargando asociaciones...</p>
-    }
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="font-headline text-lg">Asociar Calibres a Productos</CardTitle>
-                <CardDescription>Seleccione un producto y marque los calibres que le corresponden.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-1">
-                    <Label>Producto</Label>
-                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Seleccione un producto" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {products.map(p => (
-                                <SelectItem key={p} value={p}>{p}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="md:col-span-2">
-                    {selectedProduct && (
-                        <div className="space-y-3">
-                            <h4 className="font-medium">Calibres para {selectedProduct}</h4>
-                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 border rounded-md max-h-60 overflow-y-auto">
-                                {sortedCalibers.map(caliber => (
-                                    <div key={caliber.id} className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id={`${selectedProduct}-${caliber.name}`}
-                                            checked={currentAssociatedCalibers.includes(caliber.name)}
-                                            onCheckedChange={(checked) => handleAssociationChange(selectedProduct, caliber.name, !!checked)}
-                                        />
-                                        <label
-                                            htmlFor={`${selectedProduct}-${caliber.name}`}
-                                            className="text-sm font-medium leading-none"
-                                        >
-                                            {caliber.name} ({caliber.code})
-                                        </label>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
 export default function SettingsPage() {
     const { firestore } = useFirebase();
     const productsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'products') : null, [firestore]);
@@ -495,7 +405,7 @@ export default function SettingsPage() {
                 </TabsContent>
                  <TabsContent value="associations">
                     <div className='mt-6'>
-                      <ProductCaliberAssociation />
+                      <ProductCaliberManager />
                     </div>
                 </TabsContent>
                 <TabsContent value="accounts">

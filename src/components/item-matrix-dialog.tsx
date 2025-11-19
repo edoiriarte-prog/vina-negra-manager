@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -86,9 +84,19 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
           }
       }));
     } else {
-        setMatrixData([]);
+        // CORRECCIÓN IMPORTANTE: Evitar actualización de estado si ya está vacío
+        setMatrixData((prev) => (prev.length > 0 ? [] : prev));
     }
-  }, [selectedProduct, productCaliberAssociations, calibers, inventory]);
+    
+  // CORRECCIÓN IMPORTANTE: Usamos JSON.stringify para comparar el contenido de los arrays y no su referencia
+  // Esto detiene el bucle infinito.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    selectedProduct, 
+    JSON.stringify(productCaliberAssociations), 
+    JSON.stringify(calibers), 
+    JSON.stringify(inventory)
+  ]);
 
 
   const handleMatrixChange = (index: number, field: keyof MatrixRow, value: string | number) => {
@@ -219,7 +227,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                       />
                     </TableCell>
                     <TableCell>
-                       <Select
+                        <Select
                             value={row.packagingType}
                             onValueChange={(value) => handleMatrixChange(index, 'packagingType', value)}
                         >

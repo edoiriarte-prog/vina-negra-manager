@@ -4,7 +4,7 @@
 
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import { BankAccount } from '@/lib/types';
-import { collection } from 'firebase/firestore';
+import { collection, doc, setDoc } from 'firebase/firestore';
 import { useMemo } from 'react';
 
 
