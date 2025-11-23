@@ -1,176 +1,27 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 15%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 262 84% 60%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 22%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 25%;
-    --input: 217 33% 25%;
-    --ring: 262 84% 60%;
-    --chart-1: 262 84% 60%;
-    --chart-2: 180 84% 60%;
-    --chart-3: 30 84% 60%;
-    --chart-4: 300 84% 60%;
-    --chart-5: 220 84% 60%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 15%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 262 84% 60%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 22%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 25%;
-    --input: 217 33% 25%;
-    --ring: 262 84% 60%;
-    --chart-1: 262 84% 60%;
-    --chart-2: 180 84% 60%;
-    --chart-3: 30 84% 60%;
-    --chart-4: 300 84% 60%;
-    --chart-5: 220 84% 60%;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
   body {
-    @apply bg-background text-foreground;
-    font-family: sans-serif;
+    @apply bg-slate-950 text-slate-100; /* Fondo base oscuro para todo el sistema */
   }
-  /* Hide number input arrows */
-  input[type=number]::-webkit-inner-spin-button,
-  input[type=number]::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-
-  input[type=number] {
-    -moz-appearance: textfield;
-  }
-}
-
-@media print {
-  @page {
-    size: A4;
-    margin: 0;
-  }
-
-  body {
-    background: white !important;
-    color: black !important;
-    font-family: sans-serif;
-  }
-  .no-print, .no-print * {
-    display: none !important;
+ 
+  /* Personalización del Scrollbar para que combine */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
   }
   
-  /* Ensure all text is black for contrast */
-  h1, h2, h3, h4, h5, h6, p, span, div, th, td, label {
-    color: black !important;
-  }
-
-  /* Make sure titles are bold */
-  .font-bold {
-    font-weight: bold !important;
-  }
-
-  /* Specific overrides for preview content */
-  .print-preview h1, .print-preview h2, .print-preview h3 {
-    font-weight: bold !important;
-    color: black !important;
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-950;
   }
   
-  /* General print styles */
-  * {
-    background-color: transparent !important;
-    box-shadow: none !important;
-    text-shadow: none !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-800 rounded-full border-2 border-slate-950;
   }
 
-  .lot-page, .lot-page-boxes {
-    page-break-after: always;
-  }
-
-  .print-section {
-    page-break-inside: avoid;
-  }
-
-  .print-summary-card {
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    box-shadow: none;
-  }
-
-  /* Keep table structure */
-  table, th, td, tr {
-    border-color: #D1D5DB !important;
-    border-style: solid;
-  }
-
-  thead {
-    display: table-header-group; /* Important for repeating headers */
-  }
-  
-  thead tr th {
-    font-weight: 600;
-    background-color: #F9FAFB !important;
-  }
-
-  tfoot {
-    display: table-footer-group;
-  }
-  
-  tfoot tr {
-     background-color: #F9FAFB !important;
-     font-weight: bold;
-  }
-
-  tr {
-    page-break-inside: avoid;
-  }
-
-  td, th {
-    padding: 8px 12px;
-  }
-
-  .badge-print {
-    border: 1px solid #e5e7eb;
-    padding: 2px 8px;
-    border-radius: 9999px;
-    font-size: 10px;
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-700;
   }
 }

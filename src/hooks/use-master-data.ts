@@ -1,78 +1,141 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { BankAccount } from '@/lib/types';
+import { 
+  useCollection, 
+  useDoc, 
+  useFirebase, 
+  useMemoFirebase, 
+  updateDocumentNonBlocking, 
+  setDocumentNonBlocking, 
+  addDocumentNonBlocking, 
+  deleteDocumentNonBlocking 
+} from '@/firebase';
+import { BankAccount, Contact, InventoryItem } from '@/lib/types'; // Added Contact and InventoryItem
+import { doc, collection } from 'firebase/firestore';
 
 export type ProductCaliberAssociation = {
   id: string; 
   calibers: string[];
 };
 
+// Estructura del documento único de configuración
+type MasterSettings = {
+  products: string[];
+  calibers: { name: string; code: string }[];
+  warehouses: string[];
+  units: string[];
+  packagingTypes: string[];
+  productCaliberAssociations: ProductCaliberAssociation[];
+};
+
 export function useMasterData() {
-  // --- 1. PRODUCTOS ---
-  const [products, setProducts] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('products');
-        return saved ? JSON.parse(saved) : []; 
+  const { firestore } = useFirebase();
+
+  // 1. DOCUMENTO DE CONFIGURACIÓN GENERAL (Listas simples)
+  const settingsDocRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'general') : null, [firestore]);
+  const { data: settingsData } = useDoc<MasterSettings>(settingsDocRef);
+
+  // 2. COLECCIÓN DE CUENTAS BANCARIAS
+  const accountsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'bankAccounts') : null, [firestore]);
+  const { data: bankAccountsData } = useCollection<BankAccount>(accountsCollection);
+
+  // 3. COLECCIÓN DE CONTACTOS (Proveedores/Clientes) - NUEVO
+  const contactsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
+  const { data: contactsData } = useCollection<Contact>(contactsCollection);
+
+  // 4. COLECCIÓN DE INVENTARIO - NUEVO
+  const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
+  const { data: inventoryData } = useCollection<InventoryItem>(inventoryCollection);
+
+
+  // --- VALORES POR DEFECTO ---
+  const products = settingsData?.products || [];
+  const calibers = settingsData?.calibers || [];
+  const warehouses = settingsData?.warehouses || [];
+  const units = settingsData?.units || ['Kilos', 'Cajas']; 
+  const packagingTypes = settingsData?.packagingTypes || [];
+  const productCaliberAssociations = settingsData?.productCaliberAssociations || [];
+  
+  // Data collections
+  const bankAccounts = bankAccountsData || [];
+  const contacts = contactsData || []; // Ahora disponible
+  const inventory = inventoryData || []; // Ahora disponible
+
+  // --- FUNCIÓN GENÉRICA PARA ACTUALIZAR ARRAYS ---
+  const updateSettingList = (field: keyof MasterSettings, newList: any[]) => {
+    if (!firestore || !settingsDocRef) return;
+    setDocumentNonBlocking(settingsDocRef, { [field]: newList }, { merge: true });
+  };
+
+  // --- PRODUCTOS ---
+  const addProduct = (p: string) => {
+    if (products.includes(p)) return;
+    updateSettingList('products', [...products, p]);
+  };
+  const removeProduct = (p: string) => updateSettingList('products', products.filter(item => item !== p));
+
+  // --- CALIBRES ---
+  const addCaliber = (c: { name: string; code: string }) => {
+    if (calibers.find(cal => cal.name === c.name)) return;
+    updateSettingList('calibers', [...calibers, c]);
+  };
+  const removeCaliber = (name: string) => updateSettingList('calibers', calibers.filter(item => item.name !== name));
+
+  // --- BODEGAS ---
+  const addWarehouse = (w: string) => {
+    if (warehouses.includes(w)) return;
+    updateSettingList('warehouses', [...warehouses, w]);
+  };
+  const removeWarehouse = (w: string) => updateSettingList('warehouses', warehouses.filter(item => item !== w));
+
+  // --- UNIDADES ---
+  const addUnit = (u: string) => {
+    if (units.includes(u)) return;
+    updateSettingList('units', [...units, u]);
+  };
+  const removeUnit = (u: string) => updateSettingList('units', units.filter(item => item !== u));
+
+  // --- ENVASES ---
+  const addPackagingType = (p: string) => {
+    if (packagingTypes.includes(p)) return;
+    updateSettingList('packagingTypes', [...packagingTypes, p]);
+  };
+  const removePackagingType = (p: string) => updateSettingList('packagingTypes', packagingTypes.filter(item => item !== p));
+
+  // --- ASOCIACIONES ---
+  const updateProductCalibers = (productName: string, caliberNames: string[]) => {
+    const index = productCaliberAssociations.findIndex(a => a.id === productName);
+    let newAssociations = [...productCaliberAssociations];
+    
+    if (index >= 0) {
+      newAssociations[index] = { id: productName, calibers: caliberNames };
+    } else {
+      newAssociations.push({ id: productName, calibers: caliberNames });
     }
-    return [];
-  });
+    updateSettingList('productCaliberAssociations', newAssociations);
+  };
 
-  // --- 2. CALIBRES ---
-  const [calibers, setCalibers] = useState<{ name: string; code: string }[]>(() => {
-     if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('calibers');
-        return saved ? JSON.parse(saved) : []; 
+  // --- CUENTAS BANCARIAS ---
+  const addBankAccount = (account: BankAccount) => {
+    if (!firestore) return;
+    if (account.id) {
+        setDocumentNonBlocking(doc(firestore, 'bankAccounts', account.id), account, { merge: true });
+    } else {
+        addDocumentNonBlocking(collection(firestore, 'bankAccounts'), account);
     }
-    return [];
-  });
+  };
+  
+  const updateBankAccount = (account: BankAccount) => {
+     if (!firestore) return;
+     updateDocumentNonBlocking(doc(firestore, 'bankAccounts', account.id), account);
+  };
 
-  // --- 3. BODEGAS ---
-  const [warehouses, setWarehouses] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-       const saved = localStorage.getItem('warehouses');
-       return saved ? JSON.parse(saved) : ['Bodega Central', 'Patio 1']; 
-   }
-   return ['Bodega Central']; 
- });
+  const removeBankAccount = (id: string) => {
+      if (!firestore) return;
+      deleteDocumentNonBlocking(doc(firestore, 'bankAccounts', id));
+  };
 
-  // --- 4. UNIDADES (Ahora editable) ---
-  const [units, setUnits] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-       const saved = localStorage.getItem('units');
-       return saved ? JSON.parse(saved) : ['Kilos', 'Cajas']; 
-   }
-   return ['Kilos', 'Cajas']; 
- });
-
-  // --- 5. ENVASES (Ahora editable) ---
-  const [packagingTypes, setPackagingTypes] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-       const saved = localStorage.getItem('packagingTypes');
-       return saved ? JSON.parse(saved) : ['TORITO PLASTICO 15K', 'CAJA PLASTICA 10K', 'BIN']; 
-   }
-   return ['TORITO PLASTICO 15K', 'CAJA PLASTICA 10K', 'BIN']; 
- });
-
-  // --- 6. ASOCIACIONES ---
-  const [productCaliberAssociations, setProductCaliberAssociations] = useState<ProductCaliberAssociation[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('productCaliberAssociations');
-      return saved ? JSON.parse(saved) : [];
-    }
-    return [];
-  });
-
-  // --- 7. CUENTAS BANCARIAS ---
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bankAccounts');
-      return saved ? JSON.parse(saved) : [];
-    }
-    return [];
-  });
-
-  // --- DATOS ESTÁTICOS DE REFERENCIA ---
+  // Datos estáticos
   const internalConcepts = [
     { name: 'Retiro de Socios' }, { name: 'Pago de Impuestos' }, { name: 'Comisión Bancaria' },
     { name: 'Préstamo Interno' }, { name: 'Gastos Generales' }, { name: 'Mantención' }, 
@@ -83,56 +146,21 @@ export function useMasterData() {
       { name: 'Administración' }, { name: 'Campo' }, { name: 'Packing' }, { name: 'Comercial' }, { name: 'Logística' }
   ];
 
-  // --- PERSISTENCIA ---
-  useEffect(() => { localStorage.setItem('products', JSON.stringify(products)); }, [products]);
-  useEffect(() => { localStorage.setItem('calibers', JSON.stringify(calibers)); }, [calibers]);
-  useEffect(() => { localStorage.setItem('warehouses', JSON.stringify(warehouses)); }, [warehouses]);
-  useEffect(() => { localStorage.setItem('units', JSON.stringify(units)); }, [units]);
-  useEffect(() => { localStorage.setItem('packagingTypes', JSON.stringify(packagingTypes)); }, [packagingTypes]);
-  useEffect(() => { localStorage.setItem('productCaliberAssociations', JSON.stringify(productCaliberAssociations)); }, [productCaliberAssociations]);
-  useEffect(() => { localStorage.setItem('bankAccounts', JSON.stringify(bankAccounts)); }, [bankAccounts]);
-
-  // --- FUNCIONES ---
-  const addProduct = (p: string) => setProducts([...products, p]);
-  const removeProduct = (p: string) => setProducts(products.filter(item => item !== p));
-  
-  const addCaliber = (c: {name: string, code: string}) => setCalibers([...calibers, c]);
-  const removeCaliber = (n: string) => setCalibers(calibers.filter(item => item.name !== n));
-
-  const addWarehouse = (w: string) => setWarehouses([...warehouses, w]);
-  const removeWarehouse = (w: string) => setWarehouses(warehouses.filter(item => item !== w));
-
-  const addUnit = (u: string) => setUnits([...units, u]);
-  const removeUnit = (u: string) => setUnits(units.filter(item => item !== u));
-
-  const addPackagingType = (p: string) => setPackagingTypes([...packagingTypes, p]);
-  const removePackagingType = (p: string) => setPackagingTypes(packagingTypes.filter(item => item !== p));
-
-  const addBankAccount = (account: BankAccount) => setBankAccounts([...bankAccounts, account]);
-  const updateBankAccount = (account: BankAccount) => setBankAccounts(bankAccounts.map(a => a.id === account.id ? account : a));
-  const removeBankAccount = (id: string) => setBankAccounts(bankAccounts.filter(a => a.id !== id));
-
-  const updateProductCalibers = (productName: string, caliberNames: string[]) => {
-    setProductCaliberAssociations(prev => {
-      const index = prev.findIndex(a => a.id === productName);
-      let newAssociations = [...prev];
-      if (index >= 0) {
-        newAssociations[index] = { ...newAssociations[index], calibers: caliberNames };
-      } else {
-        newAssociations.push({ id: productName, calibers: caliberNames });
-      }
-      return newAssociations;
-    });
-  };
-
   return {
+    // Listas de Configuración
     products, addProduct, removeProduct,
     calibers, addCaliber, removeCaliber,
     warehouses, addWarehouse, removeWarehouse,
     units, addUnit, removeUnit,
     packagingTypes, addPackagingType, removePackagingType,
-    bankAccounts, addBankAccount, updateBankAccount, removeBankAccount,
     productCaliberAssociations, updateProductCalibers,
+    
+    // Colecciones Principales (AHORA INCLUIDAS)
+    inventory, 
+    contacts, 
+    bankAccounts, addBankAccount, updateBankAccount, removeBankAccount,
+    
+    // Estáticos
     internalConcepts, costCenters
   };
 }

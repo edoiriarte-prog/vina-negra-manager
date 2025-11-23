@@ -1,184 +1,71 @@
-
-
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { SalesOrder, PurchaseOrder } from '@/lib/types';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { TrendingUp } from "lucide-react";
 
-type PerformanceReportProps = {}
+// Datos simulados (Idealmente vendrían de una prop o hook)
+const data = [
+  { name: 'Ene', ventas: 4000, compras: 2400 },
+  { name: 'Feb', ventas: 3000, compras: 1398 },
+  { name: 'Mar', ventas: 2000, compras: 9800 },
+  { name: 'Abr', ventas: 2780, compras: 3908 },
+  { name: 'May', ventas: 1890, compras: 4800 },
+  { name: 'Jun', ventas: 2390, compras: 3800 },
+];
 
-type PerformanceItem = {
-    key: string;
-    product: string;
-    caliber: string;
-    totalKilos: number;
-    totalValue: number;
-    avgPrice: number;
-}
+export function PerformanceReports() {
+  // Estilos Enterprise
+  const cardClass = "bg-slate-900 border-slate-800 shadow-sm";
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value);
-
-const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
-
-export function PerformanceReports({}: PerformanceReportProps) {
-    const { firestore } = useFirebase();
-
-    const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
-    const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
-
-    const { data: salesOrders, isLoading: loadingSales } = useCollection<SalesOrder>(salesOrdersQuery);
-    const { data: purchaseOrders, isLoading: loadingPurchases } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
-
-    const [salesPerformance, setSalesPerformance] = useState<PerformanceItem[]>([]);
-    const [purchasePerformance, setPurchasePerformance] = useState<PerformanceItem[]>([]);
-    
-    const isLoading = loadingSales || loadingPurchases;
-
-    useEffect(() => {
-        if (salesOrders) {
-            const salesMap = new Map<string, { totalKilos: number, totalValue: number }>();
-            salesOrders.forEach(order => {
-                if (order.status === 'completed') {
-                    order.items.forEach(item => {
-                        const key = `${item.product} - ${item.caliber}`;
-                        const existing = salesMap.get(key) || { totalKilos: 0, totalValue: 0 };
-                        const quantityInKilos = item.unit === 'Kilos' ? item.quantity : 0; // Assuming conversion is 1:1 or cajas are not kilos
-                        
-                        existing.totalKilos += quantityInKilos;
-                        existing.totalValue += item.price * item.quantity;
-                        salesMap.set(key, existing);
-                    });
-                }
-            });
-
-            const salesData: PerformanceItem[] = [];
-            salesMap.forEach((value, key) => {
-                const [product, caliber] = key.split(' - ');
-                salesData.push({
-                    key,
-                    product,
-                    caliber,
-                    totalKilos: value.totalKilos,
-                    totalValue: value.totalValue,
-                    avgPrice: value.totalKilos > 0 ? value.totalValue / value.totalKilos : 0,
-                });
-            });
-            setSalesPerformance(salesData.sort((a,b) => b.totalValue - a.totalValue));
-        }
-
-        if (purchaseOrders) {
-            const purchaseMap = new Map<string, { totalKilos: number, totalValue: number }>();
-            purchaseOrders.forEach(order => {
-                 if (order.status === 'completed') {
-                    order.items.forEach(item => {
-                        const key = `${item.product} - ${item.caliber}`;
-                        const existing = purchaseMap.get(key) || { totalKilos: 0, totalValue: 0 };
-                        const quantityInKilos = item.unit === 'Kilos' ? item.quantity : 0;
-
-                        existing.totalKilos += quantityInKilos;
-                        existing.totalValue += item.price * item.quantity;
-                        purchaseMap.set(key, existing);
-                    });
-                }
-            });
-
-            const purchaseData: PerformanceItem[] = [];
-            purchaseMap.forEach((value, key) => {
-                const [product, caliber] = key.split(' - ');
-                purchaseData.push({
-                    key,
-                    product,
-                    caliber,
-                    totalKilos: value.totalKilos,
-                    totalValue: value.totalValue,
-                    avgPrice: value.totalKilos > 0 ? value.totalValue / value.totalKilos : 0,
-                });
-            });
-            setPurchasePerformance(purchaseData.sort((a,b) => b.totalValue - a.totalValue));
-        }
-    }, [salesOrders, purchaseOrders]);
-    
-    const renderPerformanceRows = (data: PerformanceItem[]) => {
-        if (isLoading) {
-            return Array.from({ length: 3 }).map((_, index) => (
-                <TableRow key={`skeleton-perf-${index}`}>
-                    <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
-                </TableRow>
-            ));
-        }
-
-        return data.map(item => (
-            <TableRow key={item.key}>
-                <TableCell className="font-medium">{item.product}</TableCell>
-                <TableCell>{item.caliber}</TableCell>
-                <TableCell className="text-right">{formatKilos(item.totalKilos)}</TableCell>
-                <TableCell className="text-right">{formatCurrency(item.totalValue)}</TableCell>
-                <TableCell className="text-right font-semibold">{formatCurrency(item.avgPrice)}/kg</TableCell>
-            </TableRow>
-        ));
-    }
-
-    return (
-        <div className="flex flex-col gap-6 mt-6">
-            <Card className="print-container">
-                <CardHeader>
-                    <CardTitle className="font-headline text-2xl">Rendimiento de Ventas</CardTitle>
-                    <CardDescription>Análisis de ventas por producto y calibre.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Producto</TableHead>
-                                    <TableHead>Calibre</TableHead>
-                                    <TableHead className="text-right">Kilos Vendidos</TableHead>
-                                    <TableHead className="text-right">Ingreso Total</TableHead>
-                                    <TableHead className="text-right">Precio Promedio/kg</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {renderPerformanceRows(salesPerformance)}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
-
-             <Card className="print-container">
-                <CardHeader>
-                    <CardTitle className="font-headline text-2xl">Rendimiento de Compras</CardTitle>
-                    <CardDescription>Análisis de compras por producto y calibre.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Producto</TableHead>
-                                    <TableHead>Calibre</TableHead>
-                                    <TableHead className="text-right">Kilos Comprados</TableHead>
-                                    <TableHead className="text-right">Costo Total</TableHead>
-                                    <TableHead className="text-right">Costo Promedio/kg</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {renderPerformanceRows(purchasePerformance)}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-    )
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      {/* Gráfico Principal */}
+      <Card className={`${cardClass} md:col-span-2`}>
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-blue-500" />
+            Rendimiento Operativo
+          </CardTitle>
+          <CardDescription className="text-slate-400">
+            Comparativa mensual de volumen de ventas vs compras.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[350px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={data}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <XAxis 
+                    dataKey="name" 
+                    stroke="#94a3b8" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={false} 
+                />
+                <YAxis 
+                    stroke="#94a3b8" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={false}
+                    tickFormatter={(value) => `$${value}`}
+                />
+                <Tooltip 
+                    cursor={{fill: '#1e293b'}}
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9', borderRadius: '8px' }}
+                    itemStyle={{ color: '#cbd5e1' }}
+                />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                <Bar dataKey="ventas" name="Ventas" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
+                <Bar dataKey="compras" name="Compras" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

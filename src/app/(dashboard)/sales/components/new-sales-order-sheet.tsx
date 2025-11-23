@@ -1,69 +1,43 @@
-
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-  SheetClose,
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose,
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, Eye, CalendarIcon, Layers } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-
-import { SalesOrder, OrderItem, Contact, InventoryItem, PurchaseOrder, InventoryAdjustment } from '@/lib/types';
-import { format, parseISO, addDays } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
+import { Plus, Trash2, CalendarIcon, User, Truck, Warehouse, CreditCard, Info, PackageCheck, DollarSign, MapPin } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SalesOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
+import { format, addDays, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ItemMatrixDialog } from './item-matrix-dialog';
-import { LotSelectionDialog } from './lot-selection-dialog';
+import { ItemMatrixDialog } from './item-matrix-dialog'; // Usamos la misma matriz inteligente
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
-import { es } from 'date-fns/locale';
-import { Calendar } from '@/components/ui/calendar';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 
 type NewSalesOrderSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (order: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems?: OrderItem[]) => void;
+  onSave: (order: SalesOrder) => void;
   order: SalesOrder | null;
   clients: Contact[];
   carriers: Contact[];
   inventory: InventoryItem[];
   nextOrderId: string;
-  purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
-  inventoryAdjustments: InventoryAdjustment[];
-  contacts: Contact[];
-  sheetType?: 'sales' | 'dispatch';
 };
 
+type SalesOrderFormData = Omit<SalesOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'>;
 
-const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dispatch'): Omit<SalesOrder, 'id' | 'totalPackages'> => {
-    const isDispatch = sheetType === 'dispatch';
+// ID BASE PARA VENTAS (2099 para iniciar en 2100)
+const BASE_OV_ID = 2099;
+
+const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
     if (order) {
         return {
             ...order,
@@ -74,221 +48,52 @@ const getInitialFormData = (order: SalesOrder | null, sheetType?: 'sales' | 'dis
     }
     return {
         clientId: '',
-        date: '',
+        date: format(new Date(), 'yyyy-MM-dd'),
         items: [],
-        totalAmount: 0,
-        totalKilos: 0,
-        relatedPurchaseIds: [],
         status: 'pending',
-        paymentMethod: isDispatch ? 'Contado' : 'Contado',
+        paymentMethod: 'Contado',
+        saleType: 'Venta Firme',
         creditDays: 0,
         advancePercentage: 0,
         advanceDueDate: undefined,
         balanceDueDate: undefined,
-        warehouse: '',
-        saleType: isDispatch ? 'SOLO TRASLADO' : 'Venta Firme',
-        movementType: isDispatch ? 'Traslado Bodega Interna' : 'Venta Directa',
+        warehouse: 'Bodega Central', // Origen
         destinationWarehouse: '',
         carrierId: '',
         driverName: '',
         licensePlate: '',
-        orderType: 'sales', // Always 'sales' now
-        includeVat: !isDispatch,
+        orderType: 'sales',
         notes: '',
-        destinationAccountId: '',
     };
 };
 
 export function NewSalesOrderSheet({ 
-    isOpen, onOpenChange, onSave, order, clients, carriers, 
-    inventory, nextOrderId, purchaseOrders, salesOrders, inventoryAdjustments, contacts, 
-    sheetType = 'sales' 
+    isOpen, onOpenChange, onSave, order, clients, carriers, inventory, salesOrders 
 }: NewSalesOrderSheetProps) {
-  const [formData, setFormData] = useState(() => getInitialFormData(order, sheetType));
+  
+  const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order));
+  const [includeVat, setIncludeVat] = useState(true); 
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const [isLotSelectionOpen, setIsLotSelectionOpen] = useState(false);
-  const { products, calibers, units, packagingTypes, warehouses, bankAccounts, productCaliberAssociations } = useMasterData();
+  const [nextIdDisplay, setNextIdDisplay] = useState('');
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  const { products, calibers, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (isOpen) {
-      setFormData(getInitialFormData(order, sheetType));
-    }
-  }, [order, isOpen, sheetType]);
-
-  const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
-    const newItems = [...formData.items];
-    const item = { ...newItems[index] };
-    (item[field] as any) = value; // Type assertion
-    newItems[index] = item;
-    setFormData(prev => ({ ...prev, items: newItems }));
-  };
-
-  const handleSelectChange = (name: keyof Omit<SalesOrder, 'id' | 'items' | 'totalPackages' > | `items.${number}.${keyof OrderItem}`, value: any) => {
-    if (name.startsWith('items.')) {
-        const [_, indexStr, field] = name.split('.');
-        const index = parseInt(indexStr);
-        handleItemChange(index, field as keyof OrderItem, value);
-    } else {
-        setFormData(prev => ({ ...prev, [name as keyof typeof formData]: value }));
-    }
-  };
-  
-  useEffect(() => {
-      if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {
-          const dueDate = addDays(parseISO(formData.date), formData.creditDays);
-          setFormData(prev => ({...prev, balanceDueDate: format(dueDate, 'yyyy-MM-dd')}))
-      }
-  }, [formData.creditDays, formData.date, formData.paymentMethod]);
-
-  const removeItem = (index: number) => {
-    setFormData(prev => ({
-        ...prev,
-        items: prev.items.filter((_, i) => i !== index)
-    }))
-  }
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    
-    // --- VALIDATION START ---
-    if (!formData.date) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Por favor, seleccione una fecha.' });
-        return;
-    }
-    if (!formData.clientId) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Por favor, seleccione un cliente.' });
-        return;
-    }
-    if (!formData.warehouse) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Por favor, seleccione una bodega.' });
-        return;
-    }
-    if (formData.items.length === 0) {
-        toast({ variant: 'destructive', title: 'Error', description: 'El documento debe tener al menos un ítem.' });
-        return;
-    }
-    
-    for (const [index, item] of formData.items.entries()) {
-        if (!item.product || !item.caliber) {
-            toast({ variant: 'destructive', title: 'Error en Ítem', description: `El ítem #${index + 1} no tiene producto o calibre seleccionado.` });
-            return;
-        }
-        if (!item.quantity || item.quantity <= 0) {
-            toast({ variant: 'destructive', title: 'Error en Ítem', description: `La cantidad del ítem #${index + 1} debe ser mayor a 0.` });
-            return;
-        }
-        if (!item.unit) {
-            toast({ variant: 'destructive', title: 'Error en Ítem', description: `La unidad del ítem #${index + 1} no ha sido seleccionada.` });
-            return;
-        }
-        if (sheetType === 'sales' && (!item.price || item.price <= 0)) {
-            toast({ variant: 'destructive', title: 'Error en Ítem', description: `El precio del ítem #${index + 1} debe ser mayor a 0.` });
-            return;
-        }
-        if ((item.packagingType && !item.packagingQuantity) || (!item.packagingType && item.packagingQuantity)) {
-            toast({ variant: 'destructive', title: 'Error en Ítem', description: `El ítem #${index + 1} debe tener tipo y cantidad de envase.` });
-            return;
-        }
-    }
-
-    if (sheetType === 'sales' && formData.paymentMethod === 'Pago con Anticipo y Saldo') {
-        if (!formData.advanceDueDate || !formData.balanceDueDate) {
-            toast({
-                variant: 'destructive',
-                title: 'Error de validación',
-                description: 'Por favor complete las fechas de vencimiento para la modalidad de pago seleccionada.',
-            });
-            return;
-        }
-        if (new Date(formData.balanceDueDate) < new Date(formData.advanceDueDate)) {
-            toast({
-                variant: 'destructive',
-                title: 'Error de validación',
-                description: 'La fecha de vencimiento del saldo no puede ser anterior a la del anticipo.',
-            });
-            return;
-        }
-    }
-    
-    // Stock validation
-    for (const item of formData.items) {
-      const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === formData.warehouse);
-      const currentStock = inventoryItem ? inventoryItem.stock : 0;
-      
-      if (item.quantity > currentStock) {
-          toast({
-              variant: "destructive",
-              title: "Error de Stock",
-              description: `No hay stock para ${item.product} - ${item.caliber} en ${formData.warehouse}. Stock: ${currentStock} kg.`,
-          });
-          return;
-      }
-    }
-    // --- VALIDATION END ---
-    
-    onSave(formData);
-  };
-  
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
-    if (name.startsWith('items.')) {
-        const [_, indexStr, field] = name.split('.');
-        const index = parseInt(indexStr);
-        handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'advancePercentage', 'packagingQuantity'].includes(field) ? Number(value) : value);
-    } else {
-        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage', 'creditDays'].includes(name) ? Number(value) : value }));
-    }
-  };
-
-  const handleMatrixSave = (matrixItems: Omit<OrderItem, 'id'>[]) => {
-    const newItems: OrderItem[] = matrixItems.map(item => ({
-        ...item,
-        id: `temp-${Date.now()}-${Math.random()}`,
-        price: sheetType === 'dispatch' ? 0 : item.price,
-    }));
-
-    if (order) {
-        onSave(formData, newItems);
-    } else {
-        setFormData(prev => ({...prev, items: [...prev.items, ...newItems]}));
-    }
-    setIsMatrixOpen(false);
-  }
-  
-  const handleLotSave = (lotItem: OrderItem) => {
-    const newItem: OrderItem = {
-      ...lotItem,
-      id: `temp-lot-${Date.now()}`,
-      price: sheetType === 'dispatch' ? 0 : lotItem.price,
-    };
-
-    if (order) {
-      onSave(formData, [newItem]);
-    } else {
-      setFormData(prev => ({ ...prev, items: [...prev.items, newItem]}));
-    }
-  }
-
-  const title = order ? `Editar ${sheetType === 'sales' ? 'Orden de Venta' : 'Orden de Salida'}` : `Crear ${sheetType === 'sales' ? 'Orden de Venta' : 'Orden de Salida'}`;
-  const description = order 
-    ? 'Actualice la información del documento.'
-    : 'Complete la información para registrar un nuevo documento.';
-
+  // Cálculos
   const grossTotal = useMemo(() => {
     return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
   }, [formData.items]);
   
   const { netTotal, vatAmount, finalTotal } = useMemo(() => {
-      if (formData.includeVat) {
-          const net = grossTotal / 1.19;
-          const vat = grossTotal - net;
-          return { netTotal: net, vatAmount: vat, finalTotal: grossTotal };
+      const net = grossTotal; 
+      if (includeVat) {
+          const vat = net * 0.19;
+          const total = net + vat;
+          return { netTotal: net, vatAmount: vat, finalTotal: total };
       }
-      // If VAT is NOT included, the prices are net. `grossTotal` is the net total.
-      return { netTotal: grossTotal, vatAmount: 0, finalTotal: grossTotal };
-  }, [grossTotal, formData.includeVat]);
-
+      return { netTotal: net, vatAmount: 0, finalTotal: net };
+  }, [grossTotal, includeVat]);
 
   const advanceAmount = useMemo(() => {
     if (formData.paymentMethod !== 'Pago con Anticipo y Saldo' || !formData.advancePercentage) return 0;
@@ -300,489 +105,477 @@ export function NewSalesOrderSheet({
      return finalTotal - advanceAmount;
   }, [finalTotal, advanceAmount, formData.paymentMethod]);
 
+  // --- LÓGICA ID ROBUSTA (BASE 2100) ---
+  useEffect(() => {
+    if (isOpen) {
+        if (!order) {
+            const existingIds = (salesOrders || [])
+                .map(o => {
+                    const match = o.id.match(/OV-(\d+)/);
+                    return match ? parseInt(match[1], 10) : 0;
+                })
+                .filter(n => !isNaN(n));
+            
+            const maxId = existingIds.length > 0 ? Math.max(...existingIds) : BASE_OV_ID;
+            const nextNum = maxId < BASE_OV_ID ? BASE_OV_ID + 1 : maxId + 1;
+            const newId = `OV-${nextNum}`;
+            
+            setNextIdDisplay(newId);
+            if (!hasInitialized) {
+                setFormData(getInitialFormData(null));
+                setIncludeVat(true); 
+                setHasInitialized(true);
+            }
+        } else {
+            if (!hasInitialized) {
+                setNextIdDisplay(order.id);
+                setFormData(getInitialFormData(order));
+                setIncludeVat(true); 
+                setHasInitialized(true);
+            }
+        }
+    } else {
+        setHasInitialized(false);
+    }
+  }, [isOpen, order, hasInitialized, salesOrders]);
+
+  const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
+    const newItems = [...formData.items];
+    const item = { ...newItems[index] };
+    (item[field] as any) = value; 
+    newItems[index] = item;
+    setFormData(prev => ({ ...prev, items: newItems }));
+  };
+
+  const handleSelectChange = (name: string, value: any) => {
+    if (name.startsWith('items.')) {
+        const [_, indexStr, field] = name.split('.');
+        const index = parseInt(indexStr);
+        handleItemChange(index, field as keyof OrderItem, value);
+    } else {
+        setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+  
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target;
+    if (name.startsWith('items.')) {
+        const [_, indexStr, field] = name.split('.');
+        const index = parseInt(indexStr);
+        handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'packagingQuantity'].includes(field) ? Number(value) : value);
+    } else {
+        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage', 'creditDays'].includes(name) ? Number(value) : value }));
+    }
+  };
+
+  useEffect(() => {
+      if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {
+          const dueDate = addDays(parseISO(formData.date), formData.creditDays);
+          setFormData(prev => ({...prev, balanceDueDate: format(dueDate, 'yyyy-MM-dd')}))
+      }
+  }, [formData.creditDays, formData.date, formData.paymentMethod]);
+
+  const removeItem = (index: number) => {
+    setFormData(prev => ({...prev, items: prev.items.filter((_, i) => i !== index)}));
+  }
+
+  const handleMatrixSave = (matrixItems: Omit<OrderItem, 'id'>[]) => {
+    const newItems: OrderItem[] = matrixItems.map(item => ({
+        ...item,
+        id: `temp-${Date.now()}-${Math.random()}`,
+    }));
+    setFormData(prev => ({...prev, items: [...prev.items, ...newItems]}));
+    setIsMatrixOpen(false);
+  }
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!formData.date) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione una fecha.' });
+    if (!formData.clientId) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un cliente.' });
+    if (formData.items.length === 0) return toast({ variant: 'destructive', title: 'Error', description: 'Agregue al menos un ítem.' });
+    
+    const sanitizedItems = formData.items.map(item => ({
+        ...item,
+        packagingType: item.packagingType || null,
+        packagingQuantity: Number(item.packagingQuantity) || 0,
+        lotNumber: item.lotNumber || null,
+        quantity: Number(item.quantity) || 0,
+        price: Number(item.price) || 0,
+    }));
+
+    const calculatedTotalPackages = sanitizedItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
+    const calculatedTotalKilos = sanitizedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+
+    const finalOrder: SalesOrder = {
+        id: order ? order.id : nextIdDisplay,
+        clientId: formData.clientId,
+        date: formData.date,
+        items: sanitizedItems,
+        totalPackages: calculatedTotalPackages,
+        totalKilos: calculatedTotalKilos,
+        totalAmount: finalTotal,
+        status: formData.status,
+        paymentMethod: formData.paymentMethod,
+        saleType: formData.saleType,
+        warehouse: formData.warehouse,
+        destinationWarehouse: formData.destinationWarehouse || null,
+        carrierId: formData.carrierId || null,
+        driverName: formData.driverName || null,
+        licensePlate: formData.licensePlate || null,
+        orderType: formData.orderType || 'sales',
+        advanceDueDate: formData.advanceDueDate || null,
+        balanceDueDate: formData.balanceDueDate || null,
+        notes: formData.notes || null,
+        creditDays: Number(formData.creditDays || 0),
+        advancePercentage: Number(formData.advancePercentage || 0),
+    };
+
+    onSave(finalOrder);
+  };
+
+  const title = order ? `Editar OV ${order.id}` : `Nueva Venta`;
 
   if (!formData) return null;
+
+  // Estilos Reutilizables (Theme Slate/Blue)
+  const darkInputClass = "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 placeholder:text-slate-600";
+  const darkCardClass = "bg-slate-900 border-slate-800 shadow-sm";
+  const labelClass = "text-xs font-medium text-slate-400 uppercase tracking-wide";
 
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="sm:max-w-7xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{title}</SheetTitle>
-            <SheetDescription>{description}</SheetDescription>
-          </SheetHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-6 py-4">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="date" className="text-right">
-                      Fecha
-                    </Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button
-                            variant={"outline"}
-                            className={cn(
-                            "col-span-3 justify-start text-left font-normal",
-                            !formData.date && "text-muted-foreground"
-                            )}
-                        >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {formData.date ? format(parseISO(formData.date), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                        <Calendar
-                            mode="single"
-                            selected={formData.date ? parseISO(formData.date) : undefined}
-                            onSelect={(date) => {
-                                if (date) {
-                                    handleSelectChange('date', format(date, 'yyyy-MM-dd'))
-                                }
-                            }}
-                            initialFocus
-                        />
-                        </PopoverContent>
-                    </Popover>
-                  </div>
-                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="clientId" className="text-right">
-                      Cliente
-                    </Label>
-                    <Select
-                      required
-                      onValueChange={(value) => handleSelectChange('clientId', value)}
-                      value={formData.clientId}
-                    >
-                      <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Seleccione un cliente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map(client => (
-                          <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {sheetType === 'sales' && (
-                   <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="saleType" className="text-right">
-                        Tipo de Venta
-                      </Label>
-                      <Select
-                        onValueChange={(value: 'Venta Firme' | 'Consignación' | 'Mínimo Garantizado' | 'SOLO TRASLADO') => handleSelectChange('saleType', value)}
-                        value={formData.saleType}
-                      >
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Seleccione un tipo de venta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Venta Firme">Venta Firme</SelectItem>
-                          <SelectItem value="Consignación">Consignación</SelectItem>
-                          <SelectItem value="Mínimo Garantizado">Mínimo Garantizado</SelectItem>
-                          <SelectItem value="SOLO TRASLADO">SOLO TRASLADO</SelectItem>
-                        </SelectContent>
-                      </Select>
+        <SheetContent className="sm:max-w-7xl w-[95vw] overflow-y-auto p-0 flex flex-col gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
+          
+          {/* --- HEADER SUPERIOR FIJO --- */}
+          <SheetHeader className="bg-slate-900 border-b border-slate-800 px-6 py-4 sticky top-0 z-10">
+             <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                    <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-600/30">
+                        <PackageCheck className="h-6 w-6 text-blue-400" />
                     </div>
+                    <div>
+                        <SheetTitle className="text-xl font-bold text-slate-100 tracking-tight">{title}</SheetTitle>
+                        <SheetDescription className="text-xs text-slate-400 font-mono mt-0.5">
+                            {nextIdDisplay ? `ID: ${nextIdDisplay}` : 'Calculando ID...'}
+                        </SheetDescription>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Badge variant="outline" className={`capitalize border-slate-700 text-slate-300 ${formData.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : ''}`}>
+                        {formData.status === 'completed' ? 'Despachada' : formData.status}
+                    </Badge>
+                </div>
+            </div>
+          </SheetHeader>
+
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-8">
+              
+              {/* --- SECCIÓN 1: DATOS GENERALES --- */}
+              <div className="grid md:grid-cols-4 gap-5">
+                {/* Cliente */}
+                <Card className={`${darkCardClass} md:col-span-2`}>
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <User className="h-4 w-4 text-blue-500" />
+                            Cliente
+                        </div>
+                        <Select required onValueChange={(value) => handleSelectChange('clientId', value)} value={formData.clientId}>
+                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                {clients.map(c => (<SelectItem key={c.id} value={c.id} className="focus:bg-slate-800 focus:text-slate-100">{c.name}</SelectItem>))}
+                            </SelectContent>
+                        </Select>
+                    </CardContent>
+                </Card>
+
+                {/* Fecha */}
+                <Card className={darkCardClass}>
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <CalendarIcon className="h-4 w-4 text-orange-500" />
+                            Fecha Emisión
+                        </div>
+                        <Input type="date" name="date" value={formData.date} onChange={handleInputChange} className={`${darkInputClass} [color-scheme:dark]`} required />
+                    </CardContent>
+                </Card>
+
+                {/* Bodega Origen */}
+                <Card className={darkCardClass}>
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <Warehouse className="h-4 w-4 text-emerald-500" />
+                            Bodega Origen
+                        </div>
+                        <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
+                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                {warehouses.map(w => <SelectItem key={w} value={w} className="focus:bg-slate-800 focus:text-slate-100">{w}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </CardContent>
+                </Card>
+              </div>
+
+              {/* --- SECCIÓN 2: DATOS DE TRANSPORTE (NUEVA) --- */}
+              <div className="grid md:grid-cols-3 gap-5">
+                 <Card className={darkCardClass}>
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <Truck className="h-4 w-4 text-purple-500" />
+                            Transportista
+                        </div>
+                        <Select onValueChange={(v) => handleSelectChange('carrierId', v)} value={formData.carrierId || ''}>
+                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Opcional" /></SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                <SelectItem value="none">Ninguno</SelectItem>
+                                {carriers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </CardContent>
+                 </Card>
+                 <Card className={darkCardClass}>
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <User className="h-4 w-4 text-slate-500" />
+                            Chofer
+                        </div>
+                        <Input name="driverName" value={formData.driverName || ''} onChange={handleInputChange} placeholder="Ej: Juan Pérez" className={darkInputClass} />
+                    </CardContent>
+                 </Card>
+                 <Card className={darkCardClass}>
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <MapPin className="h-4 w-4 text-red-500" />
+                            Patente
+                        </div>
+                        <Input name="licensePlate" value={formData.licensePlate || ''} onChange={handleInputChange} placeholder="Ej: AB-CD-12" className={darkInputClass} />
+                    </CardContent>
+                 </Card>
+              </div>
+
+              {/* --- SECCIÓN 3: ITEMS --- */}
+              <div className={`rounded-xl border border-slate-800 overflow-hidden ${darkCardClass}`}>
+                <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                    <h3 className="font-semibold text-slate-200 flex items-center gap-2">
+                        <Info className="h-4 w-4 text-blue-400" /> Detalle de Productos
+                    </h3>
+                    <Button type="button" onClick={() => setIsMatrixOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md shadow-blue-900/20 transition-all">
+                        <Plus className="mr-2 h-4 w-4" /> Agregar Items (Matriz)
+                    </Button>
+                </div>
+
+                <div className="p-0">
+                    {formData.items.length === 0 ? (
+                        <div className="py-16 text-center text-slate-500 bg-slate-950/50 flex flex-col items-center">
+                            <PackageCheck className="h-12 w-12 mb-3 opacity-20" />
+                            <p className="text-lg font-medium">No hay productos agregados</p>
+                            <p className="text-sm opacity-70">Use el botón para agregar productos.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-slate-400 uppercase bg-slate-950 border-b border-slate-800">
+                                    <tr>
+                                        <th className="px-4 py-3 font-semibold">Producto</th>
+                                        <th className="px-4 py-3 font-semibold">Calibre</th>
+                                        <th className="px-4 py-3 font-semibold">Envase</th>
+                                        <th className="px-4 py-3 text-center font-semibold">Cant.</th>
+                                        <th className="px-4 py-3 text-center font-semibold">Kilos</th>
+                                        <th className="px-4 py-3 text-right text-blue-400 font-semibold">P. Neto</th>
+                                        <th className="px-4 py-3 text-right text-emerald-400 font-semibold">P. c/IVA</th>
+                                        <th className="px-4 py-3 text-right font-semibold">Total</th>
+                                        <th className="px-4 py-3"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800 bg-slate-900/30">
+                                    {formData.items.map((item, index) => {
+                                        const subtotal = (item.quantity || 0) * (item.price || 0);
+                                        return (
+                                            <tr key={index} className="hover:bg-slate-800/50 transition-colors group">
+                                                <td className="px-4 py-2">
+                                                    <Select onValueChange={(v) => handleSelectChange(`items.${index}.product`, v)} value={item.product}>
+                                                        <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 font-medium text-slate-200 focus:ring-0"><SelectValue /></SelectTrigger>
+                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{products.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                                                    </Select>
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <Select onValueChange={(v) => handleSelectChange(`items.${index}.caliber`, v)} value={item.caliber}>
+                                                        <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-slate-400 focus:ring-0"><SelectValue /></SelectTrigger>
+                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{calibers.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
+                                                    </Select>
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <Select onValueChange={(v) => handleSelectChange(`items.${index}.packagingType`, v)} value={item.packagingType || ''}>
+                                                        <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-xs text-slate-400 focus:ring-0"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                                                    </Select>
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <Input type="number" value={item.packagingQuantity || ''} onChange={(e) => handleItemChange(index, 'packagingQuantity', Number(e.target.value))} className="h-7 text-center bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-300" />
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <Input type="number" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))} className="h-7 text-center font-bold bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-100" />
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <Input type="number" value={item.price || ''} onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500" />
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <Input type="number" value={item.price ? Math.round(item.price * 1.19) : ''} onChange={(e) => handleItemChange(index, 'price', Math.round(Number(e.target.value) / 1.19))} className="h-7 text-right font-mono text-emerald-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-emerald-500" />
+                                                </td>
+                                                <td className="px-4 py-2 text-right font-medium text-slate-300 font-mono">
+                                                    {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(subtotal)}
+                                                </td>
+                                                <td className="px-4 py-2 text-center">
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-7 w-7 text-slate-500 hover:text-red-400 hover:bg-red-950/30">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </div>
-                <div className="space-y-4">
-                  {sheetType === 'sales' && (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="status" className="text-right">
-                        Estado
-                        </Label>
-                        <Select
-                        required
-                        onValueChange={(value: 'pending' | 'completed' | 'cancelled') => handleSelectChange('status', value)}
-                        value={formData.status}
-                        >
-                        <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Seleccione un estado" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="pending">Pendiente</SelectItem>
-                            <SelectItem value="completed">Completada</SelectItem>
-                            <SelectItem value="cancelled">Cancelada</SelectItem>
-                        </SelectContent>
-                        </Select>
-                    </div>
-                  )}
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="warehouse" className="text-right">
-                            Bodega Origen
-                        </Label>
-                        <Select
-                            required
-                            onValueChange={(value) => handleSelectChange('warehouse', value)}
-                            value={formData.warehouse}
-                        >
-                            <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Seleccione bodega de origen" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {warehouses.map(w => (
-                                <SelectItem key={w} value={w}>{w}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="movementType" className="text-right">
-                          Tipo Movimiento
-                        </Label>
-                        <Select
-                          onValueChange={(value: 'Venta Directa' | 'Traslado a Bodega Externa' | 'Traslado Bodega Interna') => handleSelectChange('movementType', value)}
-                          value={formData.movementType}
-                        >
-                          <SelectTrigger className="col-span-3">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Venta Directa">Venta Directa</SelectItem>
-                            <SelectItem value="Traslado a Bodega Externa">Traslado a Bodega Externa</SelectItem>
-                            <SelectItem value="Traslado Bodega Interna">Traslado Bodega Interna</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {(formData.movementType === 'Traslado a Bodega Externa' || formData.movementType === 'Traslado Bodega Interna') && (
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="destinationWarehouse" className="text-right">
-                            Bodega Destino
-                          </Label>
-                          <Select
-                            onValueChange={(value) => handleSelectChange('destinationWarehouse', value)}
-                            value={formData.destinationWarehouse}
-                          >
-                            <SelectTrigger className="col-span-3">
-                              <SelectValue placeholder="Seleccione bodega de destino" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {warehouses.filter(w => w !== formData.warehouse).map(w => (
-                                <SelectItem key={w} value={w}>{w}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                </div>
               </div>
-              
-                <Card>
-                    <CardHeader><CardTitle className="text-lg font-headline">Transporte</CardTitle></CardHeader>
-                    <CardContent className="grid md:grid-cols-3 gap-4">
-                        <div>
-                            <Label htmlFor="carrierId">Transportista</Label>
-                             <Select onValueChange={(value) => handleSelectChange('carrierId', value)} value={formData.carrierId}>
-                                <SelectTrigger><SelectValue placeholder="Seleccione transportista" /></SelectTrigger>
-                                <SelectContent>
-                                    {carriers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="driverName">Nombre Chofer</Label>
-                            <Input id="driverName" name="driverName" value={formData.driverName || ''} onChange={handleInputChange} />
-                        </div>
-                         <div>
-                            <Label htmlFor="licensePlate">Patente</Label>
-                            <Input id="licensePlate" name="licensePlate" value={formData.licensePlate || ''} onChange={handleInputChange} />
-                        </div>
-                    </CardContent>
-                </Card>
 
-              <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="text-lg font-headline">Ítems del Documento</CardTitle>
-                         <div className="flex gap-2">
-                             <Button type="button" variant="outline" size="sm" onClick={() => setIsLotSelectionOpen(true)} disabled={!formData.warehouse}>
-                                <Layers className="mr-2 h-4 w-4" />
-                                Agregar desde Lote
-                            </Button>
-                            <Button type="button" variant="outline" size="sm" onClick={() => setIsMatrixOpen(true)} disabled={!formData.warehouse}>
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Agregar por Matriz
-                            </Button>
-                         </div>
-                    </div>
-                     {!formData.warehouse && <p className="text-xs text-destructive">Seleccione una bodega para agregar items.</p>}
-                </CardHeader>
-                <CardContent>
-                    {formData.items.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay ítems en la orden.</p>}
-
-                    {formData.items.map((item, index) => {
-                        const subtotal = (item.quantity || 0) * (item.price || 0);
-                        const inventoryItem = inventory.find(i => i.product === item.product && i.caliber === item.caliber && i.warehouse === formData.warehouse);
-                        const stock = inventoryItem ? inventoryItem.stock : 0;
-                        const availableCaliberNames = productCaliberAssociations.find(a => a.id === item.product)?.calibers || [];
-                        const sortedAvailableCalibers = calibers.filter(c => availableCaliberNames.includes(c.name)).sort((a,b) => calibers.findIndex(c => c.name === a.name) - calibers.findIndex(c => c.name === b.name));
-                        
-                        return (
-                        <div key={item.id} className="grid grid-cols-12 gap-2 items-end mb-2 p-3 border rounded-md relative">
-                            {/* Product */}
-                            <div className="col-span-6 md:col-span-2">
-                                <Label>Producto</Label>
-                                <Select required onValueChange={(value) => handleSelectChange(`items.${index}.product`, value)} value={item.product}>
-                                    <SelectTrigger><SelectValue placeholder="Producto" /></SelectTrigger>
-                                    <SelectContent>
-                                        {products.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {/* Caliber */}
-                            <div className="col-span-6 md:col-span-2">
-                                <Label>Calibre</Label>
-                                <Select required onValueChange={(value) => handleSelectChange(`items.${index}.caliber`, value)} value={item.caliber} disabled={!item.product}>
-                                    <SelectTrigger><SelectValue placeholder="Calibre" /></SelectTrigger>
-                                    <SelectContent>
-                                      {sortedAvailableCalibers.map(c => <SelectItem key={`${item.id}-${c.name}-${c.code}`} value={c.name}>{`${c.name} (${c.code})`}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                             {/* Packaging Type */}
-                             <div className="col-span-6 md:col-span-1">
-                                <Label>T. Envase</Label>
-                                <Select onValueChange={(value) => handleSelectChange(`items.${index}.packagingType`, value)} value={item.packagingType}>
-                                    <SelectTrigger><SelectValue placeholder="Envase" /></SelectTrigger>
-                                    <SelectContent>
-                                        {packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {/* Packaging Quantity */}
-                            <div className="col-span-6 md:col-span-1">
-                                <Label># Envases</Label>
-                                <Input name={`items.${index}.packagingQuantity`} type="number" value={item.packagingQuantity || ''} onChange={handleInputChange} placeholder="0" className="text-base"/>
-                            </div>
-                            {/* Quantity */}
-                            <div className="col-span-6 md:col-span-1">
-                                <Label>Cantidad</Label>
-                                <Input name={`items.${index}.quantity`} type="number" value={item.quantity || ''} onChange={handleInputChange} placeholder="0" required className="text-base" />
-                            </div>
-                            {/* Unit */}
-                            <div className="col-span-6 md:col-span-1">
-                                <Label>Unidad</Label>
-                                <Select required onValueChange={(value) => handleSelectChange(`items.${index}.unit`, value)} value={item.unit}>
-                                    <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
-                                    <SelectContent>
-                                        {units.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {/* Price */}
-                            <div className="col-span-6 md:col-span-1">
-                                <Label>Precio</Label>
-                                <Input name={`items.${index}.price`} type="number" value={item.price || ''} onChange={handleInputChange} placeholder="0" required className="text-base" disabled={sheetType === 'dispatch'}/>
-                            </div>
-                            {/* Subtotal */}
-                            <div className="col-span-6 md:col-span-1">
-                                <Label>Subtotal</Label>
-                                <Input value={new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(subtotal)} readOnly disabled />
-                            </div>
-                            <div className="col-span-6 md:col-span-1 flex flex-col">
-                                <Label>Stock</Label>
-                                <Badge variant={stock >= (item.quantity || 0) ? 'default' : 'destructive'} className="mt-2 w-fit">
-                                    {stock.toLocaleString('es-CL')} kg
-                                </Badge>
-                            </div>
-                             {/* Lot Number */}
-                             <div className="col-span-10 mt-2">
-                               <Label>Lote</Label>
-                               <Input name={`items.${index}.lotNumber`} value={item.lotNumber || ''} onChange={handleInputChange} placeholder="Número de lote" />
-                             </div>
-
-                            {/* Remove button */}
-                            <div className='col-span-2 mt-auto self-end'>
-                                <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </div>
-                        </div>
-                    )})}
-                </CardContent>
-              </Card>
-
-            {sheetType === 'sales' && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg font-headline">Condiciones y Resumen</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="paymentMethod" className="text-right">
-                                    Modalidad
-                                </Label>
-                                <Select
-                                    required
-                                    onValueChange={(value: 'Contado' | 'Crédito' | 'Pago con Anticipo y Saldo') => handleSelectChange('paymentMethod', value)}
-                                    value={formData.paymentMethod}
-                                >
-                                    <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="Seleccione modalidad" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Contado">Contado</SelectItem>
-                                        <SelectItem value="Crédito">Crédito</SelectItem>
-                                        <SelectItem value="Pago con Anticipo y Saldo">Pago con Anticipo y Saldo</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="destinationAccountId" className="text-right">
-                                    Cta. Destino
-                                </Label>
-                                <Select
-                                    onValueChange={(value) => handleSelectChange('destinationAccountId', value)}
-                                    value={formData.destinationAccountId}
-                                >
-                                    <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="Seleccione cuenta" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {bankAccounts.filter(acc => acc.status === 'Activa').map(acc => (
-                                        <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
-                                <div className="space-y-4 pl-8 border-l-2 ml-4">
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="advancePercentage" className="text-right">
-                                            Anticipo (%)
-                                        </Label>
-                                        <Input id="advancePercentage" name="advancePercentage" type="number" value={formData.advancePercentage || ''} onChange={handleInputChange} className="col-span-3" required min="0" max="100"/>
-                                    </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="advanceDueDate" className="text-right">
-                                            Venc. Anticipo
-                                        </Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                            <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !formData.advanceDueDate && "text-muted-foreground")}>
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
-                                            </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0">
-                                            <Calendar mode="single" selected={formData.advanceDueDate ? parseISO(formData.advanceDueDate) : undefined} onSelect={(date) => date && handleSelectChange('advanceDueDate', format(date, 'yyyy-MM-dd'))} initialFocus />
-                                            </PopoverContent>
-                                        </Popover>
-                                    </div>
-                                </div>
-                            )}
-
-                             {formData.paymentMethod === 'Crédito' && (
-                                <div className="space-y-4 pl-8 border-l-2 ml-4">
-                                     <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="creditDays" className="text-right">
-                                            Días Crédito
-                                        </Label>
-                                        <Input id="creditDays" name="creditDays" type="number" value={formData.creditDays || ''} onChange={handleInputChange} className="col-span-3" required min="0"/>
-                                    </div>
-                                </div>
-                            )}
-
-                            {(formData.paymentMethod === 'Crédito' || formData.paymentMethod === 'Pago con Anticipo y Saldo') && (
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="balanceDueDate" className="text-right">
-                                        Venc. Saldo
-                                    </Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !formData.balanceDueDate && "text-muted-foreground")}>
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
-                                        </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0">
-                                        <Calendar mode="single" selected={formData.balanceDueDate ? parseISO(formData.balanceDueDate) : undefined} onSelect={(date) => date && handleSelectChange('balanceDueDate', format(date, 'yyyy-MM-dd'))} initialFocus />
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                            )}
-                            <div className="grid grid-cols-4 items-start gap-4">
-                                <Label htmlFor="notes" className="text-right pt-2">
-                                    Notas
-                                </Label>
-                                <Textarea
-                                    id="notes"
-                                    name="notes"
-                                    value={formData.notes || ''}
-                                    onChange={handleInputChange}
-                                    className="col-span-3"
-                                    placeholder="Agregue notas o detalles adicionales aquí..."
-                                />
-                            </div>
-                        </div>
-                        <div className="bg-muted p-4 rounded-lg">
-                            <div className='flex justify-between items-center mb-4'>
-                                <h4 className="font-semibold">Resumen</h4>
-                                <div className="flex items-center space-x-2">
-                                    <Switch
-                                    id="includeVat"
-                                    checked={formData.includeVat}
-                                    onCheckedChange={(checked) => handleSelectChange('includeVat', checked)}
-                                    />
-                                    <Label htmlFor="includeVat">Precios con IVA</Label>
-                                </div>
-                            </div>
-                            <div className='text-sm space-y-2'>
-                            {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
-                                    <>
-                                        <div className='flex justify-between'>
-                                            <span className="text-muted-foreground">Monto Anticipo ({formData.advancePercentage}%):</span>
-                                            <span className='font-medium'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(advanceAmount)}</span>
-                                        </div>
-                                        <div className='flex justify-between'>
-                                            <span className="text-muted-foreground">Vencimiento:</span>
-                                            <span className='font-medium'>{formData.advanceDueDate ? format(parseISO(formData.advanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
-                                        </div>
-                                        <Separator className="my-2" />
-                                        <div className='flex justify-between'>
-                                            <span className="text-muted-foreground">Monto Saldo:</span>
-                                            <span className='font-medium'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(balanceAmount)}</span>
-                                        </div>
-                                        <div className='flex justify-between'>
-                                            <span className="text-muted-foreground">Vencimiento:</span>
-                                            <span className='font-medium'>{formData.balanceDueDate ? format(parseISO(formData.balanceDueDate), 'dd-MM-yyyy', { locale: es }) : '-'}</span>
-                                        </div>
-                                        <Separator className="my-2 bg-foreground" />
-                                    </>
+              {/* --- SECCIÓN 4: PIE DE PÁGINA --- */}
+              <div className="grid md:grid-cols-12 gap-6 items-start">
+                  
+                  {/* Condiciones */}
+                  <div className="md:col-span-7 space-y-4">
+                      <Card className={darkCardClass}>
+                          <CardContent className="p-5 space-y-5">
+                              <div className='flex justify-between items-center border-b border-slate-800 pb-2 mb-4'>
+                                <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                                    <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones de Venta
+                                </h4>
+                                {/* Selector Estado */}
+                                {order ? (
+                                    <Select onValueChange={(v: any) => handleSelectChange('status', v)} value={formData.status}>
+                                        <SelectTrigger className="h-7 w-32 text-xs bg-slate-950 border-slate-800"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                            <SelectItem value="pending">Pendiente</SelectItem>
+                                            <SelectItem value="completed">Despachada</SelectItem>
+                                            <SelectItem value="cancelled">Cancelada</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <Badge variant="outline" className="bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Pendiente</Badge>
                                 )}
-                                
-                                <div className='flex justify-between text-xs'>
-                                    <span>Subtotal Neto:</span>
-                                    <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(netTotal)}</span>
-                                </div>
-                                {formData.includeVat && (
-                                    <div className='flex justify-between text-xs'>
-                                        <span>IVA (19%):</span>
-                                        <span>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(vatAmount)}</span>
-                                    </div>
-                                )}
-                                
-                                <div className='flex justify-between text-lg'>
-                                    <span className="font-bold">Total:</span>
-                                    <span className='font-bold'>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(finalTotal)}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-5">
+                                  <div className="space-y-2">
+                                      <Label className={labelClass}>Tipo de Venta</Label>
+                                      <Select onValueChange={(v: any) => handleSelectChange('saleType', v)} value={formData.saleType}>
+                                          <SelectTrigger className={darkInputClass}><SelectValue /></SelectTrigger>
+                                          <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                              <SelectItem value="Venta Firme">Venta Firme</SelectItem>
+                                              <SelectItem value="Consignación">Consignación</SelectItem>
+                                              <SelectItem value="Mínimo Garantizado">Mínimo Garantizado</SelectItem>
+                                          </SelectContent>
+                                      </Select>
+                                  </div>
+                                  <div className="space-y-2">
+                                      <Label className={labelClass}>Método de Pago</Label>
+                                      <Select onValueChange={(v: any) => handleSelectChange('paymentMethod', v)} value={formData.paymentMethod}>
+                                          <SelectTrigger className={darkInputClass}><SelectValue /></SelectTrigger>
+                                          <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                              <SelectItem value="Contado">Contado</SelectItem>
+                                              <SelectItem value="Crédito">Crédito</SelectItem>
+                                              <SelectItem value="Pago con Anticipo y Saldo">Anticipo + Saldo</SelectItem>
+                                          </SelectContent>
+                                      </Select>
+                                  </div>
+                              </div>
+
+                              {/* Crédito / Vencimiento */}
+                              {(formData.paymentMethod === 'Crédito' || formData.paymentMethod === 'Pago con Anticipo y Saldo') && (
+                                  <div className="space-y-2">
+                                      <Label className={labelClass}>Días Crédito / Vencimiento</Label>
+                                      <div className="flex gap-2">
+                                          <Input type="number" placeholder="Días" value={formData.creditDays || ''} onChange={(e) => handleSelectChange('creditDays', Number(e.target.value))} className={`${darkInputClass} w-20 text-center`} />
+                                          <Input type="date" className={`${darkInputClass} flex-1 [color-scheme:dark]`} value={formData.balanceDueDate || ''} onChange={(e) => handleSelectChange('balanceDueDate', e.target.value)} />
+                                      </div>
+                                  </div>
+                              )}
+
+                              {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
+                                  <div className="grid grid-cols-2 gap-4 bg-blue-950/30 p-3 rounded-lg border border-blue-900/50">
+                                      <div className="space-y-1">
+                                          <Label className="text-xs text-blue-400">% Anticipo</Label>
+                                          <Input type="number" value={formData.advancePercentage || ''} onChange={(e) => handleSelectChange('advancePercentage', Number(e.target.value))} className="bg-slate-950 border-slate-800 h-8 text-blue-200" />
+                                      </div>
+                                      <div className="space-y-1">
+                                          <Label className="text-xs text-blue-400">Fecha Anticipo</Label>
+                                          <Input type="date" value={formData.advanceDueDate || ''} onChange={(e) => handleSelectChange('advanceDueDate', e.target.value)} className="bg-slate-950 border-slate-800 h-8 text-blue-200 [color-scheme:dark]" />
+                                      </div>
+                                  </div>
+                              )}
+
+                              <div className="space-y-2 pt-2">
+                                  <Label className={labelClass}>Notas / Observaciones</Label>
+                                  <Textarea 
+                                      name="notes" 
+                                      value={formData.notes || ''} 
+                                      onChange={handleInputChange} 
+                                      className="min-h-[80px] resize-none bg-slate-950 border-slate-800 text-slate-300 focus:border-slate-600"
+                                      placeholder="Instrucciones de despacho..."
+                                  />
+                              </div>
+                          </CardContent>
+                      </Card>
+                  </div>
+
+                  {/* Resumen Financiero */}
+                  <div className="md:col-span-5">
+                      <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 shadow-xl relative overflow-hidden">
+                          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-emerald-500"></div>
+                          <CardContent className="p-6 space-y-6">
+                              <div className="flex justify-between items-center pb-4 border-b border-slate-800">
+                                  <h4 className="font-semibold text-slate-100 flex items-center gap-2">
+                                      <DollarSign className="h-4 w-4 text-emerald-500" /> Totales
+                                  </h4>
+                                  <div className="flex items-center gap-2 bg-slate-950/50 px-3 py-1 rounded-full border border-slate-800">
+                                      <Switch id="includeVat" checked={includeVat} onCheckedChange={setIncludeVat} className="data-[state=checked]:bg-emerald-500" />
+                                      <Label htmlFor="includeVat" className="text-[10px] cursor-pointer text-slate-400 uppercase font-bold">Ver con IVA</Label>
+                                  </div>
+                              </div>
+
+                              <div className="space-y-4">
+                                  <div className="flex justify-between text-slate-400 text-sm">
+                                      <span>Subtotal Neto</span>
+                                      <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(netTotal)}</span>
+                                  </div>
+                                  {includeVat && (
+                                      <div className="flex justify-between text-slate-400 text-sm">
+                                          <span>IVA (19%)</span>
+                                          <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(vatAmount)}</span>
+                                      </div>
+                                  )}
+                                  
+                                  <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 flex justify-between items-end mt-2">
+                                      <span className="text-sm text-slate-400 font-medium uppercase tracking-wider mb-1">Total a Pagar</span>
+                                      <span className="text-2xl font-bold text-white tracking-tight">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(finalTotal)}</span>
+                                  </div>
+                              </div>
+                          </CardContent>
+                      </Card>
+                  </div>
+              </div>
+
             </div>
-            <SheetFooter className="mt-6">
-              <SheetClose asChild>
-                <Button type="button" variant="outline">
-                  Cancelar
-                </Button>
-              </SheetClose>
-              <Button type="submit">Guardar</Button>
+
+            {/* FOOTER DE ACCIONES FIJO */}
+            <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
+              <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={formData.items.length === 0}>
+                  Guardar Venta
+              </Button>
             </SheetFooter>
           </form>
         </SheetContent>
@@ -794,17 +587,6 @@ export function NewSalesOrderSheet({
         onSave={handleMatrixSave}
         orderType="sale"
         inventory={inventory.filter(i => i.warehouse === formData.warehouse)}
-      />
-      
-      <LotSelectionDialog 
-        isOpen={isLotSelectionOpen}
-        onOpenChange={setIsLotSelectionOpen}
-        purchaseOrders={purchaseOrders}
-        salesOrders={salesOrders}
-        inventoryAdjustments={inventoryAdjustments}
-        onSave={handleLotSave}
-        warehouse={formData.warehouse}
-        contacts={contacts}
       />
     </>
   );

@@ -1,489 +1,193 @@
-
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { SalesOrder, Contact, PurchaseOrder, InventoryItem, OrderItem, ServiceOrder, FinancialMovement, InventoryAdjustment } from '@/lib/types';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { NewSalesOrderSheet } from './components/new-sales-order-sheet';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, X, MoreHorizontal, Eye, ChevronDown, Edit, Trash2 } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import * as XLSX from 'xlsx';
-import { format, parseISO } from 'date-fns';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
-import { es } from 'date-fns/locale';
-import { SalesOrderPreview } from './components/sales-order-preview';
-import { getColumns } from './components/columns';
-import { DataTable } from './components/data-table';
-import { useCollection, useFirebase, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
-import { getInventory } from '@/lib/data';
-
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value);
-
+import { useState } from "react";
+import { SalesOrder, Contact } from "@/lib/types"; 
+import { getColumns } from "./components/columns"; // Importamos la función generadora
+import { DataTable } from "@/components/ui/data-table"; 
+import { useSalesOrders } from "@/hooks/use-sales-orders"; 
+import { useMasterData } from "@/hooks/use-master-data"; 
+import { Button } from "@/components/ui/button";
+import { Plus, TrendingUp, Clock, Truck, Search } from "lucide-react";
+import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
+// Asegúrate de tener este componente creado (te lo di en el paso anterior)
+import { SalesOrderPreview } from "./components/sales-order-preview"; 
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 export default function SalesPage() {
-  const { firestore } = useFirebase();
+  // Hooks de datos
+  const { orders, loading, createOrder, updateOrder, deleteOrder } = useSalesOrders();
+  
+  // Obtenemos contactos e inventario
+  // Casteamos a any por seguridad si el hook no está 100% tipado aún
+  const { contacts, inventory, carriers } = useMasterData() as any; 
+  
+  // Filtramos solo los CLIENTES para esta vista
+  const clients = contacts ? contacts.filter((c: Contact) => c.type === 'client') : [];
+  const carrierList = contacts ? contacts.filter((c: Contact) => c.type === 'carrier') : [];
 
-  const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
-  const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
-  const inventoryAdjustmentsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'inventoryAdjustments') : null, [firestore]);
-  const financialMovementsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financialMovements') : null, [firestore]);
-  const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
-
-  const { data: salesOrders, isLoading: loadingSales } = useCollection<SalesOrder>(salesOrdersQuery);
-  const { data: purchaseOrders, isLoading: loadingPurchases } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
-  const { data: inventoryAdjustments, isLoading: loadingAdjustments } = useCollection<InventoryAdjustment>(inventoryAdjustmentsQuery);
-  const { data: financialMovements, isLoading: loadingFinancials } = useCollection<FinancialMovement>(financialMovementsQuery);
-  const { data: contacts, isLoading: loadingContacts } = useCollection<Contact>(contactsQuery);
-
-  const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
-  const [confirmingEditOrder, setConfirmingEditOrder] = useState<SalesOrder | null>(null);
-  const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
+  // Estados
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [previewingOrder, setPreviewingOrder] = useState<SalesOrder | null>(null);
+  const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
+  const [previewOrder, setPreviewOrder] = useState<SalesOrder | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
-  const [filter, setFilter] = useState('');
+  // Cálculos de KPIs
+  const totalAmount = orders.reduce((sum: number, o: SalesOrder) => sum + (o.totalAmount || 0), 0);
+  const pendingCount = orders.filter((o: SalesOrder) => o.status === 'pending').length;
+  const completedCount = orders.filter((o: SalesOrder) => o.status === 'completed').length;
 
-  const { toast } = useToast();
+  // Filtrado de órdenes
+  const filteredOrders = orders.filter((o: SalesOrder) => 
+    o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    clients.find((c: Contact) => c.id === o.clientId)?.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const isLoading = loadingSales || loadingPurchases || loadingAdjustments || loadingFinancials || loadingContacts;
-  
-  const clients = useMemo(() => contacts?.filter(c => Array.isArray(c.type) && c.type.includes('client')) || [], [contacts]);
-  const carriers = useMemo(() => contacts?.filter(c => Array.isArray(c.type) && c.type.includes('supplier')) || [], [contacts]);
-
-  const nonDispatchOrders = useMemo(() => salesOrders?.filter(o => o.orderType !== 'dispatch') || [], [salesOrders]);
-
-  const groupedOrders = useMemo(() => {
-    if (!nonDispatchOrders || !clients) return [];
-    const groups: Record<string, { clientName: string; orders: SalesOrder[]; subtotal: number; }> = {};
-    
-    nonDispatchOrders.forEach(order => {
-        const client = clients.find(s => s.id === order.clientId);
-        if (!client) return;
-
-        if (!groups[client.id]) {
-            groups[client.id] = {
-                clientName: client.name,
-                orders: [],
-                subtotal: 0,
-            };
-        }
-        groups[client.id].orders.push(order);
-        groups[client.id].subtotal += order.totalAmount;
-    });
-
-    return Object.values(groups).sort((a,b) => a.clientName.localeCompare(b.clientName));
-  }, [nonDispatchOrders, clients]);
-
-  const grandTotal = useMemo(() => {
-    return groupedOrders.reduce((sum, group) => sum + group.subtotal, 0);
-  }, [groupedOrders]);
-  
-  const filteredGroupedOrders = useMemo(() => {
-      if (!filter) return groupedOrders;
-      return groupedOrders.filter(group => 
-        group.clientName.toLowerCase().includes(filter.toLowerCase())
-      );
-  }, [groupedOrders, filter]);
-
-  
-  const inventory = useMemo(() => getInventory(purchaseOrders || [], salesOrders || [], inventoryAdjustments || [], editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
-
-  const handleSaveOrder = (orderData: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
-    if (!firestore) return;
-    const allItems = [...orderData.items, ...newItems.map(item => ({ ...item, id: `temp-${Date.now()}-${Math.random()}` }))];
-    
-    // This is the definitive calculation logic
-    const grossTotal = allItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    const finalAmount = orderData.includeVat ? grossTotal : grossTotal;
-    
-    const totalKilos = allItems.reduce((sum, item) => {
-      if (item.unit === 'Kilos') {
-        return sum + Number(item.quantity || 0);
-      }
-      return sum;
-    }, 0);
-    const totalPackages = allItems.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
-
-    let finalOrderData = {
-      ...(orderData as Omit<SalesOrder, 'id'>),
-      items: allItems,
-      totalAmount: finalAmount,
-      totalKilos,
-      totalPackages,
-      paymentStatus: orderData.paymentStatus || 'Pendiente'
-    };
-
-    if ('id' in orderData) {
-      updateDocumentNonBlocking(doc(firestore, 'salesOrders', orderData.id), finalOrderData);
-      toast({ title: 'Orden Actualizada', description: `La orden ${orderData.id} ha sido actualizada.` });
-      setPreviewingOrder({ ...finalOrderData, id: orderData.id, totalPackages });
-    } else {
-      addDocumentNonBlocking(collection(firestore, 'salesOrders'), finalOrderData).then(docRef => {
-        if(docRef) {
-          toast({ title: 'Orden Creada', description: `La orden ${docRef.id} ha sido creada.` });
-          setPreviewingOrder({ ...finalOrderData, id: docRef.id, totalPackages });
-        }
-      });
-    }
-    
-    setIsSheetOpen(false);
-    setEditingOrder(null);
-  };
-
+  // Handlers
   const handleEdit = (order: SalesOrder) => {
-    setConfirmingEditOrder(order);
+    setEditingOrder(order);
+    setIsSheetOpen(true);
   };
-  
-  const confirmEdit = () => {
-    if (confirmingEditOrder) {
-      setEditingOrder(confirmingEditOrder);
-      setIsSheetOpen(true);
-      setConfirmingEditOrder(null);
-    }
-  }
 
-  const handleDelete = (order: SalesOrder) => {
-    setDeletingOrder(order);
-  };
-  
-  const confirmDelete = () => {
-    if (deletingOrder && firestore) {
-      deleteDocumentNonBlocking(doc(firestore, 'salesOrders', deletingOrder.id));
-      toast({ variant: "destructive", title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
-      setDeletingOrder(null);
-    }
-  }
-
-  const handleSheetOpenChange = (open: boolean) => {
-    setIsSheetOpen(open);
-    if (!open) {
-      setEditingOrder(null);
-    }
-  }
-  
-  const openNewOrderSheet = () => {
+  const handleCreate = () => {
     setEditingOrder(null);
     setIsSheetOpen(true);
-  }
-  
-  const toggleCollapsible = (clientId: string) => {
-    setOpenCollapsibles(prev => ({...prev, [clientId]: !prev[clientId]}));
-  }
-
-  const handleExport = (orderToExport: SalesOrder) => {
-    const client = clients.find(c => c.id === orderToExport.clientId);
-    const dataForSheet = orderToExport.items.map(item => {
-      
-      const advanceAmount = orderToExport.paymentMethod === 'Pago con Anticipo y Saldo' ? orderToExport.totalAmount * ((orderToExport.advancePercentage || 0) / 100) : 0;
-      const balanceAmount = orderToExport.paymentMethod === 'Pago con Anticipo y Saldo' ? orderToExport.totalAmount - advanceAmount : 0;
-
-      return {
-        'Proveedor': 'Viña Negra',
-        'O/V': orderToExport.id,
-        'Fecha': format(new Date(orderToExport.date), "dd-MM-yyyy"),
-        'Cliente': client?.name,
-        'Producto': item.product,
-        'Calibre': item.caliber,
-        'Tipo Envase': item.packagingType,
-        'Cant. Envase': item.packagingQuantity,
-        'Cantidad (kg)': item.quantity,
-        'Precio Unitario': item.price,
-        'Subtotal': item.quantity * item.price,
-        'Lote': item.lotNumber,
-        'Modalidad de Pago': orderToExport.paymentMethod,
-        'Monto Anticipo': advanceAmount > 0 ? advanceAmount : '',
-        'Venc. Anticipo': orderToExport.advanceDueDate ? format(parseISO(orderToExport.advanceDueDate), 'dd-MM-yyyy') : '',
-        'Monto Saldo': balanceAmount > 0 ? balanceAmount : '',
-        'Venc. Saldo': orderToExport.balanceDueDate ? format(parseISO(orderToExport.balanceDueDate), 'dd-MM-yyyy') : '',
-      }
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Packing List');
-    XLSX.writeFile(workbook, `PackingList-${orderToExport.id}.xlsx`);
-    toast({ title: 'Exportación Exitosa', description: `Se ha generado el packing list para la O/V ${orderToExport.id}.` });
   };
-  
-  const handleExportAllCompleted = () => {
-    if (!nonDispatchOrders) return;
-    const completedOrders = nonDispatchOrders.filter(o => o.status === 'completed');
-    if (completedOrders.length === 0) {
-        toast({
-            variant: "destructive",
-            title: "Sin Órdenes",
-            description: "No hay órdenes completadas para exportar."
-        });
-        return;
-    }
-    
-    const allItems: any[] = [];
-    completedOrders.forEach(order => {
-        const client = clients.find(c => c.id === order.clientId);
-        const advanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount * ((order.advancePercentage || 0) / 100) : 0;
-        const balanceAmount = order.paymentMethod === 'Pago con Anticipo y Saldo' ? order.totalAmount - advanceAmount : 0;
 
-        order.items.forEach(item => {
-            allItems.push({
-                'Proveedor': 'Viña Negra',
-                'O/V': order.id,
-                'Fecha': format(new Date(order.date), "dd-MM-yyyy"),
-                'Cliente': client?.name,
-                'Producto': item.product,
-                'Calibre': item.caliber,
-                'Tipo Envase': item.packagingType,
-                'Cant. Envase': item.packagingQuantity,
-                'Cantidad (kg)': item.quantity,
-                'Precio Unitario': item.price,
-                'Subtotal': item.quantity * item.price,
-                'Lote': item.lotNumber,
-                'Modalidad de Pago': order.paymentMethod,
-                'Monto Anticipo': advanceAmount > 0 ? advanceAmount : '',
-                'Venc. Anticipo': order.advanceDueDate ? format(parseISO(order.advanceDueDate), 'dd-MM-yyyy') : '',
-                'Monto Saldo': balanceAmount > 0 ? balanceAmount : '',
-                'Venc. Saldo': order.balanceDueDate ? format(parseISO(order.balanceDueDate), 'dd-MM-yyyy') : '',
-            });
-        });
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(allItems);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Packing List Completado');
-    XLSX.writeFile(workbook, `PackingList_Completadas.xlsx`);
-    toast({ title: 'Exportación Exitosa', description: 'Se ha generado el packing list con todas las órdenes completadas.' });
+  const handleDelete = async (id: string) => {
+      if (confirm("¿Estás seguro de eliminar esta orden de venta?")) {
+          await deleteOrder(id);
+      }
   }
 
-    const handlePreviewRequest = (order: SalesOrder) => {
-        setPreviewingOrder(order);
-    }
-
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPreview: handlePreviewRequest, clients });
-
-  const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      )
-    }
-    return (
-      <div className="rounded-md border">
-          <Table>
-              <TableHeader>
-                  <TableRow>
-                      <TableHead className='w-[400px]'>Cliente</TableHead>
-                      <TableHead className='text-right'>Monto Total</TableHead>
-                  </TableRow>
-              </TableHeader>
-              <TableBody>
-                  {filteredGroupedOrders.map(group => {
-                      const clientId = clients.find(s => s.name === group.clientName)?.id || '';
-                      return (
-                          <React.Fragment key={clientId}>
-                              <TableRow className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggleCollapsible(clientId)}>
-                                  <TableCell className='font-bold'>
-                                       <div className="flex items-center gap-2">
-                                          <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[clientId] && "rotate-180")} />
-                                          {group.clientName}
-                                      </div>
-                                  </TableCell>
-                                  <TableCell className='text-right font-bold'>{formatCurrency(group.subtotal)}</TableCell>
-                              </TableRow>
-                              {openCollapsibles[clientId] && (
-                                  <TableRow>
-                                      <TableCell colSpan={2} className="p-0">
-                                          <div className='p-4 bg-background'>
-                                              <Table>
-                                                  <TableHeader>
-                                                      <TableRow>
-                                                          <TableHead>O/V</TableHead>
-                                                          <TableHead>Fecha</TableHead>
-                                                          <TableHead className="text-right">Kilos</TableHead>
-                                                          <TableHead className="text-right">Monto</TableHead>
-                                                          <TableHead className="w-[50px]"></TableHead>
-                                                      </TableRow>
-                                                  </TableHeader>
-                                                  <TableBody>
-                                                      {group.orders.map(order => (
-                                                          <TableRow key={order.id}>
-                                                              <TableCell className="font-medium">{order.id}</TableCell>
-                                                              <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
-                                                              <TableCell className="text-right">{order.totalKilos.toLocaleString('es-CL')} kg</TableCell>
-                                                              <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
-                                                              <TableCell>
-                                                                   <DropdownMenu>
-                                                                    <DropdownMenuTrigger asChild>
-                                                                      <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                        <span className="sr-only">Abrir menú</span>
-                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                      </Button>
-                                                                    </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end">
-                                                                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                                      <DropdownMenuItem onClick={() => handlePreviewRequest(order)}>
-                                                                            <Eye className='mr-2 h-4 w-4' />
-                                                                            Visualizar
-                                                                        </DropdownMenuItem>
-                                                                      <DropdownMenuItem onClick={() => handleEdit(order)}>
-                                                                        <Edit className='mr-2 h-4 w-4' />
-                                                                        Editar
-                                                                      </DropdownMenuItem>
-                                                                      <DropdownMenuSeparator />
-                                                                      <DropdownMenuItem 
-                                                                        className="text-destructive focus:text-destructive"
-                                                                        onClick={() => handleDelete(order)}
-                                                                      >
-                                                                        <Trash2 className='mr-2 h-4 w-4' />
-                                                                        Eliminar
-                                                                      </DropdownMenuItem>
-                                                                    </DropdownMenuContent>
-                                                                  </DropdownMenu>
-                                                              </TableCell>
-                                                          </TableRow>
-                                                      ))}
-                                                  </TableBody>
-                                              </Table>
-                                          </div>
-                                      </TableCell>
-                                  </TableRow>
-                              )}
-                          </React.Fragment>
-                      );
-                  })}
-              </TableBody>
-              <TableFooter>
-                  <TableRow>
-                      <TableHead className='text-right font-bold text-lg'>Total General</TableHead>
-                      <TableHead className='text-right font-bold text-lg'>{formatCurrency(grandTotal)}</TableHead>
-                  </TableRow>
-              </TableFooter>
-          </Table>
-      </div>
-    );
+  const handlePreview = (order: SalesOrder) => {
+      setPreviewOrder(order);
   }
+
+  const handleCloseSheet = (open: boolean) => {
+    setIsSheetOpen(open);
+    if (!open) setEditingOrder(null);
+  };
+
+  // Generamos las columnas
+  const columns = getColumns({
+      onEdit: handleEdit,
+      onDelete: (order) => handleDelete(order.id),
+      onPreview: handlePreview,
+      clients: clients // Pasamos la lista de clientes para resolver los nombres
+  });
+
+  // Estilos Reutilizables
+  const cardClass = "bg-slate-900 border-slate-800 shadow-sm hover:border-slate-700 transition-all";
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2">
+    <div className="p-8 space-y-8 bg-slate-950 min-h-screen text-slate-100">
+      
+      {/* --- HEADER & ACCIONES --- */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-white">Gestión de Ventas</h2>
+          <p className="text-slate-400 mt-1">Control de despachos y facturación.</p>
+        </div>
+        <Button onClick={handleCreate} className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20 font-semibold">
+          <Plus className="mr-2 h-4 w-4" /> Nueva Venta
+        </Button>
+      </div>
+
+      {/* --- KPIs RESUMEN --- */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className={cardClass}>
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+              <TrendingUp className="h-8 w-8 text-emerald-500" />
+            </div>
             <div>
-                <CardTitle className="font-headline text-2xl">Gestión de Ventas (O/V)</CardTitle>
-                <CardDescription>Crea y administra tus órdenes de venta.</CardDescription>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Ventas</p>
+              <h3 className="text-2xl font-bold text-white">
+                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(totalAmount)}
+              </h3>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleExportAllCompleted}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Exportar Packing List
-              </Button>
-              <Button onClick={openNewOrderSheet}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Nueva Venta
-              </Button>
-            </div>
-          </div>
-          <div className="py-4">
-              <Input
-                placeholder="Filtrar por cliente..."
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                className="max-w-sm"
-              />
-            </div>
-        </CardHeader>
-        <CardContent>
-          {renderContent()}
-        </CardContent>
-      </Card>
-      
-      {isSheetOpen && (
-        <NewSalesOrderSheet 
-            isOpen={isSheetOpen}
-            onOpenChange={handleSheetOpenChange}
-            onSave={handleSaveOrder}
-            order={editingOrder}
-            clients={clients}
-            carriers={carriers}
-            inventory={inventory}
-            nextOrderId={""}
-            purchaseOrders={purchaseOrders || []}
-            salesOrders={salesOrders || []}
-            inventoryAdjustments={inventoryAdjustments || []}
-            contacts={contacts || []}
-        />
-      )}
+          </CardContent>
+        </Card>
 
-      <AlertDialog open={!!confirmingEditOrder} onOpenChange={(open) => !open && setConfirmingEditOrder(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro de que quieres editar esta orden?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se abrirá el formulario para editar la orden "{confirmingEditOrder?.id}".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConfirmingEditOrder(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmEdit}>Editar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <Card className={cardClass}>
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
+              <Clock className="h-8 w-8 text-yellow-500" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Por Despachar</p>
+              <h3 className="text-2xl font-bold text-white">{pendingCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
+            </div>
+          </CardContent>
+        </Card>
 
-      <AlertDialog open={!!deletingOrder} onOpenChange={(open) => !open && setDeletingOrder(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro de que quieres eliminar esta orden?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente la orden
-               "{deletingOrder?.id}".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeletingOrder(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Eliminar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      {previewingOrder && (
+        <Card className={cardClass}>
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+              <Truck className="h-8 w-8 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Despachadas</p>
+              <h3 className="text-2xl font-bold text-white">{completedCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* --- TABLA --- */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-800 w-full max-w-md transition-all focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/20">
+            <Search className="h-4 w-4 text-slate-500 ml-2" />
+            <Input 
+                placeholder="Buscar Cliente o N° Venta..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="border-none bg-transparent focus-visible:ring-0 text-slate-200 placeholder:text-slate-600 h-8"
+            />
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg p-1">
+            <DataTable 
+                columns={columns} 
+                data={filteredOrders} 
+                searchKey="id"
+                meta={{
+                    onEdit: handleEdit,
+                    onDelete: (order: SalesOrder) => handleDelete(order.id),
+                    onView: setPreviewOrder
+                }}
+            />
+        </div>
+      </div>
+
+      {/* --- MODALES --- */}
+      <NewSalesOrderSheet
+        isOpen={isSheetOpen}
+        onOpenChange={handleCloseSheet}
+        onSave={(data) => {
+            if (editingOrder) updateOrder(data as any);
+            else createOrder(data as any);
+            setIsSheetOpen(false);
+        }}
+        order={editingOrder}
+        clients={clients}
+        carriers={carrierList} // Pasamos lista de transportistas
+        inventory={inventory || []}
+        nextOrderId=""
+        salesOrders={orders}
+      />
+
+      {previewOrder && (
           <SalesOrderPreview
-            order={previewingOrder}
-            isOpen={!!previewingOrder}
-            onOpenChange={setPreviewingOrder}
-            onExportRequest={() => handleExport(previewingOrder)}
-        />
+            isOpen={!!previewOrder}
+            onOpenChange={(open) => !open && setPreviewOrder(null)}
+            order={previewOrder}
+            // Buscamos el cliente para pasar sus datos a la vista previa
+            client={clients.find((c: Contact) => c.id === previewOrder.clientId) || null}
+          />
       )}
-    </>
+
+    </div>
   );
 }

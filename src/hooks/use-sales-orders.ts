@@ -6,53 +6,51 @@ import {
   updateDocumentNonBlocking, 
   deleteDocumentNonBlocking,
   useFirebase,
-  useMemoFirebase // <--- IMPORTANTE: Agregamos este import
+  useMemoFirebase // <--- IMPORTANTE
 } from "@/firebase"; 
-import { PurchaseOrder } from "@/lib/types";
+import { SalesOrder } from "@/lib/types";
 import { collection, doc, orderBy, query } from "firebase/firestore";
-// Ya no necesitamos 'useMemo' de React, usamos el de Firebase
 
-export function usePurchases() {
+export function useSalesOrders() {
   const { firestore } = useFirebase();
 
-  // 1. Definir la consulta (Query) usando el hook correcto
+  // 1. Consulta (Query) con useMemoFirebase
   const ordersQuery = useMemoFirebase(() => { // <--- CAMBIO AQUÍ
     if (!firestore) return null;
-    return query(collection(firestore, "purchaseOrders"), orderBy("date", "desc"));
+    return query(collection(firestore, "salesOrders"), orderBy("date", "desc"));
   }, [firestore]);
 
   // 2. Obtener datos
-  // Capturamos como 'any' para validar loading/isLoading sin errores de tipo
-  const result = useCollection<PurchaseOrder>(ordersQuery) as any;
+  const result = useCollection<SalesOrder>(ordersQuery) as any;
   
   const data = result.data;
   const error = result.error;
   const loading = result.loading !== undefined ? result.loading : result.isLoading;
 
   // 3. CRUD Actions
-  const createOrder = async (order: Omit<PurchaseOrder, "id"> & { id?: string }) => {
+  const createOrder = async (order: Omit<SalesOrder, "id"> & { id?: string }) => {
     if (!firestore) return;
     
-    const colRef = collection(firestore, "purchaseOrders");
+    const colRef = collection(firestore, "salesOrders");
     
     if (order.id) {
         const { setDoc } = await import("firebase/firestore");
-        await setDoc(doc(firestore, "purchaseOrders", order.id), order);
+        await setDoc(doc(firestore, "salesOrders", order.id), order);
     } else {
         await addDocumentNonBlocking(colRef, order);
     }
   };
 
-  const updateOrder = async (order: PurchaseOrder) => {
+  const updateOrder = async (order: SalesOrder) => {
     if (!firestore) return;
-    const docRef = doc(firestore, "purchaseOrders", order.id);
+    const docRef = doc(firestore, "salesOrders", order.id);
     const { id, ...dataToUpdate } = order; 
     await updateDocumentNonBlocking(docRef, dataToUpdate);
   };
 
   const deleteOrder = async (id: string) => {
     if (!firestore) return;
-    const docRef = doc(firestore, "purchaseOrders", id);
+    const docRef = doc(firestore, "salesOrders", id);
     await deleteDocumentNonBlocking(docRef);
   };
 

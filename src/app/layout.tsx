@@ -1,24 +1,24 @@
-import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
-import { FirebaseClientProvider } from '@/firebase'; // <--- ¡AQUÍ ESTÁ EL ENCHUFE PRINCIPAL!
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
 
-export const metadata = {
-  title: 'Viña Negra Manager',
-  description: 'Sistema de Gestión Viña Negra',
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "Viña Negra Manager",
+  description: "Sistema de Gestión Agrocomercial",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
-    <html lang="es">
-      <body>
-        {/* Este proveedor alimenta a TODA la aplicación, incluida la carpeta principal */}
-        <FirebaseClientProvider>
-           {children}
-        </FirebaseClientProvider>
+    <html lang="es" className="dark">
+      <body className={`${inter.className} bg-slate-950 text-slate-100 min-h-screen antialiased`}>
+        {children}
         <Toaster />
       </body>
     </html>

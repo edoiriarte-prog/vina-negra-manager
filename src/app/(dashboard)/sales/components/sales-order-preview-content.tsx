@@ -1,321 +1,187 @@
-
-
 "use client";
 
 import React from 'react';
-import { SalesOrder, Contact, OrderItem, PurchaseOrder } from '@/lib/types';
-import { useLocalStorage } from '@/hooks/use-local-storage';
-import { contacts as initialContacts, purchaseOrders as initialPurchaseOrders } from '@/lib/data';
+import { SalesOrder, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { useMasterData } from '@/hooks/use-master-data';
+import { Separator } from '@/components/ui/separator';
 
+// --- CORRECCIÓN AQUÍ: Definimos 'client' (singular) ---
 interface PreviewContentProps {
-  order: SalesOrder;
+    order: SalesOrder;
+    client: Contact | null; 
 }
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value);
-
-const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
-
-type SummarizedItem = {
-    product: string;
-    caliber: string;
-    caliberCode: string;
-    totalPackages: number;
-    totalKilos: number;
-    avgNetPrice: number;
-    avgGrossPrice: number;
-    netSubtotal: number;
-    grossSubtotal: number;
-    relatedPurchaseIds?: string[];
-    lotNumbers?: string[];
-    destinationLotNumber?: string;
-}
-
-
-export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order }, ref) => {
-    const [contacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
-    const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
-    const { calibers, bankAccounts } = useMasterData();
-    const client = contacts.find(c => c.id === order.clientId);
-    const carrier = contacts.find(c => c.id === order.carrierId);
-    const destinationAccount = bankAccounts.find(acc => acc.id === order.destinationAccountId);
+export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, client }, ref) => {
+    const { calibers } = useMasterData();
 
     const getCaliberCode = (caliberName: string) => {
         const caliber = calibers.find(c => c.name === caliberName);
         return caliber ? caliber.code : 'N/A';
     }
 
+    const currency = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+    const numberFormat = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+
+    // Cálculos
+    const calculatedNetTotal = order.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.price || 0)), 0);
+    const calculatedVat = calculatedNetTotal * 0.19;
+    const calculatedGrossTotal = calculatedNetTotal + calculatedVat;
+
     const totalPackages = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
-    const totalKilos = order.items.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : 0, 0);
+    const totalKilos = order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
-    const summarizedItems = React.useMemo(() => {
-        const summary = new Map<string, { totalPackages: number, totalKilos: number, totalGrossValue: number, product: string, relatedPurchaseIds: Set<string>, lotNumbers: Set<string>, destinationLotNumber?: string }>();
-        const transferPurchaseOrder = order.movementType === 'Traslado Bodega Interna' 
-            ? purchaseOrders.find(po => po.description?.includes(order.id))
-            : undefined;
-
-        order.items.forEach(item => {
-            const key = item.caliber;
-            const existing = summary.get(key) || { totalPackages: 0, totalKilos: 0, totalGrossValue: 0, product: item.product, relatedPurchaseIds: new Set(), lotNumbers: new Set() };
-            
-            existing.totalPackages += item.packagingQuantity || 0;
-            existing.totalKilos += item.unit === 'Kilos' ? item.quantity : 0;
-            existing.totalGrossValue += item.quantity * item.price;
-            existing.product = item.product;
-            if(order.relatedPurchaseIds) {
-                order.relatedPurchaseIds.forEach(id => existing.relatedPurchaseIds.add(id));
-            }
-            if(item.lotNumber) {
-                existing.lotNumbers.add(item.lotNumber);
-            }
-            
-            if (transferPurchaseOrder) {
-                const transferItem = transferPurchaseOrder.items.find(tItem => tItem.caliber === item.caliber && tItem.product === item.product);
-                if (transferItem?.lotNumber) {
-                    existing.destinationLotNumber = transferItem.lotNumber;
-                }
-            }
-
-
-            summary.set(key, existing);
-        });
-
-        const result: SummarizedItem[] = [];
-        summary.forEach((value, key) => {
-            const grossAvgPrice = value.totalKilos > 0 ? value.totalGrossValue / value.totalKilos : 0;
-            const netAvgPrice = order.includeVat ? grossAvgPrice / 1.19 : grossAvgPrice;
-
-            result.push({
-                product: value.product,
-                caliber: key,
-                caliberCode: getCaliberCode(key),
-                totalPackages: value.totalPackages,
-                totalKilos: value.totalKilos,
-                avgNetPrice: netAvgPrice,
-                avgGrossPrice: grossAvgPrice,
-                netSubtotal: netAvgPrice * value.totalKilos,
-                grossSubtotal: grossAvgPrice * value.totalKilos,
-                relatedPurchaseIds: Array.from(value.relatedPurchaseIds),
-                lotNumbers: Array.from(value.lotNumbers),
-                destinationLotNumber: value.destinationLotNumber
-            });
-        });
-        
-        return result.sort((a,b) => {
-            const caliberAIndex = calibers.findIndex(c => c.name === a.caliber);
-            const caliberBIndex = calibers.findIndex(c => c.name === b.caliber);
-            return caliberAIndex - caliberBIndex;
-        });
-
-    }, [order, calibers, purchaseOrders]);
-
-    const netTotal = React.useMemo(() => {
-        return summarizedItems.reduce((sum, item) => sum + item.netSubtotal, 0);
-    }, [summarizedItems]);
-
-    const vatAmount = order.includeVat ? netTotal * 0.19 : 0;
-    const grossTotal = netTotal + vatAmount;
-    
-    const docTitle = order.orderType === 'dispatch' ? 'ORDEN DE SALIDA' : 'ORDEN DE VENTA';
-
+    const displayDueDate = order.balanceDueDate || order.advanceDueDate;
 
     return (
-        <div ref={ref} className="p-10 bg-white text-black font-sans text-base">
-            {/* Header */}
-            <div className="flex justify-between items-start pb-6 mb-8 border-b-2 border-gray-900">
-                <div className='text-left'>
-                    <h2 className="text-4xl font-bold text-gray-800">AVN</h2>
-                    <p className="text-lg text-gray-600">AGROCOMERCIAL</p>
-                    <div className="mt-4 text-xs space-y-px text-gray-600">
-                        <p>RUT: 78.261.683-8</p>
-                        <p>MONTE PATRIA, LIMARI, CUARTA REGION</p>
-                    </div>
-                </div>
-                <div className='text-right'>
-                    <h1 className="text-4xl font-bold text-gray-900 tracking-tight">{docTitle}</h1>
-                    <div className="mt-2 space-y-1 text-sm">
-                        <p><span className="font-semibold text-gray-600">Nº de Documento:</span> <span className="font-mono">{order.id}</span></p>
-                        <p><span className="font-semibold text-gray-600">Fecha Emisión:</span> {format(parseISO(order.date), "dd-MM-yyyy", { locale: es })}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Client & Shipping Info */}
-            <div className="grid grid-cols-2 gap-8 mb-8 text-xs">
-                 <div className='space-y-1 bg-gray-50 p-4 rounded-lg border'>
-                    <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">CLIENTE</h3>
-                    <div className="grid grid-cols-3 gap-x-4">
-                        <span className="font-semibold text-gray-600 col-span-1">Nombre:</span>
-                        <span className="col-span-2">{client?.name}</span>
-                        <span className="font-semibold text-gray-600 col-span-1">RUT:</span>
-                        <span className="col-span-2">{client?.rut}</span>
-                         <span className="font-semibold text-gray-600 col-span-1">Dirección:</span>
-                        <span className="col-span-2">{client?.address}, {client?.commune}</span>
-                         <span className="font-semibold text-gray-600 col-span-1">Atención:</span>
-                        <span className="col-span-2">{client?.contactPerson || 'N/A'}</span>
-                    </div>
-                </div>
-                <div className='space-y-4'>
-                    <div className='space-y-1 bg-gray-50 p-4 rounded-lg border'>
-                        <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">TRANSPORTE</h3>
-                        <div className="grid grid-cols-3 gap-x-4">
-                            <span className="font-semibold text-gray-600 col-span-1">Transportista:</span>
-                            <span className="col-span-2">{carrier?.name || 'N/A'}</span>
-                            <span className="font-semibold text-gray-600 col-span-1">Chofer:</span>
-                            <span className="col-span-2">{order.driverName || 'N/A'}</span>
-                            <span className="font-semibold text-gray-600 col-span-1">Patente:</span>
-                            <span className="col-span-2">{order.licensePlate || 'N/A'}</span>
-                        </div>
-                    </div>
-                     <div className='space-y-1 bg-gray-50 p-4 rounded-lg border'>
-                        <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">BODEGAS</h3>
-                        <div className="grid grid-cols-3 gap-x-4">
-                            <span className="font-semibold text-gray-600 col-span-1">Bodega Origen:</span>
-                            <span className="col-span-2">{order.warehouse || 'N/A'}</span>
-                            <span className="font-semibold text-gray-600 col-span-1">Bodega Destino:</span>
-                            <span className="col-span-2">{order.destinationWarehouse || 'N/A'}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-             <div className="mb-8 text-xs">
-                <div className='space-y-1 bg-gray-50 p-4 rounded-lg border'>
-                    <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">CONDICIONES COMERCIALES</h3>
-                     <div className="grid grid-cols-3 gap-x-4">
-                        <span className="font-semibold text-gray-600 col-span-1">Tipo Venta:</span>
-                        <span className="col-span-2">{order.saleType || 'N/A'}</span>
-                        <span className="font-semibold text-gray-600 col-span-1">Modalidad Pago:</span>
-                        <span className="col-span-2">{order.paymentMethod}</span>
-                        
-                        {order.paymentMethod === 'Crédito' && order.creditDays && (
-                            <>
-                                <span className="font-semibold text-gray-600 col-span-1">Plazo Crédito (días):</span>
-                                <span className="col-span-2">{order.creditDays}</span>
-                            </>
-                        )}
-                        {order.paymentMethod === 'Crédito' && order.balanceDueDate && (
-                             <>
-                                <span className="font-semibold text-gray-600 col-span-1">Fecha Vencimiento:</span>
-                                <span className="col-span-2">{format(parseISO(order.balanceDueDate), "dd-MM-yyyy", { locale: es })}</span>
-                            </>
-                        )}
-                         {order.notes && (
-                            <>
-                                <span className="font-semibold text-gray-600 col-span-1">Notas:</span>
-                                <span className="col-span-2 whitespace-pre-wrap">{order.notes}</span>
-                            </>
-                         )}
-                    </div>
-                </div>
-            </div>
-
-
-            {/* Items Table */}
-            <Table className="text-black text-base">
-                <TableHeader>
-                    <TableRow className="bg-gray-100 hover:bg-gray-100 border-b-2 border-gray-300">
-                        <TableHead className="text-black font-bold">Descripción</TableHead>
-                        <TableHead className="text-right text-black font-bold">Cant. Envases</TableHead>
-                        <TableHead className="text-right text-black font-bold">Cant. (Kg)</TableHead>
-                        <TableHead className="text-right text-black font-bold">P. Unitario Neto</TableHead>
-                        <TableHead className="text-right text-black font-bold">P. Unitario Total</TableHead>
-                        <TableHead className="text-right text-black font-bold">SUB TOTAL</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                {summarizedItems.map((item, index) => (
-                    <TableRow key={index} className="border-gray-200">
-                        <TableCell className="align-middle text-sm+">
-                            {item.product} - {item.caliber} ({item.caliberCode})
-                            <span className="text-xs text-gray-500 block">
-                                {item.lotNumbers && item.lotNumbers.length > 0 && (
-                                    ` (Lote Origen: ${item.lotNumbers.map(ln => ln.split('-').pop()).join(', ')})`
-                                )}
-                                {item.destinationLotNumber && (
-                                    ` (Lote Destino: ${item.destinationLotNumber.split('-').pop()})`
-                                )}
-                            </span>
-                        </TableCell>
-                        <TableCell className="text-right align-middle text-sm+">{formatPackages(item.totalPackages)}</TableCell>
-                        <TableCell className="text-right align-middle text-sm+">{item.totalKilos.toLocaleString('es-CL')} kg</TableCell>
-                        <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgNetPrice)}</TableCell>
-                        <TableCell className="text-right align-middle text-sm+">{formatCurrency(item.avgGrossPrice)}</TableCell>
-                        <TableCell className="text-right align-middle font-semibold text-sm+">{formatCurrency(item.grossSubtotal)}</TableCell>
-                    </TableRow>
-                ))}
-                </TableBody>
-                <TableFooter>
-                    <TableRow className="bg-gray-100 hover:bg-gray-100 border-t-2 border-gray-300">
-                        <TableHead className="text-right text-black font-bold text-base">TOTALES</TableHead>
-                        <TableHead className="text-right text-black font-bold text-base">{formatPackages(totalPackages)}</TableHead>
-                        <TableHead className="text-right text-black font-bold text-base">{totalKilos.toLocaleString('es-CL')} kg</TableHead>
-                        <TableHead colSpan={3} className="text-right text-black font-bold text-base">
-                             <div className="flex justify-end mt-4">
-                                <div className="w-full max-w-sm space-y-2 text-sm">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-normal text-gray-600">Subtotal Neto:</span>
-                                        <span>{formatCurrency(netTotal)}</span>
-                                    </div>
-                                    {order.includeVat && (
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-normal text-gray-600">IVA (19%):</span>
-                                            <span>{formatCurrency(vatAmount)}</span>
-                                        </div>
-                                    )}
-                                     <div className="flex justify-between items-center text-base pt-1 border-t border-gray-400">
-                                        <span className="font-bold">TOTAL A PAGAR:</span>
-                                        <span className="font-bold">{formatCurrency(grossTotal)}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </TableHead>
-                    </TableRow>
-                </TableFooter>
-            </Table>
+        <div ref={ref} className="p-8 bg-white text-black font-sans max-w-[210mm] mx-auto min-h-[297mm] relative text-xs">
             
-            {destinationAccount && (
-                 <div className="mt-8 pt-6 border-t-2 border-gray-900 text-xs">
-                    <h3 className="text-sm font-bold text-gray-800 mb-2">DATOS DE TRANSFERENCIA</h3>
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-1 bg-gray-50 p-4 rounded-lg border">
-                        <span className="font-semibold text-gray-600">Nombre:</span>
-                        <span>{destinationAccount.owner || 'N/A'}</span>
-                        
-                        <span className="font-semibold text-gray-600">RUT:</span>
-                        <span>{destinationAccount.ownerRUT || 'N/A'}</span>
+            {/* HEADER */}
+            <div className="flex justify-between items-start mb-6 border-b-2 border-gray-800 pb-4">
+                <div className="w-1/2">
+                    <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 uppercase">Viña Negra SpA</h1>
+                    <p className="text-xs text-gray-600 font-semibold tracking-widest uppercase">Agrocomercial</p>
+                </div>
+                <div className='text-right w-1/2'>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-1">ORDEN DE VENTA</h2>
+                    <div className="inline-block bg-gray-100 border border-gray-300 px-3 py-1 rounded-md mb-1">
+                        <p className="text-lg font-mono font-bold text-gray-800">{order.id}</p>
+                    </div>
+                    <p className="text-sm font-bold text-black">
+                        Fecha: {order.date ? format(parseISO(order.date), "dd 'de' MMMM, yyyy", { locale: es }) : 'N/A'}
+                    </p>
+                </div>
+            </div>
 
-                        <span className="font-semibold text-gray-600">Banco:</span>
-                        <span>{destinationAccount.bankName || 'N/A'}</span>
-                        
-                        <span className="font-semibold text-gray-600">Tipo Cuenta:</span>
-                        <span>{destinationAccount.accountType || 'N/A'}</span>
-
-                        <span className="font-semibold text-gray-600">Nº Cuenta:</span>
-                        <span className="font-mono">{destinationAccount.accountNumber || 'N/A'}</span>
-
-                        <span className="font-semibold text-gray-600">Email:</span>
-                        <span>{destinationAccount.ownerEmail || 'N/A'}</span>
+            {/* INFO EMPRESAS + DESPACHO */}
+            <div className="grid grid-cols-2 gap-6 mb-6">
+                {/* CLIENTE */}
+                <div className="border rounded-lg p-4">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase border-b pb-1 mb-2">Datos del Cliente</h3>
+                    <p className="font-bold text-sm text-gray-800">{client?.name || 'Cliente General'}</p>
+                    <div className="mt-1 space-y-0.5 text-gray-700">
+                        <p><span className="font-semibold">RUT:</span> {client?.rut || 'N/A'}</p>
+                        <p><span className="font-semibold">Dirección:</span> {client?.address || ''}</p>
+                        <p><span className="font-semibold">Giro:</span> {client?.businessLine || 'N/A'}</p>
                     </div>
                 </div>
-            )}
 
-            <div className="text-center text-xs text-gray-500 pt-8 mt-8 border-t border-dashed">
-                <p>Documento generado por Viña Negra Manager</p>
+                {/* DESPACHO */}
+                <div className="border rounded-lg p-4 bg-gray-50/50">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase border-b pb-1 mb-2">Información de Despacho</h3>
+                    <div className="space-y-1 text-gray-700">
+                        <p><span className="font-semibold">Bodega Origen:</span> {order.warehouse}</p>
+                        <p><span className="font-semibold">Transportista:</span> {order.carrierId === 'none' ? 'Propio/Cliente' : order.carrierId || 'N/A'}</p>
+                        {order.driverName && <p><span className="font-semibold">Chofer:</span> {order.driverName}</p>}
+                        {order.licensePlate && <p><span className="font-semibold">Patente:</span> {order.licensePlate}</p>}
+                    </div>
+                </div>
+            </div>
+
+            {/* TABLA ITEMS */}
+            <div className="mb-6">
+                <Table className="text-xs border border-gray-200 table-fixed w-full">
+                    <TableHeader className="bg-gray-100">
+                        <TableRow className="border-b border-gray-300">
+                            <TableHead className="text-gray-900 font-bold h-8 w-[6%]">CÓD.</TableHead>
+                            <TableHead className="text-gray-900 font-bold h-8 w-[28%]">PRODUCTO</TableHead>
+                            <TableHead className="text-center text-gray-900 font-bold h-8 w-[6%]">ENV.</TableHead>
+                            <TableHead className="text-right text-gray-900 font-bold h-8 w-[8%]">KGS</TableHead>
+                            <TableHead className="text-right text-gray-900 font-bold h-8 w-[10%]">P. NETO</TableHead>
+                            <TableHead className="text-right text-gray-900 font-bold h-8 w-[10%]">P. C/IVA</TableHead>
+                            <TableHead className="text-right text-gray-900 font-bold h-8 w-[12%]">SUBT. NETO</TableHead>
+                            <TableHead className="text-right text-gray-900 font-bold h-8 w-[14%]">TOTAL C/IVA</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {order.items.map((item, idx) => {
+                            const netPrice = item.price || 0;
+                            const grossPrice = netPrice * 1.19;
+                            const subTotalNet = netPrice * (item.quantity || 0);
+                            const totalLineGross = subTotalNet * 1.19;
+
+                            return (
+                                <TableRow key={item.id || idx} className="border-b border-gray-100 hover:bg-transparent">
+                                    <TableCell className="font-medium text-gray-600 py-1.5">{getCaliberCode(item.caliber)}</TableCell>
+                                    <TableCell className="text-gray-800 py-1.5">
+                                        <span className="font-bold block">{item.product}</span>
+                                        <span className="text-gray-500 block text-[10px]">Calibre: {item.caliber}</span>
+                                    </TableCell>
+                                    <TableCell className="text-center py-1.5">{item.packagingQuantity || 0}</TableCell>
+                                    <TableCell className="text-right font-medium py-1.5">{numberFormat.format(item.quantity)}</TableCell>
+                                    <TableCell className="text-right text-gray-700 py-1.5 font-mono">{currency.format(netPrice)}</TableCell>
+                                    <TableCell className="text-right text-gray-700 py-1.5 font-mono">{currency.format(grossPrice)}</TableCell>
+                                    <TableCell className="text-right font-semibold text-gray-800 py-1.5 font-mono">{currency.format(subTotalNet)}</TableCell>
+                                    <TableCell className="text-right font-bold text-gray-900 py-1.5 font-mono bg-gray-50">{currency.format(totalLineGross)}</TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                    <tfoot className="bg-gray-50 font-bold text-gray-700">
+                        <tr>
+                            <TableCell colSpan={2} className="text-right py-1.5 uppercase text-[10px]">Totales:</TableCell>
+                            <TableCell className="text-center py-1.5">{numberFormat.format(totalPackages)}</TableCell>
+                            <TableCell className="text-right py-1.5">{numberFormat.format(totalKilos)}</TableCell>
+                            <TableCell colSpan={4}></TableCell>
+                        </tr>
+                    </tfoot>
+                </Table>
+            </div>
+
+            {/* TOTALES Y CONDICIONES */}
+            <div className="flex justify-between items-start mt-2">
+                <div className="w-3/5 pr-6">
+                    <div className="border rounded-md p-3 bg-white">
+                        <h4 className="font-bold text-xs text-gray-800 mb-2 border-b pb-1 uppercase">Condiciones Comerciales</h4>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-700">
+                            <div><span className="font-semibold">Tipo Venta:</span> {order.saleType}</div>
+                            <div><span className="font-semibold">Forma de Pago:</span> {order.paymentMethod}</div>
+                            <div><span className="font-semibold">Estado:</span> <span className="capitalize">{order.status === 'completed' ? 'Despachada' : 'Pendiente'}</span></div>
+                            {displayDueDate && <div><span className="font-semibold">Vencimiento:</span> {format(parseISO(displayDueDate), "dd/MM/yyyy")}</div>}
+                        </div>
+                        {order.notes && (
+                            <div className="mt-3 pt-2 border-t">
+                                <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Observaciones:</span>
+                                <p className="text-xs text-gray-600 italic leading-tight bg-gray-50 p-1 rounded">{order.notes}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="w-2/5">
+                    <div className="bg-gray-50 rounded-lg p-3 border">
+                        <div className="flex justify-between py-1 text-xs text-gray-600">
+                            <span>Subtotal Neto:</span>
+                            <span className="font-medium font-mono">{currency.format(calculatedNetTotal)}</span>
+                        </div>
+                        <div className="flex justify-between py-1 text-xs text-gray-600 mb-2">
+                            <span>IVA (19%):</span>
+                            <span className="font-medium font-mono">{currency.format(calculatedVat)}</span>
+                        </div>
+                        <Separator className="bg-gray-300" />
+                        <div className="flex justify-between py-2 text-base font-bold text-gray-900">
+                            <span>TOTAL A PAGAR:</span>
+                            <span className="font-mono">{currency.format(calculatedGrossTotal)}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* FOOTER */}
+            <div className="absolute bottom-4 left-0 right-0 text-center border-t pt-1">
+                <p className="text-[9px] text-gray-400">Documento generado electrónicamente por Viña Negra Manager. No válido como factura.</p>
             </div>
         </div>
     );
 });
 
 SalesOrderPreviewContent.displayName = 'SalesOrderPreviewContent';
-
-    
-
-    
