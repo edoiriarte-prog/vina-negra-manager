@@ -23,7 +23,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase"; 
+import { firestore as db } from "@/firebase"; 
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { processOrderStockMovement } from "@/lib/inventory-actions"; 
