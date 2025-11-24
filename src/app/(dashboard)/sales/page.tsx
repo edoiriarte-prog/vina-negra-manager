@@ -13,38 +13,41 @@ import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
 import { SalesOrderPreview } from "./components/sales-order-preview"; 
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function SalesPage() {
-  // Hooks de datos
   const { orders, createOrder, updateOrder, deleteOrder } = useSalesOrders();
   
-  // Obtenemos contactos e inventario
   const { contacts, inventory, purchaseOrders, inventoryAdjustments } = useMasterData(); 
   
-  // Filtramos Clientes y Transportistas
   const clients = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('client')) : [];
   const carrierList = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('carrier')) : [];
 
-  // Estados
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [previewOrder, setPreviewOrder] = useState<SalesOrder | null>(null);
+  const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Cálculos de KPIs
   const totalAmount = orders.reduce((sum: number, o: SalesOrder) => sum + (o.totalAmount || 0), 0);
   const pendingCount = orders.filter((o: SalesOrder) => o.status === 'pending' || o.status === 'draft').length;
   const completedCount = orders.filter((o: SalesOrder) => o.status === 'dispatched' || o.status === 'invoiced').length;
 
-  // Filtrado de órdenes
   const filteredOrders = orders.filter((o: SalesOrder) => {
       const clientName = clients.find((c: Contact) => c.id === o.clientId)?.name || '';
       return o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
              clientName.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-
-  // Handlers
   const handleEdit = (order: SalesOrder) => {
     setEditingOrder(order);
     setIsSheetOpen(true);
@@ -61,19 +64,20 @@ export default function SalesPage() {
     if (editingOrder) {
       updateOrder(finalData);
     } else {
-      // Para un nuevo pedido, `orderData` contiene todos los datos necesarios del formulario.
-      // `finalData` combina los items del formulario con los nuevos de la matriz.
-      // El id se asignará en la base de datos, por lo que no lo necesitamos aquí.
       createOrder(finalData);
     }
     setIsSheetOpen(false);
     setEditingOrder(null);
   };
 
+  const handleDeleteRequest = (order: SalesOrder) => {
+      setDeletingOrder(order);
+  }
 
-  const handleDelete = async (orderToDelete: SalesOrder) => {
-      if (confirm(`¿Estás seguro de eliminar la orden de venta ${orderToDelete.id}?`)) {
-          await deleteOrder(orderToDelete.id);
+  const confirmDelete = async () => {
+      if (deletingOrder) {
+          await deleteOrder(deletingOrder.id);
+          setDeletingOrder(null);
       }
   }
 
@@ -86,21 +90,18 @@ export default function SalesPage() {
     if (!open) setEditingOrder(null);
   };
 
-  // Generamos las columnas
   const columns = getColumns({
       onEdit: handleEdit,
-      onDelete: handleDelete,
+      onDelete: handleDeleteRequest,
       onPreview: handlePreview,
       clients: clients 
   });
 
-  // Estilos Reutilizables
   const cardClass = "bg-slate-900 border-slate-800 shadow-sm hover:border-slate-700 transition-all";
 
   return (
     <div className="p-3 md:p-6 space-y-6 bg-slate-950 min-h-screen text-slate-100">
       
-      {/* --- HEADER & ACCIONES --- */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Gestión de Ventas</h2>
@@ -111,7 +112,6 @@ export default function SalesPage() {
         </Button>
       </div>
 
-      {/* --- KPIs RESUMEN --- */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
@@ -152,7 +152,6 @@ export default function SalesPage() {
         </Card>
       </div>
 
-      {/* --- TABLA --- */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-800 w-full max-w-md transition-all focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/20">
             <Search className="h-4 w-4 text-slate-500 ml-2" />
@@ -172,7 +171,6 @@ export default function SalesPage() {
         </div>
       </div>
 
-      {/* --- MODALES --- */}
       <NewSalesOrderSheet
         isOpen={isSheetOpen}
         onOpenChange={handleCloseSheet}
@@ -197,6 +195,21 @@ export default function SalesPage() {
             client={clients.find((c: Contact) => c.id === previewOrder.clientId) || null}
           />
       )}
+
+      <AlertDialog open={!!deletingOrder} onOpenChange={() => setDeletingOrder(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro de eliminar esta orden?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La orden {deletingOrder?.id} será eliminada permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );
