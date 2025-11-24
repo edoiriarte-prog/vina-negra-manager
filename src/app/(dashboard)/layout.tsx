@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, ReactNode } from 'react';
@@ -23,7 +22,7 @@ type OperationsContextType = {
 // --- CONTEXT ---
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
 
-// --- PROVIDER (Moved here from the .ts file) ---
+// --- PROVIDER ---
 function OperationsProvider({ children }: { children: ReactNode }) {
   const { firestore } = useFirebase();
 
@@ -94,16 +93,16 @@ export default function DashboardLayout({
   return (
     <FirebaseClientProvider>
       <AuthGuard>
-        <MasterDataProvider>
-          <OperationsProvider>
+        <OperationsProvider>
+          <MasterDataProvider>
             <div className="flex min-h-screen bg-slate-950 text-slate-100">
               <MainNav />
               <main className="flex-1 ml-64 flex flex-col min-h-screen transition-all duration-300">
                 <div className="flex-1 p-3 md:p-6">{children}</div>
               </main>
             </div>
-          </OperationsProvider>
-        </MasterDataProvider>
+          </MasterDataProvider>
+        </OperationsProvider>
       </AuthGuard>
     </FirebaseClientProvider>
   );
