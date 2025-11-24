@@ -1,4 +1,6 @@
-import { MainNav } from "./main-nav"; // <--- Importante: ruta relativa "./"
+import { MainNav } from "./main-nav";
+import { AuthGuard } from "@/app/auth-guard";
+import { FirebaseClientProvider } from "@/firebase/client-provider";
 
 export default function DashboardLayout({
   children,
@@ -6,16 +8,17 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
-      {/* Sidebar Personalizado */}
-      <MainNav />
-
-      {/* Contenido con margen izquierdo para respetar la sidebar */}
-      <main className="flex-1 ml-64 flex flex-col min-h-screen transition-all duration-300">
-        <div className="flex-1 p-0">
-          {children}
+    <FirebaseClientProvider>
+      <AuthGuard>
+        <div className="flex min-h-screen bg-slate-950 text-slate-100">
+          <MainNav />
+          <main className="flex-1 ml-64 flex flex-col min-h-screen transition-all duration-300">
+            <div className="flex-1 p-3 md:p-6">{children}</div>
+          </main>
         </div>
-      </main>
-    </div>
+      </AuthGuard>
+    </FirebaseClientProvider>
   );
 }
+
+    

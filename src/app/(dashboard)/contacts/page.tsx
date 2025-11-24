@@ -15,18 +15,15 @@ import { NewContactSheet } from "./components/new-contact-sheet";
 import { Contact, Interaction } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useMasterData } from "@/hooks/use-master-data"; // <-- USAMOS EL HOOK MAESTRO
+import { useMasterData } from "@/hooks/use-master-data";
+import { useContactsCRUD } from "@/hooks/use-contacts-crud"; // <-- 1. IMPORTAMOS EL NUEVO HOOK
 
 export default function ContactsPage() {
-  // Ahora obtenemos los 'contacts' y 'isLoading' del hook maestro.
+  // Obtenemos los datos y el estado de carga del hook maestro
   const { contacts: data, isLoading: loading } = useMasterData();
   
-  // Nota: Faltan las funciones createContact, updateContact, deleteContact, que deberían 
-  // ser pasadas a un nuevo hook CRUD para este módulo.
-  // Por ahora, usaremos las funciones placeholder para que la app no falle.
-  const createContact = async (contact: Omit<Contact, "id">) => { console.log("PLACEHOLDER: Creating contact", contact); };
-  const updateContact = async (id: string, data: Partial<Contact>) => { console.log("PLACEHOLDER: Updating contact", id, data); };
-  const deleteContact = async (id: string) => { console.log("PLACEHOLDER: Deleting contact", id); };
+  // 2. Usamos el nuevo hook para obtener las funciones CRUD
+  const { createContact, updateContact, deleteContact, handleDeleteInteraction: deleteInteractionFn } = useContactsCRUD();
   
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
@@ -52,7 +49,7 @@ export default function ContactsPage() {
     (c.email?.toLowerCase() || "").includes(searchTerm.toLowerCase())
   );
 
-  // --- MANEJADORES DE CRUD (Usando place-holders por ahora) ---
+  // --- MANEJADORES DE CRUD ---
   const handleCreateNew = () => {
     setEditingContact(null);
     setIsSheetOpen(true);
@@ -65,30 +62,43 @@ export default function ContactsPage() {
 
   const handleDelete = async (contact: Contact) => {
     if (confirm(`¿Estás seguro de eliminar a ${contact.name} de la base de datos?`)) {
-      // Usar la función placeholder de eliminación
       await deleteContact(contact.id); 
     }
   };
-
+  
+  // 3. ACTUALIZAMOS EL MANEJADOR onSave
   const handleSave = async (contactData: Contact | Omit<Contact, "id">, newInteraction?: Omit<Interaction, "id">) => {
-    // Lógica para preparar la data...
-    let dataToSave = { ...contactData };
-    // ... (omito la lógica compleja de interacciones por ser placeholder)
-
     if ("id" in contactData) {
-      // CASO: ACTUALIZAR
-      await updateContact(contactData.id, dataToSave);
-    } else {
-      // CASO: CREAR
-      await createContact(dataToSave as Omit<Contact, "id">);
-    }
+      // CASO: ACTUALIZAR CONTACTO EXISTENTE
+      const dataToUpdate: Partial<Contact> = { ...contactData };
+      
+      // Si hay una nueva interacción, la añadimos a las existentes
+      if (newInteraction) {
+        const newInteractionWithId = { ...newInteraction, id: `int-${Date.now()}` };
+        dataToUpdate.interactions = [...(contactData.interactions || []), newInteractionWithId];
+      }
+      
+      await updateContact(contactData.id, dataToUpdate);
 
+    } else {
+      // CASO: CREAR NUEVO CONTACTO
+      const newContact: Omit<Contact, "id"> = {
+        ...contactData,
+        // Si hay una nueva interacción al crear, la incluimos
+        interactions: newInteraction ? [{ ...newInteraction, id: `int-${Date.now()}` }] : [],
+      };
+      await createContact(newContact);
+    }
+    
     setIsSheetOpen(false);
   };
 
+  // 4. MANEJADOR DE ELIMINACIÓN DE INTERACCIÓN
   const handleDeleteInteraction = async (contactId: string, interactionId: string) => {
-      console.log(`PLACEHOLDER: Deleting interaction ${interactionId} from ${contactId}`);
-      // Lógica placeholder para eliminar interacción
+      const contact = data.find(c => c.id === contactId);
+      if (contact) {
+          await deleteInteractionFn(contactId, interactionId, contact.interactions || []);
+      }
   };
 
   const columns = useMemo(() => getColumns({
@@ -111,12 +121,12 @@ export default function ContactsPage() {
   }
 
   return (
-    <div className="p-8 space-y-8 bg-slate-950 min-h-screen text-slate-100">
+    <div className="p-3 md:p-6 space-y-6 bg-slate-950 min-h-screen text-slate-100">
       
       {/* --- HEADER & ACCIONES --- */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Directorio de Contactos</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Directorio de Contactos</h2>
           <p className="text-slate-400 mt-1">
             Gestión centralizada de clientes, proveedores y socios de Viña Negra.
           </p>
@@ -129,15 +139,15 @@ export default function ContactsPage() {
       </div>
 
       {/* --- KPIs RESUMEN --- */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-              <Users className="h-8 w-8 text-blue-500" />
+              <Users className="h-6 w-6 md:h-8 md:w-8 text-blue-500" />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Directorio</p>
-              <h3 className="text-2xl font-bold text-white">{totalContacts}</h3>
+              <h3 className="text-xl md:text-2xl font-bold text-white">{totalContacts}</h3>
             </div>
           </CardContent>
         </Card>
@@ -145,11 +155,11 @@ export default function ContactsPage() {
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-              <Briefcase className="h-8 w-8 text-emerald-500" />
+              <Briefcase className="h-6 w-6 md:h-8 md:w-8 text-emerald-500" />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Clientes Activos</p>
-              <h3 className="text-2xl font-bold text-white">{totalClients}</h3>
+              <h3 className="text-xl md:text-2xl font-bold text-white">{totalClients}</h3>
             </div>
           </CardContent>
         </Card>
@@ -157,11 +167,11 @@ export default function ContactsPage() {
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
-              <Truck className="h-8 w-8 text-amber-500" />
+              <Truck className="h-6 w-6 md:h-8 md:w-8 text-amber-500" />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Proveedores</p>
-              <h3 className="text-2xl font-bold text-white">{totalSuppliers}</h3>
+              <h3 className="text-xl md:text-2xl font-bold text-white">{totalSuppliers}</h3>
             </div>
           </CardContent>
         </Card>
@@ -179,7 +189,7 @@ export default function ContactsPage() {
             />
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg p-1">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg p-1 overflow-x-auto">
            <DataTable columns={columns} data={filteredContacts} />
         </div>
       </div>
@@ -195,3 +205,5 @@ export default function ContactsPage() {
     </div>
   );
 }
+
+    

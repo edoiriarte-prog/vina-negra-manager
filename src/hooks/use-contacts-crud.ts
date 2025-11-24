@@ -39,7 +39,6 @@ export function useContactsCRUD() {
         
         const updatedInteractions = currentInteractions.filter(i => i.id !== interactionId);
         
-        const contactRef = doc(firestore, 'contacts', contactId);
         await updateContact(contactId, { interactions: updatedInteractions });
     };
 
@@ -47,6 +46,8 @@ export function useContactsCRUD() {
         createContact,
         updateContact,
         deleteContact,
-        handleDeleteInteraction: handleDeleteInteraction // Usamos una función de ayuda separada para claridad
+        handleDeleteInteraction: handleDeleteInteraction 
     };
 }
+
+    
