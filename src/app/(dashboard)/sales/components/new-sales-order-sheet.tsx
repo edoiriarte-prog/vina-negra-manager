@@ -1,636 +1,369 @@
-
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose,
-} from '@/components/ui/sheet';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Plus, Trash2, CalendarIcon, User, Truck, Warehouse, CreditCard, Info, PackageCheck, DollarSign, MapPin } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SalesOrder, OrderItem, Contact, InventoryItem, PurchaseOrder, InventoryAdjustment } from '@/lib/types';
-import { format, addDays, parseISO } from 'date-fns';
-import { useMasterData } from '@/hooks/use-master-data';
-import { Card, CardContent } from '@/components/ui/card';
-import { ItemMatrixDialog } from './item-matrix-dialog'; 
-import { useToast } from '@/hooks/use-toast';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { LotSelectionDialog } from './lot-selection-dialog';
+import { useState, useEffect } from "react";
+import { 
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose 
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Trash2, Plus, ShoppingCart, Truck } from "lucide-react";
+import { 
+  SalesOrder, 
+  Contact, 
+  InventoryItem, 
+  OrderItem, 
+  PurchaseOrder, 
+  InventoryAdjustment 
+} from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
-type NewSalesOrderSheetProps = {
+interface NewSalesOrderSheetProps {
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  onSave: (order: SalesOrder, newItems?: OrderItem[]) => void;
+  onOpenChange: (open: boolean) => void;
+  onSave: (orderData: SalesOrder | Omit<SalesOrder, "id">) => void;
   order: SalesOrder | null;
   clients: Contact[];
-  carriers: Contact[];
-  inventory: InventoryItem[];
-  salesOrders: SalesOrder[];
-  sheetType: 'sale' | 'dispatch';
-  purchaseOrders: PurchaseOrder[];
-  inventoryAdjustments: InventoryAdjustment[];
-  contacts: Contact[];
-};
+  carriers?: Contact[]; // Opcional
+  inventory: InventoryItem[]; // Ahora recibimos el inventario real
+  nextOrderId?: string;
+  purchaseOrders?: PurchaseOrder[];
+  salesOrders?: SalesOrder[];
+  inventoryAdjustments?: InventoryAdjustment[];
+  contacts?: Contact[];
+  sheetType?: 'sale' | 'dispatch'; // Para diferenciar Venta de Traspaso
+}
 
-type SalesOrderFormData = Omit<SalesOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'>;
-
-// Define la base para las Órdenes de Venta
-const BASE_OV_ID = 2099;
-
-const getInitialFormData = (order: SalesOrder | null, type: 'sale' | 'dispatch'): SalesOrderFormData => {
-    if (order) {
-        return {
-            ...order,
-            date: format(new Date(order.date), 'yyyy-MM-dd'),
-            advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : null,
-            balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : null,
-            status: (order.status as any) === 'completed' ? 'dispatched' : order.status,
-            orderType: type
-        };
-    }
-    return {
-        clientId: '',
-        date: format(new Date(), 'yyyy-MM-dd'),
-        items: [],
-        status: 'pending',
-        paymentMethod: 'Contado',
-        saleType: type === 'dispatch' ? 'Traslado Bodega Interna' : 'Venta Firme',
-        creditDays: 0,
-        advancePercentage: 0,
-        advanceDueDate: null,
-        balanceDueDate: null,
-        warehouse: 'Bodega Central', 
-        destinationWarehouse: null,
-        carrierId: null,
-        driverName: null,
-        licensePlate: null,
-        orderType: type,
-        notes: null,
-        includeVat: true,
-        paymentStatus: 'Pendiente'
-    };
-};
-
-export function NewSalesOrderSheet({ 
-    isOpen, onOpenChange, onSave, order, clients, carriers, inventory, salesOrders, sheetType, purchaseOrders, inventoryAdjustments, contacts 
+export function NewSalesOrderSheet({
+  isOpen,
+  onOpenChange,
+  onSave,
+  order,
+  clients,
+  inventory,
+  sheetType = 'sale' // Por defecto es venta
 }: NewSalesOrderSheetProps) {
   
-  const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order, sheetType));
-  const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const [isLotSelectionOpen, setIsLotSelectionOpen] = useState(false);
-  const [nextIdDisplay, setNextIdDisplay] = useState('');
-  const [hasInitialized, setHasInitialized] = useState(false);
-
-  const { products, calibers, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
+  const isDispatch = sheetType === 'dispatch';
 
-  const grossTotal = useMemo(() => {
-    return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-  }, [formData.items]);
+  // Estado inicial del formulario
+  const [formData, setFormData] = useState<Partial<SalesOrder>>({
+    clientId: "",
+    warehouse: "Principal", // Bodega de origen
+    date: new Date().toISOString().split('T')[0],
+    status: isDispatch ? "dispatched" : "pending",
+    includeVat: false,
+    items: [],
+    destinationWarehouse: "", // Solo para traspasos
+  });
+
+  const [items, setItems] = useState<OrderItem[]>([]);
   
-  const { netTotal, vatAmount, finalTotal } = useMemo(() => {
-      const net = grossTotal; 
-      if (formData.includeVat) {
-          const vat = net * 0.19;
-          const total = net + vat;
-          return { netTotal: net, vatAmount: vat, finalTotal: total };
-      }
-      return { netTotal: net, vatAmount: 0, finalTotal: net };
-  }, [grossTotal, formData.includeVat]);
+  // Estados para el item que se está agregando
+  const [currentItem, setCurrentItem] = useState<Partial<OrderItem>>({
+    product: "",
+    caliber: "",
+    format: "",
+    quantity: 0,
+    packagingQuantity: 0,
+    price: 0,
+  });
 
+  // Cargar datos si estamos editando
   useEffect(() => {
-    if (isOpen) {
-        if (!order) {
-            const idPrefix = sheetType === 'sale' ? 'OV' : 'TR';
-            const baseId = sheetType === 'sale' ? 2099 : 0;
-            const existingIds = (salesOrders || [])
-                .filter(o => o.orderType === sheetType)
-                .map(o => {
-                    const match = o.id.match(new RegExp(`${idPrefix}-(\\d+)`));
-                    return match ? parseInt(match[1], 10) : 0;
-                })
-                .filter(n => !isNaN(n));
-            
-            const maxId = existingIds.length > 0 ? Math.max(...existingIds) : baseId;
-            const nextNum = maxId < baseId + 1 ? baseId + 1 : maxId + 1;
-            const newId = `${idPrefix}-${nextNum}`;
-            
-            setNextIdDisplay(newId);
-            if (!hasInitialized) {
-                setFormData(getInitialFormData(null, sheetType));
-                setHasInitialized(true);
-            }
-        } else {
-            if (!hasInitialized) {
-                setNextIdDisplay(order.id);
-                setFormData(getInitialFormData(order, sheetType));
-                setHasInitialized(true);
-            }
-        }
+    if (order) {
+      setFormData({ ...order });
+      setItems(order.items || []);
     } else {
-        setHasInitialized(false);
+      // Resetear al abrir nuevo
+      setFormData({
+        clientId: "",
+        warehouse: "Principal",
+        date: new Date().toISOString().split('T')[0],
+        status: isDispatch ? "dispatched" : "pending",
+        includeVat: false,
+        destinationWarehouse: "",
+      });
+      setItems([]);
     }
-  }, [isOpen, order, hasInitialized, salesOrders, sheetType]);
+  }, [order, isOpen, isDispatch]);
 
-  const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
-    const newItems = [...formData.items];
-    const item = { ...newItems[index] };
-    (item[field] as any) = value; 
-    newItems[index] = item;
-    setFormData(prev => ({ ...prev, items: newItems }));
-  };
+  // --- MANEJO DE ITEMS ---
 
-  const handleSelectChange = (name: string, value: any) => {
-    if (name.startsWith('items.')) {
-        const [_, indexStr, field] = name.split('.');
-        const index = parseInt(indexStr);
-        handleItemChange(index, field as keyof OrderItem, value);
-    } else {
-        setFormData(prev => ({ ...prev, [name]: value }));
-    }
-  };
+  // Productos únicos disponibles en el inventario seleccionado
+  const availableProducts = Array.from(new Set(inventory.map(i => i.name)));
   
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
-    if (name.startsWith('items.')) {
-        const [_, indexStr, field] = name.split('.');
-        const index = parseInt(indexStr);
-        handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'packagingQuantity'].includes(field) ? Number(value) : value);
-    } else {
-        setFormData((prev) => ({ ...prev, [name]: ['advancePercentage', 'creditDays'].includes(name) ? Number(value) : value }));
-    }
-  };
+  // Calibres disponibles para el producto seleccionado
+  const availableCalibers = inventory
+    .filter(i => i.name === currentItem.product && i.warehouse === formData.warehouse)
+    .map(i => i.caliber);
 
-  useEffect(() => {
-      if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {
-          const dueDate = addDays(parseISO(formData.date), formData.creditDays);
-          setFormData(prev => ({...prev, balanceDueDate: format(dueDate, 'yyyy-MM-dd')}))
-      }
-  }, [formData.creditDays, formData.date, formData.paymentMethod]);
+  // Stock actual del producto/calibre seleccionado
+  const currentStockItem = inventory.find(i => 
+    i.name === currentItem.product && 
+    i.caliber === currentItem.caliber && 
+    i.warehouse === formData.warehouse
+  );
+
+  const addItem = () => {
+    if (!currentItem.product || !currentItem.caliber || !currentItem.quantity) return;
+
+    // Validar stock (simple)
+    if (currentStockItem && currentItem.quantity! > currentStockItem.stock) {
+        toast({
+            variant: "destructive",
+            title: "Stock Insuficiente",
+            description: `Solo quedan ${currentStockItem.stock} kg disponibles.`
+        });
+        return;
+    }
+
+    const newItem: OrderItem = {
+      product: currentItem.product,
+      caliber: currentItem.caliber,
+      quantity: Number(currentItem.quantity),
+      packagingQuantity: Number(currentItem.packagingQuantity || 0),
+      price: Number(currentItem.price || 0),
+      total: Number(currentItem.quantity) * Number(currentItem.price || 0),
+      unit: 'Kilos',
+      format: currentItem.format || 'Estándar',
+      lotNumber: currentItem.lotNumber || '' // Opcional: lógica de lotes
+    };
+
+    setItems([...items, newItem]);
+    // Resetear item actual pero mantener producto para agilizar carga
+    setCurrentItem(prev => ({ ...prev, caliber: "", quantity: 0, packagingQuantity: 0 }));
+  };
 
   const removeItem = (index: number) => {
-    setFormData(prev => ({...prev, items: prev.items.filter((_, i) => i !== index)}));
-  }
-
-  const handleMatrixSave = (matrixItems: Omit<OrderItem, 'id'>[]) => {
-    const newItems: OrderItem[] = matrixItems.map(item => ({
-        ...item,
-        id: `temp-${Date.now()}-${Math.random()}`,
-    }));
-    setFormData(prev => ({...prev, items: [...prev.items, ...newItems]}));
-    setIsMatrixOpen(false);
-  }
-  
-  const handleLotSave = (newItem: OrderItem) => {
-    const existingItemIndex = formData.items.findIndex(
-      (item) =>
-        item.product === newItem.product &&
-        item.caliber === newItem.caliber &&
-        item.lotNumber === newItem.lotNumber &&
-        item.price === newItem.price
-    );
-
-    let newItems;
-    if (existingItemIndex > -1) {
-      newItems = [...formData.items];
-      newItems[existingItemIndex].quantity += newItem.quantity;
-      newItems[existingItemIndex].packagingQuantity = (newItems[existingItemIndex].packagingQuantity || 0) + (newItem.packagingQuantity || 0);
-    } else {
-      newItems = [...formData.items, { ...newItem, id: `temp-lot-${Date.now()}` }];
-    }
-    setFormData(prev => ({ ...prev, items: newItems }));
+    setItems(items.filter((_, i) => i !== index));
   };
 
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!formData.date) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione una fecha.' });
-    if (!formData.clientId) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un cliente.' });
-    if (formData.items.length === 0) return toast({ variant: 'destructive', title: 'Error', description: 'Agregue al menos un ítem.' });
-    
-    if (formData.saleType === 'Traslado Bodega Interna' && !formData.destinationWarehouse) {
-        return toast({ variant: 'destructive', title: 'Falta Destino', description: 'Para traslados internos debe seleccionar una Bodega de Destino.' });
+  // --- GUARDAR ---
+  const handleSubmit = () => {
+    if (!formData.clientId && !isDispatch) {
+        toast({ variant: "destructive", title: "Falta Cliente", description: "Selecciona un cliente." });
+        return;
+    }
+    if (items.length === 0) {
+        toast({ variant: "destructive", title: "Orden Vacía", description: "Agrega al menos un producto." });
+        return;
     }
 
-    const sanitizedItems = formData.items.map(item => ({
-        ...item,
-        packagingType: item.packagingType || null,
-        packagingQuantity: Number(item.packagingQuantity) || 0,
-        lotNumber: item.lotNumber || null,
-        quantity: Number(item.quantity) || 0,
-        price: Number(item.price) || 0,
-    }));
-
-    const calculatedTotalPackages = sanitizedItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
-    const calculatedTotalKilos = sanitizedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-
-    const finalOrder: SalesOrder = {
-        id: order ? order.id : nextIdDisplay,
-        clientId: formData.clientId,
-        date: formData.date,
-        items: sanitizedItems,
-        totalPackages: calculatedTotalPackages,
-        totalKilos: calculatedTotalKilos,
-        totalAmount: finalTotal,
-        status: formData.status,
-        paymentMethod: formData.paymentMethod,
-        saleType: formData.saleType,
-        warehouse: formData.warehouse,
-        destinationWarehouse: formData.destinationWarehouse || null,
-        carrierId: formData.carrierId || null,
-        driverName: formData.driverName || null,
-        licensePlate: formData.licensePlate || null,
-        orderType: formData.orderType,
-        advanceDueDate: formData.advanceDueDate || null,
-        balanceDueDate: formData.balanceDueDate || null,
-        notes: formData.notes || null,
-        creditDays: Number(formData.creditDays || 0),
-        advancePercentage: Number(formData.advancePercentage || 0),
-        includeVat: formData.includeVat,
-        paymentStatus: formData.paymentStatus || 'Pendiente'
+    // Preparar objeto final
+    const finalOrder: any = {
+        ...formData,
+        items: items,
+        // Si es traspaso interno, usamos un ID genérico si no hay cliente
+        clientId: formData.clientId || (isDispatch ? 'internal_transfer' : ''), 
     };
 
     onSave(finalOrder);
   };
 
-  const title = order ? `Editar ${sheetType === 'sale' ? `OV ${order.id}` : `TR ${order.id}`}` : `Nueva ${sheetType === 'sale' ? 'Venta' : 'Orden de Traspaso'}`;
-
-  const getStatusColor = (status: string) => {
-      switch(status) {
-          case 'dispatched': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
-          case 'invoiced': return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
-          case 'draft': return 'bg-slate-500/10 text-slate-400 border-slate-500/30';
-          case 'cancelled': return 'bg-red-500/10 text-red-400 border-red-500/30';
-          default: return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
-      }
-  };
-
-  const getStatusLabel = (status: string) => {
-      switch(status) {
-          case 'dispatched': return 'Despachada';
-          case 'invoiced': return 'Facturada';
-          case 'draft': return 'Borrador';
-          case 'pending': return 'Pendiente';
-          case 'cancelled': return 'Cancelada';
-          default: return status;
-      }
-  };
-
-  if (!formData) return null;
-
-  const darkInputClass = "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 placeholder:text-slate-600";
-  const darkCardClass = "bg-slate-900 border-slate-800 shadow-sm";
-  const labelClass = "text-xs font-medium text-slate-400 uppercase tracking-wide";
+  // Totales
+  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const totalAmount = formData.includeVat ? subtotal * 1.19 : subtotal;
 
   return (
-    <>
-      <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="sm:max-w-7xl w-[95vw] overflow-y-auto p-0 flex flex-col gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
-          
-          <SheetHeader className="bg-slate-900 border-b border-slate-800 px-6 py-4 sticky top-0 z-10">
-             <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                    <div className="bg-blue-600/20 p-2.5 rounded-xl border border-blue-600/30">
-                        <PackageCheck className="h-6 w-6 text-blue-400" />
-                    </div>
-                    <div>
-                        <SheetTitle className="text-xl font-bold text-slate-100 tracking-tight">{title}</SheetTitle>
-                        <SheetDescription className="text-xs text-slate-400 font-mono mt-0.5">
-                            {nextIdDisplay ? `ID: ${nextIdDisplay}` : 'Calculando ID...'}
-                        </SheetDescription>
-                    </div>
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-2xl bg-slate-950 border-l-slate-800 text-slate-100 overflow-y-auto">
+        <SheetHeader>
+          <div className="flex items-center gap-2">
+             {isDispatch ? <Truck className="text-blue-500"/> : <ShoppingCart className="text-emerald-500"/>}
+             <SheetTitle className="text-white">{order ? 'Editar' : 'Nueva'} {isDispatch ? 'Orden de Despacho' : 'Venta'}</SheetTitle>
+          </div>
+          <SheetDescription className="text-slate-400">
+            {isDispatch 
+                ? 'Registra una salida de stock o traspaso de bodega.' 
+                : 'Genera una nueva venta comercial.'}
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="grid gap-6 py-6">
+            {/* --- DATOS GENERALES --- */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label className="text-slate-300">Cliente / Destino</Label>
+                    <Select 
+                        value={formData.clientId} 
+                        onValueChange={(v) => setFormData(prev => ({...prev, clientId: v}))}
+                    >
+                        <SelectTrigger className="bg-slate-900 border-slate-800 text-slate-100">
+                            <SelectValue placeholder="Seleccionar..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                            {clients.map(c => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={`capitalize border-slate-700 ${getStatusColor(formData.status)}`}>
-                        {getStatusLabel(formData.status)}
-                    </Badge>
+                <div className="space-y-2">
+                    <Label className="text-slate-300">Fecha</Label>
+                    <Input 
+                        type="date" 
+                        value={formData.date}
+                        onChange={(e) => setFormData(prev => ({...prev, date: e.target.value}))}
+                        className="bg-slate-900 border-slate-800 text-slate-100"
+                    />
                 </div>
             </div>
-          </SheetHeader>
 
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-            <div className="p-6 space-y-8">
-              
-              <div className="grid md:grid-cols-4 gap-5">
-                <Card className={`${darkCardClass} md:col-span-2`}>
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <User className="h-4 w-4 text-blue-500" /> Cliente
-                        </div>
-                        <Select required onValueChange={(value) => handleSelectChange('clientId', value)} value={formData.clientId}>
-                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+            <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <Label className="text-slate-300">Bodega Origen</Label>
+                    <Select 
+                        value={formData.warehouse} 
+                        onValueChange={(v) => setFormData(prev => ({...prev, warehouse: v}))}
+                    >
+                        <SelectTrigger className="bg-slate-900 border-slate-800 text-slate-100">
+                            <SelectValue placeholder="Seleccionar..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                            {/* Idealmente traer bodegas de useMasterData, hardcodeado por ahora para simplicidad */}
+                            <SelectItem value="Principal">Principal</SelectItem>
+                            <SelectItem value="Cámara Frío 1">Cámara Frío 1</SelectItem>
+                            <SelectItem value="Patio Techado">Patio Techado</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                {!isDispatch && (
+                    <div className="flex items-center space-x-2 pt-8">
+                        <Switch 
+                            id="vat" 
+                            checked={formData.includeVat}
+                            onCheckedChange={(c) => setFormData(prev => ({...prev, includeVat: c}))}
+                        />
+                        <Label htmlFor="vat" className="text-slate-300">Incluir IVA (19%)</Label>
+                    </div>
+                )}
+            </div>
+
+            <Separator className="bg-slate-800" />
+
+            {/* --- AGREGAR PRODUCTOS --- */}
+            <div className="space-y-4">
+                <h4 className="font-medium text-slate-200">Agregar Productos</h4>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label className="text-xs text-slate-400">Producto</Label>
+                        <Select 
+                            value={currentItem.product} 
+                            onValueChange={(v) => setCurrentItem(prev => ({...prev, product: v, caliber: ''}))}
+                        >
+                            <SelectTrigger className="bg-slate-900 border-slate-800 text-slate-100 h-8">
+                                <SelectValue placeholder="Producto" />
+                            </SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {clients.map(c => (<SelectItem key={c.id} value={c.id} className="focus:bg-slate-800 focus:text-slate-100">{c.name}</SelectItem>))}
+                                {availableProducts.map(p => (
+                                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
-                    </CardContent>
-                </Card>
-
-                <Card className={darkCardClass}>
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <CalendarIcon className="h-4 w-4 text-orange-500" /> Fecha Emisión
-                        </div>
-                        <Input type="date" name="date" value={formData.date} onChange={handleInputChange} className={`${darkInputClass} [color-scheme:dark]`} required />
-                    </CardContent>
-                </Card>
-
-                <Card className={darkCardClass}>
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Warehouse className="h-4 w-4 text-emerald-500" /> Bodega Origen
-                        </div>
-                        <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
-                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-xs text-slate-400">Calibre</Label>
+                        <Select 
+                            value={currentItem.caliber} 
+                            onValueChange={(v) => setCurrentItem(prev => ({...prev, caliber: v}))}
+                            disabled={!currentItem.product}
+                        >
+                            <SelectTrigger className="bg-slate-900 border-slate-800 text-slate-100 h-8">
+                                <SelectValue placeholder="Calibre" />
+                            </SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {warehouses.map(w => <SelectItem key={w.id} value={w.name}>{w.name}</SelectItem>)}
+                                {availableCalibers.map(c => (
+                                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
-                    </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-5">
-                 <Card className={darkCardClass}>
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Truck className="h-4 w-4 text-purple-500" /> Transportista
-                        </div>
-                        <Select onValueChange={(v) => handleSelectChange('carrierId', v)} value={formData.carrierId || ''}>
-                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Opcional" /></SelectTrigger>
-                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                <SelectItem value="none">Ninguno</SelectItem>
-                                {carriers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </CardContent>
-                 </Card>
-                 <Card className={darkCardClass}>
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <User className="h-4 w-4 text-slate-500" /> Chofer
-                        </div>
-                        <Input name="driverName" value={formData.driverName || ''} onChange={handleInputChange} placeholder="Ej: Juan Pérez" className={darkInputClass} />
-                    </CardContent>
-                 </Card>
-                 
-                 {formData.saleType === 'Traslado Bodega Interna' ? (
-                     <Card className={`${darkCardClass} border-blue-500/30`}>
-                        <CardContent className="p-4 space-y-3">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
-                                <Warehouse className="h-4 w-4" /> Bodega Destino
-                            </div>
-                            <Select required onValueChange={(v) => handleSelectChange('destinationWarehouse', v)} value={formData.destinationWarehouse || ''}>
-                                <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                    {warehouses.filter(w => w.name !== formData.warehouse).map(w => <SelectItem key={w.id} value={w.name}>{w.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </CardContent>
-                     </Card>
-                 ) : (
-                     <Card className={darkCardClass}>
-                        <CardContent className="p-4 space-y-3">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                                <MapPin className="h-4 w-4 text-red-500" /> Patente
-                            </div>
-                            <Input name="licensePlate" value={formData.licensePlate || ''} onChange={handleInputChange} placeholder="Ej: AB-CD-12" className={darkInputClass} />
-                        </CardContent>
-                     </Card>
-                 )}
-              </div>
-
-              <div className={`rounded-xl border border-slate-800 overflow-hidden ${darkCardClass}`}>
-                <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                    <h3 className="font-semibold text-slate-200 flex items-center gap-2">
-                        <Info className="h-4 w-4 text-blue-400" /> Detalle de Productos
-                    </h3>
-                    <div className="flex gap-2">
-                        <Button type="button" onClick={() => setIsLotSelectionOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-md shadow-emerald-900/20 transition-all">
-                            <Plus className="mr-2 h-4 w-4" /> Agregar por Lote
-                        </Button>
-                        <Button type="button" onClick={() => setIsMatrixOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md shadow-blue-900/20 transition-all">
-                            <Plus className="mr-2 h-4 w-4" /> Carga Masiva (Matriz)
-                        </Button>
                     </div>
                 </div>
 
-                <div className="p-0">
-                    {formData.items.length === 0 ? (
-                        <div className="py-16 text-center text-slate-500 bg-slate-950/50 flex flex-col items-center">
-                            <PackageCheck className="h-12 w-12 mb-3 opacity-20" />
-                            <p className="text-lg font-medium">No hay productos agregados</p>
-                            <p className="text-sm opacity-70">Use el botón para agregar productos.</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="text-xs text-slate-400 uppercase bg-slate-950 border-b border-slate-800">
-                                    <tr>
-                                        <th className="px-4 py-3 font-semibold">Producto</th>
-                                        <th className="px-4 py-3 font-semibold">Calibre</th>
-                                        <th className="px-4 py-3 font-semibold">Lote</th>
-                                        <th className="px-4 py-3 text-center font-semibold">Cant. Env.</th>
-                                        <th className="px-4 py-3 text-center font-semibold">Kilos</th>
-                                        <th className="px-4 py-3 text-right text-blue-400 font-semibold">P. Neto</th>
-                                        <th className="px-4 py-3 text-right text-emerald-400 font-semibold">P. c/IVA</th>
-                                        <th className="px-4 py-3 text-right font-semibold">Total</th>
-                                        <th className="px-4 py-3"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-800 bg-slate-900/30">
-                                    {formData.items.map((item, index) => {
-                                        const subtotal = (item.quantity || 0) * (item.price || 0);
-                                        const availableStock = inventory.find(i => i.product === item.product && i.caliber === item.caliber)?.stock || 0;
-                                        const hasEnoughStock = item.quantity <= availableStock;
-                                        return (
-                                            <tr key={index} className="hover:bg-slate-800/50 transition-colors group">
-                                                <td className="px-4 py-2">{item.product}</td>
-                                                <td className="px-4 py-2">{item.caliber}</td>
-                                                <td className="px-4 py-2"><Badge variant="secondary">{item.lotNumber}</Badge></td>
-                                                <td className="px-4 py-2">
-                                                    <Input type="number" value={item.packagingQuantity || ''} onChange={(e) => handleItemChange(index, 'packagingQuantity', Number(e.target.value))} className="h-7 text-center bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-300" />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <Input type="number" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))} className={`h-7 text-center font-bold bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 ${hasEnoughStock ? 'text-slate-100' : 'text-red-400 border-red-500/50'}`} />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <Input type="number" value={item.price || ''} onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500" />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <Input type="number" value={item.price ? Math.round(item.price * 1.19) : ''} onChange={(e) => handleItemChange(index, 'price', Math.round(Number(e.target.value) / 1.19))} className="h-7 text-right font-mono text-emerald-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-emerald-500" />
-                                                </td>
-                                                <td className="px-4 py-2 text-right font-medium text-slate-300 font-mono">
-                                                    {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(subtotal)}
-                                                </td>
-                                                <td className="px-4 py-2 text-center">
-                                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-7 w-7 text-slate-500 hover:text-red-400 hover:bg-red-950/30">
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                        <Label className="text-xs text-slate-400">Kilos</Label>
+                        <Input 
+                            type="number" 
+                            className="bg-slate-900 border-slate-800 text-slate-100 h-8" 
+                            placeholder="0"
+                            value={currentItem.quantity || ''}
+                            onChange={(e) => setCurrentItem(prev => ({...prev, quantity: Number(e.target.value)}))}
+                        />
+                        {currentStockItem && (
+                            <p className="text-[10px] text-slate-500 text-right">Max: {currentStockItem.stock}</p>
+                        )}
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-xs text-slate-400">Envases (Cajas)</Label>
+                        <Input 
+                            type="number" 
+                            className="bg-slate-900 border-slate-800 text-slate-100 h-8" 
+                            placeholder="0"
+                            value={currentItem.packagingQuantity || ''}
+                            onChange={(e) => setCurrentItem(prev => ({...prev, packagingQuantity: Number(e.target.value)}))}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-xs text-slate-400">Precio/Kg</Label>
+                        <Input 
+                            type="number" 
+                            className="bg-slate-900 border-slate-800 text-slate-100 h-8" 
+                            placeholder="$"
+                            value={currentItem.price || ''}
+                            onChange={(e) => setCurrentItem(prev => ({...prev, price: Number(e.target.value)}))}
+                        />
+                    </div>
                 </div>
-              </div>
-
-              <div className="grid md:grid-cols-12 gap-6 items-start">
-                  
-                  <div className="md:col-span-7 space-y-4">
-                      <Card className={darkCardClass}>
-                          <CardContent className="p-5 space-y-5">
-                              <div className='flex justify-between items-center border-b border-slate-800 pb-2 mb-4'>
-                                <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                                    <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones de Venta
-                                </h4>
-                                <Select onValueChange={(v: any) => handleSelectChange('status', v)} value={formData.status}>
-                                    <SelectTrigger className="h-7 w-36 text-xs bg-slate-950 border-slate-800"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                        <SelectItem value="draft">Borrador</SelectItem>
-                                        <SelectItem value="pending">Pendiente</SelectItem>
-                                        <SelectItem value="dispatched">Despachada</SelectItem>
-                                        <SelectItem value="invoiced">Facturada</SelectItem>
-                                        <SelectItem value="cancelled">Cancelada</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-5">
-                                  <div className="space-y-2">
-                                      <Label className={labelClass}>Tipo de Venta</Label>
-                                      <Select onValueChange={(v: any) => handleSelectChange('saleType', v)} value={formData.saleType}>
-                                          <SelectTrigger className={darkInputClass}><SelectValue /></SelectTrigger>
-                                          <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                              <SelectItem value="Venta Firme">Venta Firme</SelectItem>
-                                              <SelectItem value="Consignación">Consignación</SelectItem>
-                                              <SelectItem value="Traslado Bodega Interna">Traslado Bodega Interna</SelectItem>
-                                          </SelectContent>
-                                      </Select>
-                                  </div>
-                                  <div className="space-y-2">
-                                      <Label className={labelClass}>Método de Pago</Label>
-                                      <Select onValueChange={(v: any) => handleSelectChange('paymentMethod', v)} value={formData.paymentMethod}>
-                                          <SelectTrigger className={darkInputClass}><SelectValue /></SelectTrigger>
-                                          <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                              <SelectItem value="Contado">Contado</SelectItem>
-                                              <SelectItem value="Crédito">Crédito</SelectItem>
-                                              <SelectItem value="Pago con Anticipo y Saldo">Anticipo + Saldo</SelectItem>
-                                          </SelectContent>
-                                      </Select>
-                                  </div>
-                              </div>
-
-                              {(formData.paymentMethod === 'Crédito' || formData.paymentMethod === 'Pago con Anticipo y Saldo') && (
-                                  <div className="space-y-2">
-                                      <Label className={labelClass}>Días Crédito / Vencimiento</Label>
-                                      <div className="flex gap-2">
-                                          <Input type="number" placeholder="Días" value={formData.creditDays || ''} onChange={(e) => handleSelectChange('creditDays', Number(e.target.value))} className={`${darkInputClass} w-20 text-center`} />
-                                          <Input type="date" className={`${darkInputClass} flex-1 [color-scheme:dark]`} value={formData.balanceDueDate || ''} onChange={(e) => handleSelectChange('balanceDueDate', e.target.value)} />
-                                      </div>
-                                  </div>
-                              )}
-
-                              {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
-                                  <div className="grid grid-cols-2 gap-4 bg-blue-950/30 p-3 rounded-lg border border-blue-900/50">
-                                      <div className="space-y-1">
-                                          <Label className="text-xs text-blue-400">% Anticipo</Label>
-                                          <Input type="number" value={formData.advancePercentage || ''} onChange={(e) => handleSelectChange('advancePercentage', Number(e.target.value))} className="bg-slate-950 border-slate-800 h-8 text-blue-200" />
-                                      </div>
-                                      <div className="space-y-1">
-                                          <Label className="text-xs text-blue-400">Fecha Anticipo</Label>
-                                          <Input type="date" value={formData.advanceDueDate || ''} onChange={(e) => handleSelectChange('advanceDueDate', e.target.value)} className="bg-slate-950 border-slate-800 h-8 text-blue-200 [color-scheme:dark]" />
-                                      </div>
-                                  </div>
-                              )}
-
-                              <div className="space-y-2 pt-2">
-                                  <Label className={labelClass}>Notas / Observaciones</Label>
-                                  <Textarea 
-                                      name="notes" 
-                                      value={formData.notes || ''} 
-                                      onChange={handleInputChange} 
-                                      className="min-h-[80px] resize-none bg-slate-950 border-slate-800 text-slate-300 focus:border-slate-600"
-                                      placeholder="Instrucciones de despacho..."
-                                  />
-                              </div>
-                          </CardContent>
-                      </Card>
-                  </div>
-
-                  <div className="md:col-span-5">
-                      <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 shadow-xl relative overflow-hidden">
-                          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-emerald-500"></div>
-                          <CardContent className="p-6 space-y-6">
-                              <div className="flex justify-between items-center pb-4 border-b border-slate-800">
-                                  <h4 className="font-semibold text-slate-100 flex items-center gap-2">
-                                      <DollarSign className="h-4 w-4 text-emerald-500" /> Totales
-                                  </h4>
-                                  <div className="flex items-center gap-2 bg-slate-950/50 px-3 py-1 rounded-full border border-slate-800">
-                                      <Switch id="includeVat" checked={formData.includeVat} onCheckedChange={v => setFormData(p => ({...p, includeVat: v}))} className="data-[state=checked]:bg-emerald-500" />
-                                      <Label htmlFor="includeVat" className="text-[10px] cursor-pointer text-slate-400 uppercase font-bold">Ver con IVA</Label>
-                                  </div>
-                              </div>
-
-                              <div className="space-y-4">
-                                  <div className="flex justify-between text-slate-400 text-sm">
-                                      <span>Subtotal Neto</span>
-                                      <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(netTotal)}</span>
-                                  </div>
-                                  {formData.includeVat && (
-                                      <div className="flex justify-between text-slate-400 text-sm">
-                                          <span>IVA (19%)</span>
-                                          <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(vatAmount)}</span>
-                                      </div>
-                                  )}
-                                  
-                                  <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 flex justify-between items-end mt-2">
-                                      <span className="text-sm text-slate-400 font-medium uppercase tracking-wider mb-1">Total a Pagar</span>
-                                      <span className="text-2xl font-bold text-white tracking-tight">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(finalTotal)}</span>
-                                  </div>
-                              </div>
-                          </CardContent>
-                      </Card>
-                  </div>
-              </div>
-
+                <Button onClick={addItem} variant="secondary" className="w-full bg-slate-800 text-slate-200 hover:bg-slate-700" disabled={!currentItem.quantity}>
+                    <Plus className="h-4 w-4 mr-2"/> Agregar Item
+                </Button>
             </div>
 
-            <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
-              <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={formData.items.length === 0}>
-                  Guardar Venta
-              </Button>
-            </SheetFooter>
-          </form>
-        </SheetContent>
-      </Sheet>
+            {/* --- LISTA DE ITEMS --- */}
+            <div className="space-y-2">
+                {items.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-3 bg-slate-900/50 rounded border border-slate-800 text-sm">
+                        <div>
+                            <span className="text-white font-medium">{item.product} {item.caliber}</span>
+                            <div className="text-slate-500 text-xs">
+                                {item.quantity} kg • {item.packagingQuantity} cajas • ${item.price}/kg
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-emerald-400 font-mono">${(item.total).toLocaleString('es-CL')}</span>
+                            <button onClick={() => removeItem(idx)} className="text-slate-500 hover:text-red-400">
+                                <Trash2 className="h-4 w-4"/>
+                            </button>
+                        </div>
+                    </div>
+                ))}
+                {items.length > 0 && (
+                    <div className="flex justify-between items-center pt-4 border-t border-slate-800">
+                        <span className="text-lg font-bold text-white">Total</span>
+                        <span className="text-lg font-bold text-emerald-400">
+                            ${Math.round(totalAmount).toLocaleString('es-CL')}
+                        </span>
+                    </div>
+                )}
+            </div>
 
-      <ItemMatrixDialog 
-        isOpen={isMatrixOpen}
-        onOpenChange={setIsMatrixOpen}
-        onSave={handleMatrixSave}
-        orderType="sale"
-        inventory={inventory.filter(i => i.warehouse === formData.warehouse)}
-      />
+        </div>
 
-       <LotSelectionDialog
-        isOpen={isLotSelectionOpen}
-        onOpenChange={setIsLotSelectionOpen}
-        onSave={handleLotSave}
-        purchaseOrders={purchaseOrders}
-        salesOrders={salesOrders}
-        inventoryAdjustments={inventoryAdjustments}
-        warehouse={formData.warehouse}
-        contacts={contacts}
-      />
-    </>
+        <SheetFooter>
+          <SheetClose asChild>
+            <Button variant="outline" className="border-slate-700 text-slate-300 bg-transparent hover:bg-slate-800">Cancelar</Button>
+          </SheetClose>
+          <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-500 text-white">
+            {order ? 'Guardar Cambios' : `Crear ${isDispatch ? 'Despacho' : 'Venta'}`}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

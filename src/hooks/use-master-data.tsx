@@ -1,149 +1,173 @@
 
-
 "use client";
 
-import { useState, useMemo, createContext, useContext, ReactNode } from 'react';
-import { BankAccount, Contact, InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment } from '@/lib/types';
-import { useCollection, useFirebase, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
-import { getInventory } from '@/lib/inventory'; 
+import { createContext, useContext, ReactNode, useState, useEffect, useMemo } from 'react';
+import {
+  useCollection,
+  useDoc,
+  useFirebase,
+  useMemoFirebase,
+  setDocumentNonBlocking,
+  addDocumentNonBlocking,
+  deleteDocumentNonBlocking
+} from '@/firebase';
+import { BankAccount, Contact, PurchaseOrder, SalesOrder, InventoryAdjustment } from '@/lib/types';
+import { doc, collection } from 'firebase/firestore';
+import { getInventory } from '@/lib/inventory';
 
 // --- TYPES ---
 export type ProductCaliberAssociation = {
-    id: string; 
-    calibers: string[];
+  id: string; // Corresponds to product name for simplicity
+  calibers: string[];
 };
 
-type MasterDataContextType = {
-    products: { id: string; name: string }[];
-    addProduct: (p: string) => void;
-    removeProduct: (id: string) => void;
-    calibers: { id: string; name: string; code: string }[];
-    addCaliber: (c: { name: string; code: string }) => void;
-    removeCaliber: (id: string) => void;
-    warehouses: { id: string; name: string }[];
-    addWarehouse: (w: string) => void;
-    removeWarehouse: (id: string) => void;
-    units: { id: string; name: string }[];
-    addUnit: (u: string) => void;
-    removeUnit: (id: string) => void;
-    packagingTypes: { id: string; name: string }[];
-    addPackagingType: (p: string) => void;
-    removePackagingType: (id: string) => void;
-    productCaliberAssociations: ProductCaliberAssociation[];
-    updateProductCalibers: (productName: string, caliberNames: string[]) => void;
-    bankAccounts: BankAccount[];
-    addBankAccount: (account: Omit<BankAccount, 'id'>) => void;
-    updateBankAccount: (account: BankAccount) => void;
-    removeBankAccount: (id: string) => void;
-    contacts: Contact[];
-    internalConcepts: { name: string }[];
-    costCenters: { name: string }[];
-    isLoading: boolean;
+type MasterSettings = {
+  products: { id: string, name: string }[];
+  calibers: { id: string, name: string; code: string }[];
+  warehouses: { id: string, name: string }[];
+  units: { id: string, name: string }[];
+  packagingTypes: { id: string, name: string }[];
+  internalConcepts: { name: string }[];
+  costCenters: { name: string }[];
+  productCaliberAssociations: ProductCaliberAssociation[];
+};
+
+type MasterDataContextType = MasterSettings & {
+  bankAccounts: BankAccount[];
+  contacts: Contact[];
+  inventory: InventoryItem[];
+  isLoading: boolean;
+  addProduct: (name: string) => void;
+  removeProduct: (id: string) => void;
+  addCaliber: (caliber: { name: string, code: string }) => void;
+  removeCaliber: (id: string) => void;
+  addWarehouse: (name: string) => void;
+  removeWarehouse: (id: string) => void;
+  addPackagingType: (name: string) => void;
+  removePackagingType: (id: string) => void;
+  addBankAccount: (account: Omit<BankAccount, 'id'>) => void;
+  removeBankAccount: (id: string) => void;
+  updateProductCalibers: (productId: string, caliberIds: string[]) => void;
 };
 
 // --- CONTEXT ---
 const MasterDataContext = createContext<MasterDataContextType | undefined>(undefined);
 
-// --- PROVIDER COMPONENT ---
+// --- PROVIDER ---
 export function MasterDataProvider({ children }: { children: ReactNode }) {
-    const { firestore } = useFirebase();
+  const { firestore } = useFirebase();
 
-    // --- DATA FETCHING ---
-    const productsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'products') : null, [firestore]);
-    const { data: productsData, isLoading: l1 } = useCollection<{name: string}>(productsCollection);
-    const products = productsData || [];
-    
-    const calibersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'calibers') : null, [firestore]);
-    const { data: calibersData, isLoading: l2 } = useCollection<{name: string, code: string}>(calibersCollection);
-    const calibers = calibersData || [];
-    
-    const unitsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'units') : null, [firestore]);
-    const { data: unitsData, isLoading: l3 } = useCollection<{name: string}>(unitsCollection);
-    const units = unitsData || [];
+  // Settings Doc
+  const settingsDocRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'general') : null), [firestore]);
+  const { data: settingsData, isLoading: l1 } = useDoc<MasterSettings>(settingsDocRef);
+  
+  // Collections
+  const accountsCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'bankAccounts') : null), [firestore]);
+  const contactsCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'contacts') : null), [firestore]);
+  const purchasesCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'purchaseOrders') : null), [firestore]);
+  const salesCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'salesOrders') : null), [firestore]);
+  const adjustmentsCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'inventoryAdjustments') : null), [firestore]);
+  
+  const { data: bankAccounts, isLoading: l2 } = useCollection<BankAccount>(accountsCollection);
+  const { data: contacts, isLoading: l3 } = useCollection<Contact>(contactsCollection);
+  const { data: purchaseOrders, isLoading: l4 } = useCollection<PurchaseOrder>(purchasesCollection);
+  const { data: salesOrders, isLoading: l5 } = useCollection<SalesOrder>(salesCollection);
+  const { data: inventoryAdjustments, isLoading: l6 } = useCollection<InventoryAdjustment>(adjustmentsCollection);
 
-    const assocCollection = useMemoFirebase(() => firestore ? collection(firestore, 'productCaliberAssociations') : null, [firestore]);
-    const { data: assocData, isLoading: l4 } = useCollection<ProductCaliberAssociation>(assocCollection);
-    const productCaliberAssociations = assocData || [];
-    
-    const warehousesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'warehouses') : null, [firestore]);
-    const { data: warehousesData, isLoading: l5 } = useCollection<{name: string}>(warehousesCollection);
-    const warehouses = warehousesData || [];
+  // Defaults
+  const products = settingsData?.products || [];
+  const calibers = settingsData?.calibers || [];
+  const warehouses = settingsData?.warehouses || [];
+  const units = settingsData?.units || [];
+  const packagingTypes = settingsData?.packagingTypes || [];
+  const internalConcepts = settingsData?.internalConcepts || [];
+  const costCenters = settingsData?.costCenters || [];
+  const productCaliberAssociations = settingsData?.productCaliberAssociations || [];
 
-    const packagingTypesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'packagingTypes') : null, [firestore]);
-    const { data: packagingTypesData, isLoading: l6 } = useCollection<{name: string}>(packagingTypesCollection);
-    const packagingTypes = packagingTypesData || [];
+  const isLoading = l1 || l2 || l3 || l4 || l5 || l6;
 
-    const accountsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'bankAccounts') : null, [firestore]);
-    const { data: bankAccountsData, isLoading: l7 } = useCollection<BankAccount>(accountsCollection);
-    const bankAccounts = bankAccountsData || [];
+  const inventory = useMemo(() => {
+    return getInventory(purchaseOrders || [], salesOrders || [], inventoryAdjustments || []);
+  }, [purchaseOrders, salesOrders, inventoryAdjustments]);
 
-    const contactsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
-    const { data: contactsData, isLoading: l8 } = useCollection<Contact>(contactsCollection);
-    const contacts = contactsData || [];
+  // CRUD Helpers
+  const updateSettingList = (field: keyof MasterSettings, newList: any[]) => {
+    if (!settingsDocRef) return;
+    setDocumentNonBlocking(settingsDocRef, { [field]: newList }, { merge: true });
+  };
+  
+  const addItem = (list: {id:string, name: string}[], name: string, field: keyof MasterSettings) => {
+      if(!list.find(i => i.name === name)) {
+          const newItem = { id: `item-${Date.now()}`, name };
+          updateSettingList(field, [...list, newItem]);
+      }
+  }
 
-    const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8;
-    
-    // --- CRUD FUNCTIONS ---
-    const addProduct = (name: string) => { if (firestore && name) addDocumentNonBlocking(collection(firestore, 'products'), { name }); };
-    const removeProduct = (id: string) => { if (firestore) deleteDocumentNonBlocking(doc(firestore, 'products', id)); };
+  const removeItem = (list: {id:string}[], id: string, field: keyof MasterSettings) => {
+      updateSettingList(field, list.filter(item => item.id !== id));
+  }
+  
+  const addProduct = (name: string) => addItem(products, name, 'products');
+  const removeProduct = (id: string) => removeItem(products, id, 'products');
+  
+  const addCaliber = (caliber: {name: string, code: string}) => {
+      if(!calibers.find(c => c.name === caliber.name)) {
+          const newCaliber = { ...caliber, id: `cal-${Date.now()}`};
+          updateSettingList('calibers', [...calibers, newCaliber]);
+      }
+  }
+  const removeCaliber = (id: string) => removeItem(calibers, id, 'calibers');
 
-    const addCaliber = (caliber: { name: string; code: string }) => { if (firestore && caliber.name) addDocumentNonBlocking(collection(firestore, 'calibers'), caliber); };
-    const removeCaliber = (id: string) => { if (firestore) deleteDocumentNonBlocking(doc(firestore, 'calibers', id)); };
-    
-    const addUnit = (name: string) => { if (firestore && name) addDocumentNonBlocking(collection(firestore, 'units'), { name }); };
-    const removeUnit = (id: string) => { if (firestore) deleteDocumentNonBlocking(doc(firestore, 'units', id)); };
+  const addWarehouse = (name: string) => addItem(warehouses, name, 'warehouses');
+  const removeWarehouse = (id: string) => removeItem(warehouses, id, 'warehouses');
+  
+  const addPackagingType = (name: string) => addItem(packagingTypes, name, 'packagingTypes');
+  const removePackagingType = (id: string) => removeItem(packagingTypes, id, 'packagingTypes');
+  
+  const addBankAccount = (account: Omit<BankAccount, 'id'>) => {
+    if (!firestore) return;
+    addDocumentNonBlocking(collection(firestore, 'bankAccounts'), account);
+  };
+  
+  const removeBankAccount = (id: string) => {
+    if (!firestore) return;
+    deleteDocumentNonBlocking(doc(firestore, 'bankAccounts', id));
+  };
+  
+  const updateProductCalibers = (productId: string, caliberIds: string[]) => {
+    const newAssociations = [...productCaliberAssociations];
+    const existingIndex = newAssociations.findIndex(a => a.id === productId);
 
-    const addWarehouse = (name: string) => { if (firestore && name) addDocumentNonBlocking(collection(firestore, 'warehouses'), { name }); };
-    const removeWarehouse = (id: string) => { if (firestore) deleteDocumentNonBlocking(doc(firestore, 'warehouses', id)); };
-
-    const addPackagingType = (name: string) => { if (firestore && name) addDocumentNonBlocking(collection(firestore, 'packagingTypes'), { name }); };
-    const removePackagingType = (id: string) => { if (firestore) deleteDocumentNonBlocking(doc(firestore, 'packagingTypes', id)); };
-
-    const updateProductCalibers = (productName: string, caliberNames: string[]) => {
-        if (!firestore) return;
-        const assocRef = doc(firestore, 'productCaliberAssociations', productName);
-        setDocumentNonBlocking(assocRef, { id: productName, calibers: caliberNames }, { merge: true });
-    };
-
-    const addBankAccount = (account: Omit<BankAccount, 'id'>) => { if (firestore) addDocumentNonBlocking(collection(firestore, 'bankAccounts'), account); };
-    const updateBankAccount = (account: BankAccount) => { if (firestore) setDocumentNonBlocking(doc(firestore, 'bankAccounts', account.id), account, { merge: true }); };
-    const removeBankAccount = (id: string) => { if (firestore) deleteDocumentNonBlocking(doc(firestore, 'bankAccounts', id)); };
-
-    const internalConcepts = [
-        { name: 'Retiro de Socios' }, { name: 'Pago de Impuestos' }, { name: 'Comisión Bancaria' },
-        { name: 'Préstamo Interno' }, { name: 'Gastos Generales' }, { name: 'Mantención' }, 
-        { name: 'Combustible' }, { name: 'Remuneraciones' }, { name: 'Leyes Sociales' }
-    ];
-    
-    const costCenters = [
-        { name: 'Administración' }, { name: 'Campo' }, { name: 'Packing' }, { name: 'Comercial' }, { name: 'Logística' }
-    ];
-    
-    const value: MasterDataContextType = {
-        products, addProduct, removeProduct,
-        calibers, addCaliber, removeCaliber,
-        warehouses, addWarehouse, removeWarehouse,
-        units, addUnit, removeUnit,
-        packagingTypes, addPackagingType, removePackagingType,
-        productCaliberAssociations, updateProductCalibers,
-        contacts, bankAccounts, addBankAccount, updateBankAccount, removeBankAccount,
-        internalConcepts, costCenters,
-        isLoading
-    };
-
-    return (
-        <MasterDataContext.Provider value={value}>
-            {children}
-        </MasterDataContext.Provider>
-    );
-}
-
-// --- CUSTOM HOOK ---
-export function useMasterData() {
-    const context = useContext(MasterDataContext);
-    if (context === undefined) {
-        throw new Error('useMasterData must be used within a MasterDataProvider');
+    if (existingIndex > -1) {
+      newAssociations[existingIndex].calibers = caliberIds;
+    } else {
+      newAssociations.push({ id: productId, calibers: caliberIds });
     }
-    return context;
+    updateSettingList('productCaliberAssociations', newAssociations);
+  };
+
+  const value = {
+    products, calibers, warehouses, units, packagingTypes, internalConcepts, costCenters, productCaliberAssociations,
+    bankAccounts: bankAccounts || [],
+    contacts: contacts || [],
+    inventory: inventory || [],
+    isLoading,
+    addProduct, removeProduct,
+    addCaliber, removeCaliber,
+    addWarehouse, removeWarehouse,
+    addPackagingType, removePackagingType,
+    addBankAccount, removeBankAccount,
+    updateProductCalibers,
+  };
+
+  return <MasterDataContext.Provider value={value}>{children}</MasterDataContext.Provider>;
 }
+
+// --- HOOK ---
+export const useMasterData = () => {
+  const context = useContext(MasterDataContext);
+  if (context === undefined) {
+    throw new Error('useMasterData must be used within a MasterDataProvider');
+  }
+  return context;
+};

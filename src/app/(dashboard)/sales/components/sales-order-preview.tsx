@@ -1,116 +1,91 @@
 "use client";
 
-import React, { useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
-  DialogClose,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { SalesOrder, Contact } from '@/lib/types';
-// Importamos el diseño del contenido
-import { SalesOrderPreviewContent } from './sales-order-preview-content';
-import { useReactToPrint } from 'react-to-print';
-import { Printer, Download, Loader2 } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { SalesOrder } from "@/lib/types";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
+import { Separator } from "@/components/ui/separator";
+import { Download, Printer } from "lucide-react";
 
-type SalesOrderPreviewProps = {
+// AQUÍ AGREGAMOS 'onExportRequest' PARA QUE NO FALLE
+interface SalesOrderPreviewProps {
   order: SalesOrder | null;
-  client: Contact | null; // <--- AQUÍ ESTABA EL FALTANTE
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-};
+  onOpenChange: (open: boolean) => void;
+  onExportRequest?: () => void; // <--- ESTA LÍNEA ES LA CLAVE
+}
 
-export function SalesOrderPreview({ order, client, isOpen, onOpenChange }: SalesOrderPreviewProps) {
-  const componentRef = useRef<HTMLDivElement>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
-  
-  // Imprimir
-  const handlePrint = useReactToPrint({
-      contentRef: componentRef,
-      documentTitle: order ? `OV_${order.id}` : 'Orden_de_Venta',
-  });
-
-  // Descargar PDF
-  const handleDownloadPdf = async () => {
-    const element = componentRef.current;
-    if (!element) return;
-
-    setIsDownloading(true);
-    try {
-        const canvas = await html2canvas(element, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff'
-        });
-
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const imgProps = pdf.getImageProperties(imgData);
-        const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
-        pdf.save(`OV_${order?.id || 'document'}.pdf`);
-
-    } catch (error) {
-        console.error("Error al generar PDF:", error);
-        alert("Error al generar el PDF.");
-    } finally {
-        setIsDownloading(false);
-    }
-  };
-
+export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest }: SalesOrderPreviewProps) {
   if (!order) return null;
-  
+
+  const formatCurrency = (val: number) => 
+    new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] p-0 flex flex-col gap-0 bg-white text-black">
-        
-        {/* Header */}
-        <DialogHeader className="p-4 border-b shrink-0">
-          <DialogTitle>Vista Previa: {order.id}</DialogTitle>
+      <DialogContent className="sm:max-w-[600px] bg-white text-slate-900">
+        <DialogHeader>
+          <DialogTitle>Detalle de Orden {order.number || order.id.substring(0,8)}</DialogTitle>
+          <DialogDescription>
+            {format(parseISO(order.date), "PPPP", { locale: es })}
+          </DialogDescription>
         </DialogHeader>
-        
-        {/* Contenido Scrollable */}
-        <div className="flex-1 overflow-y-auto bg-gray-100 p-4 flex justify-center">
-            <div className="shadow-lg bg-white w-full max-w-[210mm] shrink-0">
-                {/* Renderizamos el contenido pasándole el cliente */}
-                <SalesOrderPreviewContent
-                    ref={componentRef}
-                    order={order} 
-                    client={client}
-                />
+
+        <div className="grid gap-4 py-4 text-sm">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="font-semibold text-slate-500">Cliente</p>
+              <p>{order.clientId}</p>
             </div>
+            <div className="text-right">
+              <p className="font-semibold text-slate-500">Estado</p>
+              <p className="uppercase font-bold">{order.status}</p>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <p className="font-semibold text-slate-500 mb-2">Items</p>
+            <div className="space-y-2">
+              {order.items.map((item, index) => (
+                <div key={index} className="flex justify-between">
+                  <span>{item.product} {item.caliber} ({item.quantity} kg)</span>
+                  <span>{formatCurrency(item.total)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="flex justify-between font-bold text-lg">
+            <span>Total</span>
+            <span>{formatCurrency(order.totalAmount)}</span>
+          </div>
         </div>
 
-        {/* Footer */}
-        <DialogFooter className="p-4 border-t bg-white shrink-0 flex flex-col-reverse sm:flex-row gap-2">
-            <Button 
-                onClick={handleDownloadPdf} 
-                variant="secondary"
-                disabled={isDownloading}
-                className="w-full sm:w-auto"
-            >
-                {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                {isDownloading ? "Generando..." : "Descargar PDF"}
+        <DialogFooter className="sm:justify-between">
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <div className="flex gap-2">
+            {onExportRequest && (
+                <Button onClick={onExportRequest} variant="outline" className="gap-2">
+                    <Download className="h-4 w-4" /> Exportar
+                </Button>
+            )}
+            <Button onClick={() => window.print()} className="gap-2">
+              <Printer className="h-4 w-4" /> Imprimir
             </Button>
-
-            <Button onClick={() => handlePrint && handlePrint()} className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700">
-                <Printer className="mr-2 h-4 w-4" />
-                Imprimir
-            </Button>
-
-            <DialogClose asChild>
-                <Button type="button" variant="outline" className="w-full sm:w-auto">Cerrar</Button>
-            </DialogClose>
+          </div>
         </DialogFooter>
-
       </DialogContent>
     </Dialog>
   );

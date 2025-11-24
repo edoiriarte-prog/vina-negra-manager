@@ -17,7 +17,7 @@ export interface Contact {
   rut: string;
   name: string;
   email: string;
-  type: ContactType[] | string[]; // Array para soportar múltiples roles
+  type: ContactType[] | string[]; 
   tags?: string[];
   address?: string;
   commune?: string;
@@ -30,23 +30,20 @@ export interface Contact {
 export type Category = 'fruit' | 'supply' | 'service';
 export type Unit = 'Kilos' | 'Cajas' | 'Unidades' | 'Litros' | string;
 
-// Item maestro de inventario
 export interface InventoryItem {
   id: string;
   name: string;
   category?: Category;
-  stock: number; // Stock total calculado
+  stock: number; 
   unit: Unit;
   minStock?: number;
   cost?: number;
   price?: number;
   location?: string;
-  // Campos auxiliares para lógica de fruta
   caliber?: string;
   warehouse?: string;
 }
 
-// Ajustes manuales de inventario (Mermas, correcciones)
 export interface InventoryAdjustment {
     id: string;
     date: string;
@@ -54,8 +51,8 @@ export interface InventoryAdjustment {
     caliber: string;
     warehouse: string;
     type: 'increase' | 'decrease';
-    quantity: number; // Kilos
-    packagingQuantity?: number; // Cajas/Envases
+    quantity: number; 
+    packagingQuantity?: number; 
     reason: string;
     lotNumber?: string;
     notes?: string;
@@ -63,20 +60,19 @@ export interface InventoryAdjustment {
 
 // --- 3. ÓRDENES (COMPRAS Y VENTAS) ---
 
-// Estados ampliados para soportar el flujo real
 export type OrderStatus = 'pending' | 'completed' | 'cancelled' | 'received' | 'dispatched' | 'invoiced' | 'draft';
 
-// Item dentro de una orden (Detalle)
 export interface OrderItem {
-  product: string; // ID o Nombre del producto
-  caliber: string; // Importante para fruta
-  quantity: number; // Cantidad principal (ej: Kilos)
-  packagingQuantity?: number; // Cantidad secundaria (ej: Cajas)
+  product: string; 
+  caliber: string; 
+  quantity: number; 
+  packagingQuantity?: number; 
   price: number;
-  total: number; // quantity * price
+  total: number; 
   unit?: string;
-  lotNumber?: string; // Para trazabilidad
-  format?: string; // Tipo de envase
+  lotNumber?: string; 
+  format?: string; 
+  packagingType?: string; // Alias para format
 }
 
 export interface PurchaseOrder {
@@ -84,14 +80,15 @@ export interface PurchaseOrder {
   date: string;
   supplierId: string;
   status: OrderStatus;
-  warehouse: string; // Bodega de recepción
-  destinationWarehouse?: string; // Por si acaso
+  warehouse: string; 
+  destinationWarehouse?: string; 
   items: OrderItem[];
   totalAmount: number;
-  totalKilos?: number; // Opcional, calculado
+  totalKilos?: number; 
   notes?: string;
   number?: string;
   paymentCondition?: string;
+  includeVat?: boolean; // <--- PROPIEDAD AGREGADA
 }
 
 export interface SalesOrder {
@@ -99,14 +96,26 @@ export interface SalesOrder {
   date: string;
   clientId: string;
   status: OrderStatus;
-  warehouse?: string; // Bodega de origen
-  destinationWarehouse?: string; // Para traslados internos
+  warehouse?: string; 
+  destinationWarehouse?: string; 
   items: OrderItem[];
   totalAmount: number;
-  totalKilos?: number; // Opcional, calculado
+  totalKilos?: number; 
+  totalPackages?: number; // <--- PROPIEDAD AGREGADA
   notes?: string;
   number?: string;
-  saleType?: string; // 'Venta Nacional', 'Exportación', 'Traslado Bodega Interna'
+  saleType?: string; 
+  includeVat?: boolean; // <--- PROPIEDAD AGREGADA
+  paymentStatus?: string; // <--- PROPIEDAD AGREGADA
+  orderType?: 'sale' | 'dispatch'; // Para diferenciar en lógica interna
+}
+
+// Servicos (Placeholder)
+export interface ServiceOrder {
+    id: string;
+    supplierId: string;
+    date: string;
+    cost: number;
 }
 
 // --- 4. FINANZAS ---
@@ -122,6 +131,7 @@ export interface FinancialMovement {
   relatedOrderId?: string;
   contactId?: string;
   status?: 'paid' | 'pending';
+  relatedDocument?: { id: string };
 }
 
 // --- 5. CONFIGURACIÓN Y OTROS ---
