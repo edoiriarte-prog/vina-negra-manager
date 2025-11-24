@@ -7,13 +7,12 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, CalendarIcon, Truck, Warehouse, CreditCard, Info, PackageCheck, DollarSign } from 'lucide-react';
+import { Plus, Trash2, CalendarIcon, Truck, Warehouse, CreditCard, Info, PackageCheck, DollarSign, Barcode } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PurchaseOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
 import { format, addDays, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { ItemMatrixDialog } from '../../sales/components/item-matrix-dialog'; 
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
@@ -31,7 +30,10 @@ type NewPurchaseOrderSheetProps = {
   purchaseOrders: PurchaseOrder[];
 };
 
-type PurchaseOrderFormData = Omit<PurchaseOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'>;
+// Definimos el tipo extendido para incluir status en el formulario
+type PurchaseOrderFormData = Omit<PurchaseOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'> & {
+    status: 'draft' | 'pending' | 'received' | 'completed' | 'cancelled';
+};
 
 const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData => {
     if (order) {
@@ -40,6 +42,7 @@ const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData 
             date: format(new Date(order.date), 'yyyy-MM-dd'),
             advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : undefined,
             balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
+            status: order.status,
         };
     }
     return {
@@ -109,7 +112,8 @@ export function NewPurchaseOrderSheet({
                     .filter(n => !isNaN(n));
                 
                 const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 1099;
-                const newId = `OC-${maxId + 1}`;
+                const nextNum = maxId < 1099 ? 1100 : maxId + 1;
+                const newId = `OC-${nextNum}`;
                 
                 setNextIdDisplay(newId);
                 setFormData(getInitialFormData(null));
@@ -183,9 +187,10 @@ export function NewPurchaseOrderSheet({
     
     const sanitizedItems = formData.items.map(item => ({
         ...item,
-        packagingType: item.packagingType || null,
+        // CORRECCIÓN: Usamos undefined para tipos estrictos
+        packagingType: item.packagingType || undefined,
         packagingQuantity: Number(item.packagingQuantity) || 0,
-        lotNumber: item.lotNumber || null,
+        lotNumber: item.lotNumber || undefined, // IMPORTANTE: Guardamos el lote
         quantity: Number(item.quantity) || 0,
         price: Number(item.price) || 0,
     }));
@@ -217,9 +222,30 @@ export function NewPurchaseOrderSheet({
 
   const title = order ? `Editar OC ${order.id}` : `Nueva Compra`;
 
+  // Helpers visuales de estado
+  const getStatusColor = (status: string) => {
+      switch(status) {
+          case 'completed': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+          case 'received': return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+          case 'draft': return 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+          case 'cancelled': return 'bg-red-500/10 text-red-400 border-red-500/30';
+          default: return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
+      }
+  };
+
+  const getStatusLabel = (status: string) => {
+      switch(status) {
+          case 'completed': return 'Recepcionada';
+          case 'received': return 'En Tránsito'; // O Recibida Parcial
+          case 'draft': return 'Borrador';
+          case 'pending': return 'Pendiente';
+          case 'cancelled': return 'Anulada';
+          default: return status;
+      }
+  };
+
   if (!formData) return null;
 
-  // Clases reutilizables para el nuevo tema
   const darkInputClass = "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 placeholder:text-slate-600";
   const darkCardClass = "bg-slate-900 border-slate-800 shadow-sm";
   const labelClass = "text-xs font-medium text-slate-400 uppercase tracking-wide";
@@ -229,7 +255,7 @@ export function NewPurchaseOrderSheet({
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="sm:max-w-7xl w-[95vw] overflow-y-auto p-0 flex flex-col gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
           
-          {/* --- HEADER SUPERIOR FIJO --- */}
+          {/* HEADER */}
           <SheetHeader className="bg-slate-900 border-b border-slate-800 px-6 py-4 sticky top-0 z-10">
              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
@@ -244,8 +270,8 @@ export function NewPurchaseOrderSheet({
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={`capitalize border-slate-700 text-slate-300 ${formData.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : ''}`}>
-                        {formData.status === 'completed' ? 'Recepcionada' : formData.status}
+                    <Badge variant="outline" className={`capitalize border-slate-700 ${getStatusColor(formData.status)}`}>
+                        {getStatusLabel(formData.status)}
                     </Badge>
                 </div>
             </div>
@@ -254,14 +280,12 @@ export function NewPurchaseOrderSheet({
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
             <div className="p-6 space-y-8">
               
-              {/* --- SECCIÓN 1: DATOS GENERALES --- */}
+              {/* SECCIÓN 1: DATOS GENERALES */}
               <div className="grid md:grid-cols-3 gap-5">
-                {/* Proveedor */}
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Truck className="h-4 w-4 text-blue-500" />
-                            Proveedor
+                            <Truck className="h-4 w-4 text-blue-500" /> Proveedor
                         </div>
                         <Select required onValueChange={(value) => handleSelectChange('supplierId', value)} value={formData.supplierId}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
@@ -272,23 +296,19 @@ export function NewPurchaseOrderSheet({
                     </CardContent>
                 </Card>
 
-                {/* Fecha */}
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <CalendarIcon className="h-4 w-4 text-orange-500" />
-                            Fecha Emisión
+                            <CalendarIcon className="h-4 w-4 text-orange-500" /> Fecha Emisión
                         </div>
                         <Input type="date" name="date" value={formData.date} onChange={handleInputChange} className={`${darkInputClass} [color-scheme:dark]`} required />
                     </CardContent>
                 </Card>
 
-                {/* Bodega */}
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Warehouse className="h-4 w-4 text-emerald-500" />
-                            Bodega Destino
+                            <Warehouse className="h-4 w-4 text-emerald-500" /> Bodega Destino
                         </div>
                         <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
@@ -300,7 +320,7 @@ export function NewPurchaseOrderSheet({
                 </Card>
               </div>
 
-              {/* --- SECCIÓN 2: ITEMS --- */}
+              {/* SECCIÓN 2: ITEMS */}
               <div className={`rounded-xl border border-slate-800 overflow-hidden ${darkCardClass}`}>
                 <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                     <h3 className="font-semibold text-slate-200 flex items-center gap-2">
@@ -325,6 +345,8 @@ export function NewPurchaseOrderSheet({
                                     <tr>
                                         <th className="px-4 py-3 font-semibold">Producto</th>
                                         <th className="px-4 py-3 font-semibold">Calibre</th>
+                                        {/* NUEVA COLUMNA: LOTE */}
+                                        <th className="px-4 py-3 font-semibold w-[120px]">Lote</th> 
                                         <th className="px-4 py-3 font-semibold">Envase</th>
                                         <th className="px-4 py-3 text-center font-semibold">Cant.</th>
                                         <th className="px-4 py-3 text-center font-semibold">Kilos</th>
@@ -350,6 +372,18 @@ export function NewPurchaseOrderSheet({
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-slate-400 focus:ring-0"><SelectValue /></SelectTrigger>
                                                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{calibers.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
                                                     </Select>
+                                                </td>
+                                                {/* INPUT DE LOTE */}
+                                                <td className="px-4 py-2">
+                                                    <div className="flex items-center gap-1">
+                                                        <Barcode className="h-3 w-3 text-slate-500" />
+                                                        <Input 
+                                                            value={item.lotNumber || ''} 
+                                                            onChange={(e) => handleItemChange(index, 'lotNumber', e.target.value)} 
+                                                            className="h-7 text-xs bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-300 uppercase placeholder:text-slate-700" 
+                                                            placeholder="LOTE-001"
+                                                        />
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-2">
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.packagingType`, v)} value={item.packagingType || ''}>
@@ -387,16 +421,30 @@ export function NewPurchaseOrderSheet({
                 </div>
               </div>
 
-              {/* --- SECCIÓN 3: PIE DE PÁGINA --- */}
+              {/* SECCIÓN 3: PIE DE PÁGINA */}
               <div className="grid md:grid-cols-12 gap-6 items-start">
                   
                   {/* Izquierda: Condiciones */}
                   <div className="md:col-span-7 space-y-4">
                       <Card className={darkCardClass}>
                           <CardContent className="p-5 space-y-5">
-                              <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2 mb-4 border-b border-slate-800 pb-2">
-                                  <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones Comerciales
-                              </h4>
+                              <div className='flex justify-between items-center border-b border-slate-800 pb-2 mb-4'>
+                                  <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                                      <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones Comerciales
+                                  </h4>
+                                  {/* SELECTOR DE ESTADO (NUEVO) */}
+                                  <Select onValueChange={(v: any) => handleSelectChange('status', v)} value={formData.status}>
+                                      <SelectTrigger className="h-7 w-36 text-xs bg-slate-950 border-slate-800"><SelectValue /></SelectTrigger>
+                                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                          <SelectItem value="draft">Borrador</SelectItem>
+                                          <SelectItem value="pending">Pendiente</SelectItem>
+                                          <SelectItem value="received">En Tránsito</SelectItem>
+                                          <SelectItem value="completed">Recepcionada</SelectItem>
+                                          <SelectItem value="cancelled">Anulada</SelectItem>
+                                      </SelectContent>
+                                  </Select>
+                              </div>
+
                               <div className="grid grid-cols-2 gap-5">
                                   <div className="space-y-2">
                                       <Label className={labelClass}>Método de Pago</Label>

@@ -2,29 +2,28 @@
 
 import { useState } from "react";
 import { SalesOrder, Contact } from "@/lib/types"; 
-import { getColumns } from "./components/columns"; // Importamos la función generadora
+import { getColumns } from "./components/columns"; 
 import { DataTable } from "@/components/ui/data-table"; 
 import { useSalesOrders } from "@/hooks/use-sales-orders"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { Button } from "@/components/ui/button";
 import { Plus, TrendingUp, Clock, Truck, Search } from "lucide-react";
 import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
-// Asegúrate de tener este componente creado (te lo di en el paso anterior)
 import { SalesOrderPreview } from "./components/sales-order-preview"; 
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 export default function SalesPage() {
   // Hooks de datos
-  const { orders, loading, createOrder, updateOrder, deleteOrder } = useSalesOrders();
+  const { orders, createOrder, updateOrder, deleteOrder } = useSalesOrders();
   
   // Obtenemos contactos e inventario
-  // Casteamos a any por seguridad si el hook no está 100% tipado aún
-  const { contacts, inventory, carriers } = useMasterData() as any; 
+  // Nota: Quitamos 'carriers' del destructuring porque useMasterData no lo devuelve directo, lo filtramos abajo
+  const { contacts, inventory } = useMasterData(); 
   
-  // Filtramos solo los CLIENTES para esta vista
-  const clients = contacts ? contacts.filter((c: Contact) => c.type === 'client') : [];
-  const carrierList = contacts ? contacts.filter((c: Contact) => c.type === 'carrier') : [];
+  // Filtramos Clientes y Transportistas
+  const clients = contacts ? contacts.filter((c: Contact) => c.type === 'client' || c.type === 'both') : [];
+  const carrierList = contacts ? contacts.filter((c: Contact) => c.type === 'carrier' || c.type === 'both') : [];
 
   // Estados
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -32,10 +31,14 @@ export default function SalesPage() {
   const [previewOrder, setPreviewOrder] = useState<SalesOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Cálculos de KPIs
+  // Cálculos de KPIs (CORREGIDOS PARA NUEVOS TIPOS)
   const totalAmount = orders.reduce((sum: number, o: SalesOrder) => sum + (o.totalAmount || 0), 0);
-  const pendingCount = orders.filter((o: SalesOrder) => o.status === 'pending').length;
-  const completedCount = orders.filter((o: SalesOrder) => o.status === 'completed').length;
+  
+  // Pendientes: Estado 'pending' o 'draft'
+  const pendingCount = orders.filter((o: SalesOrder) => o.status === 'pending' || o.status === 'draft').length;
+  
+  // Completadas: Ahora consideramos 'dispatched' (Despachado) e 'invoiced' (Facturado)
+  const completedCount = orders.filter((o: SalesOrder) => o.status === 'dispatched' || o.status === 'invoiced').length;
 
   // Filtrado de órdenes
   const filteredOrders = orders.filter((o: SalesOrder) => 
@@ -166,13 +169,14 @@ export default function SalesPage() {
         isOpen={isSheetOpen}
         onOpenChange={handleCloseSheet}
         onSave={(data) => {
+            // TypeScript ahora estará feliz porque los datos coinciden
             if (editingOrder) updateOrder(data as any);
             else createOrder(data as any);
             setIsSheetOpen(false);
         }}
         order={editingOrder}
         clients={clients}
-        carriers={carrierList} // Pasamos lista de transportistas
+        carriers={carrierList}
         inventory={inventory || []}
         nextOrderId=""
         salesOrders={orders}
@@ -183,7 +187,6 @@ export default function SalesPage() {
             isOpen={!!previewOrder}
             onOpenChange={(open) => !open && setPreviewOrder(null)}
             order={previewOrder}
-            // Buscamos el cliente para pasar sus datos a la vista previa
             client={clients.find((c: Contact) => c.id === previewOrder.clientId) || null}
           />
       )}

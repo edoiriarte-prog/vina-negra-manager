@@ -3,18 +3,18 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  Boxes,
   LayoutDashboard,
-  Landmark,
   ShoppingCart,
   ShoppingBag,
   Truck,
   Users,
-  BarChart,
   HelpCircle,
   FileSliders,
   Settings,
   PackageCheck,
+  Boxes,
+  Wallet,    // Nuevo para Tesorería
+  Landmark,  // Nuevo para Cta Corriente
 } from "lucide-react"
 
 import {
@@ -27,14 +27,22 @@ import { cn } from "@/lib/utils"
 const menuItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contacts", label: "Contactos", icon: Users },
+  
+  // Operaciones
   { href: "/purchases", label: "Compras (O/C)", icon: ShoppingBag },
   { href: "/sales", label: "Ventas (O/V)", icon: ShoppingCart },
   { href: "/dispatches", label: "Orden de Salida", icon: PackageCheck },
   { href: "/services", label: "Servicios (O/S)", icon: Truck },
+  
+  // Logística
   { href: "/inventory", label: "Inventario", icon: Boxes },
-  { href: "/inventory-adjustments", label: "Ajustes de Inventario", icon: FileSliders },
-  { href: "/financials", label: "Tesorería", icon: Landmark },
-  { href: "/mercantile-account", label: "Cta. Corriente Mercantil", icon: BarChart },
+  { href: "/inventory-adjustments", label: "Ajustes de Stock", icon: FileSliders },
+  
+  // Finanzas (Nuevos Módulos)
+  { href: "/current-account", label: "Cuenta Corriente", icon: Landmark },
+  { href: "/financials", label: "Tesorería", icon: Wallet },
+  
+  // Sistema
   { href: "/settings", label: "Configuración", icon: Settings },
   { href: "/help", label: "Ayuda", icon: HelpCircle },
 ]

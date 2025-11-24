@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useMasterData, ProductCaliberAssociation } from '@/hooks/use-master-data';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -8,116 +8,112 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Save, RotateCcw, Eraser } from 'lucide-react';
+import { Save, RotateCcw, Eraser, CheckSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils'; // Asegúrate de tener esta utilidad, si no, usa clases normales
 
 export function ProductCaliberManager() {
   const { products, calibers, productCaliberAssociations, updateProductCalibers } = useMasterData();
   const [localAssociations, setLocalAssociations] = useState<ProductCaliberAssociation[]>([]);
   const { toast } = useToast();
 
-  // 1. Sincronizar estado local con el global al cargar y detectar nuevos productos
+  // 1. Sincronización robusta: Solo inicializa, no sobrescribe trabajo en curso sin querer
   useEffect(() => {
-      if (products.length > 0) {
-          setLocalAssociations(prev => {
-              // Si es la primera carga, copiamos todo
-              if (prev.length === 0 && productCaliberAssociations.length > 0) {
-                  return JSON.parse(JSON.stringify(productCaliberAssociations));
-              }
+    if (products.length > 0 && productCaliberAssociations.length > 0) {
+      setLocalAssociations(prev => {
+        // Si ya tenemos datos locales, verificamos si faltan productos nuevos
+        const currentIds = new Set(prev.map(a => a.id));
+        const missingProducts = products.filter(p => !currentIds.has(p));
 
-              // Si ya hay datos locales, solo nos aseguramos de que existan entradas para todos los productos
-              const newAssoc = [...prev];
-              let changed = false;
-              products.forEach(p => {
-                  if (!newAssoc.find(a => a.id === p)) {
-                      // Si hay un producto nuevo en maestros que no está en local, lo agregamos
-                      // Intentamos ver si ya tiene datos guardados globalmente, si no, vacío.
-                      const existingGlobal = productCaliberAssociations.find(ga => ga.id === p);
-                      newAssoc.push(existingGlobal ? JSON.parse(JSON.stringify(existingGlobal)) : { id: p, calibers: [] });
-                      changed = true;
-                  }
-              });
-              return changed ? newAssoc : prev;
-          })
-      }
-  }, [products, productCaliberAssociations]);
+        if (missingProducts.length === 0 && prev.length > 0) {
+          return prev; // No hay cambios estructurales, no tocamos nada
+        }
+
+        const newAssoc = [...prev];
+        
+        // Agregamos solo lo que falta
+        products.forEach(p => {
+          if (!currentIds.has(p)) {
+            const existingGlobal = productCaliberAssociations.find(ga => ga.id === p);
+            newAssoc.push(existingGlobal 
+              ? { ...existingGlobal, calibers: [...existingGlobal.calibers] } // Shallow copy es suficiente aquí
+              : { id: p, calibers: [] }
+            );
+          }
+        });
+
+        return newAssoc;
+      });
+    } else if (products.length > 0 && localAssociations.length === 0) {
+       // Inicialización en frío (primera carga)
+       const initialMap = products.map(p => {
+         const existing = productCaliberAssociations.find(a => a.id === p);
+         return existing ? { ...existing, calibers: [...existing.calibers] } : { id: p, calibers: [] };
+       });
+       setLocalAssociations(initialMap);
+    }
+  }, [products, productCaliberAssociations, localAssociations.length]); // Dependencias optimizadas
 
 
-  // Manejar cambios en los checkboxes (Solo memoria Local)
-  const handleToggleCaliber = (product: string, caliberName: string, isChecked: boolean) => {
-    setLocalAssociations(prev => {
-      const index = prev.findIndex(a => a.id === product);
-      let newAssociations = [...prev];
+  // Toggle Individual
+  const handleToggleCaliber = useCallback((product: string, caliberName: string, isChecked: boolean) => {
+    setLocalAssociations(prev => prev.map(item => {
+      if (item.id !== product) return item;
       
-      if (index === -1) {
-          newAssociations.push({ id: product, calibers: isChecked ? [caliberName] : [] });
-          return newAssociations;
-      }
-
-      const currentCalibers = newAssociations[index].calibers;
-      let newCalibersList: string[];
+      const newCalibers = isChecked 
+        ? [...item.calibers, caliberName]
+        : item.calibers.filter(c => c !== caliberName);
       
-      if (isChecked) {
-        newCalibersList = [...currentCalibers, caliberName];
-      } else {
-        newCalibersList = currentCalibers.filter(c => c !== caliberName);
-      }
+      return { ...item, calibers: newCalibers };
+    }));
+  }, []);
 
-      newAssociations[index] = { ...newAssociations[index], calibers: newCalibersList };
-      return newAssociations;
-    });
+  // Seleccionar TODOS los calibres para un producto
+  const handleSelectAll = (productName: string) => {
+    const allCaliberNames = calibers.map(c => c.name);
+    setLocalAssociations(prev => prev.map(item => 
+      item.id === productName ? { ...item, calibers: allCaliberNames } : item
+    ));
   };
 
-  // Limpiar selección de un producto (Local)
+  // Limpiar selección (Deseleccionar todos)
   const handleClearProduct = (productName: string) => {
-    setLocalAssociations(prev => {
-        const index = prev.findIndex(a => a.id === productName);
-        if (index === -1) return prev;
-        const newAssociations = [...prev];
-        newAssociations[index] = { ...newAssociations[index], calibers: [] };
-        return newAssociations;
-    });
+    setLocalAssociations(prev => prev.map(item => 
+      item.id === productName ? { ...item, calibers: [] } : item
+    ));
   };
 
-  // Guardar UN producto específico
+  // Guardar
   const handleSaveProduct = (productName: string) => {
       const localData = localAssociations.find(a => a.id === productName);
       if (localData) {
           updateProductCalibers(productName, localData.calibers);
-          toast({ title: "Guardado", description: `Configuración de ${productName} actualizada.` });
+          toast({ title: "Configuración Guardada", description: `Calibres actualizados para ${productName}.`, variant: "default" });
       }
   };
 
-  // Restaurar UN producto específico
+  // Restaurar
   const handleRestoreProduct = (productName: string) => {
       const globalData = productCaliberAssociations.find(a => a.id === productName);
       const globalCalibers = globalData ? [...globalData.calibers] : [];
       
-      setLocalAssociations(prev => {
-          const index = prev.findIndex(a => a.id === productName);
-          const newAssociations = [...prev];
-          if (index >= 0) {
-              newAssociations[index] = { ...newAssociations[index], calibers: globalCalibers };
-          } else {
-              newAssociations.push({ id: productName, calibers: globalCalibers });
-          }
-          return newAssociations;
-      });
+      setLocalAssociations(prev => prev.map(item => 
+        item.id === productName ? { ...item, calibers: globalCalibers } : item
+      ));
       
-      toast({ title: "Restaurado", description: `Cambios en ${productName} descartados.` });
+      toast({ title: "Restaurado", description: `Se han descartado los cambios en ${productName}.` });
   };
 
   // Helpers visuales
   const isCaliberSelectedLocal = (product: string, caliberName: string) => {
-    const association = localAssociations.find(a => a.id === product);
-    return association?.calibers.includes(caliberName) || false;
+    return localAssociations.find(a => a.id === product)?.calibers.includes(caliberName) || false;
   };
 
   const getCountLocal = (product: string) => {
     return localAssociations.find(a => a.id === product)?.calibers.length || 0;
   };
 
-  // Detectar si hay cambios pendientes para un producto (comparando local vs global)
+  // Detección de cambios (Optimizada)
   const hasProductChanged = (productName: string) => {
       const local = localAssociations.find(a => a.id === productName)?.calibers || [];
       const globalData = productCaliberAssociations.find(a => a.id === productName);
@@ -125,86 +121,95 @@ export function ProductCaliberManager() {
       
       if (local.length !== global.length) return true;
       
-      const sortedLocal = [...local].sort();
-      const sortedGlobal = [...global].sort();
+      // Comparación rápida de arrays ordenados
+      const sortedLocal = [...local].sort().join(',');
+      const sortedGlobal = [...global].sort().join(',');
       
-      return JSON.stringify(sortedLocal) !== JSON.stringify(sortedGlobal);
+      return sortedLocal !== sortedGlobal;
   };
 
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardHeader>
-        <CardTitle>Asociación de Productos y Calibres</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+            Asociación de Productos y Calibres
+        </CardTitle>
         <CardDescription>
-          Define qué calibres corresponden a cada producto. <strong>Guarda los cambios individualmente</strong> por cada producto modificado.
+          Configura qué calibres están disponibles para cada variedad de fruta.
         </CardDescription>
       </CardHeader>
       <CardContent>
         {products.length === 0 ? (
-          <div className="text-center py-6 text-muted-foreground bg-muted/20 rounded-md">
-             Primero debes agregar <strong>Productos</strong> en la pestaña "Datos Maestros".
+          <div className="text-center py-10 border-2 border-dashed rounded-lg">
+             <p className="text-muted-foreground mb-2">No hay productos registrados.</p>
+             <Button variant="outline" size="sm">Ir a Maestros de Productos</Button>
           </div>
         ) : (
-          <Accordion type="single" collapsible className="w-full border rounded-lg overflow-hidden">
+          <Accordion type="single" collapsible className="w-full space-y-2">
             {products.map((product) => {
               const changed = hasProductChanged(product);
+              const count = getCountLocal(product);
+              
               return (
-                <AccordionItem key={product} value={product} className="px-4 bg-card hover:bg-accent/5 transition-colors">
-                  <AccordionTrigger className="hover:no-underline py-4">
+                <AccordionItem key={product} value={product} className="border rounded-lg bg-card px-2">
+                  <AccordionTrigger className="hover:no-underline py-3 px-2">
                     <div className="flex items-center gap-4 w-full">
                       <span className="font-semibold text-lg">{product}</span>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={getCountLocal(product) > 0 ? "default" : "secondary"} className="text-xs font-normal">
-                            {getCountLocal(product)} hab.
+                      <div className="flex items-center gap-2 ml-auto mr-4">
+                        {changed && (
+                            <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 animate-in fade-in">
+                                Sin guardar
+                            </Badge>
+                        )}
+                        <Badge variant={count > 0 ? "secondary" : "outline"}>
+                            {count} calibres
                         </Badge>
-                        {changed && <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">Modificado</Badge>}
                       </div>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pb-4">
-                    {/* BARRA DE HERRAMIENTAS DEL PRODUCTO */}
-                    <div className="flex flex-wrap justify-between items-center mb-4 border-b pb-2 gap-2 bg-muted/20 p-2 rounded">
-                        <span className="text-sm text-muted-foreground hidden sm:block pl-2">Acciones:</span>
-                        <div className="flex gap-2 ml-auto">
+                  <AccordionContent className="pb-4 px-2">
+                    
+                    {/* BARRA DE ACCIONES */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-2 bg-muted/30 rounded-md border">
+                        <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => handleSelectAll(product)} title="Seleccionar Todos">
+                                <CheckSquare className="mr-2 h-3.5 w-3.5" /> Todos
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => handleClearProduct(product)} title="Limpiar Selección">
+                                <Eraser className="mr-2 h-3.5 w-3.5" /> Ninguno
+                            </Button>
+                        </div>
+                        <div className="flex gap-2">
                             <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                onClick={() => handleClearProduct(product)}
-                                title="Desmarcar todos"
-                                className="text-muted-foreground hover:text-destructive h-8"
+                                size="sm" variant="ghost" 
+                                onClick={() => handleRestoreProduct(product)} 
+                                disabled={!changed}
+                                className="text-muted-foreground"
                             >
-                                <Eraser className="mr-2 h-3 w-3" /> Limpiar
+                                <RotateCcw className="mr-2 h-3.5 w-3.5" /> Deshacer
                             </Button>
                             <Button 
                                 size="sm" 
-                                variant="outline" 
-                                onClick={() => handleRestoreProduct(product)}
+                                onClick={() => handleSaveProduct(product)} 
                                 disabled={!changed}
-                                className="h-8"
+                                className={cn(changed && "bg-amber-600 hover:bg-amber-700 text-white")}
                             >
-                                <RotateCcw className="mr-2 h-3 w-3" /> Restaurar
-                            </Button>
-                            <Button 
-                                size="sm" 
-                                onClick={() => handleSaveProduct(product)}
-                                disabled={!changed}
-                                className={`h-8 ${changed ? "animate-pulse ring-2 ring-primary/20" : ""}`}
-                            >
-                                <Save className="mr-2 h-3 w-3" /> Guardar
+                                <Save className="mr-2 h-3.5 w-3.5" /> Guardar Cambios
                             </Button>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-2">
-                      {calibers.length === 0 && (
-                         <p className="text-sm text-muted-foreground col-span-full text-center">
-                           No hay calibres registrados en el sistema.
-                         </p>
-                      )}
+                    {/* GRILLA DE CALIBRES */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                       {calibers.map((caliber) => (
                         <div 
                           key={`${product}-${caliber.name}`} 
-                          className="flex items-center space-x-3 p-2 rounded hover:bg-background transition-colors border border-transparent hover:border-border"
+                          className={cn(
+                              "flex items-start space-x-2 p-2 rounded-md border transition-all",
+                              isCaliberSelectedLocal(product, caliber.name) 
+                                ? "bg-primary/5 border-primary/20" 
+                                : "bg-background hover:bg-muted/50 border-transparent"
+                          )}
                         >
                           <Checkbox 
                             id={`${product}-${caliber.name}`} 
@@ -213,10 +218,10 @@ export function ProductCaliberManager() {
                           />
                           <Label 
                             htmlFor={`${product}-${caliber.name}`}
-                            className="text-sm font-medium leading-none cursor-pointer flex flex-col"
+                            className="text-sm cursor-pointer w-full"
                           >
-                            <span>{caliber.name}</span>
-                            <span className="text-[10px] text-muted-foreground font-mono mt-1">Cód: {caliber.code}</span>
+                            <div className="font-medium">{caliber.name}</div>
+                            {caliber.code && <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{caliber.code}</div>}
                           </Label>
                         </div>
                       ))}

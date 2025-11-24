@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { SalesOrder, Contact } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit, Trash2, Eye, CalendarCheck, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, Eye, CalendarCheck, ArrowUpDown, FileText } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,18 +36,24 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
 
   const getStatusStyles = (currentStatus: string) => {
     switch (currentStatus) {
-      case "completed":
-        // Verde para despachada
+      case "dispatched":
         return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 hover:text-emerald-600";
+      case "invoiced":
+        return "bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-600";
+      case "pending":
+        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20 hover:text-yellow-600";
+      case "draft":
+        return "bg-slate-500/10 text-slate-500 border-slate-500/20 hover:bg-slate-500/20 hover:text-slate-400";
       case "cancelled":
         return "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20 hover:text-red-600";
       default:
-        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20 hover:bg-yellow-500/20 hover:text-yellow-700";
+        return "bg-slate-500/10 text-slate-500";
     }
   };
 
   const handleStatusChange = async (newStatus: string) => {
     const oldStatus = status;
+    // Forzamos el tipado para evitar errores con strings genéricos
     setStatus(newStatus as any);
     setIsLoading(true);
 
@@ -57,18 +63,22 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
       const updateData: any = { status: newStatus };
 
       // TRAZABILIDAD: Fecha de Despacho
-      if (newStatus === "completed" && oldStatus !== "completed") {
+      // Se activa cuando pasa a 'dispatched' (antes era 'completed')
+      if (newStatus === "dispatched" && oldStatus !== "dispatched") {
         updateData.dispatchedAt = new Date().toISOString();
       }
 
       await updateDoc(orderRef, updateData);
       
-      // 2. MOVIMIENTO DE INVENTARIO (Resta automática)
-      await processOrderStockMovement(order, newStatus, oldStatus);
+      // 2. MOVIMIENTO DE INVENTARIO
+      // Si tienes una función auxiliar, asegúrate de que maneje los nuevos strings ('dispatched', 'invoiced')
+      if (processOrderStockMovement) {
+          await processOrderStockMovement(order, newStatus, oldStatus);
+      }
 
       toast({
-        title: "Venta Actualizada",
-        description: `Orden ${order.id} marcada como ${newStatus === 'completed' ? 'Despachada' : newStatus}. Stock descontado.`,
+        title: "Estado Actualizado",
+        description: `La orden ${order.id} ahora está ${getStatusLabel(newStatus)}.`,
         className: "bg-slate-900 text-white border-slate-800"
       });
 
@@ -77,7 +87,7 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
       setStatus(oldStatus as any);
       toast({
         title: "Error",
-        description: "No se pudo actualizar el estado.",
+        description: "No se pudo actualizar el estado en la base de datos.",
         variant: "destructive",
       });
     } finally {
@@ -85,21 +95,35 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
     }
   };
 
+  const getStatusLabel = (s: string) => {
+      switch(s) {
+          case 'draft': return 'Borrador';
+          case 'pending': return 'Pendiente';
+          case 'dispatched': return 'Despachada';
+          case 'invoiced': return 'Facturada';
+          case 'cancelled': return 'Cancelada';
+          default: return s;
+      }
+  };
+
   return (
     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
       <Select value={status} onValueChange={handleStatusChange} disabled={isLoading}>
         <SelectTrigger className={`h-7 w-[130px] text-xs font-semibold border rounded-full px-3 transition-all ${getStatusStyles(status)}`}>
-          <SelectValue />
+          <SelectValue>{getStatusLabel(status)}</SelectValue>
         </SelectTrigger>
         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+          <SelectItem value="draft" className="text-slate-400 focus:bg-slate-800 cursor-pointer">Borrador</SelectItem>
           <SelectItem value="pending" className="text-yellow-400 focus:bg-slate-800 cursor-pointer">Pendiente</SelectItem>
-          <SelectItem value="completed" className="text-emerald-400 focus:bg-slate-800 cursor-pointer">Despachada</SelectItem>
+          <SelectItem value="dispatched" className="text-emerald-400 focus:bg-slate-800 cursor-pointer">Despachada</SelectItem>
+          <SelectItem value="invoiced" className="text-blue-400 focus:bg-slate-800 cursor-pointer">Facturada</SelectItem>
           <SelectItem value="cancelled" className="text-red-400 focus:bg-slate-800 cursor-pointer">Cancelada</SelectItem>
         </SelectContent>
       </Select>
 
       {/* TOOLTIP DE DESPACHO */}
-      {status === 'completed' && (order as any).dispatchedAt && (
+      {/* Mostramos el ícono si está despachada O facturada */}
+      {(status === 'dispatched' || status === 'invoiced') && (order as any).dispatchedAt && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -124,7 +148,7 @@ interface ColumnsProps {
   onEdit: (order: SalesOrder) => void;
   onDelete: (order: SalesOrder) => void;
   onPreview: (order: SalesOrder) => void;
-  clients: Contact[]; // Recibimos clientes, no proveedores
+  clients: Contact[]; 
 }
 
 export const getColumns = ({ onEdit, onDelete, onPreview, clients }: ColumnsProps): ColumnDef<SalesOrder>[] => [
@@ -156,7 +180,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: ColumnsProp
   },
   {
     accessorKey: "status",
-    header: "Estado / Trazabilidad",
+    header: "Estado",
     cell: ({ row }) => <StatusCell order={row.original} />,
   },
   {
@@ -187,9 +211,12 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: ColumnsProp
             <DropdownMenuItem onClick={() => onPreview(order)} className="cursor-pointer focus:bg-slate-800 focus:text-white">
               <Eye className="mr-2 h-4 w-4 text-blue-500" /> Vista Previa
             </DropdownMenuItem>
+            
+            {/* Solo permitimos editar si no está facturada (opcional, pero buena práctica) */}
             <DropdownMenuItem onClick={() => onEdit(order)} className="cursor-pointer focus:bg-slate-800 focus:text-white">
               <Edit className="mr-2 h-4 w-4 text-amber-500" /> Editar
             </DropdownMenuItem>
+            
             <DropdownMenuSeparator className="bg-slate-800" />
             <DropdownMenuItem onClick={() => onDelete(order)} className="cursor-pointer text-red-500 focus:bg-red-900/20 focus:text-red-400">
               <Trash2 className="mr-2 h-4 w-4" /> Eliminar

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useMemo, useRef, forwardRef } from 'react';
@@ -7,9 +6,7 @@ import { useReactToPrint } from 'react-to-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment } from '@/lib/types';
-import { useLocalStorage } from '@/hooks/use-local-storage';
-import { purchaseOrders as initialPurchaseOrders, salesOrders as initialSalesOrders, inventoryAdjustments as initialInventoryAdjustments } from '@/lib/data';
+import { InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +19,10 @@ type InventoryHistoryDialogProps = {
   item: InventoryItem | null;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  purchaseOrders: PurchaseOrder[];
+  salesOrders: SalesOrder[];
+  inventoryAdjustments: InventoryAdjustment[];
+  contacts: Contact[];
 };
 
 type Transaction = {
@@ -102,11 +103,7 @@ const PrintableContent = forwardRef<HTMLDivElement, PrintableContentProps>(({ hi
 });
 PrintableContent.displayName = 'PrintableContent';
 
-export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: InventoryHistoryDialogProps) {
-  const [purchaseOrders] = useLocalStorage<PurchaseOrder[]>('purchaseOrders', initialPurchaseOrders);
-  const [salesOrders] = useLocalStorage<SalesOrder[]>('salesOrders', initialSalesOrders);
-  const [inventoryAdjustments] = useLocalStorage<InventoryAdjustment[]>('inventoryAdjustments', initialInventoryAdjustments);
-  const [contacts] = useLocalStorage('contacts', []);
+export function InventoryHistoryDialog({ item, isOpen, onOpenChange, purchaseOrders, salesOrders, inventoryAdjustments, contacts }: InventoryHistoryDialogProps) {
   const { toast } = useToast();
 
   const componentRef = useRef<HTMLDivElement>(null);
@@ -121,7 +118,7 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
 
     // Aggregate inflows from purchase orders
     purchaseOrders
-      .filter(po => (item.warehouse === 'All' || po.warehouse === item.warehouse) && po.status === 'completed')
+      .filter(po => (item.warehouse === 'All' || po.warehouse === item.warehouse) && (po.status === 'completed' || po.status === 'received'))
       .forEach(po => {
         po.items
           .filter(i => i.product === item.product && i.caliber === item.caliber)
@@ -142,7 +139,7 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange }: Inventory
 
     // Aggregate outflows from sales orders
     salesOrders
-      .filter(so => (item.warehouse === 'All' || so.warehouse === item.warehouse) && (so.status === 'completed' || so.status === 'pending'))
+      .filter(so => (item.warehouse === 'All' || so.warehouse === item.warehouse) && (so.status === 'completed' || so.status === 'pending' || so.status === 'dispatched' || so.status === 'invoiced'))
       .forEach(so => {
         so.items
           .filter(i => i.product === item.product && i.caliber === item.caliber)

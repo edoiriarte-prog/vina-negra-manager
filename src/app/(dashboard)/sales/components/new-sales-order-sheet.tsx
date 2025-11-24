@@ -13,8 +13,7 @@ import { SalesOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
 import { format, addDays, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { ItemMatrixDialog } from './item-matrix-dialog'; // Usamos la misma matriz inteligente
+import { ItemMatrixDialog } from './item-matrix-dialog'; 
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,9 +31,12 @@ type NewSalesOrderSheetProps = {
   salesOrders: SalesOrder[];
 };
 
-type SalesOrderFormData = Omit<SalesOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'>;
+// Ajustamos el tipo para que acepte los nuevos status
+type SalesOrderFormData = Omit<SalesOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'> & {
+    status: 'draft' | 'pending' | 'dispatched' | 'invoiced' | 'cancelled';
+};
 
-// ID BASE PARA VENTAS (2099 para iniciar en 2100)
+// ID BASE PARA VENTAS
 const BASE_OV_ID = 2099;
 
 const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
@@ -44,6 +46,7 @@ const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
             date: format(new Date(order.date), 'yyyy-MM-dd'),
             advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : undefined,
             balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
+            status: (order.status as any) === 'completed' ? 'dispatched' : order.status,
         };
     }
     return {
@@ -57,7 +60,7 @@ const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
         advancePercentage: 0,
         advanceDueDate: undefined,
         balanceDueDate: undefined,
-        warehouse: 'Bodega Central', // Origen
+        warehouse: 'Bodega Central', 
         destinationWarehouse: '',
         carrierId: '',
         driverName: '',
@@ -95,17 +98,7 @@ export function NewSalesOrderSheet({
       return { netTotal: net, vatAmount: 0, finalTotal: net };
   }, [grossTotal, includeVat]);
 
-  const advanceAmount = useMemo(() => {
-    if (formData.paymentMethod !== 'Pago con Anticipo y Saldo' || !formData.advancePercentage) return 0;
-    return finalTotal * (formData.advancePercentage / 100);
-  }, [finalTotal, formData.paymentMethod, formData.advancePercentage]);
-
-  const balanceAmount = useMemo(() => {
-     if (formData.paymentMethod !== 'Pago con Anticipo y Saldo') return 0;
-     return finalTotal - advanceAmount;
-  }, [finalTotal, advanceAmount, formData.paymentMethod]);
-
-  // --- LÓGICA ID ROBUSTA (BASE 2100) ---
+  // Lógica ID
   useEffect(() => {
     if (isOpen) {
         if (!order) {
@@ -168,6 +161,7 @@ export function NewSalesOrderSheet({
     }
   };
 
+  // Vencimiento automático
   useEffect(() => {
       if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {
           const dueDate = addDays(parseISO(formData.date), formData.creditDays);
@@ -194,11 +188,16 @@ export function NewSalesOrderSheet({
     if (!formData.clientId) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un cliente.' });
     if (formData.items.length === 0) return toast({ variant: 'destructive', title: 'Error', description: 'Agregue al menos un ítem.' });
     
+    if (formData.saleType === 'Traslado Bodega Interna' && !formData.destinationWarehouse) {
+        return toast({ variant: 'destructive', title: 'Falta Destino', description: 'Para traslados internos debe seleccionar una Bodega de Destino.' });
+    }
+
     const sanitizedItems = formData.items.map(item => ({
         ...item,
-        packagingType: item.packagingType || null,
+        // CORRECCIÓN CLAVE: Usamos undefined para opcionales, no null
+        packagingType: item.packagingType || undefined,
         packagingQuantity: Number(item.packagingQuantity) || 0,
-        lotNumber: item.lotNumber || null,
+        lotNumber: item.lotNumber || undefined,
         quantity: Number(item.quantity) || 0,
         price: Number(item.price) || 0,
     }));
@@ -223,6 +222,8 @@ export function NewSalesOrderSheet({
         driverName: formData.driverName || null,
         licensePlate: formData.licensePlate || null,
         orderType: formData.orderType || 'sales',
+        
+        // CAMPOS FINANCIEROS (Ahora reconocidos por types.ts)
         advanceDueDate: formData.advanceDueDate || null,
         balanceDueDate: formData.balanceDueDate || null,
         notes: formData.notes || null,
@@ -235,9 +236,30 @@ export function NewSalesOrderSheet({
 
   const title = order ? `Editar OV ${order.id}` : `Nueva Venta`;
 
+  // Helpers visuales
+  const getStatusColor = (status: string) => {
+      switch(status) {
+          case 'dispatched': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+          case 'invoiced': return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+          case 'draft': return 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+          case 'cancelled': return 'bg-red-500/10 text-red-400 border-red-500/30';
+          default: return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
+      }
+  };
+
+  const getStatusLabel = (status: string) => {
+      switch(status) {
+          case 'dispatched': return 'Despachada';
+          case 'invoiced': return 'Facturada';
+          case 'draft': return 'Borrador';
+          case 'pending': return 'Pendiente';
+          case 'cancelled': return 'Cancelada';
+          default: return status;
+      }
+  };
+
   if (!formData) return null;
 
-  // Estilos Reutilizables (Theme Slate/Blue)
   const darkInputClass = "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 placeholder:text-slate-600";
   const darkCardClass = "bg-slate-900 border-slate-800 shadow-sm";
   const labelClass = "text-xs font-medium text-slate-400 uppercase tracking-wide";
@@ -247,7 +269,7 @@ export function NewSalesOrderSheet({
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="sm:max-w-7xl w-[95vw] overflow-y-auto p-0 flex flex-col gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
           
-          {/* --- HEADER SUPERIOR FIJO --- */}
+          {/* HEADER */}
           <SheetHeader className="bg-slate-900 border-b border-slate-800 px-6 py-4 sticky top-0 z-10">
              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
@@ -262,8 +284,8 @@ export function NewSalesOrderSheet({
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={`capitalize border-slate-700 text-slate-300 ${formData.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : ''}`}>
-                        {formData.status === 'completed' ? 'Despachada' : formData.status}
+                    <Badge variant="outline" className={`capitalize border-slate-700 ${getStatusColor(formData.status)}`}>
+                        {getStatusLabel(formData.status)}
                     </Badge>
                 </div>
             </div>
@@ -272,14 +294,12 @@ export function NewSalesOrderSheet({
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
             <div className="p-6 space-y-8">
               
-              {/* --- SECCIÓN 1: DATOS GENERALES --- */}
+              {/* SECCIÓN 1: GENERAL */}
               <div className="grid md:grid-cols-4 gap-5">
-                {/* Cliente */}
                 <Card className={`${darkCardClass} md:col-span-2`}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <User className="h-4 w-4 text-blue-500" />
-                            Cliente
+                            <User className="h-4 w-4 text-blue-500" /> Cliente
                         </div>
                         <Select required onValueChange={(value) => handleSelectChange('clientId', value)} value={formData.clientId}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
@@ -290,23 +310,19 @@ export function NewSalesOrderSheet({
                     </CardContent>
                 </Card>
 
-                {/* Fecha */}
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <CalendarIcon className="h-4 w-4 text-orange-500" />
-                            Fecha Emisión
+                            <CalendarIcon className="h-4 w-4 text-orange-500" /> Fecha Emisión
                         </div>
                         <Input type="date" name="date" value={formData.date} onChange={handleInputChange} className={`${darkInputClass} [color-scheme:dark]`} required />
                     </CardContent>
                 </Card>
 
-                {/* Bodega Origen */}
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Warehouse className="h-4 w-4 text-emerald-500" />
-                            Bodega Origen
+                            <Warehouse className="h-4 w-4 text-emerald-500" /> Bodega Origen
                         </div>
                         <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
@@ -318,13 +334,12 @@ export function NewSalesOrderSheet({
                 </Card>
               </div>
 
-              {/* --- SECCIÓN 2: DATOS DE TRANSPORTE (NUEVA) --- */}
+              {/* SECCIÓN 2: TRANSPORTE */}
               <div className="grid md:grid-cols-3 gap-5">
                  <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Truck className="h-4 w-4 text-purple-500" />
-                            Transportista
+                            <Truck className="h-4 w-4 text-purple-500" /> Transportista
                         </div>
                         <Select onValueChange={(v) => handleSelectChange('carrierId', v)} value={formData.carrierId || ''}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Opcional" /></SelectTrigger>
@@ -338,24 +353,39 @@ export function NewSalesOrderSheet({
                  <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <User className="h-4 w-4 text-slate-500" />
-                            Chofer
+                            <User className="h-4 w-4 text-slate-500" /> Chofer
                         </div>
                         <Input name="driverName" value={formData.driverName || ''} onChange={handleInputChange} placeholder="Ej: Juan Pérez" className={darkInputClass} />
                     </CardContent>
                  </Card>
-                 <Card className={darkCardClass}>
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <MapPin className="h-4 w-4 text-red-500" />
-                            Patente
-                        </div>
-                        <Input name="licensePlate" value={formData.licensePlate || ''} onChange={handleInputChange} placeholder="Ej: AB-CD-12" className={darkInputClass} />
-                    </CardContent>
-                 </Card>
+                 
+                 {formData.saleType === 'Traslado Bodega Interna' ? (
+                     <Card className={`${darkCardClass} border-blue-500/30`}>
+                        <CardContent className="p-4 space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
+                                <Warehouse className="h-4 w-4" /> Bodega Destino
+                            </div>
+                            <Select required onValueChange={(v) => handleSelectChange('destinationWarehouse', v)} value={formData.destinationWarehouse || ''}>
+                                <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                    {warehouses.filter(w => w !== formData.warehouse).map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </CardContent>
+                     </Card>
+                 ) : (
+                     <Card className={darkCardClass}>
+                        <CardContent className="p-4 space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                                <MapPin className="h-4 w-4 text-red-500" /> Patente
+                            </div>
+                            <Input name="licensePlate" value={formData.licensePlate || ''} onChange={handleInputChange} placeholder="Ej: AB-CD-12" className={darkInputClass} />
+                        </CardContent>
+                     </Card>
+                 )}
               </div>
 
-              {/* --- SECCIÓN 3: ITEMS --- */}
+              {/* SECCIÓN 3: ITEMS */}
               <div className={`rounded-xl border border-slate-800 overflow-hidden ${darkCardClass}`}>
                 <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                     <h3 className="font-semibold text-slate-200 flex items-center gap-2">
@@ -442,7 +472,7 @@ export function NewSalesOrderSheet({
                 </div>
               </div>
 
-              {/* --- SECCIÓN 4: PIE DE PÁGINA --- */}
+              {/* SECCIÓN 4: PIE DE PÁGINA (FINANZAS) */}
               <div className="grid md:grid-cols-12 gap-6 items-start">
                   
                   {/* Condiciones */}
@@ -453,19 +483,16 @@ export function NewSalesOrderSheet({
                                 <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
                                     <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones de Venta
                                 </h4>
-                                {/* Selector Estado */}
-                                {order ? (
-                                    <Select onValueChange={(v: any) => handleSelectChange('status', v)} value={formData.status}>
-                                        <SelectTrigger className="h-7 w-32 text-xs bg-slate-950 border-slate-800"><SelectValue /></SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                            <SelectItem value="pending">Pendiente</SelectItem>
-                                            <SelectItem value="completed">Despachada</SelectItem>
-                                            <SelectItem value="cancelled">Cancelada</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                ) : (
-                                    <Badge variant="outline" className="bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Pendiente</Badge>
-                                )}
+                                <Select onValueChange={(v: any) => handleSelectChange('status', v)} value={formData.status}>
+                                    <SelectTrigger className="h-7 w-36 text-xs bg-slate-950 border-slate-800"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                        <SelectItem value="draft">Borrador</SelectItem>
+                                        <SelectItem value="pending">Pendiente</SelectItem>
+                                        <SelectItem value="dispatched">Despachada</SelectItem>
+                                        <SelectItem value="invoiced">Facturada</SelectItem>
+                                        <SelectItem value="cancelled">Cancelada</SelectItem>
+                                    </SelectContent>
+                                </Select>
                               </div>
 
                               <div className="grid grid-cols-2 gap-5">
@@ -477,6 +504,9 @@ export function NewSalesOrderSheet({
                                               <SelectItem value="Venta Firme">Venta Firme</SelectItem>
                                               <SelectItem value="Consignación">Consignación</SelectItem>
                                               <SelectItem value="Mínimo Garantizado">Mínimo Garantizado</SelectItem>
+                                              <SelectItem value="Precio Fijo">Precio Fijo</SelectItem>
+                                              <SelectItem value="Libre Consignación">Libre Consignación</SelectItem>
+                                              <SelectItem value="Traslado Bodega Interna">Traslado Bodega Interna</SelectItem>
                                           </SelectContent>
                                       </Select>
                                   </div>
@@ -570,7 +600,7 @@ export function NewSalesOrderSheet({
 
             </div>
 
-            {/* FOOTER DE ACCIONES FIJO */}
+            {/* FOOTER */}
             <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
               <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
               <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={formData.items.length === 0}>

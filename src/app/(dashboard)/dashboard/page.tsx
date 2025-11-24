@@ -52,83 +52,75 @@ export default function DashboardPage() {
   const salesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
   const { data: sales, isLoading: loadingSales } = useCollection<SalesOrder>(salesQuery);
 
-  // 2. CALCULADORA DE MÉTRICAS (KPIS) MEJORADA
+  // 2. CALCULADORA DE MÉTRICAS (KPIS) AJUSTADA A NUEVOS ESTADOS
   const kpis = useMemo(() => {
-    // Valores por defecto
     const stats = {
         movIngresos: 0,      // Dinero real entrado (Caja)
         movEgresos: 0,       // Dinero real salido (Caja)
-        ventasTotales: 0,    // Total facturado histórico
-        comprasTotales: 0,   // Total comprado histórico
-        porCobrar: 0,        // Saldo real pendiente de cobro
-        porPagar: 0,         // Saldo real pendiente de pago
+        ventasTotales: 0,    // Ventas "Cerradas" (Despachadas/Facturadas)
+        comprasTotales: 0,   // Compras "Cerradas" (Recepcionadas/En Tránsito)
+        porCobrar: 0,        // Pipeline Activo de Ventas
+        porPagar: 0,         // Pipeline Activo de Compras
         balance: 0
     };
 
-    // A. Flujo de Caja (Lo que realmente entró/salió)
+    // A. Flujo de Caja Real (Lo que pasó por el banco/caja)
     if (movements) {
         stats.movIngresos = movements.filter(m => m.type === 'income').reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
         stats.movEgresos = movements.filter(m => m.type === 'expense').reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
         stats.balance = stats.movIngresos - stats.movEgresos;
     }
 
-    // B. Ventas y Cuentas por Cobrar
+    // B. Ventas (KPIs de Gestión)
     if (sales) {
         sales.forEach(order => {
             const total = Number(order.totalAmount) || 0;
-            stats.ventasTotales += total;
+            const status = order.status;
 
-            // Lógica inteligente para deuda:
-            // Si la orden tiene pagos registrados, usamos su saldo calculado.
-            // Si no tiene pagos pero no está cancelada, se debe todo.
-            // (Ajusta esta lógica si tienes un campo específico 'balance' o 'paidAmount' en tu DB)
-            
-            // Opción 1: Si guardas el saldo pendiente en la orden (Recomendado)
-            // const saldo = order.balance !== undefined ? Number(order.balance) : total;
-            
-            // Opción 2: Calcular basado en estado (Usada aquí por seguridad si no hay campo balance)
-            let deuda = 0;
-            if (order.status !== 'cancelled') {
-                 // Si tienes un sistema de pagos parciales, aquí deberías restar lo pagado.
-                 // Por ahora, asumimos que si no está pagada al 100%, tomamos el total o el saldo si existe.
-                 // IMPORTANTE: Esto asume que todas las órdenes activas suman a la deuda si no están pagadas.
-                 // Ajustar según tu modelo de datos exacto.
-                 deuda = total; // Por defecto debe todo
+            // KPI 1: Ventas Realizadas (Ya salió mercadería)
+            // Sumamos solo si está Despachada o Facturada
+            if (status === 'dispatched' || status === 'invoiced') {
+                stats.ventasTotales += total;
             }
-            stats.porCobrar += deuda;
+
+            // KPI 2: Por Cobrar (Proyección Financiera)
+            // Sumamos todo lo ACTIVO (Pendiente + Despachado + Facturado)
+            // Excluimos: Borradores (draft) y Canceladas
+            if (['pending', 'dispatched', 'invoiced'].includes(status)) {
+                stats.porCobrar += total;
+            }
         });
         
-        // RE-CALCULO BASADO EN TU IMAGEN:
-        // Parece que en MercantileAccount ya calculas esto bien.
-        // Vamos a intentar replicar esa lógica: Sumar todo lo que no sea "Pagado".
-        // Si tienes un campo 'paymentStatus' o similar, úsalo.
-        // Si no, usaremos el total de todas las ventas activas como "Por Cobrar" inicial.
-        stats.porCobrar = sales
-            .filter(s => s.status !== 'cancelled') // Ignorar canceladas
-            .reduce((acc, s) => acc + (Number(s.totalAmount) || 0), 0);
-            
-        // Restamos los ingresos reales vinculados a ventas (si los hubiera en movements)
-        // Como simplificación para que cuadre con tu imagen:
-        // Suma total de ventas activas = Por Cobrar (si no hay pagos registrados aún)
+        // Ajuste simple: Restamos lo que ya ingresó a caja para no duplicar la percepción de riqueza
+        // (Esto es una aproximación, idealmente se cruzaría por ID de venta)
+        // stats.porCobrar = Math.max(0, stats.porCobrar - stats.movIngresos); 
+        // *Comentado para mostrar el bruto por cobrar según órdenes, que suele ser más útil para gestión de cobranza*
     }
 
-    // C. Compras y Cuentas por Pagar
+    // C. Compras (KPIs de Gestión)
     if (purchases) {
         purchases.forEach(order => {
             const total = Number(order.totalAmount) || 0;
-            stats.comprasTotales += total;
-        });
+            const status = order.status;
 
-        // Calculamos Por Pagar sumando todas las compras activas
-        stats.porPagar = purchases
-            .filter(p => p.status !== 'cancelled')
-            .reduce((acc, p) => acc + (Number(p.totalAmount) || 0), 0);
+            // KPI 1: Compras Ejecutadas
+            // Sumamos Recepcionadas o En Tránsito (ya hay compromiso firme de stock)
+            if (status === 'completed' || status === 'received') {
+                stats.comprasTotales += total;
+            }
+
+            // KPI 2: Por Pagar
+            // Sumamos todo lo ACTIVO
+            if (['pending', 'received', 'completed'].includes(status)) {
+                stats.porPagar += total;
+            }
+        });
     }
 
     return stats;
   }, [movements, sales, purchases]);
 
-  // Cálculo para la barra de progreso
+  // Cálculo para la barra de progreso (Cashflow)
   const totalFlow = kpis.movIngresos + kpis.movEgresos;
   const incomePercent = totalFlow > 0 ? (kpis.movIngresos / totalFlow) * 100 : 0;
   const expensePercent = totalFlow > 0 ? (kpis.movEgresos / totalFlow) * 100 : 0;
@@ -185,26 +177,26 @@ export default function DashboardPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card className="border-l-4 border-l-blue-500">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ventas Totales</CardTitle>
+                <CardTitle className="text-sm font-medium">Ventas Realizadas</CardTitle>
                 <TrendingUp className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatCurrency(kpis.ventasTotales)}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {sales?.length || 0} Órdenes generadas
+                  Despachadas o Facturadas
                 </p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-orange-500">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Compras Totales</CardTitle>
+                <CardTitle className="text-sm font-medium">Compras Realizadas</CardTitle>
                 <Package className="h-4 w-4 text-orange-500" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatCurrency(kpis.comprasTotales)}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {purchases?.length || 0} Órdenes recibidas
+                  Recepcionadas o En Tránsito
                 </p>
               </CardContent>
             </Card>
@@ -238,7 +230,7 @@ export default function DashboardPage() {
              </Card>
           </div>
 
-          {/* --- FILA 2: ESTADO DE CUENTAS (AQUÍ ESTÁ EL CAMBIO IMPORTANTE) --- */}
+          {/* --- FILA 2: ESTADO DE CUENTAS (PIPELINE) --- */}
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="bg-green-950/10 border-green-200">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -249,9 +241,8 @@ export default function DashboardPage() {
                     <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">Activos</Badge>
                 </CardHeader>
                 <CardContent>
-                    {/* Usamos kpis.porCobrar que ahora suma el total de ventas activas */}
                     <div className="text-3xl font-bold text-green-800">{formatCurrency(kpis.porCobrar)}</div>
-                    <p className="text-sm text-green-600/80 mt-1">Total facturado pendiente de cobro total/parcial</p>
+                    <p className="text-sm text-green-600/80 mt-1">Suma de todas las ventas activas (Pendientes + Cerradas)</p>
                 </CardContent>
             </Card>
 
@@ -264,9 +255,8 @@ export default function DashboardPage() {
                     <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300">Pasivos</Badge>
                 </CardHeader>
                 <CardContent>
-                    {/* Usamos kpis.porPagar que ahora suma el total de compras activas */}
                     <div className="text-3xl font-bold text-red-800">{formatCurrency(kpis.porPagar)}</div>
-                    <p className="text-sm text-red-600/80 mt-1">Total comprado pendiente de pago total/parcial</p>
+                    <p className="text-sm text-red-600/80 mt-1">Suma de todas las compras activas</p>
                 </CardContent>
             </Card>
           </div>
