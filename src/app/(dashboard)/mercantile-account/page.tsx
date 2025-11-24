@@ -82,17 +82,17 @@ export default function MercantileAccountPage() {
         const payments: Payment[] = [];
 
         if (type === 'client') {
-            salesOrders.filter(s => s.clientId === contact.id && s.status !== 'cancelled' && s.status !== 'draft')
+            salesOrders.filter(s => s.clientId === contact.id && (s.status === 'completed' || s.status === 'dispatched' || s.status === 'invoiced'))
               .forEach(s => documents.push({ id: s.id, date: s.date, type: 'O/V', amount: s.totalAmount }));
             
             financialMovements.filter(fm => fm.contactId === contact.id && fm.type === 'income')
               .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: p.amount, relatedDocumentId: p.relatedDocument?.id }));
 
         } else { // supplier
-            purchaseOrders.filter(p => p.supplierId === contact.id && p.status !== 'cancelled' && p.status !== 'draft')
+            purchaseOrders.filter(p => p.supplierId === contact.id && (p.status === 'completed' || p.status === 'received'))
               .forEach(p => documents.push({ id: p.id, date: p.date, type: 'O/C', amount: p.totalAmount }));
 
-            serviceOrders.filter(s => s.provider === contact.name) // Asumiendo que se linkea por nombre
+            serviceOrders.filter(s => s.supplierId === contact.id)
               .forEach(s => documents.push({ id: s.id, date: s.date, type: 'O/S', amount: s.cost }));
 
             financialMovements.filter(fm => fm.contactId === contact.id && fm.type === 'expense')
