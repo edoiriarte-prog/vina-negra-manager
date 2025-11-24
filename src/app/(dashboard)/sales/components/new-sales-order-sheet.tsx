@@ -29,7 +29,6 @@ type NewSalesOrderSheetProps = {
   clients: Contact[];
   carriers: Contact[];
   inventory: InventoryItem[];
-  nextOrderId: string;
   salesOrders: SalesOrder[];
   sheetType: 'sale' | 'dispatch';
   purchaseOrders: PurchaseOrder[];
@@ -37,9 +36,7 @@ type NewSalesOrderSheetProps = {
   contacts: Contact[];
 };
 
-type SalesOrderFormData = Omit<SalesOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'> & {
-    status: 'draft' | 'pending' | 'dispatched' | 'invoiced' | 'cancelled';
-};
+type SalesOrderFormData = Omit<SalesOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'>;
 
 const BASE_OV_ID = 2099;
 
@@ -48,8 +45,8 @@ const getInitialFormData = (order: SalesOrder | null, type: 'sale' | 'dispatch')
         return {
             ...order,
             date: format(new Date(order.date), 'yyyy-MM-dd'),
-            advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : undefined,
-            balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
+            advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : null,
+            balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : null,
             status: (order.status as any) === 'completed' ? 'dispatched' : order.status,
             orderType: type
         };
@@ -63,16 +60,17 @@ const getInitialFormData = (order: SalesOrder | null, type: 'sale' | 'dispatch')
         saleType: type === 'dispatch' ? 'Traslado Bodega Interna' : 'Venta Firme',
         creditDays: 0,
         advancePercentage: 0,
-        advanceDueDate: undefined,
-        balanceDueDate: undefined,
+        advanceDueDate: null,
+        balanceDueDate: null,
         warehouse: 'Bodega Central', 
-        destinationWarehouse: '',
-        carrierId: '',
-        driverName: '',
-        licensePlate: '',
+        destinationWarehouse: null,
+        carrierId: null,
+        driverName: null,
+        licensePlate: null,
         orderType: type,
-        notes: '',
+        notes: null,
         includeVat: true,
+        paymentStatus: 'Pendiente'
     };
 };
 
@@ -196,12 +194,10 @@ export function NewSalesOrderSheet({
 
     let newItems;
     if (existingItemIndex > -1) {
-      // Update existing item
       newItems = [...formData.items];
       newItems[existingItemIndex].quantity += newItem.quantity;
       newItems[existingItemIndex].packagingQuantity = (newItems[existingItemIndex].packagingQuantity || 0) + (newItem.packagingQuantity || 0);
     } else {
-      // Add new item
       newItems = [...formData.items, { ...newItem, id: `temp-lot-${Date.now()}` }];
     }
     setFormData(prev => ({ ...prev, items: newItems }));
@@ -253,6 +249,7 @@ export function NewSalesOrderSheet({
         creditDays: Number(formData.creditDays || 0),
         advancePercentage: Number(formData.advancePercentage || 0),
         includeVat: formData.includeVat,
+        paymentStatus: formData.paymentStatus || 'Pendiente'
     };
 
     onSave(finalOrder);

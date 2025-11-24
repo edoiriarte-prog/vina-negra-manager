@@ -29,17 +29,15 @@ type NewPurchaseOrderSheetProps = {
   purchaseOrders: PurchaseOrder[];
 };
 
-type PurchaseOrderFormData = Omit<PurchaseOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'> & {
-    status: 'draft' | 'pending' | 'received' | 'completed' | 'cancelled';
-};
+type PurchaseOrderFormData = Omit<PurchaseOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'>;
 
 const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData => {
     if (order) {
         return {
             ...order,
             date: format(new Date(order.date), 'yyyy-MM-dd'),
-            advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : undefined,
-            balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
+            advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : null,
+            balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : null,
             status: order.status,
         };
     }
@@ -51,11 +49,11 @@ const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData 
         paymentMethod: 'Contado',
         creditDays: 0,
         advancePercentage: 0,
-        advanceDueDate: undefined,
-        balanceDueDate: undefined,
+        advanceDueDate: null,
+        balanceDueDate: null,
         warehouse: 'Bodega Central',
         orderType: 'purchase',
-        notes: '',
+        notes: null,
     };
 };
 
@@ -204,7 +202,7 @@ export function NewPurchaseOrderSheet({
         status: formData.status,
         paymentMethod: formData.paymentMethod,
         warehouse: formData.warehouse,
-        orderType: formData.orderType || 'purchase',
+        orderType: formData.orderType,
         advanceDueDate: formData.advanceDueDate || null,
         balanceDueDate: formData.balanceDueDate || null,
         notes: formData.notes || null,
