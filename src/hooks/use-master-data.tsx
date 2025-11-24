@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
@@ -6,6 +7,7 @@ import { useLocalStorage } from './use-local-storage';
 import { BankAccount, Contact, InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment } from '@/lib/types';
 import { useCollection, useFirebase, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
+import { getInventory } from '@/lib/inventory'; // Make sure to have this helper
 
 // --- TYPES ---
 export type ProductCaliberAssociation = {
@@ -84,10 +86,6 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     const contactsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
     const { data: contactsData, isLoading: l8 } = useCollection<Contact>(contactsCollection);
     const contacts = contactsData || [];
-
-    const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
-    const { data: inventoryData, isLoading: l9 } = useCollection<InventoryItem>(inventoryCollection);
-    const inventory = inventoryData || [];
     
     const purchaseOrdersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
     const { data: purchaseOrdersData, isLoading: l10 } = useCollection<PurchaseOrder>(purchaseOrdersCollection);
@@ -102,7 +100,11 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     const inventoryAdjustments = inventoryAdjustmentsData || [];
 
 
-    const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8 || l9 || l10 || l11 || l12;
+    const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8 || l10 || l11 || l12;
+    
+    const inventory = useMemo(() => {
+        return getInventory(purchaseOrders, salesOrders, inventoryAdjustments);
+    }, [purchaseOrders, salesOrders, inventoryAdjustments]);
 
     // --- CRUD FUNCTIONS ---
     const addProduct = (name: string) => { if (firestore && name) addDocumentNonBlocking(collection(firestore, 'products'), { name }); };
@@ -168,5 +170,3 @@ export function useMasterData() {
     }
     return context;
 }
-
-    
