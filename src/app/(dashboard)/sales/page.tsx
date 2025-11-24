@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState } from "react";
-import { SalesOrder, Contact } from "@/lib/types"; 
+import { SalesOrder, Contact, PurchaseOrder, InventoryAdjustment } from "@/lib/types"; 
 import { getColumns } from "./components/columns"; 
 import { DataTable } from "@/components/ui/data-table"; 
 import { useSalesOrders } from "@/hooks/use-sales-orders"; 
@@ -18,12 +19,11 @@ export default function SalesPage() {
   const { orders, createOrder, updateOrder, deleteOrder } = useSalesOrders();
   
   // Obtenemos contactos e inventario
-  // Nota: Quitamos 'carriers' del destructuring porque useMasterData no lo devuelve directo, lo filtramos abajo
-  const { contacts, inventory } = useMasterData(); 
+  const { contacts, inventory, purchaseOrders, inventoryAdjustments } = useMasterData(); 
   
   // Filtramos Clientes y Transportistas
-  const clients = contacts ? contacts.filter((c: Contact) => c.type === 'client' || c.type === 'both') : [];
-  const carrierList = contacts ? contacts.filter((c: Contact) => c.type === 'carrier' || c.type === 'both') : [];
+  const clients = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('client')) : [];
+  const carrierList = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('carrier')) : [];
 
   // Estados
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -31,20 +31,18 @@ export default function SalesPage() {
   const [previewOrder, setPreviewOrder] = useState<SalesOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Cálculos de KPIs (CORREGIDOS PARA NUEVOS TIPOS)
+  // Cálculos de KPIs
   const totalAmount = orders.reduce((sum: number, o: SalesOrder) => sum + (o.totalAmount || 0), 0);
-  
-  // Pendientes: Estado 'pending' o 'draft'
   const pendingCount = orders.filter((o: SalesOrder) => o.status === 'pending' || o.status === 'draft').length;
-  
-  // Completadas: Ahora consideramos 'dispatched' (Despachado) e 'invoiced' (Facturado)
   const completedCount = orders.filter((o: SalesOrder) => o.status === 'dispatched' || o.status === 'invoiced').length;
 
   // Filtrado de órdenes
-  const filteredOrders = orders.filter((o: SalesOrder) => 
-    o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    clients.find((c: Contact) => c.id === o.clientId)?.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrders = orders.filter((o: SalesOrder) => {
+      const clientName = clients.find((c: Contact) => c.id === o.clientId)?.name || '';
+      return o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             clientName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
 
   // Handlers
   const handleEdit = (order: SalesOrder) => {
@@ -77,19 +75,19 @@ export default function SalesPage() {
       onEdit: handleEdit,
       onDelete: (order) => handleDelete(order.id),
       onPreview: handlePreview,
-      clients: clients // Pasamos la lista de clientes para resolver los nombres
+      clients: clients 
   });
 
   // Estilos Reutilizables
   const cardClass = "bg-slate-900 border-slate-800 shadow-sm hover:border-slate-700 transition-all";
 
   return (
-    <div className="p-8 space-y-8 bg-slate-950 min-h-screen text-slate-100">
+    <div className="p-3 md:p-6 space-y-6 bg-slate-950 min-h-screen text-slate-100">
       
       {/* --- HEADER & ACCIONES --- */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Gestión de Ventas</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Gestión de Ventas</h2>
           <p className="text-slate-400 mt-1">Control de despachos y facturación.</p>
         </div>
         <Button onClick={handleCreate} className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20 font-semibold">
@@ -98,15 +96,15 @@ export default function SalesPage() {
       </div>
 
       {/* --- KPIs RESUMEN --- */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-              <TrendingUp className="h-8 w-8 text-emerald-500" />
+              <TrendingUp className="h-6 w-6 md:h-8 md:w-8 text-emerald-500" />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Ventas</p>
-              <h3 className="text-2xl font-bold text-white">
+              <h3 className="text-xl md:text-2xl font-bold text-white">
                 {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(totalAmount)}
               </h3>
             </div>
@@ -116,11 +114,11 @@ export default function SalesPage() {
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
-              <Clock className="h-8 w-8 text-yellow-500" />
+              <Clock className="h-6 w-6 md:h-8 md:w-8 text-yellow-500" />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Por Despachar</p>
-              <h3 className="text-2xl font-bold text-white">{pendingCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
+              <h3 className="text-xl md:text-2xl font-bold text-white">{pendingCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
             </div>
           </CardContent>
         </Card>
@@ -128,11 +126,11 @@ export default function SalesPage() {
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-              <Truck className="h-8 w-8 text-blue-500" />
+              <Truck className="h-6 w-6 md:h-8 md:w-8 text-blue-500" />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Despachadas</p>
-              <h3 className="text-2xl font-bold text-white">{completedCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
+              <h3 className="text-xl md:text-2xl font-bold text-white">{completedCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
             </div>
           </CardContent>
         </Card>
@@ -168,10 +166,12 @@ export default function SalesPage() {
       <NewSalesOrderSheet
         isOpen={isSheetOpen}
         onOpenChange={handleCloseSheet}
-        onSave={(data) => {
-            // TypeScript ahora estará feliz porque los datos coinciden
-            if (editingOrder) updateOrder(data as any);
-            else createOrder(data as any);
+        onSave={(data, newItems) => {
+            if (editingOrder) {
+                updateOrder({ ...editingOrder, ...data, items: [...(data.items || []), ...(newItems || [])] });
+            } else {
+                createOrder({ ...data, items: [...(data.items || []), ...(newItems || [])] } as any);
+            }
             setIsSheetOpen(false);
         }}
         order={editingOrder}
@@ -180,6 +180,10 @@ export default function SalesPage() {
         inventory={inventory || []}
         nextOrderId=""
         salesOrders={orders}
+        sheetType="sale"
+        purchaseOrders={purchaseOrders || []}
+        inventoryAdjustments={inventoryAdjustments || []}
+        contacts={contacts || []}
       />
 
       {previewOrder && (
@@ -194,3 +198,5 @@ export default function SalesPage() {
     </div>
   );
 }
+
+    

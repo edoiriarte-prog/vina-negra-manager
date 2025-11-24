@@ -59,6 +59,9 @@ export function LotSelectionDialog({
   const { toast } = useToast();
 
   const availableLots = useMemo(() => {
+    // FIX: Add a guard clause to prevent crash if purchaseOrders is undefined
+    if (!purchaseOrders) return [];
+
     const lotMap = new Map<string, AvailableLot>();
 
     // Step 1: Aggregate all lot entries from all purchase orders (completed)
@@ -129,13 +132,10 @@ export function LotSelectionDialog({
     
     // ... or transferred into it.
     salesOrders.forEach(so => {
-        if(so.movementType === 'Traslado Bodega Interna' && so.destinationWarehouse === warehouse) {
-            const transferPO = purchaseOrders.find(po => po.description?.includes(so.id));
-            if(transferPO) {
-                 transferPO.items.forEach(item => {
-                    if (item.lotNumber) lotsInWarehouse.add(item.lotNumber);
-                 });
-            }
+        if(so.saleType === 'Traslado Bodega Interna' && so.destinationWarehouse === warehouse) {
+             so.items.forEach(item => {
+                if (item.lotNumber) lotsInWarehouse.add(item.lotNumber);
+             });
         }
     })
 
@@ -327,3 +327,5 @@ export function LotSelectionDialog({
     </Dialog>
   );
 }
+
+    

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { 
@@ -6,16 +7,16 @@ import {
   updateDocumentNonBlocking, 
   deleteDocumentNonBlocking,
   useFirebase,
-  useMemoFirebase // <--- IMPORTANTE
+  useMemoFirebase
 } from "@/firebase"; 
 import { SalesOrder } from "@/lib/types";
-import { collection, doc, orderBy, query } from "firebase/firestore";
+import { collection, doc, orderBy, query, setDoc } from "firebase/firestore";
 
 export function useSalesOrders() {
   const { firestore } = useFirebase();
 
   // 1. Consulta (Query) con useMemoFirebase
-  const ordersQuery = useMemoFirebase(() => { // <--- CAMBIO AQUÍ
+  const ordersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, "salesOrders"), orderBy("date", "desc"));
   }, [firestore]);
@@ -34,7 +35,6 @@ export function useSalesOrders() {
     const colRef = collection(firestore, "salesOrders");
     
     if (order.id) {
-        const { setDoc } = await import("firebase/firestore");
         await setDoc(doc(firestore, "salesOrders", order.id), order);
     } else {
         await addDocumentNonBlocking(colRef, order);
@@ -63,3 +63,5 @@ export function useSalesOrders() {
     deleteOrder
   };
 }
+
+    

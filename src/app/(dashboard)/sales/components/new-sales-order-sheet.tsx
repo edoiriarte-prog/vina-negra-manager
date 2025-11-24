@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -9,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, CalendarIcon, User, Truck, Warehouse, CreditCard, Info, PackageCheck, DollarSign, MapPin } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SalesOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
+import { SalesOrder, OrderItem, Contact, InventoryItem, PurchaseOrder, InventoryAdjustment } from '@/lib/types';
 import { format, addDays, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,8 +32,8 @@ type NewSalesOrderSheetProps = {
   nextOrderId: string;
   salesOrders: SalesOrder[];
   sheetType: 'sale' | 'dispatch';
-  purchaseOrders: any[];
-  inventoryAdjustments: any[];
+  purchaseOrders: PurchaseOrder[];
+  inventoryAdjustments: InventoryAdjustment[];
   contacts: Contact[];
 };
 
@@ -634,3 +635,5 @@ export function NewSalesOrderSheet({
     </>
   );
 }
+
+    
