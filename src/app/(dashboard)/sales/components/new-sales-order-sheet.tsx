@@ -106,7 +106,7 @@ export function NewSalesOrderSheet({
     if (isOpen) {
         if (!order) {
             const idPrefix = sheetType === 'sale' ? 'OV' : 'TR';
-            const baseId = sheetType === 'sale' ? BASE_OV_ID : 0;
+            const baseId = sheetType === 'sale' ? 2099 : 0;
             const existingIds = (salesOrders || [])
                 .filter(o => o.orderType === sheetType)
                 .map(o => {
@@ -116,7 +116,7 @@ export function NewSalesOrderSheet({
                 .filter(n => !isNaN(n));
             
             const maxId = existingIds.length > 0 ? Math.max(...existingIds) : baseId;
-            const nextNum = maxId <= baseId ? baseId + 1 : maxId + 1;
+            const nextNum = maxId < baseId + 1 ? baseId + 1 : maxId + 1;
             const newId = `${idPrefix}-${nextNum}`;
             
             setNextIdDisplay(newId);
@@ -181,7 +181,8 @@ export function NewSalesOrderSheet({
         ...item,
         id: `temp-${Date.now()}-${Math.random()}`,
     }));
-    onSave(formData, newItems);
+    setFormData(prev => ({...prev, items: [...prev.items, ...newItems]}));
+    setIsMatrixOpen(false);
   }
   
   const handleLotSave = (newItem: OrderItem) => {
@@ -615,7 +616,7 @@ export function NewSalesOrderSheet({
       <ItemMatrixDialog 
         isOpen={isMatrixOpen}
         onOpenChange={setIsMatrixOpen}
-        onSave={(items) => onSave(formData, items)}
+        onSave={handleMatrixSave}
         orderType="sale"
         inventory={inventory.filter(i => i.warehouse === formData.warehouse)}
       />
