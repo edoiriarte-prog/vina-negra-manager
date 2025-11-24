@@ -55,9 +55,9 @@ export default function SalesPage() {
     setIsSheetOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-      if (confirm("¿Estás seguro de eliminar esta orden de venta?")) {
-          await deleteOrder(id);
+  const handleDelete = async (orderToDelete: SalesOrder) => {
+      if (confirm(`¿Estás seguro de eliminar la orden de venta ${orderToDelete.id}?`)) {
+          await deleteOrder(orderToDelete.id);
       }
   }
 
@@ -73,7 +73,7 @@ export default function SalesPage() {
   // Generamos las columnas
   const columns = getColumns({
       onEdit: handleEdit,
-      onDelete: (order) => handleDelete(order.id),
+      onDelete: handleDelete,
       onPreview: handlePreview,
       clients: clients 
   });
@@ -152,12 +152,6 @@ export default function SalesPage() {
             <DataTable 
                 columns={columns} 
                 data={filteredOrders} 
-                searchKey="id"
-                meta={{
-                    onEdit: handleEdit,
-                    onDelete: (order: SalesOrder) => handleDelete(order.id),
-                    onView: setPreviewOrder
-                }}
             />
         </div>
       </div>
@@ -198,5 +192,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -28,15 +29,11 @@ import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  searchKey?: string;
-  meta?: any; // Para pasar funciones (editar, borrar) a las columnas
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
-  searchKey,
-  meta,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -54,26 +51,10 @@ export function DataTable<TData, TValue>({
       sorting,
       columnFilters,
     },
-    meta: meta,
   });
 
   return (
     <div className="w-full space-y-4">
-      {/* Buscador (Solo si se pasa searchKey) */}
-      {searchKey && (
-        <div className="flex items-center relative max-w-sm">
-          <Search className="absolute left-3 h-4 w-4 text-slate-500" />
-          <Input
-            placeholder="Buscar..."
-            value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-            onChange={(event) =>
-              table.getColumn(searchKey)?.setFilterValue(event.target.value)
-            }
-            className="pl-9 bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:ring-blue-500/20 focus:border-blue-500/50 h-9 text-sm"
-          />
-        </div>
-      )}
-
       {/* Tabla */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
         <Table>
