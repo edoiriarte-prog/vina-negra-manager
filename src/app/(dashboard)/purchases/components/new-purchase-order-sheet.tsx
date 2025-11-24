@@ -313,7 +313,7 @@ export function NewPurchaseOrderSheet({
                         <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {warehouses.map(w => <SelectItem key={w} value={w} className="focus:bg-slate-800 focus:text-slate-100">{w}</SelectItem>)}
+                                {warehouses.map(w => <SelectItem key={w.id} value={w.name} className="focus:bg-slate-800 focus:text-slate-100">{w.name}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </CardContent>
@@ -388,7 +388,7 @@ export function NewPurchaseOrderSheet({
                                                 <td className="px-4 py-2">
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.packagingType`, v)} value={item.packagingType || ''}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-xs text-slate-400 focus:ring-0"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}</SelectContent>
                                                     </Select>
                                                 </td>
                                                 <td className="px-4 py-2">
@@ -569,3 +569,4 @@ export function NewPurchaseOrderSheet({
     </>
   );
 }
+    

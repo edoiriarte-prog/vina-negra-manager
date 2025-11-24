@@ -26,9 +26,9 @@ type MasterDataContextType = {
     units: string[];
     addUnit: (u: string) => void;
     removeUnit: (u: string) => void;
-    packagingTypes: string[];
+    packagingTypes: { id: string; name: string }[];
     addPackagingType: (p: string) => void;
-    removePackagingType: (p: string) => void;
+    removePackagingType: (id: string) => void;
     productCaliberAssociations: ProductCaliberAssociation[];
     updateProductCalibers: (productName: string, caliberNames: string[]) => void;
     bankAccounts: BankAccount[];
@@ -58,13 +58,17 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
         { name: 'PAL_EXTRA', code: '50' }, { name: 'PAL_PRIMERA', code: '60' },
     ]);
     const [units, setUnits] = useLocalStorage<string[]>('units', ['Kilos', 'Cajas']);
-    const [packagingTypes, setPackagingTypes] = useLocalStorage<string[]>('packagingTypes', ['CAJA PL 10KG', 'CAJA CARTÓN 15KG', 'BIN 400KG']);
     const [productCaliberAssociations, setProductCaliberAssociations] = useLocalStorage<ProductCaliberAssociation[]>('productCaliberAssociations', []);
 
     // Warehouses from Firestore
     const warehousesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'warehouses') : null, [firestore]);
     const { data: warehousesData, isLoading: l1 } = useCollection<{name: string}>(warehousesCollection);
     const warehouses = warehousesData || [];
+
+    // Packaging Types from Firestore
+    const packagingTypesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'packagingTypes') : null, [firestore]);
+    const { data: packagingTypesData, isLoading: l8 } = useCollection<{name: string}>(packagingTypesCollection);
+    const packagingTypes = packagingTypesData || [];
 
     // Bank Accounts from Firestore
     const accountsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'bankAccounts') : null, [firestore]);
@@ -95,7 +99,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     const inventoryAdjustments = inventoryAdjustmentsData || [];
 
 
-    const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7;
+    const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8;
 
     // --- CRUD FUNCTIONS (Sin cambios aquí) ---
     const addProduct = (p: string) => !products.includes(p) && setProducts([...products, p]);
@@ -115,11 +119,19 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const addPackagingType = (name: string) => {
+        if (firestore && name && !packagingTypes.some(p => p.name === name)) {
+            addDocumentNonBlocking(collection(firestore, 'packagingTypes'), { name });
+        }
+    };
+    const removePackagingType = (id: string) => {
+        if (firestore) {
+            deleteDocumentNonBlocking(doc(firestore, 'packagingTypes', id));
+        }
+    };
+
     const addUnit = (u: string) => !units.includes(u) && setUnits([...units, u]);
     const removeUnit = (u: string) => setUnits(units.filter(item => item !== u));
-
-    const addPackagingType = (p: string) => !packagingTypes.includes(p) && setPackagingTypes([...packagingTypes, p]);
-    const removePackagingType = (p: string) => setPackagingTypes(packagingTypes.filter(item => item !== p));
 
     const updateProductCalibers = (productName: string, caliberNames: string[]) => {
         const index = productCaliberAssociations.findIndex(a => a.id === productName);
@@ -173,4 +185,5 @@ export function useMasterData() {
     return context;
 }
 
+    
     

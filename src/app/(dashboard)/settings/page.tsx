@@ -147,11 +147,10 @@ export default function SettingsPage() {
                     </div>
                     <Separator className="bg-slate-800" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {/* TIPADO AGREGADO AQUÍ: (item: string) */}
-                        {packagingTypes.map((item: string) => (
-                            <div key={item} className={listClass}>
-                                <span className="font-medium text-slate-200">{item}</span>
-                                <Button variant="ghost" size="sm" onClick={() => removePackagingType(item)} className="text-slate-500 hover:text-red-400"><Trash2 className="h-4 w-4"/></Button>
+                        {packagingTypes.map((item) => (
+                            <div key={item.id} className={listClass}>
+                                <span className="font-medium text-slate-200">{item.name}</span>
+                                <Button variant="ghost" size="sm" onClick={() => removePackagingType(item.id)} className="text-slate-500 hover:text-red-400"><Trash2 className="h-4 w-4"/></Button>
                             </div>
                         ))}
                     </div>
@@ -163,4 +162,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+    
     
