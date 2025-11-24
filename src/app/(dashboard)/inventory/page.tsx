@@ -100,7 +100,6 @@ export default function InventoryPage() {
     });
     const [selectedWarehouse, setSelectedWarehouse] = useState<string>('All');
     const [selectedLotWarehouse, setSelectedLotWarehouse] = useState<string>('All');
-    const [selectedProduct, setSelectedProduct] = useState<string>('');
     const [inventoryData, setInventoryData] = useState<InventoryReportItem[]>([]);
     const [viewingHistory, setViewingHistory] = useState<any | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -118,70 +117,61 @@ export default function InventoryPage() {
     useEffect(() => {
         setIsClient(true);
     }, []);
-    
-    useEffect(() => {
-        if (isClient && masterProducts.length > 0 && !selectedProduct) {
-            setSelectedProduct(masterProducts[0].name);
-        }
-    }, [isClient, masterProducts, selectedProduct]);
 
     const isLoading = isLoadingPO || isLoadingSO || isLoadingIA || isLoadingContacts;
 
-    // --- LÓGICA DE INVENTARIO (SIN CAMBIOS FUNCIONALES) ---
-    // (Tu lógica de cálculo de stock es extensa y se mantiene intacta)
     useEffect(() => {
-        if (isClient && !isLoading && selectedProduct && purchaseOrders && salesOrders && inventoryAdjustments) {
+      if (isClient && !isLoading && masterProducts.length > 0 && purchaseOrders && salesOrders && inventoryAdjustments) {
+        
+        const allProducts = masterProducts.map(p => p.name);
+        let fullReportData: InventoryReportItem[] = [];
+
+        allProducts.forEach(productName => {
             const getStockAsOf = (date: Date, product: string) => {
                 const stockMap = new Map<string, { kg: number, packages: number }>();
 
-                // Process Purchases (Entradas)
                 purchaseOrders
                     .filter(po => isValidPurchase(po.status) && !isAfter(parseISO(po.date), date))
                     .forEach(po => {
                         const warehouse = po.destinationWarehouse || po.warehouse;
-                           if (selectedWarehouse === 'All' || warehouse === selectedWarehouse) {
-                                po.items.forEach(item => {
-                                    if (item.product === product && (item.unit === 'Kilos' || !item.unit)) {
+                        if (selectedWarehouse === 'All' || warehouse === selectedWarehouse) {
+                            po.items.forEach(item => {
+                                if (item.product === product && (item.unit === 'Kilos' || !item.unit)) {
+                                    const key = `${item.product}-${item.caliber}`;
+                                    const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
+                                    currentStock.kg += item.quantity;
+                                    currentStock.packages += (item.packagingQuantity || 0);
+                                    stockMap.set(key, currentStock);
+                                }
+                            });
+                        }
+                    });
+
+                salesOrders
+                    .filter(so => isValidSale(so.status) && !isAfter(parseISO(so.date), date))
+                    .forEach(so => {
+                        so.items.forEach(item => {
+                            if (item.product === product && (item.unit === 'Kilos' || !item.unit)) {
+                                if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
+                                    const key = `${item.product}-${item.caliber}`;
+                                    const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
+                                    currentStock.kg -= item.quantity;
+                                    currentStock.packages -= (item.packagingQuantity || 0);
+                                    stockMap.set(key, currentStock);
+                                }
+                                if (so.saleType === 'Traslado Bodega Interna' && so.destinationWarehouse) {
+                                    if (selectedWarehouse === 'All' || so.destinationWarehouse === selectedWarehouse) {
                                         const key = `${item.product}-${item.caliber}`;
                                         const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
                                         currentStock.kg += item.quantity;
                                         currentStock.packages += (item.packagingQuantity || 0);
                                         stockMap.set(key, currentStock);
                                     }
-                                });
+                                }
                             }
+                        });
                     });
 
-                // Process Sales and Transfers (Salidas)
-                salesOrders
-                    .filter(so => isValidSale(so.status) && !isAfter(parseISO(so.date), date))
-                    .forEach(so => {
-                             so.items.forEach(item => {
-                                if (item.product === product && (item.unit === 'Kilos' || !item.unit)) {
-                                    // Decrease from source warehouse
-                                    if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
-                                        const key = `${item.product}-${item.caliber}`;
-                                        const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
-                                        currentStock.kg -= item.quantity;
-                                        currentStock.packages -= (item.packagingQuantity || 0);
-                                        stockMap.set(key, currentStock);
-                                    }
-
-                                    // Increase in destination warehouse (for internal transfers)
-                                    if (so.saleType === 'Traslado Bodega Interna' && so.destinationWarehouse) {
-                                        if (selectedWarehouse === 'All' || so.destinationWarehouse === selectedWarehouse) {
-                                            const key = `${item.product}-${item.caliber}`;
-                                            const currentStock = stockMap.get(key) || { kg: 0, packages: 0 };
-                                            currentStock.kg += item.quantity;
-                                            currentStock.packages += (item.packagingQuantity || 0);
-                                            stockMap.set(key, currentStock);
-                                        }
-                                    }
-                                }
-                            });
-                        });
-
-                // Process Adjustments
                 inventoryAdjustments
                     .filter(adj => adj.product === product && !isAfter(parseISO(adj.date), date))
                     .forEach(adj => {
@@ -194,11 +184,10 @@ export default function InventoryPage() {
                             stockMap.set(key, currentStock);
                         }
                     });
-
                 return stockMap;
             };
 
-            const initialStockMap = getStockAsOf(new Date(dateRange.from.getTime() - 86400000), selectedProduct);
+            const initialStockMap = getStockAsOf(new Date(dateRange.from.getTime() - 86400000), productName);
             const filterByDate = (dateStr: string) => !isBefore(parseISO(dateStr), dateRange.from) && !isAfter(parseISO(dateStr), dateRange.to);
 
             const inflowsMap = new Map<string, { kg: number, packages: number }>();
@@ -206,14 +195,11 @@ export default function InventoryPage() {
             const adjustmentsMap = new Map<string, { kg: number, packages: number }>();
             const allCalibers = new Set<string>();
 
-            // Calculate inflows, outflows, and adjustments for the selected period
-            
-            // Compras (Entradas)
             purchaseOrders.filter(po => isValidPurchase(po.status) && filterByDate(po.date)).forEach(po => {
                 const warehouse = po.destinationWarehouse || po.warehouse;
                 if (selectedWarehouse === 'All' || warehouse === selectedWarehouse) {
                     po.items.forEach(item => {
-                        if (item.product === selectedProduct) {
+                        if (item.product === productName) {
                             const key = `${item.product}-${item.caliber}`;
                             const current = inflowsMap.get(key) || { kg: 0, packages: 0 };
                             current.kg += item.quantity;
@@ -225,11 +211,9 @@ export default function InventoryPage() {
                 }
             });
 
-            // Ventas (Salidas)
             salesOrders.filter(so => isValidSale(so.status) && filterByDate(so.date)).forEach(so => {
                 so.items.forEach(item => {
-                    if (item.product === selectedProduct) {
-                        // Outflow from source
+                    if (item.product === productName) {
                         if (selectedWarehouse === 'All' || so.warehouse === selectedWarehouse) {
                             const key = `${item.product}-${item.caliber}`;
                             const current = outflowsMap.get(key) || { kg: 0, packages: 0 };
@@ -238,7 +222,6 @@ export default function InventoryPage() {
                             outflowsMap.set(key, current);
                             allCalibers.add(item.caliber);
                         }
-                        // Inflow to destination for transfers
                         if (so.saleType === 'Traslado Bodega Interna' && so.destinationWarehouse) {
                             if (selectedWarehouse === 'All' || so.destinationWarehouse === selectedWarehouse) {
                                 const key = `${item.product}-${item.caliber}`;
@@ -253,7 +236,7 @@ export default function InventoryPage() {
                 });
             });
 
-            inventoryAdjustments.filter(adj => filterByDate(adj.date) && adj.product === selectedProduct).forEach(adj => {
+            inventoryAdjustments.filter(adj => filterByDate(adj.date) && adj.product === productName).forEach(adj => {
                 if (selectedWarehouse === 'All' || adj.warehouse === selectedWarehouse) {
                     const key = `${adj.product}-${adj.caliber}`;
                     const current = adjustmentsMap.get(key) || { kg: 0, packages: 0 };
@@ -270,26 +253,20 @@ export default function InventoryPage() {
             outflowsMap.forEach((_, key) => allCalibers.add(key.split('-')[1]));
             adjustmentsMap.forEach((_, key) => allCalibers.add(key.split('-')[1]));
 
-            const reportData: InventoryReportItem[] = Array.from(allCalibers).map(caliber => {
-                const key = `${selectedProduct}-${caliber}`;
+            const productReportData: InventoryReportItem[] = Array.from(allCalibers).map(caliber => {
+                const key = `${productName}-${caliber}`;
                 const initialStock = initialStockMap.get(key) || { kg: 0, packages: 0 };
                 const inflows = inflowsMap.get(key) || { kg: 0, packages: 0 };
                 const outflows = outflowsMap.get(key) || { kg: 0, packages: 0 };
                 const adjustments = adjustmentsMap.get(key) || { kg: 0, packages: 0 };
 
                 return {
-                    key,
-                    product: selectedProduct,
-                    caliber,
+                    key, product: productName, caliber,
                     caliberCode: masterCalibers.find(c => c.name === caliber)?.code || 'N/A',
-                    initialStockKg: initialStock.kg,
-                    initialStockPackages: initialStock.packages,
-                    inflowKg: inflows.kg,
-                    inflowPackages: inflows.packages,
-                    outflowKg: outflows.kg,
-                    outflowPackages: outflows.packages,
-                    adjustmentsKg: adjustments.kg,
-                    adjustmentsPackages: adjustments.packages,
+                    initialStockKg: initialStock.kg, initialStockPackages: initialStock.packages,
+                    inflowKg: inflows.kg, inflowPackages: inflows.packages,
+                    outflowKg: outflows.kg, outflowPackages: outflows.packages,
+                    adjustmentsKg: adjustments.kg, adjustmentsPackages: adjustments.packages,
                     finalStockKg: initialStock.kg + inflows.kg - outflows.kg + adjustments.kg,
                     finalStockPackages: initialStock.packages + inflows.packages - outflows.packages + adjustments.packages,
                 };
@@ -302,9 +279,12 @@ export default function InventoryPage() {
                 return caliberAIndex - caliberBIndex;
             });
             
-            setInventoryData(reportData);
-        }
-    }, [isClient, isLoading, dateRange, selectedWarehouse, selectedProduct, purchaseOrders, salesOrders, inventoryAdjustments, masterCalibers, masterProducts]);
+            fullReportData = [...fullReportData, ...productReportData];
+        });
+
+        setInventoryData(fullReportData);
+      }
+    }, [isClient, isLoading, dateRange, selectedWarehouse, masterProducts, purchaseOrders, salesOrders, inventoryAdjustments, masterCalibers]);
     
     const lotTraceabilityData = useMemo(() => {
         if (!isClient || isLoading || !purchaseOrders || !salesOrders || !inventoryAdjustments || !contacts) return [];
@@ -473,7 +453,6 @@ export default function InventoryPage() {
 
       const summary = [
         ["Reporte de Inventario"],
-        ["Producto", selectedProduct],
         ["Periodo", `${format(dateRange.from, 'dd-MM-yyyy')} al ${format(dateRange.to, 'dd-MM-yyyy')}`],
         ["Bodega", selectedWarehouse],
         []
@@ -483,7 +462,7 @@ export default function InventoryPage() {
       XLSX.utils.sheet_add_aoa(worksheet, summary, { origin: "A1" });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario');
-      XLSX.writeFile(workbook, `Reporte_Inventario_${selectedProduct}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      XLSX.writeFile(workbook, `Reporte_Inventario_General_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
       toast({ title: 'Exportación Exitosa'});
     };
 
@@ -633,23 +612,25 @@ export default function InventoryPage() {
         toast({ title: 'Exportación Exitosa'});
     }
     
-    const totals = useMemo(() => {
+    const totalsByProduct = useMemo(() => {
         return inventoryData.reduce((acc, item) => {
-            acc.initialStockKg += item.initialStockKg;
-            acc.inflowKg += item.inflowKg;
-            acc.outflowKg += item.outflowKg;
-            acc.adjustmentsKg += item.adjustmentsKg;
-            acc.finalStockKg += item.finalStockKg;
-            acc.initialStockPackages += item.initialStockPackages;
-            acc.inflowPackages += item.inflowPackages;
-            acc.outflowPackages += item.outflowPackages;
-            acc.adjustmentsPackages += item.adjustmentsPackages;
-            acc.finalStockPackages += item.finalStockPackages;
+            if (!acc[item.product]) {
+                acc[item.product] = { initialStockKg: 0, inflowKg: 0, outflowKg: 0, adjustmentsKg: 0, finalStockKg: 0, initialStockPackages: 0, inflowPackages: 0, outflowPackages: 0, adjustmentsPackages: 0, finalStockPackages: 0 };
+            }
+            acc[item.product].initialStockKg += item.initialStockKg;
+            acc[item.product].inflowKg += item.inflowKg;
+            acc[item.product].outflowKg += item.outflowKg;
+            acc[item.product].adjustmentsKg += item.adjustmentsKg;
+            acc[item.product].finalStockKg += item.finalStockKg;
+            acc[item.product].initialStockPackages += item.initialStockPackages;
+            acc[item.product].inflowPackages += item.inflowPackages;
+            acc[item.product].outflowPackages += item.outflowPackages;
+            acc[item.product].adjustmentsPackages += item.adjustmentsPackages;
+            acc[item.product].finalStockPackages += item.finalStockPackages;
             return acc;
-        }, { initialStockKg: 0, inflowKg: 0, outflowKg: 0, adjustmentsKg: 0, finalStockKg: 0, initialStockPackages: 0, inflowPackages: 0, outflowPackages: 0, adjustmentsPackages: 0, finalStockPackages: 0 });
+        }, {} as Record<string, typeof totalsByProduct[string]>);
     }, [inventoryData]);
 
-    // ESTILOS: Aplicamos tema oscuro a las tablas y contenedores
     const tableDarkClass = "bg-slate-900 border-slate-800 text-slate-200";
     const headerDarkClass = "bg-slate-800 text-slate-300 border-slate-700";
     const cellDarkClass = "border-slate-800";
@@ -659,6 +640,11 @@ export default function InventoryPage() {
         if (!isClient || isLoading) {
             return <Skeleton className="h-96 w-full bg-slate-800" />;
         }
+
+        const groupedByProduct = inventoryData.reduce((acc, item) => {
+            (acc[item.product] = acc[item.product] || []).push(item);
+            return acc;
+        }, {} as Record<string, InventoryReportItem[]>);
 
         return (
             <div className={cn("rounded-md border overflow-x-auto", isPrint ? "border-none" : tableDarkClass)}>
@@ -688,48 +674,53 @@ export default function InventoryPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {inventoryData.length > 0 ? inventoryData.map(item => (
-                             <TableRow key={item.key} className={cn("hover:bg-slate-800/50 transition-colors", cellDarkClass)}>
-                                 <TableCell className="font-medium">{item.caliber}</TableCell>
-                                 <TableCell className="text-slate-400">{item.caliberCode}</TableCell>
-                                 <TableCell className={cn("text-right border-l", cellDarkClass)}>{formatPackages(item.initialStockPackages)}</TableCell>
-                                 <TableCell className="text-right">{formatKilos(item.initialStockKg)}</TableCell>
-                                 <TableCell className={cn("text-right border-l text-emerald-400", cellDarkClass)}>{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
-                                 <TableCell className={cn("text-right text-emerald-400")}>{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
-                                 <TableCell className={cn("text-right border-l text-red-400", cellDarkClass)}>{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
-                                 <TableCell className={cn("text-right text-red-400")}>{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
-                                 <TableCell className={cn("text-right border-l", cellDarkClass, item.adjustmentsPackages !== 0 && (item.adjustmentsPackages > 0 ? "text-blue-400" : "text-orange-400"))}>{item.adjustmentsPackages !== 0 ? formatPackages(item.adjustmentsPackages) : '-'}</TableCell>
-                                 <TableCell className={cn("text-right", item.adjustmentsKg !== 0 && (item.adjustmentsKg > 0 ? "text-blue-400" : "text-orange-400"))}>{item.adjustmentsKg !== 0 ? formatKilos(item.adjustmentsKg) : '-'}</TableCell>
-                                 <TableCell className={cn("text-right font-bold border-l text-white", cellDarkClass)}>{formatPackages(item.finalStockPackages)}</TableCell>
-                                 <TableCell className={cn("text-right font-bold text-white")}>{formatKilos(item.finalStockKg)}</TableCell>
-                                 <TableCell className="border-l no-print">
-                                     <Button variant="ghost" size="icon" onClick={() => setViewingHistory({ ...item, warehouse: selectedWarehouse })} className="text-slate-400 hover:text-blue-400">
-                                         <Eye className="h-4 w-4" />
-                                     </Button>
-                                 </TableCell>
-                             </TableRow>
+                        {Object.keys(groupedByProduct).length > 0 ? Object.entries(groupedByProduct).map(([productName, items]) => (
+                            <React.Fragment key={productName}>
+                                <TableRow className="bg-slate-800/50 hover:bg-slate-800/70">
+                                    <TableCell colSpan={13} className="font-bold text-lg text-white">{productName}</TableCell>
+                                </TableRow>
+                                {items.map(item => (
+                                    <TableRow key={item.key} className={cn("hover:bg-slate-800/50 transition-colors", cellDarkClass)}>
+                                        <TableCell className="font-medium">{item.caliber}</TableCell>
+                                        <TableCell className="text-slate-400">{item.caliberCode}</TableCell>
+                                        <TableCell className={cn("text-right border-l", cellDarkClass)}>{formatPackages(item.initialStockPackages)}</TableCell>
+                                        <TableCell className="text-right">{formatKilos(item.initialStockKg)}</TableCell>
+                                        <TableCell className={cn("text-right border-l text-emerald-400", cellDarkClass)}>{item.inflowPackages > 0 ? `+${formatPackages(item.inflowPackages)}` : '-'}</TableCell>
+                                        <TableCell className={cn("text-right text-emerald-400")}>{item.inflowKg > 0 ? `+${formatKilos(item.inflowKg)}` : '-'}</TableCell>
+                                        <TableCell className={cn("text-right border-l text-red-400", cellDarkClass)}>{item.outflowPackages > 0 ? `-${formatPackages(item.outflowPackages)}` : '-'}</TableCell>
+                                        <TableCell className={cn("text-right text-red-400")}>{item.outflowKg > 0 ? `-${formatKilos(item.outflowKg)}` : '-'}</TableCell>
+                                        <TableCell className={cn("text-right border-l", cellDarkClass, item.adjustmentsPackages !== 0 && (item.adjustmentsPackages > 0 ? "text-blue-400" : "text-orange-400"))}>{item.adjustmentsPackages !== 0 ? formatPackages(item.adjustmentsPackages) : '-'}</TableCell>
+                                        <TableCell className={cn("text-right", item.adjustmentsKg !== 0 && (item.adjustmentsKg > 0 ? "text-blue-400" : "text-orange-400"))}>{item.adjustmentsKg !== 0 ? formatKilos(item.adjustmentsKg) : '-'}</TableCell>
+                                        <TableCell className={cn("text-right font-bold border-l text-white", cellDarkClass)}>{formatPackages(item.finalStockPackages)}</TableCell>
+                                        <TableCell className={cn("text-right font-bold text-white")}>{formatKilos(item.finalStockKg)}</TableCell>
+                                        <TableCell className="border-l no-print">
+                                            <Button variant="ghost" size="icon" onClick={() => setViewingHistory({ ...item, warehouse: selectedWarehouse })} className="text-slate-400 hover:text-blue-400">
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                <TableRow className="bg-slate-800 hover:bg-slate-800">
+                                    <TableHead colSpan={2} className="text-right font-bold text-base text-white border-r border-slate-700">Total {productName}</TableHead>
+                                    <TableHead className="text-right font-bold text-base border-l border-slate-700">{formatPackages(totalsByProduct[productName].initialStockPackages)}</TableHead>
+                                    <TableHead className="text-right font-bold text-base">{formatKilos(totalsByProduct[productName].initialStockKg)}</TableHead>
+                                    <TableHead className="text-right font-bold text-base border-l border-slate-700 text-emerald-400">{formatPackages(totalsByProduct[productName].inflowPackages)}</TableHead>
+                                    <TableHead className="text-right font-bold text-base text-emerald-400">{formatKilos(totalsByProduct[productName].inflowKg)}</TableHead>
+                                    <TableHead className="text-right font-bold text-base border-l border-slate-700 text-red-400">{formatPackages(totalsByProduct[productName].outflowPackages)}</TableHead>
+                                    <TableHead className="text-right font-bold text-base text-red-400">{formatKilos(totalsByProduct[productName].outflowKg)}</TableHead>
+                                    <TableHead className="text-right font-bold text-base border-l border-slate-700">{formatPackages(totalsByProduct[productName].adjustmentsPackages)}</TableHead>
+                                    <TableHead className="text-right font-bold text-base">{formatKilos(totalsByProduct[productName].adjustmentsKg)}</TableHead>
+                                    <TableHead className="text-right font-bold text-base border-l border-slate-700 text-white">{formatPackages(totalsByProduct[productName].finalStockPackages)}</TableHead>
+                                    <TableHead className="text-right font-bold text-base text-white">{formatKilos(totalsByProduct[productName].finalStockKg)}</TableHead>
+                                    <TableHead className="no-print"></TableHead>
+                                </TableRow>
+                            </React.Fragment>
                         )) : (
                             <TableRow>
                                 <TableCell colSpan={13} className="text-center h-24 text-slate-500">No hay datos de inventario para el período y filtros seleccionados.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
-                   <TableFooter className={cn(tableDarkClass, isPrint ? "bg-gray-100 text-black" : "bg-slate-800 text-white")}>
-                        <TableRow className="hover:bg-slate-800/50 border-slate-700">
-                            <TableHead colSpan={2} className="text-right font-bold text-lg text-white border-r border-slate-700">Totales</TableHead>
-                            <TableHead className="text-right font-bold text-lg border-l border-slate-700">{formatPackages(totals.initialStockPackages)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.initialStockKg)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg border-l border-slate-700 text-emerald-400">{formatPackages(totals.inflowPackages)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg text-emerald-400">{formatKilos(totals.inflowKg)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg border-l border-slate-700 text-red-400">{formatPackages(totals.outflowPackages)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg text-red-400">{formatKilos(totals.outflowKg)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg border-l border-slate-700">{formatPackages(totals.adjustmentsPackages)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg">{formatKilos(totals.adjustmentsKg)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg border-l border-slate-700 text-white">{formatPackages(totals.finalStockPackages)}</TableHead>
-                            <TableHead className="text-right font-bold text-lg text-white">{formatKilos(totals.finalStockKg)}</TableHead>
-                             <TableHead className="no-print"></TableHead>
-                        </TableRow>
-                    </TableFooter>
                 </Table>
             </div>
         );
@@ -882,7 +873,6 @@ export default function InventoryPage() {
                     <TabsTrigger value="lots" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-emerald-900/30">Inventario por Lote</TabsTrigger>
                 </TabsList>
                 
-                {/* --- TABLA DE REPORTE POR CALIBRE --- */}
                 <TabsContent value="report">
                     <Card className="mt-6 bg-slate-900 border-slate-800 text-slate-100">
                         <CardHeader>
@@ -899,19 +889,6 @@ export default function InventoryPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="flex flex-col md:flex-row gap-4 items-end p-4 mb-4 border rounded-lg bg-slate-800/50 border-slate-700 no-print">
-                                <div className="flex-1 w-full">
-                                    <Label className="text-slate-300">Producto</Label>
-                                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                                        <SelectTrigger className="bg-slate-900 border-slate-700 text-slate-200">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
-                                            {masterProducts.map(p => (
-                                                <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
                                 <div className="flex-1 w-full">
                                     <Label className="text-slate-300">Bodega</Label>
                                     <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
@@ -944,7 +921,6 @@ export default function InventoryPage() {
                                             selected={dateRange.from} 
                                             onSelect={(date) => date && setDateRange(prev => ({...prev, from: date}))} 
                                             initialFocus 
-                                            // CLASES PARA MODO OSCURO EN CALENDARIO
                                             classNames={{
                                                 months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
                                                 month: "space-y-4",
@@ -993,7 +969,6 @@ export default function InventoryPage() {
                     </Card>
                 </TabsContent>
 
-                 {/* --- TABLA DE TRAZABILIDAD POR LOTE --- */}
                 <TabsContent value="lots">
                      <Card className="mt-6 bg-slate-900 border-slate-800 text-slate-100">
                         <CardHeader>
@@ -1007,7 +982,6 @@ export default function InventoryPage() {
                 </TabsContent>
             </Tabs>
 
-            {/* --- DIALOGOS Y MODALES --- */}
             {viewingHistory && (
                 <InventoryHistoryDialog
                     item={viewingHistory}
@@ -1020,7 +994,6 @@ export default function InventoryPage() {
                 />
             )}
             {isPreviewOpen && (
-                // El preview usa el ref para imprimir, por lo que su contenido debe ser blanco (print mode)
                 <InventoryReportPreview
                     isOpen={isPreviewOpen}
                     onOpenChange={setIsPreviewOpen}
@@ -1039,7 +1012,6 @@ export default function InventoryPage() {
                             </div>
                         </div>
                         <div className="mb-8 text-sm">
-                            <p><span className="font-semibold">Producto:</span> {selectedProduct}</p>
                             <p><span className="font-semibold">Bodega:</span> {selectedWarehouse}</p>
                         </div>
                         {renderReportContent(true)}
