@@ -364,13 +364,13 @@ export function NewPurchaseOrderSheet({
                                                 <td className="px-4 py-2">
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.product`, v)} value={item.product}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 font-medium text-slate-200 focus:ring-0"><SelectValue /></SelectTrigger>
-                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{products.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{products.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}</SelectContent>
                                                     </Select>
                                                 </td>
                                                 <td className="px-4 py-2">
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.caliber`, v)} value={item.caliber}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-slate-400 focus:ring-0"><SelectValue /></SelectTrigger>
-                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{calibers.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
+                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{calibers.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
                                                     </Select>
                                                 </td>
                                                 {/* INPUT DE LOTE */}
@@ -569,4 +569,3 @@ export function NewPurchaseOrderSheet({
     </>
   );
 }
-    
