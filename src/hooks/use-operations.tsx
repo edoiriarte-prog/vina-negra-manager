@@ -1,14 +1,25 @@
-
 "use client";
 
-import { ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import { PurchaseOrder, SalesOrder, FinancialMovement, ServiceOrder, InventoryAdjustment } from '@/lib/types';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { OperationsContext, OperationsContextType } from './use-operations';
 
+// --- 1. TIPOS ---
+export type OperationsContextType = {
+  purchaseOrders: PurchaseOrder[];
+  salesOrders: SalesOrder[];
+  financialMovements: FinancialMovement[];
+  serviceOrders: ServiceOrder[];
+  inventoryAdjustments: InventoryAdjustment[];
+  isLoading: boolean;
+};
 
-// --- PROVIDER ---
+// --- 2. CONTEXTO ---
+// Lo creamos aquí mismo para exportarlo
+export const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
+
+// --- 3. PROVIDER (El componente que enviaste) ---
 export function OperationsProvider({ children }: { children: ReactNode }) {
   const { firestore } = useFirebase();
 
@@ -59,4 +70,14 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
   };
 
   return <OperationsContext.Provider value={value}>{children}</OperationsContext.Provider>;
+}
+
+// --- 4. HOOK PERSONALIZADO ---
+// Esto es lo que usas en tus páginas: const { salesOrders } = useOperations();
+export function useOperations() {
+  const context = useContext(OperationsContext);
+  if (context === undefined) {
+    throw new Error('useOperations must be used within an OperationsProvider. Check DashboardLayout.');
+  }
+  return context;
 }
