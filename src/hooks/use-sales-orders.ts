@@ -26,10 +26,19 @@ export function useSalesOrders() {
   const error = result.error;
   const loading = result.loading !== undefined ? result.loading : result.isLoading;
 
-  const createOrder = async (order: Omit<SalesOrder, "id">) => {
+  const createOrder = async (order: Omit<SalesOrder, "id"> & { id?: string }) => {
     if (!firestore) return;
-    const colRef = collection(firestore, "salesOrders");
-    await addDocumentNonBlocking(colRef, order);
+
+    if (order.id) {
+        // If an ID is provided (like our custom OV-2100), use it to create the document.
+        const docRef = doc(firestore, "salesOrders", order.id);
+        const { id, ...dataToSave } = order;
+        await setDoc(docRef, dataToSave);
+    } else {
+        // Fallback for cases where no ID is given (shouldn't happen with the new logic, but safe to keep)
+        const colRef = collection(firestore, "salesOrders");
+        await addDocumentNonBlocking(colRef, order);
+    }
   };
 
   const updateOrder = async (order: SalesOrder) => {

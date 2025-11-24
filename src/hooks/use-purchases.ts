@@ -1,3 +1,4 @@
+
 "use client";
 
 import { 
@@ -9,7 +10,7 @@ import {
   useMemoFirebase // <--- IMPORTANTE: Agregamos este import
 } from "@/firebase"; 
 import { PurchaseOrder } from "@/lib/types";
-import { collection, doc, orderBy, query } from "firebase/firestore";
+import { collection, doc, orderBy, query, setDoc } from "firebase/firestore";
 // Ya no necesitamos 'useMemo' de React, usamos el de Firebase
 
 export function usePurchases() {
@@ -33,13 +34,11 @@ export function usePurchases() {
   const createOrder = async (order: Omit<PurchaseOrder, "id"> & { id?: string }) => {
     if (!firestore) return;
     
-    const colRef = collection(firestore, "purchaseOrders");
-    
     if (order.id) {
-        const { setDoc } = await import("firebase/firestore");
-        await setDoc(doc(firestore, "purchaseOrders", order.id), order);
+        const { id, ...dataToSave } = order;
+        await setDoc(doc(firestore, "purchaseOrders", id), dataToSave);
     } else {
-        await addDocumentNonBlocking(colRef, order);
+        await addDocumentNonBlocking(collection(firestore, "purchaseOrders"), order);
     }
   };
 
