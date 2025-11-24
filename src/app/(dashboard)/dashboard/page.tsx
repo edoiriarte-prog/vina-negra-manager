@@ -1,8 +1,8 @@
-
 "use client";
 
 import React, { useMemo } from 'react';
 import { useMasterData } from '@/hooks/use-master-data';
+import { useOperations } from '@/hooks/use-operations'; // <--- IMPORTAMOS EL NUEVO HOOK
 import KpiCard from './components/kpi-card';
 import { 
   WeeklyPurchasesChart, 
@@ -20,11 +20,7 @@ import {
     DollarSign, 
     ShoppingCart, 
     TrendingUp, 
-    Package, 
     Warehouse,
-    AlertTriangle,
-    BarChart3,
-    Users
 } from "lucide-react";
 
 // --- HELPERS ---
@@ -39,33 +35,46 @@ const formatKilos = (value: number) =>
   new Intl.NumberFormat('es-CL').format(value);
 
 export default function DashboardPage() {
+  // 1. Datos Maestros (Inventario, Contactos)
   const { 
-      purchaseOrders, 
-      salesOrders, 
-      financialMovements,
       inventory,
       contacts,
-      isLoading 
+      isLoading: loadingMaster 
   } = useMasterData();
 
+  // 2. Datos Operacionales (Ventas, Compras, Finanzas) - NUEVO HOOK
+  const {
+      purchaseOrders,
+      salesOrders,
+      financialMovements,
+      isLoading: loadingOps
+  } = useOperations();
+
+  const isLoading = loadingMaster || loadingOps;
+
   const { kpis, financialDataString } = useMemo(() => {
+    // Verificamos que todo esté cargado
     if (isLoading || !purchaseOrders || !salesOrders || !financialMovements || !inventory) {
         return { kpis: null, financialDataString: '' };
     }
 
-    const completedPurchases = purchaseOrders.filter(o => o.status === 'completed');
-    const completedSales = salesOrders.filter(o => o.status === 'completed' || o.status === 'dispatched');
+    // Filtramos solo las completadas para los cálculos
+    const completedPurchases = purchaseOrders.filter(o => o.status === 'completed' || o.status === 'received');
+    const completedSales = salesOrders.filter(o => o.status === 'completed' || o.status === 'dispatched' || o.status === 'invoiced');
 
     const totalKilosPurchased = completedPurchases.reduce((sum, order) => sum + (order.totalKilos || 0), 0);
     const totalKilosSold = completedSales.reduce((sum, order) => sum + (order.totalKilos || 0), 0);
-    const totalPurchaseAmount = completedPurchases.reduce((sum, order) => sum + order.totalAmount, 0);
-    const totalSalesAmount = completedSales.reduce((sum, order) => sum + order.totalAmount, 0);
     
-    const totalIncome = financialMovements.filter(m => m.type === 'income').reduce((sum, m) => sum + m.amount, 0);
-    const totalExpense = financialMovements.filter(m => m.type === 'expense').reduce((sum, m) => sum + m.amount, 0);
+    // Sumas monetarias
+    const totalPurchaseAmount = completedPurchases.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+    const totalSalesAmount = completedSales.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+    
+    const totalIncome = financialMovements.filter(m => m.type === 'income').reduce((sum, m) => sum + (m.amount || 0), 0);
+    const totalExpense = financialMovements.filter(m => m.type === 'expense').reduce((sum, m) => sum + (m.amount || 0), 0);
     const netCashflow = totalIncome - totalExpense;
 
-    const availableStock = inventory.reduce((sum, item) => sum + item.stock, 0);
+    // Stock
+    const availableStock = inventory.reduce((sum, item) => sum + (item.stock || 0), 0);
 
     const kpiData = {
       totalSalesAmount,
@@ -105,7 +114,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 bg-slate-950 min-h-screen">
       <div className="flex items-center justify-between space-y-2">
         <div>
             <h2 className="text-3xl font-bold tracking-tight text-white">Dashboard</h2>
@@ -150,8 +159,8 @@ export default function DashboardPage() {
           <div className="lg:col-span-2 space-y-6">
              <Card className="bg-slate-900 border-slate-800">
                   <CardHeader>
-                    <CardTitle>Flujo de Caja Semanal</CardTitle>
-                    <CardDescription>Comparativa de ingresos y egresos registrados por semana.</CardDescription>
+                    <CardTitle className="text-white">Flujo de Caja Semanal</CardTitle>
+                    <CardDescription className="text-slate-400">Comparativa de ingresos y egresos registrados por semana.</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <IncomeVsExpenseChart data={financialMovements} />
@@ -159,8 +168,8 @@ export default function DashboardPage() {
               </Card>
                <Card className="bg-slate-900 border-slate-800">
                 <CardHeader>
-                    <CardTitle>Ventas por Calibre (Kilos)</CardTitle>
-                    <CardDescription>Kilos vendidos de cada calibre por orden de venta completada.</CardDescription>
+                    <CardTitle className="text-white">Ventas por Calibre (Kilos)</CardTitle>
+                    <CardDescription className="text-slate-400">Kilos vendidos de cada calibre por orden de venta completada.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <SalesByOrderChart data={salesOrders} />
@@ -171,7 +180,7 @@ export default function DashboardPage() {
           <div className="space-y-6">
               <Card className="bg-slate-900 border-slate-800">
                   <CardHeader>
-                    <CardTitle>Resumen Ejecutivo IA</CardTitle>
+                    <CardTitle className="text-white">Resumen Ejecutivo IA</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <AiSummary financialData={financialDataString} />
@@ -179,8 +188,8 @@ export default function DashboardPage() {
               </Card>
               <Card className="bg-slate-900 border-slate-800">
                   <CardHeader>
-                    <CardTitle>Compras por Proveedor (Top 5)</CardTitle>
-                    <CardDescription>Total de Kilos comprados a cada proveedor.</CardDescription>
+                    <CardTitle className="text-white">Compras por Proveedor (Top 5)</CardTitle>
+                    <CardDescription className="text-slate-400">Total de Kilos comprados a cada proveedor.</CardDescription>
                   </CardHeader>
                   <CardContent>
                       <PurchasesBySupplierChart data={purchaseOrders} suppliers={contacts}/>
@@ -193,7 +202,7 @@ export default function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-2">
          <Card className="bg-slate-900 border-slate-800">
           <CardHeader>
-            <CardTitle>Compras Semanales ($)</CardTitle>
+            <CardTitle className="text-white">Compras Semanales ($)</CardTitle>
           </CardHeader>
           <CardContent>
             <WeeklyPurchasesChart data={purchaseOrders} />
@@ -201,7 +210,7 @@ export default function DashboardPage() {
         </Card>
         <Card className="bg-slate-900 border-slate-800">
           <CardHeader>
-            <CardTitle>Ventas Semanales ($)</CardTitle>
+            <CardTitle className="text-white">Ventas Semanales ($)</CardTitle>
           </CardHeader>
           <CardContent>
             <WeeklySalesChart data={salesOrders} />
@@ -209,8 +218,8 @@ export default function DashboardPage() {
         </Card>
          <Card className="bg-slate-900 border-slate-800">
             <CardHeader>
-                <CardTitle>Monto de Compras por Producto-Calibre</CardTitle>
-                <CardDescription>Monto total gastado en cada tipo de producto y calibre.</CardDescription>
+                <CardTitle className="text-white">Monto de Compras por Producto-Calibre</CardTitle>
+                <CardDescription className="text-slate-400">Monto total gastado en cada tipo de producto y calibre.</CardDescription>
             </CardHeader>
             <CardContent className="max-h-[400px] overflow-y-auto">
                 <PurchasesByProductCaliberChart data={purchaseOrders} />
@@ -218,8 +227,8 @@ export default function DashboardPage() {
         </Card>
         <Card className="bg-slate-900 border-slate-800">
             <CardHeader>
-                <CardTitle>Stock Actual por Calibre</CardTitle>
-                <CardDescription>Distribución de Kilos disponibles en inventario.</CardDescription>
+                <CardTitle className="text-white">Stock Actual por Calibre</CardTitle>
+                <CardDescription className="text-slate-400">Distribución de Kilos disponibles en inventario.</CardDescription>
             </CardHeader>
             <CardContent>
                 <CaliberDistributionChart data={inventory} />

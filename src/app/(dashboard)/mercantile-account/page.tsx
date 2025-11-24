@@ -1,9 +1,9 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
 import { useMasterData } from '@/hooks/use-master-data';
-import { Contact, SalesOrder, PurchaseOrder, FinancialMovement, ServiceOrder } from '@/lib/types';
+import { useOperations } from '@/hooks/use-operations';
+import { Contact, SalesOrder, PurchaseOrder, FinancialMovement } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,7 @@ import { es } from 'date-fns/locale';
 // --- FORMATO MONEDA ---
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
 
-// --- TIPO DE DATO PARA LA VISTA ---
+// --- TIPOS DE DATO PARA LA VISTA ---
 type Document = {
   id: string;
   date: string;
@@ -65,15 +65,22 @@ type DetailedMovement = {
 };
 
 export default function MercantileAccountPage() {
-  const { contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements, isLoading } = useMasterData();
+  // 1. CARGAR DATOS
+  const { contacts, isLoading: l1 } = useMasterData();
+  const { salesOrders, purchaseOrders, financialMovements, isLoading: l2 } = useOperations();
+  
+  // Placeholder para servicios (aún no implementado)
+  const serviceOrders: any[] = []; 
+
+  const isLoading = l1 || l2;
 
   // Estados de UI
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<AccountSummary | null>(null);
 
-  // 2. PROCESAMIENTO INTELIGENTE DE DATOS
+  // 2. PROCESAMIENTO DE DATOS
   const { clientsData, suppliersData } = useMemo(() => {
-    if (!contacts || !salesOrders || !purchaseOrders || !serviceOrders || !financialMovements) {
+    if (isLoading || !contacts || !salesOrders || !purchaseOrders || !financialMovements) {
         return { clientsData: [], suppliersData: [] };
     }
 
@@ -82,21 +89,33 @@ export default function MercantileAccountPage() {
         const payments: Payment[] = [];
 
         if (type === 'client') {
-            salesOrders.filter(s => s.clientId === contact.id && (s.status === 'completed' || s.status === 'dispatched' || s.status === 'invoiced'))
-              .forEach(s => documents.push({ id: s.id, date: s.date, type: 'O/V', amount: s.totalAmount }));
+            // --- CLIENTES ---
+            // 1. Cargos (Ventas)
+            salesOrders
+              .filter(s => s.clientId === contact.id && (s.status === 'completed' || s.status === 'dispatched' || s.status === 'invoiced'))
+              .forEach(s => documents.push({ id: s.id, date: s.date, type: 'O/V', amount: Number(s.totalAmount) || 0 }));
             
-            financialMovements.filter(fm => fm.contactId === contact.id && fm.type === 'income')
-              .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: p.amount, relatedDocumentId: p.relatedDocument?.id }));
+            // 2. Abonos (Pagos recibidos - Income)
+            financialMovements
+              .filter(fm => fm.contactId === contact.id && fm.type === 'income')
+              .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: Number(p.amount) || 0, relatedDocumentId: p.relatedOrderId }));
 
-        } else { // supplier
-            purchaseOrders.filter(p => p.supplierId === contact.id && (p.status === 'completed' || p.status === 'received'))
-              .forEach(p => documents.push({ id: p.id, date: p.date, type: 'O/C', amount: p.totalAmount }));
+        } else { 
+            // --- PROVEEDORES ---
+            // 1. Cargos (Compras)
+            purchaseOrders
+              .filter(p => p.supplierId === contact.id && (p.status === 'completed' || p.status === 'received'))
+              .forEach(p => documents.push({ id: p.id, date: p.date, type: 'O/C', amount: Number(p.totalAmount) || 0 }));
 
-            serviceOrders.filter(s => s.supplierId === contact.id)
-              .forEach(s => documents.push({ id: s.id, date: s.date, type: 'O/S', amount: s.cost }));
+            // 2. Cargos (Servicios - Placeholder)
+            serviceOrders
+              .filter(s => s.supplierId === contact.id)
+              .forEach(s => documents.push({ id: s.id, date: s.date, type: 'O/S', amount: Number(s.cost) || 0 }));
 
-            financialMovements.filter(fm => fm.contactId === contact.id && fm.type === 'expense')
-              .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: p.amount, relatedDocumentId: p.relatedDocument?.id }));
+            // 3. Abonos (Pagos realizados - Expense)
+            financialMovements
+              .filter(fm => fm.contactId === contact.id && fm.type === 'expense')
+              .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: Number(p.amount) || 0, relatedDocumentId: p.relatedOrderId }));
         }
 
         const totalBilled = documents.reduce((sum, doc) => sum + doc.amount, 0);
@@ -106,21 +125,23 @@ export default function MercantileAccountPage() {
         return { contact, documents, payments, totalBilled, totalPaid, balance };
     };
 
+    // Filtrar clientes
     const clients = contacts
-        .filter(c => Array.isArray(c.type) && c.type.includes('client'))
+        .filter(c => (Array.isArray(c.type) ? c.type.includes('client') : c.type === 'client'))
         .map(c => calculateAccount(c, 'client'))
-        .filter(acc => acc.totalBilled > 0 || acc.totalPaid > 0);
+        .filter(acc => acc.totalBilled > 0 || acc.totalPaid > 0); 
 
+    // Filtrar proveedores
     const suppliers = contacts
-        .filter(c => Array.isArray(c.type) && c.type.includes('supplier'))
+        .filter(c => (Array.isArray(c.type) ? c.type.includes('supplier') : c.type === 'supplier'))
         .map(c => calculateAccount(c, 'supplier'))
         .filter(acc => acc.totalBilled > 0 || acc.totalPaid > 0);
 
     return { clientsData: clients, suppliersData: suppliers };
 
-  }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements]);
+  }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements, isLoading]);
 
-  // Filtrado por búsqueda
+  // 3. FILTRADO Y TOTALES
   const filterAccounts = (list: AccountSummary[]) => {
       if (!searchTerm) return list;
       return list.filter(acc => 
@@ -133,7 +154,7 @@ export default function MercantileAccountPage() {
     billed: acc.billed + curr.totalBilled,
     paid: acc.paid + curr.totalPaid,
     balance: acc.balance + curr.balance
-  }), { billed: 0, paid: 0, balance: 0}), [clientsData, searchTerm]);
+  }), { billed: 0, paid: 0, balance: 0}), [clientsData, searchTerm]); 
   
   const supplierTotals = useMemo(() => filterAccounts(suppliersData).reduce((acc, curr) => ({
     billed: acc.billed + curr.totalBilled,
@@ -141,7 +162,12 @@ export default function MercantileAccountPage() {
     balance: acc.balance + curr.balance
   }), { billed: 0, paid: 0, balance: 0}), [suppliersData, searchTerm]);
 
-  if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-1/3"/><Skeleton className="h-64 w-full"/></div>;
+  if (isLoading) return (
+    <div className="p-8 space-y-4 bg-slate-950 min-h-screen">
+        <Skeleton className="h-12 w-1/3 bg-slate-800"/>
+        <Skeleton className="h-64 w-full bg-slate-800"/>
+    </div>
+  );
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 bg-slate-950 min-h-screen text-slate-100">
@@ -152,7 +178,7 @@ export default function MercantileAccountPage() {
             <h2 className="text-3xl font-bold tracking-tight text-white">Cuenta Corriente Mercantil</h2>
             <p className="text-slate-400 mt-1">Estado de deudas y abonos de Clientes y Proveedores.</p>
         </div>
-        <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-800 w-full md:w-auto focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/20">
+        <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-800 w-full md:w-auto focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all">
             <Search className="h-4 w-4 text-slate-500 ml-2" />
             <Input 
                 placeholder="Buscar empresa o persona..." 
@@ -191,7 +217,7 @@ export default function MercantileAccountPage() {
                         onClick={() => setSelectedAccount(acc)} 
                     />
                 ))}
-                {clientsData.length === 0 && <p className="text-slate-500 col-span-full text-center py-10">No hay movimientos de clientes registrados.</p>}
+                {clientsData.length === 0 && <p className="text-slate-500 col-span-full text-center py-10 border border-dashed border-slate-800 rounded-lg">No hay movimientos de clientes registrados.</p>}
             </div>
         </TabsContent>
 
@@ -212,18 +238,25 @@ export default function MercantileAccountPage() {
                         onClick={() => setSelectedAccount(acc)} 
                     />
                 ))}
-                {suppliersData.length === 0 && <p className="text-slate-500 col-span-full text-center py-10">No hay movimientos de proveedores registrados.</p>}
+                {suppliersData.length === 0 && <p className="text-slate-500 col-span-full text-center py-10 border border-dashed border-slate-800 rounded-lg">No hay movimientos de proveedores registrados.</p>}
             </div>
         </TabsContent>
       </Tabs>
 
       {/* --- DETALLE LATERAL (CARTOLA) --- */}
-      {selectedAccount && <AccountDetailSheet account={selectedAccount} isOpen={!!selectedAccount} onOpenChange={() => setSelectedAccount(null)} />}
+      {selectedAccount && (
+        <AccountDetailSheet 
+            account={selectedAccount} 
+            isOpen={!!selectedAccount} 
+            onOpenChange={() => setSelectedAccount(null)} 
+        />
+      )}
     </div>
   );
 }
 
 // --- COMPONENTES VISUALES ---
+
 function SummaryCard({ title, value, icon }: { title: string, value: string, icon: React.ReactNode }) {
     return (
         <Card className="bg-slate-900 border-slate-800 shadow-sm">
@@ -299,16 +332,23 @@ function AccountDetailSheet({ account, isOpen, onOpenChange }: { account: Accoun
     
     const detailedMovements: DetailedMovement[] = useMemo(() => {
         const movements: Omit<DetailedMovement, 'balance'>[] = [];
+        // Documentos son CARGOS (Aumentan deuda)
         account.documents.forEach(d => movements.push({ date: d.date, type: 'charge', description: `Doc: ${d.type} ${d.id}`, charge: d.amount, payment: 0 }));
+        // Pagos son ABONOS (Disminuyen deuda)
         account.payments.forEach(p => movements.push({ date: p.date, type: 'payment', description: `Pago: ${p.description}`, charge: 0, payment: p.amount }));
 
+        // Ordenar por fecha descendente
         movements.sort((a,b) => compareDesc(parseISO(b.date), parseISO(a.date)));
 
+        // Cálculo de saldo cronológico (de atrás hacia adelante para la vista de cartola)
         let balance = 0;
-        return movements.map(m => {
+        const chronological = [...movements].reverse().map(m => {
             balance += m.charge - m.payment;
             return { ...m, balance };
-        }).reverse();
+        });
+        
+        // Retornamos ordenado descendente (lo más reciente arriba)
+        return chronological.reverse();
     }, [account]);
 
     return (
@@ -326,15 +366,15 @@ function AccountDetailSheet({ account, isOpen, onOpenChange }: { account: Accoun
                     </div>
                     <div className="mt-4 grid grid-cols-3 gap-4 text-center">
                         <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                            <p className="text-xs text-slate-500 uppercase">Facturado</p>
+                            <p className="text-xs text-slate-500 uppercase">Total Operado</p>
                             <p className="text-lg font-bold">{formatCurrency(account.totalBilled)}</p>
                         </div>
                         <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                            <p className="text-xs text-slate-500 uppercase">Pagado</p>
+                            <p className="text-xs text-slate-500 uppercase">Total Pagado</p>
                             <p className="text-lg font-bold text-emerald-400">{formatCurrency(account.totalPaid)}</p>
                         </div>
                          <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                            <p className="text-xs text-slate-500 uppercase">Saldo</p>
+                            <p className="text-xs text-slate-500 uppercase">Saldo Actual</p>
                             <p className="text-lg font-bold text-amber-400">{formatCurrency(account.balance)}</p>
                         </div>
                     </div>
@@ -342,31 +382,44 @@ function AccountDetailSheet({ account, isOpen, onOpenChange }: { account: Accoun
 
                 <div className="flex-1 overflow-y-auto p-6">
                     <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
-                        <FileText className="h-4 w-4" /> Historial de Movimientos (Cartola)
+                        <FileText className="h-4 w-4" /> Historial de Movimientos
                     </h4>
                     
                     <ScrollArea className="h-[calc(100vh-300px)]">
                         <div className="rounded-md border border-slate-800 bg-slate-900/50">
                             <table className="w-full text-sm">
-                                <thead className="text-xs text-slate-500 uppercase">
+                                <thead className="text-xs text-slate-500 uppercase bg-slate-900/80 sticky top-0">
                                     <tr className="border-b border-slate-800">
-                                        <th className="px-4 py-2 text-left">Fecha</th>
-                                        <th className="px-4 py-2 text-left">Descripción</th>
-                                        <th className="px-4 py-2 text-right">Cargo</th>
-                                        <th className="px-4 py-2 text-right">Abono</th>
-                                        <th className="px-4 py-2 text-right">Saldo</th>
+                                        <th className="px-4 py-3 text-left">Fecha</th>
+                                        <th className="px-4 py-3 text-left">Descripción</th>
+                                        <th className="px-4 py-3 text-right">Cargo</th>
+                                        <th className="px-4 py-3 text-right">Abono</th>
+                                        <th className="px-4 py-3 text-right">Saldo</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
                                     {detailedMovements.map((mov, i) => (
-                                        <tr key={i} className="hover:bg-slate-800/30">
-                                            <td className="px-4 py-3">{format(parseISO(mov.date), 'dd-MM-yyyy')}</td>
+                                        <tr key={i} className="hover:bg-slate-800/30 transition-colors">
+                                            <td className="px-4 py-3 text-slate-300">{format(parseISO(mov.date), 'dd/MM/yyyy')}</td>
                                             <td className="px-4 py-3 text-slate-400">{mov.description}</td>
-                                            <td className="px-4 py-3 text-right font-mono text-red-400">{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</td>
-                                            <td className="px-4 py-3 text-right font-mono text-emerald-400">{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</td>
-                                            <td className="px-4 py-3 text-right font-mono text-white">{formatCurrency(mov.balance)}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-red-400">
+                                                {mov.charge > 0 ? formatCurrency(mov.charge) : '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-emerald-400">
+                                                {mov.payment > 0 ? formatCurrency(mov.payment) : '-'}
+                                            </td>
+                                            <td className={`px-4 py-3 text-right font-mono font-medium ${mov.balance > 0 ? 'text-amber-400' : 'text-white'}`}>
+                                                {formatCurrency(mov.balance)}
+                                            </td>
                                         </tr>
                                     ))}
+                                    {detailedMovements.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                                                No hay movimientos registrados.
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -376,5 +429,3 @@ function AccountDetailSheet({ account, isOpen, onOpenChange }: { account: Accoun
         </Sheet>
     )
 }
-    
-    
