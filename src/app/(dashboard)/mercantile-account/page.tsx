@@ -5,10 +5,9 @@ import React, { useState, useMemo } from 'react';
 import { useMasterData } from '@/hooks/use-master-data';
 import { useOperations } from '@/hooks/use-operations';
 import { Contact, SalesOrder, PurchaseOrder, FinancialMovement } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -68,10 +67,7 @@ type DetailedMovement = {
 export default function MercantileAccountPage() {
   // 1. CARGAR DATOS
   const { contacts, isLoading: l1 } = useMasterData();
-  const { salesOrders, purchaseOrders, financialMovements, isLoading: l2 } = useOperations();
-  
-  // Placeholder para servicios (aún no implementado)
-  const serviceOrders: any[] = []; 
+  const { salesOrders, purchaseOrders, financialMovements, serviceOrders, isLoading: l2 } = useOperations();
 
   const isLoading = l1 || l2;
 
@@ -90,30 +86,23 @@ export default function MercantileAccountPage() {
         const payments: Payment[] = [];
 
         if (type === 'client') {
-            // --- CLIENTES ---
-            // 1. Cargos (Ventas)
             salesOrders
-              .filter(s => s.clientId === contact.id && (s.status === 'completed' || s.status === 'dispatched' || s.status === 'invoiced'))
+              .filter(s => s.clientId === contact.id && (s.status === 'dispatched' || s.status === 'invoiced'))
               .forEach(s => documents.push({ id: s.id, date: s.date, type: 'O/V', amount: Number(s.totalAmount) || 0 }));
             
-            // 2. Abonos (Pagos recibidos - Income)
             financialMovements
               .filter(fm => fm.contactId === contact.id && fm.type === 'income')
               .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: Number(p.amount) || 0, relatedDocumentId: p.relatedDocument?.id }));
 
         } else { 
-            // --- PROVEEDORES ---
-            // 1. Cargos (Compras)
             purchaseOrders
               .filter(p => p.supplierId === contact.id && (p.status === 'completed' || p.status === 'received'))
               .forEach(p => documents.push({ id: p.id, date: p.date, type: 'O/C', amount: Number(p.totalAmount) || 0 }));
 
-            // 2. Cargos (Servicios - Placeholder)
             serviceOrders
               .filter(s => s.supplierId === contact.id)
               .forEach(s => documents.push({ id: s.id, date: s.date, type: 'O/S', amount: Number(s.cost) || 0 }));
 
-            // 3. Abonos (Pagos realizados - Expense)
             financialMovements
               .filter(fm => fm.contactId === contact.id && fm.type === 'expense')
               .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: Number(p.amount) || 0, relatedDocumentId: p.relatedDocument?.id }));
@@ -126,13 +115,11 @@ export default function MercantileAccountPage() {
         return { contact, documents, payments, totalBilled, totalPaid, balance };
     };
 
-    // Filtrar clientes
     const clients = contacts
         .filter(c => (Array.isArray(c.type) ? c.type.includes('client') : c.type === 'client'))
         .map(c => calculateAccount(c, 'client'))
         .filter(acc => acc.totalBilled > 0 || acc.totalPaid > 0); 
 
-    // Filtrar proveedores
     const suppliers = contacts
         .filter(c => (Array.isArray(c.type) ? c.type.includes('supplier') : c.type === 'supplier'))
         .map(c => calculateAccount(c, 'supplier'))
@@ -333,22 +320,17 @@ function AccountDetailSheet({ account, isOpen, onOpenChange }: { account: Accoun
     
     const detailedMovements: DetailedMovement[] = useMemo(() => {
         const movements: Omit<DetailedMovement, 'balance'>[] = [];
-        // Documentos son CARGOS (Aumentan deuda)
         account.documents.forEach(d => movements.push({ date: d.date, type: 'charge', description: `Doc: ${d.type} ${d.id}`, charge: d.amount, payment: 0 }));
-        // Pagos son ABONOS (Disminuyen deuda)
         account.payments.forEach(p => movements.push({ date: p.date, type: 'payment', description: `Pago: ${p.description}`, charge: 0, payment: p.amount }));
 
-        // Ordenar por fecha descendente
         movements.sort((a,b) => compareDesc(parseISO(b.date), parseISO(a.date)));
 
-        // Cálculo de saldo cronológico (de atrás hacia adelante para la vista de cartola)
         let balance = 0;
         const chronological = [...movements].reverse().map(m => {
             balance += m.charge - m.payment;
             return { ...m, balance };
         });
         
-        // Retornamos ordenado descendente (lo más reciente arriba)
         return chronological.reverse();
     }, [account]);
 
@@ -430,3 +412,5 @@ function AccountDetailSheet({ account, isOpen, onOpenChange }: { account: Accoun
         </Sheet>
     )
 }
+
+    

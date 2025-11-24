@@ -1,11 +1,11 @@
 
 "use client";
 
-import React, { useState, useMemo, useId } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useOperations } from '@/hooks/use-operations';
 import { useMasterData } from '@/hooks/use-master-data';
-import { FinancialMovement, BankAccount, Contact, PurchaseOrder, SalesOrder, ServiceOrder } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { FinancialMovement, BankAccount, Contact } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "./components/data-table";
 import { getColumns } from "./components/columns";
@@ -22,29 +22,22 @@ import {
 } from "@/components/ui/alert-dialog"
 import { 
   Wallet, 
-  TrendingUp, 
-  TrendingDown, 
-  Plus, 
   Landmark, 
   History,
   ArrowUpRight,
-  ArrowDownLeft
+  ArrowDownLeft,
+  Plus
 } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
-import { useFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useFinancialsCRUD } from '@/hooks/use-financials-crud';
 
 // Formato Moneda
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
 
 export default function FinancialsPage() {
-  const { firestore } = useFirebase();
-  const { toast } = useToast();
-
-  // --- CARGA DE DATOS ---
   const { bankAccounts, contacts, isLoading: l1 } = useMasterData();
   const { financialMovements, purchaseOrders, salesOrders, serviceOrders, isLoading: l2 } = useOperations();
+  const { createMovement, createMovements, updateMovement, deleteMovement } = useFinancialsCRUD();
 
   const isLoading = l1 || l2;
 
@@ -85,21 +78,13 @@ export default function FinancialsPage() {
 
   // --- MANEJADORES ---
   const handleSaveMovement = (movementData: (FinancialMovement | Omit<FinancialMovement, 'id'>)[] | FinancialMovement | Omit<FinancialMovement, 'id'>) => {
-    if (!firestore) return;
-
     if (Array.isArray(movementData)) {
-        // Guardado en Lote
-        movementData.forEach(mov => addDocumentNonBlocking(collection(firestore, 'financialMovements'), { ...mov, createdAt: new Date().toISOString() }));
-        toast({ title: "Movimientos en Lote Guardados" });
+        createMovements(movementData as Omit<FinancialMovement, 'id'>[]);
     } else {
-        // Guardado Individual
-        const mov = { ...movementData, amount: Number(movementData.amount) || 0 };
-        if ('id' in mov) {
-            updateDocumentNonBlocking(doc(firestore, 'financialMovements', mov.id), mov);
-            toast({ title: "Movimiento Actualizado" });
+        if ('id' in movementData) {
+            updateMovement(movementData.id, movementData);
         } else {
-            addDocumentNonBlocking(collection(firestore, 'financialMovements'), { ...mov, createdAt: new Date().toISOString() });
-            toast({ title: "Movimiento Creado" });
+            createMovement(movementData as Omit<FinancialMovement, 'id'>);
         }
     }
     setIsSheetOpen(false);
@@ -111,9 +96,8 @@ export default function FinancialsPage() {
   }
 
   const confirmDelete = () => {
-      if (deletingMovement && firestore) {
-          deleteDocumentNonBlocking(doc(firestore, 'financialMovements', deletingMovement.id));
-          toast({ variant: 'destructive', title: 'Movimiento Eliminado' });
+      if (deletingMovement) {
+          deleteMovement(deletingMovement.id);
           setDeletingMovement(null);
       }
   }
@@ -205,7 +189,7 @@ export default function FinancialsPage() {
                       <CardTitle className="text-lg text-slate-200 flex items-center gap-2">
                           <History className="h-5 w-5 text-purple-500" /> Historial de Movimientos
                       </CardTitle>
-                      <CardDescription>Registro cronológico de todas las transacciones.</CardDescription>
+                      <p className="text-sm text-slate-400">Registro cronológico de todas las transacciones.</p>
                   </div>
               </CardHeader>
               <CardContent className="p-4">
@@ -244,4 +228,5 @@ export default function FinancialsPage() {
 
     </div>
   );
-}
+
+    

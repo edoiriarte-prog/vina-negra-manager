@@ -5,7 +5,7 @@ import { useState } from "react";
 import { PurchaseOrder, Contact } from "@/lib/types"; 
 import { getColumns } from "./components/columns";
 import { DataTable } from "./components/data-table"; 
-import { usePurchases } from "@/hooks/use-purchases"; 
+import { useOperations } from "@/hooks/use-operations"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { Button } from "@/components/ui/button";
 import { Plus, ShoppingCart, Clock, CheckCircle2, Search } from "lucide-react";
@@ -13,35 +13,46 @@ import { NewPurchaseOrderSheet } from "./components/new-purchase-order-sheet";
 import { PurchaseOrderPreview } from "./components/purchase-order-preview";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { usePurchasesCRUD } from "@/hooks/use-purchases-crud";
 
 export default function PurchasesPage() {
-  // Hooks de datos
-  const { orders, loading, createOrder, updateOrder, deleteOrder } = usePurchases();
-  
+  const { purchaseOrders } = useOperations();
   const { contacts } = useMasterData();
+  const { createOrder, updateOrder, deleteOrder } = usePurchasesCRUD();
   
   const suppliers = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('supplier')) : [];
 
-  // Estados
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [previewOrder, setPreviewOrder] = useState<PurchaseOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Cálculos de KPIs
-  const totalAmount = orders.reduce((sum: number, o: PurchaseOrder) => sum + (o.totalAmount || 0), 0);
-  const pendingCount = orders.filter((o: PurchaseOrder) => o.status === 'pending').length;
-  const completedCount = orders.filter((o: PurchaseOrder) => o.status === 'completed').length;
+  const totalAmount = purchaseOrders.reduce((sum: number, o: PurchaseOrder) => sum + (o.totalAmount || 0), 0);
+  const pendingCount = purchaseOrders.filter((o: PurchaseOrder) => o.status === 'pending').length;
+  const completedCount = purchaseOrders.filter((o: PurchaseOrder) => o.status === 'completed').length;
 
-  // Filtrado de órdenes
-  const filteredOrders = orders.filter((o: PurchaseOrder) => {
+  const filteredOrders = purchaseOrders.filter((o: PurchaseOrder) => {
     const supplierName = suppliers.find((s: Contact) => s.id === o.supplierId)?.name || '';
     return o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
            supplierName.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
+  const handleSave = (order: PurchaseOrder | Omit<PurchaseOrder, "id">) => {
+    if ('id' in order) {
+      updateOrder(order.id, order);
+    } else {
+      createOrder(order as Omit<PurchaseOrder, 'id'>);
+    }
+    setIsSheetOpen(false);
+    setEditingOrder(null);
+  };
 
-  // Handlers
+  const handleDelete = async (id: string) => {
+    if (confirm("¿Estás seguro de eliminar esta orden de compra?")) {
+      await deleteOrder(id);
+    }
+  }
+
   const handleEdit = (order: PurchaseOrder) => {
     setEditingOrder(order);
     setIsSheetOpen(true);
@@ -51,12 +62,6 @@ export default function PurchasesPage() {
     setEditingOrder(null);
     setIsSheetOpen(true);
   };
-
-  const handleDelete = async (id: string) => {
-      if (confirm("¿Estás seguro de eliminar esta orden de compra?")) {
-          await deleteOrder(id);
-      }
-  }
 
   const handlePreview = (order: PurchaseOrder) => {
       setPreviewOrder(order);
@@ -74,13 +79,11 @@ export default function PurchasesPage() {
       suppliers: suppliers
   });
 
-  // Estilos Reutilizables
   const cardClass = "bg-slate-900 border-slate-800 shadow-sm hover:border-slate-700 transition-all";
 
   return (
     <div className="p-3 md:p-6 space-y-6 bg-slate-950 min-h-screen text-slate-100">
       
-      {/* --- HEADER & ACCIONES --- */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Gestión de Compras</h2>
@@ -91,7 +94,6 @@ export default function PurchasesPage() {
         </Button>
       </div>
 
-      {/* --- KPIs RESUMEN --- */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
@@ -132,7 +134,6 @@ export default function PurchasesPage() {
         </Card>
       </div>
 
-      {/* --- TABLA --- */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-800 w-full max-w-md transition-all focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/20">
             <Search className="h-4 w-4 text-slate-500 ml-2" />
@@ -153,18 +154,13 @@ export default function PurchasesPage() {
         </div>
       </div>
 
-      {/* --- MODALES --- */}
       <NewPurchaseOrderSheet
         isOpen={isSheetOpen}
         onOpenChange={handleCloseSheet}
-        onSave={(data) => {
-            if (editingOrder) updateOrder(data as any);
-            else createOrder(data as any);
-            setIsSheetOpen(false);
-        }}
+        onSave={handleSave}
         order={editingOrder}
         suppliers={suppliers}
-        purchaseOrders={orders}
+        purchaseOrders={purchaseOrders}
       />
 
       <PurchaseOrderPreview
@@ -176,4 +172,5 @@ export default function PurchasesPage() {
 
     </div>
   );
-}
+
+    

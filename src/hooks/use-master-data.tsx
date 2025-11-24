@@ -1,19 +1,17 @@
 
 "use client";
 
-import { createContext, useContext, ReactNode, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, ReactNode, useMemo } from 'react';
 import {
   useCollection,
   useDoc,
   useFirebase,
-  useMemoFirebase,
-  setDocumentNonBlocking,
-  addDocumentNonBlocking,
-  deleteDocumentNonBlocking
+  useMemoFirebase
 } from '@/firebase';
-import { BankAccount, Contact, PurchaseOrder, SalesOrder, InventoryAdjustment } from '@/lib/types';
-import { doc, collection } from 'firebase/firestore';
+import { BankAccount, Contact, PurchaseOrder, SalesOrder, InventoryAdjustment, InventoryItem } from '@/lib/types';
+import { doc, collection, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { getInventory } from '@/lib/inventory';
+import { setDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 // --- TYPES ---
 export type ProductCaliberAssociation = {
@@ -57,22 +55,28 @@ const MasterDataContext = createContext<MasterDataContextType | undefined>(undef
 export function MasterDataProvider({ children }: { children: ReactNode }) {
   const { firestore } = useFirebase();
 
-  // Settings Doc
+  // Settings Doc for master lists
   const settingsDocRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'general') : null), [firestore]);
   const { data: settingsData, isLoading: l1 } = useDoc<MasterSettings>(settingsDocRef);
   
-  // Collections
+  // Collections for other master data
   const accountsCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'bankAccounts') : null), [firestore]);
   const contactsCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'contacts') : null), [firestore]);
+  
+  const { data: bankAccounts, isLoading: l2 } = useCollection<BankAccount>(accountsCollection);
+  const { data: contacts, isLoading: l3 } = useCollection<Contact>(contactsCollection);
+
+  // We need operational data here ONLY for inventory calculation
   const purchasesCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'purchaseOrders') : null), [firestore]);
   const salesCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'salesOrders') : null), [firestore]);
   const adjustmentsCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'inventoryAdjustments') : null), [firestore]);
   
-  const { data: bankAccounts, isLoading: l2 } = useCollection<BankAccount>(accountsCollection);
-  const { data: contacts, isLoading: l3 } = useCollection<Contact>(contactsCollection);
   const { data: purchaseOrders, isLoading: l4 } = useCollection<PurchaseOrder>(purchasesCollection);
   const { data: salesOrders, isLoading: l5 } = useCollection<SalesOrder>(salesCollection);
   const { data: inventoryAdjustments, isLoading: l6 } = useCollection<InventoryAdjustment>(adjustmentsCollection);
+
+  // Combine loading states
+  const isLoading = l1 || l2 || l3 || l4 || l5 || l6;
 
   // Defaults
   const products = settingsData?.products || [];
@@ -84,13 +88,12 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
   const costCenters = settingsData?.costCenters || [];
   const productCaliberAssociations = settingsData?.productCaliberAssociations || [];
 
-  const isLoading = l1 || l2 || l3 || l4 || l5 || l6;
-
+  // Derived Data: Inventory
   const inventory = useMemo(() => {
     return getInventory(purchaseOrders || [], salesOrders || [], inventoryAdjustments || []);
   }, [purchaseOrders, salesOrders, inventoryAdjustments]);
 
-  // CRUD Helpers
+  // CRUD Helpers for master lists
   const updateSettingList = (field: keyof MasterSettings, newList: any[]) => {
     if (!settingsDocRef) return;
     setDocumentNonBlocking(settingsDocRef, { [field]: newList }, { merge: true });
@@ -135,6 +138,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
   };
   
   const updateProductCalibers = (productId: string, caliberIds: string[]) => {
+    if(!settingsDocRef) return;
     const newAssociations = [...productCaliberAssociations];
     const existingIndex = newAssociations.findIndex(a => a.id === productId);
 

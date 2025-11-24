@@ -5,7 +5,6 @@ import { useState, useMemo } from "react";
 import { SalesOrder, Contact, PurchaseOrder, InventoryAdjustment, OrderItem } from "@/lib/types"; 
 import { getColumns } from "./components/columns"; 
 import { DataTable } from "./components/data-table"; 
-import { useSalesOrders } from "@/hooks/use-sales-orders"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { useOperations } from "@/hooks/use-operations";
 import { Button } from "@/components/ui/button";
@@ -25,12 +24,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { getInventory } from "@/lib/inventory";
+import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
 
 export default function SalesPage() {
-  const { orders, createOrder, updateOrder, deleteOrder } = useSalesOrders();
-  
-  const { contacts } = useMasterData(); 
-  const { purchaseOrders, inventoryAdjustments } = useOperations();
+  const { salesOrders } = useOperations();
+  const { contacts, purchaseOrders, inventoryAdjustments } = useMasterData();
+  const { createOrder, updateOrder, deleteOrder } = useSalesOrdersCRUD();
   
   const clients = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('client')) : [];
   const carrierList = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('carrier')) : [];
@@ -41,18 +40,28 @@ export default function SalesPage() {
   const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const inventory = useMemo(() => getInventory(purchaseOrders, orders, inventoryAdjustments, editingOrder), [purchaseOrders, orders, inventoryAdjustments, editingOrder]);
+  const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, inventoryAdjustments, editingOrder), [purchaseOrders, salesOrders, inventoryAdjustments, editingOrder]);
 
-  const totalAmount = orders.reduce((sum: number, o: SalesOrder) => sum + (o.totalAmount || 0), 0);
-  const pendingCount = orders.filter((o: SalesOrder) => o.status === 'pending' || o.status === 'draft').length;
-  const completedCount = orders.filter((o: SalesOrder) => o.status === 'dispatched' || o.status === 'invoiced').length;
+  const totalAmount = salesOrders.reduce((sum: number, o: SalesOrder) => sum + (o.totalAmount || 0), 0);
+  const pendingCount = salesOrders.filter((o: SalesOrder) => o.status === 'pending' || o.status === 'draft').length;
+  const completedCount = salesOrders.filter((o: SalesOrder) => o.status === 'dispatched' || o.status === 'invoiced').length;
 
-  const filteredOrders = orders.filter((o: SalesOrder) => {
+  const filteredOrders = salesOrders.filter((o: SalesOrder) => {
       const clientName = clients.find((c: Contact) => c.id === o.clientId)?.name || '';
       return o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
              clientName.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
+  const handleSave = (orderData: SalesOrder | Omit<SalesOrder, "id">) => {
+    if ('id' in orderData) {
+      updateOrder(orderData.id, orderData);
+    } else {
+      createOrder(orderData as Omit<SalesOrder, 'id'>);
+    }
+    setIsSheetOpen(false);
+    setEditingOrder(null);
+  };
+  
   const handleEdit = (order: SalesOrder) => {
     setEditingOrder(order);
     setIsSheetOpen(true);
@@ -61,18 +70,6 @@ export default function SalesPage() {
   const handleCreate = () => {
     setEditingOrder(null);
     setIsSheetOpen(true);
-  };
-  
-  const handleSave = (orderData: SalesOrder, newItems: OrderItem[] = []) => {
-    const finalData = { ...orderData, items: [...orderData.items, ...newItems] };
-
-    if (editingOrder) {
-      updateOrder(finalData);
-    } else {
-      createOrder(finalData);
-    }
-    setIsSheetOpen(false);
-    setEditingOrder(null);
   };
 
   const handleDeleteRequest = (order: SalesOrder) => {
@@ -184,7 +181,7 @@ export default function SalesPage() {
         clients={clients}
         carriers={carrierList}
         inventory={inventory}
-        salesOrders={orders}
+        salesOrders={salesOrders}
         sheetType="sale"
         purchaseOrders={purchaseOrders}
         inventoryAdjustments={inventoryAdjustments}
@@ -196,6 +193,7 @@ export default function SalesPage() {
             isOpen={!!previewOrder}
             onOpenChange={(open) => !open && setPreviewOrder(null)}
             order={previewOrder}
+            // @ts-ignore
             client={clients.find((c: Contact) => c.id === previewOrder.clientId) || null}
           />
       )}
@@ -217,4 +215,5 @@ export default function SalesPage() {
 
     </div>
   );
-}
+
+    

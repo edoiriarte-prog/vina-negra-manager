@@ -7,24 +7,24 @@ import {
   LayoutDashboard, Users, ShoppingCart, Truck, 
   Package, Settings, FileText, LogOut,
   Landmark, // Icono Tesorería
-  BookOpen  // Icono Cta. Corriente
+  BookOpen,  // Icono Cta. Corriente
+  FileSliders,
+  PackageCheck
 } from "lucide-react";
 
 export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
   const pathname = usePathname();
 
   const routes = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard, active: pathname === "/" },
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, active: pathname === "/dashboard" },
+    { href: "/contacts", label: "Contactos", icon: Users, active: pathname.includes("/contacts") },
     { href: "/purchases", label: "Compras (O/C)", icon: ShoppingCart, active: pathname.includes("/purchases") },
     { href: "/sales", label: "Ventas (O/V)", icon: Truck, active: pathname.includes("/sales") },
     { href: "/inventory", label: "Inventario", icon: Package, active: pathname.includes("/inventory") },
-    
-    // --- MÓDULOS RESTAURADOS ---
+    { href: "/inventory-adjustments", label: "Ajustes de Stock", icon: FileSliders },
+    { href: "/dispatches", label: "Orden de Salida", icon: PackageCheck },
     { href: "/financials", label: "Tesorería", icon: Landmark, active: pathname.includes("/financials") },
     { href: "/mercantile-account", label: "Cta. Corriente", icon: BookOpen, active: pathname.includes("/mercantile-account") },
-    // ---------------------------
-
-    { href: "/contacts", label: "Contactos", icon: Users, active: pathname.includes("/contacts") },
     { href: "/reports", label: "Reportes", icon: FileText, active: pathname.includes("/reports") },
     { href: "/settings", label: "Configuración", icon: Settings, active: pathname.includes("/settings") },
   ];
@@ -52,15 +52,15 @@ export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElemen
             href={route.href}
             className={cn(
               "flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 group relative",
-              route.active
+              pathname.startsWith(route.href) && route.href !== "/" || pathname === route.href
                 ? "bg-blue-600/10 text-blue-400 shadow-sm border border-blue-600/20" 
                 : "text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-transparent"
             )}
           >
-            {route.active && (
+            {(pathname.startsWith(route.href) && route.href !== "/" || pathname === route.href) && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-blue-500 rounded-r-full" />
             )}
-            <route.icon className={cn("mr-3 h-5 w-5 transition-colors", route.active ? "text-blue-400" : "text-slate-500 group-hover:text-slate-300")} />
+            <route.icon className={cn("mr-3 h-5 w-5 transition-colors", (pathname.startsWith(route.href) && route.href !== "/" || pathname === route.href) ? "text-blue-400" : "text-slate-500 group-hover:text-slate-300")} />
             {route.label}
           </Link>
         ))}

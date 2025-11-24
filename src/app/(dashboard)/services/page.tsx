@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { useOperations } from '@/hooks/use-operations';
 import { ServiceOrder } from '@/lib/types';
 import { getColumns } from './components/columns';
 import { DataTable } from './components/data-table';
@@ -28,30 +28,24 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { collection, doc } from 'firebase/firestore';
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useServiceOrdersCRUD } from '@/hooks/use-service-orders-crud';
+
 
 export default function ServicesPage() {
-  const { firestore } = useFirebase();
-  const serviceOrdersRef = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'serviceOrders') : null),
-    [firestore]
-  );
-  const { data: serviceOrders, isLoading, error } = useCollection<ServiceOrder>(serviceOrdersRef);
-
+  const { serviceOrders, isLoading } = useOperations();
+  const { createOrder, updateOrder, deleteOrder } = useServiceOrdersCRUD();
+  
   const [editingOrder, setEditingOrder] = useState<ServiceOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<ServiceOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { toast } = useToast();
 
   const handleSaveOrder = (order: ServiceOrder | Omit<ServiceOrder, 'id'>) => {
-    if (!firestore) return;
     if ('id' in order) {
-      const docRef = doc(firestore, 'serviceOrders', order.id);
-      updateDocumentNonBlocking(docRef, order);
+      updateOrder(order.id, order);
       toast({ title: 'Orden de Servicio Actualizada' });
     } else {
-      addDocumentNonBlocking(collection(firestore, 'serviceOrders'), order);
+      createOrder(order as Omit<ServiceOrder, 'id'>);
       toast({ title: 'Orden de Servicio Creada' });
     }
     setIsSheetOpen(false);
@@ -68,8 +62,8 @@ export default function ServicesPage() {
   };
 
   const confirmDelete = () => {
-    if (deletingOrder && firestore) {
-      deleteDocumentNonBlocking(doc(firestore, 'serviceOrders', deletingOrder.id));
+    if (deletingOrder) {
+      deleteOrder(deletingOrder.id);
       toast({ variant: 'destructive', title: 'Orden de Servicio Eliminada' });
       setDeletingOrder(null);
     }
@@ -97,9 +91,6 @@ export default function ServicesPage() {
           <Skeleton className="h-40 w-full" />
         </div>
       );
-    }
-     if (error) {
-      return <div className="text-red-500">Error: {error.message}</div>;
     }
     return <DataTable columns={columns} data={serviceOrders || []} />;
   };
@@ -158,3 +149,5 @@ export default function ServicesPage() {
     </>
   );
 }
+
+    
