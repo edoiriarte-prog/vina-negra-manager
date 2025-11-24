@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useMemo } from 'react';
 import { useLocalStorage } from './use-local-storage';
 import { BankAccount, Contact, InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment } from '@/lib/types';
 import { useCollection, useFirebase, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
