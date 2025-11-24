@@ -1,898 +1,379 @@
 
-
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useMasterData } from '@/hooks/use-master-data';
 import { Contact, SalesOrder, PurchaseOrder, FinancialMovement, ServiceOrder } from '@/lib/types';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Search, 
+  Wallet, 
+  FileText, 
+  ChevronRight,
+  User,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Truck,
+  Briefcase
+} from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import { Printer, ChevronDown, MoreHorizontal, Download } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { format, parseISO, compareDesc } from 'date-fns';
 import { es } from 'date-fns/locale';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { DueDatesReport } from '../reports/components/due-dates-report';
-import { useReactToPrint } from 'react-to-print';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import { createRoot } from 'react-dom/client';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
 
-type DocumentDetail = {
+// --- FORMATO MONEDA ---
+const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
+
+// --- TIPO DE DATO PARA LA VISTA ---
+type Document = {
   id: string;
   date: string;
   type: 'O/V' | 'O/C' | 'O/S';
   amount: number;
-  paidAmount: number;
-  pendingBalance: number;
-  status: 'Pagado' | 'Abonado' | 'Pendiente';
-  paymentCompleteDate?: string;
-  items?: any[];
 };
 
-type PaymentDetail = {
+type Payment = {
     id: string;
     date: string;
     description: string;
     amount: number;
-}
-
-type ReportData = {
-  contactId: string;
-  contactName: string;
-  totalBilled: number;
-  totalPaid: number;
-  pendingBalance: number;
-  status: 'Pagado' | 'Pendiente' | 'Abono';
-  documents: DocumentDetail[];
-  payments: PaymentDetail[];
+    relatedDocumentId?: string;
 };
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value);
+type AccountSummary = {
+  contact: Contact;
+  documents: Document[];
+  payments: Payment[];
+  totalBilled: number;
+  totalPaid: number;
+  balance: number;
+};
 
+type DetailedMovement = {
+    date: string;
+    type: 'charge' | 'payment';
+    description: string;
+    charge: number;
+    payment: number;
+    balance: number;
+};
 
 export default function MercantileAccountPage() {
-  const { firestore } = useFirebase();
+  const { contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements, isLoading } = useMasterData();
 
-  const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
-  const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
-  const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
-  const serviceOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'serviceOrders') : null, [firestore]);
-  const financialMovementsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financialMovements') : null, [firestore]);
+  // Estados de UI
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedAccount, setSelectedAccount] = useState<AccountSummary | null>(null);
 
-  const { data: contacts } = useCollection<Contact>(contactsQuery);
-  const { data: salesOrders } = useCollection<SalesOrder>(salesOrdersQuery);
-  const { data: purchaseOrders } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
-  const { data: serviceOrders } = useCollection<ServiceOrder>(serviceOrdersQuery);
-  const { data: financialMovements } = useCollection<FinancialMovement>(financialMovementsQuery);
-  
-  const [clientReports, setClientReports] = useState<ReportData[]>([]);
-  const [supplierReports, setSupplierReports] = useState<ReportData[]>([]);
-  const [clientFilter, setClientFilter] = useState('');
-  const [supplierFilter, setSupplierFilter] = useState('');
-  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
-  
-  const dueDatePrintRef = useRef<HTMLDivElement>(null);
-
-  const handleDueDatePrint = useReactToPrint({
-    content: () => dueDatePrintRef.current,
-  });
-
-
-  const handleDownloadPdf = async (report: ReportData) => {
-    if (!report) return;
-  
-    // Create a temporary div to render the component into
-    const tempDiv = document.createElement('div');
-    tempDiv.style.position = 'absolute';
-    tempDiv.style.left = '-9999px';
-    tempDiv.style.width = '210mm'; // A4 width
-    document.body.appendChild(tempDiv);
-    
-    const PrintableContent = React.forwardRef<HTMLDivElement>((props, ref) => (
-      <div ref={ref}>
-        <div className="p-8 font-sans text-black bg-white">
-          {getPrintableContent(report)}
-        </div>
-      </div>
-    ));
-    PrintableContent.displayName = 'PrintableContent';
-  
-    // Use createRoot to render the component
-    const root = createRoot(tempDiv);
-    root.render(<PrintableContent />);
-  
-    // Allow time for rendering before capturing
-    setTimeout(async () => {
-      try {
-        const canvas = await html2canvas(tempDiv, {
-          scale: 2, // Increase resolution
-          useCORS: true,
-          logging: true,
-          width: tempDiv.scrollWidth,
-          height: tempDiv.scrollHeight,
-          windowWidth: tempDiv.scrollWidth,
-          windowHeight: tempDiv.scrollHeight,
-        });
-  
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4'); // A4 size page of PDF
-  
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        const ratio = imgWidth / pdfWidth;
-        let pdfHeight = imgHeight / ratio;
-  
-        let position = 0;
-        let pageHeight = pdf.internal.pageSize.getHeight();
-  
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-        let heightLeft = pdfHeight - pageHeight;
-  
-        while (heightLeft >= 0) {
-          position = heightLeft - pdfHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-          heightLeft -= pageHeight;
-        }
-  
-        pdf.save(`Estado_de_Cuenta_${report.contactName}.pdf`);
-  
-      } catch (error) {
-        console.error("Error generating PDF:", error);
-      } finally {
-        // Cleanup
-        root.unmount();
-        document.body.removeChild(tempDiv);
-      }
-    }, 500); // Increased timeout for complex rendering
-  };
-
-
-  useEffect(() => {
-    if (contacts && salesOrders && purchaseOrders && serviceOrders && financialMovements) {
-      const clients = contacts.filter(c => Array.isArray(c.type) && c.type.includes('client'));
-      const clientReportData = clients.map(client => {
-        const clientSalesOrders = salesOrders
-          .filter(so => so.orderType !== 'dispatch' && so.clientId === client.id && (so.status === 'completed' || so.status === 'pending'))
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
-        const clientMovements = financialMovements
-          .filter(fm => fm.type === 'income' && fm.contactId === client.id)
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-        const paymentPool = clientMovements.map(p => ({ ...p, remaining: p.amount }));
-
-        const clientDocuments: DocumentDetail[] = clientSalesOrders.map(order => {
-            let paidAmount = 0;
-            let lastPaymentDate: string | undefined = undefined;
-
-            for (const payment of paymentPool) {
-                if (payment.remaining > 0) {
-                    const remainingOnOrder = order.totalAmount - paidAmount;
-                    if (remainingOnOrder > 0) {
-                        const amountToApply = Math.min(payment.remaining, remainingOnOrder);
-                        paidAmount += amountToApply;
-                        payment.remaining -= amountToApply;
-                        lastPaymentDate = payment.date;
-                    }
-                }
-            }
-
-            const pendingBalance = order.totalAmount - paidAmount;
-            let status: DocumentDetail['status'] = 'Pendiente';
-            if (pendingBalance <= 1) { // Epsilon for float comparison
-                status = 'Pagado';
-            } else if (paidAmount > 0) {
-                status = 'Abonado';
-            }
-
-            return {
-                id: order.id,
-                date: order.date,
-                type: 'O/V',
-                amount: order.totalAmount,
-                paidAmount: paidAmount,
-                pendingBalance: pendingBalance,
-                status: status,
-                paymentCompleteDate: status === 'Pagado' ? lastPaymentDate : undefined,
-                items: order.items,
-            };
-        });
-
-        const totalBilled = clientDocuments.reduce((sum, doc) => sum + doc.amount, 0);
-        const totalPaid = clientDocuments.reduce((sum, doc) => sum + doc.paidAmount, 0);
-        const overallPending = totalBilled - totalPaid;
-        
-        let overallStatus: ReportData['status'] = 'Pendiente';
-        if (totalBilled > 0) {
-            if (overallPending <= 1) {
-                overallStatus = 'Pagado';
-            }
-        } else if (totalPaid > 0) {
-             overallStatus = 'Abono';
-        }
-
-
-        return {
-          contactId: client.id,
-          contactName: client.name,
-          totalBilled,
-          totalPaid,
-          pendingBalance: overallPending,
-          status: overallStatus,
-          documents: clientDocuments,
-          payments: clientMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })),
-        };
-      }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
-      setClientReports(clientReportData);
-
-      // --- Supplier Reports ---
-      const suppliers = contacts.filter(c => Array.isArray(c.type) && c.type.includes('supplier'));
-      const supplierReportData = suppliers.map(supplier => {
-        const supplierPurchaseOrders = purchaseOrders.filter(po => po.supplierId === supplier.id && (po.status === 'completed' || po.status === 'pending'));
-        const supplierServiceOrders = serviceOrders.filter(so => {
-            const contact = contacts.find(c => c.name === so.provider);
-            return contact?.id === supplier.id;
-        });
-
-        const supplierDocsRaw = [
-            ...supplierPurchaseOrders.map(po => ({ id: po.id, date: po.date, type: 'O/C' as const, amount: po.totalAmount, items: po.items })),
-            ...supplierServiceOrders.map(so => ({ id: so.id, date: so.date, type: 'O/S' as const, amount: so.cost, items: [] })),
-        ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-
-        const supplierMovements = financialMovements.filter(fm => fm.type === 'expense' && fm.contactId === supplier.id);
-        const paymentPool = supplierMovements.map(p => ({ ...p, remaining: p.amount }));
-
-        const supplierDocuments: DocumentDetail[] = supplierDocsRaw.map(doc => {
-          let paidAmount = 0;
-          let lastPaymentDate: string | undefined;
-
-          for (const payment of paymentPool) {
-            if (payment.remaining > 0) {
-              const remainingOnDoc = doc.amount - paidAmount;
-              if (remainingOnDoc > 0) {
-                const amountToApply = Math.min(payment.remaining, remainingOnDoc);
-                paidAmount += amountToApply;
-                payment.remaining -= amountToApply;
-                lastPaymentDate = payment.date;
-              }
-            }
-          }
-          
-          const pendingBalance = doc.amount - paidAmount;
-          let status: DocumentDetail['status'] = 'Pendiente';
-          if (pendingBalance <= 1) {
-            status = 'Pagado';
-          } else if (paidAmount > 0) {
-            status = 'Abonado';
-          }
-
-          return { ...doc, paidAmount, pendingBalance, status, paymentCompleteDate: status === 'Pagado' ? lastPaymentDate : undefined };
-        });
-
-        const totalBilled = supplierDocuments.reduce((sum, doc) => sum + doc.amount, 0);
-        const totalPaid = supplierMovements.reduce((sum, movement) => sum + movement.amount, 0);
-        const pendingBalance = totalBilled - totalPaid;
-
-        let status: ReportData['status'] = 'Pendiente';
-        if (totalBilled > 0) {
-            if (pendingBalance <= 1) {
-              status = 'Pagado';
-            }
-        }
-
-         return {
-          contactId: supplier.id,
-          contactName: supplier.name,
-          totalBilled,
-          totalPaid,
-          pendingBalance,
-          status,
-          documents: supplierDocuments,
-          payments: supplierMovements.map(p => ({ id: p.id, date: p.date, description: p.description, amount: p.amount })),
-        };
-      }).filter(r => r.totalBilled > 0 || r.totalPaid > 0);
-      setSupplierReports(supplierReportData);
+  // 2. PROCESAMIENTO INTELIGENTE DE DATOS
+  const { clientsData, suppliersData } = useMemo(() => {
+    if (!contacts || !salesOrders || !purchaseOrders || !serviceOrders || !financialMovements) {
+        return { clientsData: [], suppliersData: [] };
     }
+
+    const calculateAccount = (contact: Contact, type: 'client' | 'supplier'): AccountSummary => {
+        const documents: Document[] = [];
+        const payments: Payment[] = [];
+
+        if (type === 'client') {
+            salesOrders.filter(s => s.clientId === contact.id && s.status !== 'cancelled' && s.status !== 'draft')
+              .forEach(s => documents.push({ id: s.id, date: s.date, type: 'O/V', amount: s.totalAmount }));
+            
+            financialMovements.filter(fm => fm.contactId === contact.id && fm.type === 'income')
+              .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: p.amount, relatedDocumentId: p.relatedDocument?.id }));
+
+        } else { // supplier
+            purchaseOrders.filter(p => p.supplierId === contact.id && p.status !== 'cancelled' && p.status !== 'draft')
+              .forEach(p => documents.push({ id: p.id, date: p.date, type: 'O/C', amount: p.totalAmount }));
+
+            serviceOrders.filter(s => s.provider === contact.name) // Asumiendo que se linkea por nombre
+              .forEach(s => documents.push({ id: s.id, date: s.date, type: 'O/S', amount: s.cost }));
+
+            financialMovements.filter(fm => fm.contactId === contact.id && fm.type === 'expense')
+              .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: p.amount, relatedDocumentId: p.relatedDocument?.id }));
+        }
+
+        const totalBilled = documents.reduce((sum, doc) => sum + doc.amount, 0);
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+        const balance = totalBilled - totalPaid;
+
+        return { contact, documents, payments, totalBilled, totalPaid, balance };
+    };
+
+    const clients = contacts
+        .filter(c => Array.isArray(c.type) && c.type.includes('client'))
+        .map(c => calculateAccount(c, 'client'))
+        .filter(acc => acc.totalBilled > 0 || acc.totalPaid > 0);
+
+    const suppliers = contacts
+        .filter(c => Array.isArray(c.type) && c.type.includes('supplier'))
+        .map(c => calculateAccount(c, 'supplier'))
+        .filter(acc => acc.totalBilled > 0 || acc.totalPaid > 0);
+
+    return { clientsData: clients, suppliersData: suppliers };
+
   }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements]);
 
-  const clientTotals = useMemo(() => {
-    return clientReports.reduce((acc, report) => {
-        acc.totalBilled += report.totalBilled;
-        acc.totalPaid += report.totalPaid;
-        acc.pendingBalance += report.pendingBalance;
-        return acc;
-    }, { totalBilled: 0, totalPaid: 0, pendingBalance: 0 });
-  }, [clientReports]);
-
-  const supplierTotals = useMemo(() => {
-    return supplierReports.reduce((acc, report) => {
-        acc.totalBilled += report.totalBilled;
-        acc.totalPaid += report.totalPaid;
-        acc.pendingBalance += report.pendingBalance;
-        return acc;
-    }, { totalBilled: 0, totalPaid: 0, pendingBalance: 0 });
-  }, [supplierReports]);
-
-
-  
-  const toggleCollapsible = (id: string) => {
-    setOpenCollapsibles(prev => ({...prev, [id]: !prev[id]}));
-  }
-
-  const getPrintableContent = (report: ReportData) => {
-      if (!report) return null;
-      const allDocuments = report.documents || [];
-      const allItems = allDocuments.flatMap(doc => doc.items || []);
-      const totalPackages = allItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
-      const totalKilos = allItems.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : 0, 0);
-      const totalValue = allItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-      const avgPricePerKg = totalKilos > 0 ? totalValue / totalKilos : 0;
-      
-      const groupedPayments = report.payments.reduce((acc, payment) => {
-        const month = format(parseISO(payment.date), 'MMMM yyyy', { locale: es });
-        if (!acc[month]) {
-            acc[month] = {
-                payments: [],
-                total: 0,
-            };
-        }
-        acc[month].payments.push(payment);
-        acc[month].total += payment.amount;
-        return acc;
-      }, {} as Record<string, { payments: PaymentDetail[], total: number }>);
-      
-      return (
-         <>
-              <div className="grid grid-cols-2 gap-8 mb-8">
-                  <div>
-                      <h2 className="font-bold text-lg mb-2">{report.documents.some(d => d.type === 'O/C') ? 'PROVEEDOR' : 'CLIENTE'}</h2>
-                      <div className="text-sm">
-                          <p className="font-semibold text-base">{report.contactName}</p>
-                          <p>RUT: {contacts?.find(c=>c.id === report.contactId)?.rut}</p>
-                          <p>{contacts?.find(c=>c.id === report.contactId)?.address}</p>
-                          <p>{contacts?.find(c=>c.id === report.contactId)?.commune}</p>
-                      </div>
-                  </div>
-                  <div className='text-right'>
-                      <h1 className="text-2xl font-bold">ESTADO DE CUENTA</h1>
-                      <p className='text-sm'>Al {format(new Date(), "PPP", { locale: es })}</p>
-                      <div className="mt-4">
-                          <h3 className="text-lg font-bold">VIÑA NEGRA SpA</h3>
-                          <p className="text-sm">RUT: 78.261.683-8</p>
-                          <p className="text-sm">TULAHUEN S/N</p>
-                          <p className="text-sm">MONTE PATRIA, CHILE</p>
-                      </div>
-                  </div>
-              </div>
-
-              {report.documents.some(d => d.type === 'O/C') ? (
-                <>
-                  <div className="grid grid-cols-2 gap-8 mt-8">
-                      <div className="bg-gray-50 p-4 rounded-lg print-order-section">
-                          <h3 className="text-lg font-bold mb-2 text-center">Resumen Total de Compras</h3>
-                          <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                              <div className="font-bold">Total Kilos Comprados:</div>
-                              <div className="text-right font-bold">{totalKilos.toLocaleString('es-CL')} kg</div>
-                              <div className="font-bold">Total Envases:</div>
-                              <div className="text-right font-bold">{totalPackages.toLocaleString('es-CL')}</div>
-                              <div className="font-bold">Valor Total Compra:</div>
-                              <div className="text-right font-bold text-base">{formatCurrency(totalValue)}</div>
-                              <div className="font-bold">Precio Promedio por Kilo:</div>
-                              <div className="text-right font-bold text-base">{formatCurrency(avgPricePerKg)}</div>
-                          </div>
-                      </div>
-                      <div>
-                          <h3 className="text-lg font-bold mb-4 border-b pb-2">Resumen de Pagos</h3>
-                          {groupedPayments && Object.entries(groupedPayments).map(([month, data]) => (
-                          <div key={month} className="mb-4">
-                              <h4 className="font-bold text-md mb-2 capitalize">{month}</h4>
-                              <Table>
-                                  <TableBody>
-                                      {data.payments.map(payment => (
-                                          <TableRow key={payment.id}>
-                                              <TableCell className="w-[100px]">{format(parseISO(payment.date), "dd-MM-yyyy")}</TableCell>
-                                              <TableCell>{payment.description}</TableCell>
-                                              <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
-                                          </TableRow>
-                                      ))}
-                                  </TableBody>
-                                  <TableFooter>
-                                      <TableRow>
-                                          <TableCell colSpan={2} className="text-right font-bold">Total {month}</TableCell>
-                                          <TableCell className="text-right font-bold">{formatCurrency(data.total)}</TableCell>
-                                      </TableRow>
-                                  </TableFooter>
-                              </Table>
-                          </div>
-                          ))}
-                          <div className="flex justify-between items-center bg-gray-100 p-2 mt-4 rounded-md">
-                              <span className="font-bold text-lg">Total Pagado</span>
-                              <span className="font-bold text-lg">{formatCurrency(report.totalPaid)}</span>
-                          </div>
-                      </div>
-                  </div>
-                  <div className="mt-8 bg-gray-100 p-4 rounded-lg self-center">
-                          <div className="flex justify-between items-center">
-                              <span className="text-xl font-bold">SALDO PENDIENTE TOTAL</span>
-                              <span className="text-xl font-bold">{formatCurrency(report.pendingBalance)}</span>
-                          </div>
-                      </div>
-
-                  <div className="space-y-6 mt-8">
-                      {allDocuments.filter(d => d.type === 'O/C').map(doc => {
-                          const docTotalKilos = doc.items?.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0) || 0;
-                          const docTotalPackages = doc.items?.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0) || 0;
-                          return (
-                              <div key={doc.id} className="print-order-section">
-                                  <h3 className="text-lg font-bold mb-2 border-b pb-2">Detalle Orden de Compra: {doc.id} <span className="text-base font-normal">({format(parseISO(doc.date), 'dd-MM-yyyy')})</span></h3>
-                                  <Table>
-                                      <TableHeader>
-                                          <TableRow>
-                                              <TableHead className="font-bold">Producto</TableHead>
-                                              <TableHead className="font-bold">Calibre</TableHead>
-                                              <TableHead className="text-right font-bold">Envases</TableHead>
-                                              <TableHead className="text-right font-bold">Kilos</TableHead>
-                                              <TableHead className="text-right font-bold">Precio/kg</TableHead>
-                                              <TableHead className="text-right font-bold">Subtotal</TableHead>
-                                          </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                          {doc.items?.map((item, idx) => (
-                                              <TableRow key={item.id || idx}>
-                                                  <TableCell>{item.product}</TableCell>
-                                                  <TableCell>{item.caliber}</TableCell>
-                                                  <TableCell className="text-right">{item.packagingQuantity || 0}</TableCell>
-                                                  <TableCell className="text-right">{item.quantity || 0}</TableCell>
-                                                  <TableCell className="text-right">{item.unit === 'Kilos' ? formatCurrency(item.price) : '-'}</TableCell>
-                                                  <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
-                                              </TableRow>
-                                          ))}
-                                      </TableBody>
-                                      <TableFooter>
-                                          <TableRow>
-                                              <TableHead colSpan={2} className="text-right font-bold text-base">Totales O/C</TableHead>
-                                              <TableHead className="text-right font-bold text-base">{docTotalPackages.toLocaleString('es-CL')}</TableHead>
-                                              <TableHead className="text-right font-bold text-base">{docTotalKilos.toLocaleString('es-CL')} kg</TableHead>
-                                              <TableHead colSpan={1}></TableHead>
-                                              <TableHead className="text-right font-bold text-base">{formatCurrency(doc.amount)}</TableHead>
-                                          </TableRow>
-                                      </TableFooter>
-                                  </Table>
-                              </div>
-                          )
-                      })}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-8 mt-8">
-                      <div className="bg-gray-50 p-4 rounded-lg print-order-section">
-                          <h3 className="text-lg font-bold mb-2 text-center">Resumen Total de Ventas</h3>
-                          <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                              <div className="font-bold">Total Kilos Vendidos:</div>
-                              <div className="text-right font-bold">{totalKilos.toLocaleString('es-CL')} kg</div>
-                              <div className="font-bold">Total Envases:</div>
-                              <div className="text-right font-bold">{totalPackages.toLocaleString('es-CL')}</div>
-                              <div className="font-bold">Valor Total Venta:</div>
-                              <div className="text-right font-bold text-base">{formatCurrency(totalValue)}</div>
-                              <div className="font-bold">Precio Promedio por Kilo:</div>
-                              <div className="text-right font-bold text-base">{formatCurrency(avgPricePerKg)}</div>
-                          </div>
-                      </div>
-                      <div>
-                          <h3 className="text-lg font-bold mb-4 border-b pb-2">Resumen de Pagos</h3>
-                          {groupedPayments && Object.entries(groupedPayments).map(([month, data]) => (
-                          <div key={month} className="mb-4">
-                              <h4 className="font-bold text-md mb-2 capitalize">{month}</h4>
-                              <Table>
-                                  <TableBody>
-                                      {data.payments.map(payment => (
-                                          <TableRow key={payment.id}>
-                                              <TableCell className="w-[100px]">{format(parseISO(payment.date), "dd-MM-yyyy")}</TableCell>
-                                              <TableCell>{payment.description}</TableCell>
-                                              <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
-                                          </TableRow>
-                                      ))}
-                                  </TableBody>
-                                  <TableFooter>
-                                      <TableRow>
-                                          <TableCell colSpan={2} className="text-right font-bold">Total {month}</TableCell>
-                                          <TableCell className="text-right font-bold">{formatCurrency(data.total)}</TableCell>
-                                      </TableRow>
-                                  </TableFooter>
-                              </Table>
-                          </div>
-                          ))}
-                          <div className="flex justify-between items-center bg-gray-100 p-2 mt-4 rounded-md">
-                              <span className="font-bold text-lg">Total Pagado</span>
-                              <span className="font-bold text-lg">{formatCurrency(report.totalPaid)}</span>
-                          </div>
-                      </div>
-                  </div>
-                  <div className="mt-8 bg-gray-100 p-4 rounded-lg self-center">
-                          <div className="flex justify-between items-center">
-                              <span className="text-xl font-bold">SALDO PENDIENTE TOTAL</span>
-                              <span className="text-xl font-bold">{formatCurrency(report.pendingBalance)}</span>
-                          </div>
-                      </div>
-                  <div className="space-y-6 mt-8">
-                      {allDocuments.filter(d => d.type === 'O/V').map(doc => {
-                          const docTotalKilos = doc.items?.reduce((sum, item) => item.unit === 'Kilos' ? sum + item.quantity : sum, 0) || 0;
-                          const docTotalPackages = doc.items?.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0) || 0;
-                          return (
-                              <div key={doc.id} className="print-order-section">
-                                  <h3 className="text-lg font-bold mb-2 border-b pb-2">Detalle Orden de Venta: {doc.id} <span className="text-base font-normal">({format(parseISO(doc.date), 'dd-MM-yyyy')})</span></h3>
-                                  <Table>
-                                      <TableHeader>
-                                          <TableRow>
-                                              <TableHead className="font-bold">Producto</TableHead>
-                                              <TableHead className="font-bold">Calibre</TableHead>
-                                              <TableHead className="text-right font-bold">Envases</TableHead>
-                                              <TableHead className="text-right font-bold">Kilos</TableHead>
-                                              <TableHead className="text-right font-bold">Precio/kg</TableHead>
-                                              <TableHead className="text-right font-bold">Subtotal</TableHead>
-                                          </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                          {doc.items?.map((item, idx) => (
-                                              <TableRow key={item.id || idx}>
-                                                  <TableCell>{item.product}</TableCell>
-                                                  <TableCell>{item.caliber}</TableCell>
-                                                  <TableCell className="text-right">{item.packagingQuantity || 0}</TableCell>
-                                                  <TableCell className="text-right">{item.quantity || 0}</TableCell>
-                                                  <TableCell className="text-right">{item.unit === 'Kilos' ? formatCurrency(item.price) : '-'}</TableCell>
-                                                  <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
-                                              </TableRow>
-                                          ))}
-                                      </TableBody>
-                                      <TableFooter>
-                                          <TableRow>
-                                              <TableHead colSpan={2} className="text-right font-bold text-base">Totales O/V</TableHead>
-                                              <TableHead className="text-right font-bold text-base">{docTotalPackages.toLocaleString('es-CL')}</TableHead>
-                                              <TableHead className="text-right font-bold text-base">{docTotalKilos.toLocaleString('es-CL')} kg</TableHead>
-                                              <TableHead colSpan={1}></TableHead>
-                                              <TableHead className="text-right font-bold text-base">{formatCurrency(doc.amount)}</TableHead>
-                                          </TableRow>
-                                      </TableFooter>
-                                  </Table>
-                              </div>
-                          )
-                      })}
-                  </div>
-                </>
-              )}
-          </>
-      )
+  // Filtrado por búsqueda
+  const filterAccounts = (list: AccountSummary[]) => {
+      if (!searchTerm) return list;
+      return list.filter(acc => 
+        acc.contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (acc.contact.rut || '').toLowerCase().includes(searchTerm.toLowerCase())
+      );
   };
   
-  const renderClientReportRows = (data: ReportData[], filter: string) => {
-    const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
-    
-    if (!contacts) {
-        return (
-            <TableRow>
-              <TableCell colSpan={6} className="h-24 text-center">
-                {Array.from({ length: 3 }).map((_, index) => (
-                    <Skeleton key={`skeleton-${index}`} className="h-8 w-full my-2" />
-                ))}
-              </TableCell>
-            </TableRow>
-        );
-    }
-    
-    return filteredData.map((item) => (
-      <React.Fragment key={item.contactId}>
-        <TableRow>
-          <TableCell className="font-medium">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => toggleCollapsible(item.contactId)}>
-                <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
-              </Button>
-              {item.contactName}
-            </div>
-          </TableCell>
-          <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
-          <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
-          <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
-          <TableCell className="text-center">
-            <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
-          </TableCell>
-          <TableCell className="text-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Abrir menú</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => handleDownloadPdf(item)}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Descargar PDF
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TableCell>
-        </TableRow>
-        {openCollapsibles[item.contactId] && (
-          <tr className="bg-muted/20 hover:bg-muted/30">
-            <TableCell colSpan={6} className="p-0">
-                <div className="p-4">
-                    <div className="col-span-3">
-                        <h4 className="font-semibold mb-2">Detalle de Órdenes de Venta</h4>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>O/V</TableHead>
-                                    <TableHead>Fecha O/V</TableHead>
-                                    <TableHead>Monto O/V</TableHead>
-                                    <TableHead>Monto Pagado</TableHead>
-                                    <TableHead>Saldo</TableHead>
-                                    <TableHead>Estado</TableHead>
-                                    <TableHead>Fecha Pago Final</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {item.documents.map(doc => (
-                                    <TableRow key={doc.id}>
-                                        <TableCell>{doc.id}</TableCell>
-                                        <TableCell>{format(parseISO(doc.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                                        <TableCell>{formatCurrency(doc.amount)}</TableCell>
-                                        <TableCell className="text-green-600">{formatCurrency(doc.paidAmount)}</TableCell>
-                                        <TableCell className="font-bold">{formatCurrency(doc.pendingBalance)}</TableCell>
-                                        <TableCell>
-                                             <Badge variant={doc.status === 'Pagado' ? 'default' : doc.status === 'Abonado' ? 'secondary' : 'destructive'}>{doc.status}</Badge>
-                                        </TableCell>
-                                        <TableCell>{doc.paymentCompleteDate ? format(parseISO(doc.paymentCompleteDate), "dd-MM-yyyy") : '-'}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                             <TableFooter>
-                                <TableRow>
-                                    <TableCell colSpan={2} className="text-right font-bold">Totales</TableCell>
-                                    <TableCell className="font-bold">{formatCurrency(item.totalBilled)}</TableCell>
-                                    <TableCell className="font-bold text-green-600">{formatCurrency(item.totalPaid)}</TableCell>
-                                    <TableCell className="font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
-                                    <TableCell colSpan={2}></TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-                    </div>
-                </div>
-            </TableCell>
-          </tr>
-        )}
-      </React.Fragment>
-    ));
-  };
+  const clientTotals = useMemo(() => filterAccounts(clientsData).reduce((acc, curr) => ({
+    billed: acc.billed + curr.totalBilled,
+    paid: acc.paid + curr.totalPaid,
+    balance: acc.balance + curr.balance
+  }), { billed: 0, paid: 0, balance: 0}), [clientsData, searchTerm]);
+  
+  const supplierTotals = useMemo(() => filterAccounts(suppliersData).reduce((acc, curr) => ({
+    billed: acc.billed + curr.totalBilled,
+    paid: acc.paid + curr.totalPaid,
+    balance: acc.balance + curr.balance
+  }), { billed: 0, paid: 0, balance: 0}), [suppliersData, searchTerm]);
 
-   const renderSupplierReportRows = (data: ReportData[], filter: string) => {
-    const filteredData = data.filter(item => item.contactName.toLowerCase().includes(filter.toLowerCase()));
-    
-    if (!contacts) {
-        return (
-            <TableRow>
-              <TableCell colSpan={6} className="h-24 text-center">
-                {Array.from({ length: 3 }).map((_, index) => (
-                    <Skeleton key={`skeleton-supp-${index}`} className="h-8 w-full my-2" />
-                ))}
-              </TableCell>
-            </TableRow>
-        );
-    }
-    
-    return filteredData.map((item) => (
-      <React.Fragment key={item.contactId}>
-        <TableRow>
-          <TableCell className="font-medium">
-            <div className="flex items-center gap-2">
-               <Button variant="ghost" size="sm" onClick={() => toggleCollapsible(item.contactId)}>
-                <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[item.contactId] && "rotate-180")} />
-              </Button>
-              {item.contactName}
-            </div>
-          </TableCell>
-          <TableCell className="text-right">{formatCurrency(item.totalBilled)}</TableCell>
-          <TableCell className="text-right text-green-600 dark:text-green-500">{formatCurrency(item.totalPaid)}</TableCell>
-          <TableCell className="text-right font-bold">{formatCurrency(item.pendingBalance)}</TableCell>
-          <TableCell className="text-center">
-            <Badge variant={ item.status === 'Pagado' ? 'default' : item.status === 'Abono' ? 'secondary' : 'destructive' }>{item.status}</Badge>
-          </TableCell>
-           <TableCell className="text-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Abrir menú</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => handleDownloadPdf(item)}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Descargar PDF
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TableCell>
-        </TableRow>
-        {openCollapsibles[item.contactId] && (
-          <tr className="bg-muted/20 hover:bg-muted/30">
-            <TableCell colSpan={6} className="p-0">
-                <div className="p-4 grid grid-cols-2 gap-4">
-                    <div>
-                        <h4 className="font-semibold mb-2">Documentos</h4>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>ID</TableHead>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead className="text-right">Monto</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {item.documents.map(doc => (
-                                    <TableRow key={doc.id}>
-                                        <TableCell>{doc.id}</TableCell>
-                                        <TableCell>{format(parseISO(doc.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(doc.amount)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold mb-2">Pagos</h4>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead className="text-right">Monto</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                             <TableBody>
-                                {item.payments.map(payment => (
-                                    <TableRow key={payment.id}>
-                                        <TableCell>{format(parseISO(payment.date), "dd-MM-yyyy", { locale: es })}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </div>
-            </TableCell>
-          </tr>
-        )}
-      </React.Fragment>
-    ));
-  };
+  if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-1/3"/><Skeleton className="h-64 w-full"/></div>;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 bg-slate-950 min-h-screen text-slate-100">
+      
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-            <h1 className="font-headline text-3xl">Cta. Corriente Mercantil</h1>
-            <p className="text-muted-foreground">Analiza el estado de cuentas de clientes y proveedores.</p>
+            <h2 className="text-3xl font-bold tracking-tight text-white">Cuenta Corriente Mercantil</h2>
+            <p className="text-slate-400 mt-1">Estado de deudas y abonos de Clientes y Proveedores.</p>
         </div>
+        <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-800 w-full md:w-auto focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/20">
+            <Search className="h-4 w-4 text-slate-500 ml-2" />
+            <Input 
+                placeholder="Buscar empresa o persona..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="border-none bg-transparent focus-visible:ring-0 text-slate-200 placeholder:text-slate-600 h-8 w-full md:w-64"
+            />
+        </div>
+      </div>
 
-        <Card>
-            <CardHeader>
-              <CardTitle className="font-headline text-2xl">Cuentas por Cobrar (Clientes)</CardTitle>
-              <CardDescription>Resumen de facturación, pagos y saldos pendientes de clientes.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="my-4">
-                <Input 
-                    placeholder="Filtrar por cliente..." 
-                    value={clientFilter}
-                    onChange={(e) => setClientFilter(e.target.value)}
-                    className="max-w-sm"
-                  />
-              </div>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[300px]">Cliente</TableHead>
-                      <TableHead className="text-right">Total Facturado</TableHead>
-                      <TableHead className="text-right">Total Pagado</TableHead>
-                      <TableHead className="text-right">Saldo Pendiente</TableHead>
-                      <TableHead className="text-center w-[100px]">Estado</TableHead>
-                      <TableHead className="text-center w-[50px]">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {renderClientReportRows(clientReports, clientFilter)}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableHead className="text-right font-bold text-lg">Total General</TableHead>
-                      <TableHead className="text-right font-bold text-lg">{formatCurrency(clientTotals.totalBilled)}</TableHead>
-                      <TableHead className="text-right font-bold text-lg">{formatCurrency(clientTotals.totalPaid)}</TableHead>
-                      <TableHead className="text-right font-bold text-lg">{formatCurrency(clientTotals.pendingBalance)}</TableHead>
-                      <TableHead colSpan={2}/>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </div>
-            </CardContent>
-        </Card>
-          
-        <Card>
-            <CardHeader>
-              <CardTitle className="font-headline text-2xl">Cuentas por Pagar (Proveedores)</CardTitle>
-              <CardDescription>Resumen de compras, pagos y saldos pendientes a proveedores.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="my-4">
-                <Input 
-                    placeholder="Filtrar por proveedor..." 
-                    value={supplierFilter}
-                    onChange={(e) => setSupplierFilter(e.target.value)}
-                    className="max-w-sm"
-                  />
-              </div>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[300px]">Proveedor</TableHead>
-                      <TableHead className="text-right">Total Comprado</TableHead>
-                      <TableHead className="text-right">Total Pagado</TableHead>
-                      <TableHead className="text-right">Saldo Pendiente</TableHead>
-                      <TableHead className="text-center w-[100px]">Estado</TableHead>
-                      <TableHead className="text-center w-[50px]">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                   <TableBody>
-                    {renderSupplierReportRows(supplierReports, supplierFilter)}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableHead className="text-right font-bold text-lg">Total General</TableHead>
-                      <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.totalBilled)}</TableHead>
-                      <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.totalPaid)}</TableHead>
-                      <TableHead className="text-right font-bold text-lg">{formatCurrency(supplierTotals.pendingBalance)}</TableHead>
-                      <TableHead colSpan={2} />
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </div>
-            </CardContent>
-        </Card>
+      {/* CONTENIDO PRINCIPAL */}
+      <Tabs defaultValue="clients" className="space-y-6">
+        <TabsList className="bg-slate-900 border border-slate-800 p-1 h-auto">
+            <TabsTrigger value="clients" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-blue-900/30">
+                Por Cobrar (Clientes)
+            </TabsTrigger>
+            <TabsTrigger value="suppliers" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-orange-900/30">
+                Por Pagar (Proveedores)
+            </TabsTrigger>
+        </TabsList>
 
-         <Card>
-            <div ref={dueDatePrintRef} className="print-container">
-                <DueDatesReport 
-                    salesOrders={salesOrders || []} 
-                    financialMovements={financialMovements || []} 
-                    contacts={contacts || []}
-                    onPrint={handleDueDatePrint}
-                />
+        {/* --- PESTAÑA CLIENTES --- */}
+        <TabsContent value="clients" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+                <SummaryCard title="Total Facturado (Clientes)" value={formatCurrency(clientTotals.billed)} icon={<Briefcase className="text-blue-400" />} />
+                <SummaryCard title="Total Recibido (Clientes)" value={formatCurrency(clientTotals.paid)} icon={<ArrowDownLeft className="text-emerald-400" />} />
+                <SummaryCard title="Saldo por Cobrar" value={formatCurrency(clientTotals.balance)} icon={<Wallet className="text-amber-400" />} />
             </div>
-        </Card>
 
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filterAccounts(clientsData).map((acc) => (
+                    <AccountCard 
+                        key={acc.contact.id} 
+                        account={acc} 
+                        type="client" 
+                        onClick={() => setSelectedAccount(acc)} 
+                    />
+                ))}
+                {clientsData.length === 0 && <p className="text-slate-500 col-span-full text-center py-10">No hay movimientos de clientes registrados.</p>}
+            </div>
+        </TabsContent>
+
+        {/* --- PESTAÑA PROVEEDORES --- */}
+        <TabsContent value="suppliers" className="space-y-4">
+             <div className="grid gap-4 md:grid-cols-3">
+                <SummaryCard title="Total Compras (Proveedores)" value={formatCurrency(supplierTotals.billed)} icon={<Truck className="text-orange-400" />} />
+                <SummaryCard title="Total Pagado (Proveedores)" value={formatCurrency(supplierTotals.paid)} icon={<ArrowUpRight className="text-red-400" />} />
+                <SummaryCard title="Saldo por Pagar" value={formatCurrency(supplierTotals.balance)} icon={<Wallet className="text-amber-400" />} />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filterAccounts(suppliersData).map((acc) => (
+                    <AccountCard 
+                        key={acc.contact.id} 
+                        account={acc} 
+                        type="supplier" 
+                        onClick={() => setSelectedAccount(acc)} 
+                    />
+                ))}
+                {suppliersData.length === 0 && <p className="text-slate-500 col-span-full text-center py-10">No hay movimientos de proveedores registrados.</p>}
+            </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* --- DETALLE LATERAL (CARTOLA) --- */}
+      {selectedAccount && <AccountDetailSheet account={selectedAccount} isOpen={!!selectedAccount} onOpenChange={() => setSelectedAccount(null)} />}
     </div>
   );
 }
+
+// --- COMPONENTES VISUALES ---
+function SummaryCard({ title, value, icon }: { title: string, value: string, icon: React.ReactNode }) {
+    return (
+        <Card className="bg-slate-900 border-slate-800 shadow-sm">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-medium text-slate-400">{title}</CardTitle>
+                {icon}
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold text-slate-100">{value}</div>
+            </CardContent>
+        </Card>
+    )
+}
+
+function AccountCard({ account, type, onClick }: { account: AccountSummary, type: 'client' | 'supplier', onClick: () => void }) {
+    const isDebt = account.balance > 0;
+    const balanceColor = type === 'client' 
+        ? (isDebt ? 'text-amber-400' : 'text-emerald-400')
+        : (isDebt ? 'text-red-400' : 'text-emerald-400');
+    
+    return (
+        <Card 
+            className="bg-slate-900 border-slate-800 hover:border-slate-600 transition-all cursor-pointer group shadow-lg"
+            onClick={onClick}
+        >
+            <CardContent className="p-5">
+                <div className="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 className="font-bold text-lg text-slate-200 group-hover:text-blue-400 transition-colors truncate max-w-[180px]" title={account.contact.name}>
+                            {account.contact.name}
+                        </h3>
+                        <p className="text-xs text-slate-500">{account.contact.rut || 'S/R'}</p>
+                    </div>
+                    {isDebt ? (
+                        <Badge variant="outline" className={`border-opacity-30 ${type === 'client' ? 'text-amber-400 border-amber-400' : 'text-red-400 border-red-400'}`}>
+                            {type === 'client' ? 'Por Cobrar' : 'Por Pagar'}
+                        </Badge>
+                    ) : (
+                        <Badge variant="outline" className="text-emerald-400 border-emerald-400 border-opacity-30">Al día</Badge>
+                    )}
+                </div>
+
+                <div className="space-y-1">
+                    <div className="flex justify-between items-end">
+                        <span className="text-xs text-slate-500 uppercase tracking-wider">Saldo</span>
+                        <span className={`text-xl font-bold font-mono ${balanceColor}`}>
+                            {formatCurrency(account.balance)}
+                        </span>
+                    </div>
+                    <Separator className="bg-slate-800 my-2" />
+                    <div className="flex justify-between text-xs text-slate-400">
+                        <span>{type === 'client' ? 'Facturado:' : 'Comprado:'}</span>
+                        <span>{formatCurrency(account.totalBilled)}</span>
+                    </div>
+                     <div className="flex justify-between text-xs text-slate-400">
+                        <span>{type === 'client' ? 'Recibido:' : 'Pagado:'}</span>
+                        <span className="text-emerald-400">{formatCurrency(account.totalPaid)}</span>
+                    </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-800/50">
+                    <span>{account.documents.length + account.payments.length} movs.</span>
+                    <div className="flex items-center group-hover:translate-x-1 transition-transform text-blue-500">
+                        Ver cartola <ChevronRight className="h-3 w-3 ml-1" />
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function AccountDetailSheet({ account, isOpen, onOpenChange }: { account: AccountSummary, isOpen: boolean, onOpenChange: () => void }) {
+    
+    const detailedMovements: DetailedMovement[] = useMemo(() => {
+        const movements: Omit<DetailedMovement, 'balance'>[] = [];
+        account.documents.forEach(d => movements.push({ date: d.date, type: 'charge', description: `Doc: ${d.type} ${d.id}`, charge: d.amount, payment: 0 }));
+        account.payments.forEach(p => movements.push({ date: p.date, type: 'payment', description: `Pago: ${p.description}`, charge: 0, payment: p.amount }));
+
+        movements.sort((a,b) => compareDesc(parseISO(b.date), parseISO(a.date)));
+
+        let balance = 0;
+        return movements.map(m => {
+            balance += m.charge - m.payment;
+            return { ...m, balance };
+        }).reverse();
+    }, [account]);
+
+    return (
+        <Sheet open={isOpen} onOpenChange={onOpenChange}>
+            <SheetContent className="sm:max-w-3xl w-full flex flex-col p-0 gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
+                <SheetHeader className="px-6 py-4 bg-slate-900 border-b border-slate-800">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-blue-600/20 p-3 rounded-xl border border-blue-500/30">
+                            <User className="h-6 w-6 text-blue-400" />
+                        </div>
+                        <div>
+                            <SheetTitle className="text-xl text-white">{account.contact.name}</SheetTitle>
+                            <SheetDescription className="text-slate-400">{account.contact.rut}</SheetDescription>
+                        </div>
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-4 text-center">
+                        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                            <p className="text-xs text-slate-500 uppercase">Facturado</p>
+                            <p className="text-lg font-bold">{formatCurrency(account.totalBilled)}</p>
+                        </div>
+                        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                            <p className="text-xs text-slate-500 uppercase">Pagado</p>
+                            <p className="text-lg font-bold text-emerald-400">{formatCurrency(account.totalPaid)}</p>
+                        </div>
+                         <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                            <p className="text-xs text-slate-500 uppercase">Saldo</p>
+                            <p className="text-lg font-bold text-amber-400">{formatCurrency(account.balance)}</p>
+                        </div>
+                    </div>
+                </SheetHeader>
+
+                <div className="flex-1 overflow-y-auto p-6">
+                    <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+                        <FileText className="h-4 w-4" /> Historial de Movimientos (Cartola)
+                    </h4>
+                    
+                    <ScrollArea className="h-[calc(100vh-300px)]">
+                        <div className="rounded-md border border-slate-800 bg-slate-900/50">
+                            <table className="w-full text-sm">
+                                <thead className="text-xs text-slate-500 uppercase">
+                                    <tr className="border-b border-slate-800">
+                                        <th className="px-4 py-2 text-left">Fecha</th>
+                                        <th className="px-4 py-2 text-left">Descripción</th>
+                                        <th className="px-4 py-2 text-right">Cargo</th>
+                                        <th className="px-4 py-2 text-right">Abono</th>
+                                        <th className="px-4 py-2 text-right">Saldo</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                    {detailedMovements.map((mov, i) => (
+                                        <tr key={i} className="hover:bg-slate-800/30">
+                                            <td className="px-4 py-3">{format(parseISO(mov.date), 'dd-MM-yyyy')}</td>
+                                            <td className="px-4 py-3 text-slate-400">{mov.description}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-red-400">{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-emerald-400">{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-white">{formatCurrency(mov.balance)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </ScrollArea>
+                </div>
+            </SheetContent>
+        </Sheet>
+    )
+}
+    
