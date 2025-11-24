@@ -5,31 +5,18 @@ import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Trash2, Plus, Landmark, Warehouse } from 'lucide-react';
+import { Trash2, Plus, Landmark } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BankAccount } from '@/lib/types';
 
 export function MasterDataManager() {
   const {
-    products, addProduct, removeProduct,
-    calibers, addCaliber, removeCaliber,
-    units, addUnit, removeUnit,
-    packagingTypes, addPackagingType, removePackagingType,
-    warehouses, addWarehouse, removeWarehouse,
     bankAccounts, addBankAccount, removeBankAccount
   } = useMasterData();
 
-  // Estados para inputs simples
-  const [newProduct, setNewProduct] = useState('');
-  const [newCaliberName, setNewCaliberName] = useState('');
-  const [newCaliberCode, setNewCaliberCode] = useState('');
-  const [newUnit, setNewUnit] = useState('');
-  const [newPackaging, setNewPackaging] = useState('');
-  const [newWarehouse, setNewWarehouse] = useState('');
-
   // Estado para formulario de Cuenta Bancaria
-  const [newAccount, setNewAccount] = useState<Partial<BankAccount>>({
+  const [newAccount, setNewAccount] = useState<Omit<BankAccount, 'id'>>({
     name: '',
     bankName: '',
     accountType: 'Cuenta Corriente',
@@ -43,19 +30,7 @@ export function MasterDataManager() {
 
   const handleAddAccount = () => {
     if (newAccount.name && newAccount.bankName) {
-        const account: BankAccount = {
-            id: `bank-${Date.now()}`,
-            name: newAccount.name || '',
-            bankName: newAccount.bankName || '',
-            accountType: newAccount.accountType as any,
-            accountNumber: newAccount.accountNumber || '',
-            initialBalance: Number(newAccount.initialBalance) || 0,
-            owner: newAccount.owner || '',
-            ownerRUT: newAccount.ownerRUT || '',
-            ownerEmail: newAccount.ownerEmail || '',
-            status: 'Activa'
-        };
-        addBankAccount(account);
+        addBankAccount(newAccount);
         setNewAccount({
             name: '', bankName: '', accountType: 'Cuenta Corriente', accountNumber: '', 
             initialBalance: 0, owner: '', ownerRUT: '', ownerEmail: '', status: 'Activa'
@@ -65,175 +40,6 @@ export function MasterDataManager() {
 
   return (
     <div className="space-y-8">
-        
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* --- PRODUCTOS --- */}
-        <Card>
-            <CardHeader>
-            <CardTitle>Productos</CardTitle>
-            <CardDescription>Gestiona los productos disponibles.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-            <div className="flex gap-2">
-                <Input 
-                placeholder="Nuevo Producto (ej: PALTAS)" 
-                value={newProduct} 
-                onChange={(e) => setNewProduct(e.target.value.toUpperCase())} 
-                />
-                <Button onClick={() => { if(newProduct) { addProduct(newProduct); setNewProduct(''); } }}>
-                <Plus className="h-4 w-4" />
-                </Button>
-            </div>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {products.map(p => (
-                <div key={p} className="flex justify-between items-center p-2 border rounded bg-muted/20">
-                    <span className="font-medium">{p}</span>
-                    <Button variant="ghost" size="icon" onClick={() => removeProduct(p)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                </div>
-                ))}
-            </div>
-            </CardContent>
-        </Card>
-
-        {/* --- CALIBRES --- */}
-        <Card>
-            <CardHeader>
-            <CardTitle>Calibres</CardTitle>
-            <CardDescription>Define nombres y códigos para los calibres.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-            <div className="flex gap-2">
-                <Input 
-                placeholder="Nombre (ej: PRIMERA)" 
-                value={newCaliberName} 
-                onChange={(e) => setNewCaliberName(e.target.value.toUpperCase())} 
-                className="flex-1"
-                />
-                <Input 
-                placeholder="Cód. (ej: 50)" 
-                value={newCaliberCode} 
-                onChange={(e) => setNewCaliberCode(e.target.value)} 
-                className="w-24"
-                />
-                <Button onClick={() => { 
-                if(newCaliberName && newCaliberCode) { 
-                    addCaliber({name: newCaliberName, code: newCaliberCode}); 
-                    setNewCaliberName(''); setNewCaliberCode(''); 
-                } 
-                }}>
-                <Plus className="h-4 w-4" />
-                </Button>
-            </div>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {calibers.map(c => (
-                <div key={c.name} className="flex justify-between items-center p-2 border rounded bg-muted/20">
-                    <span>{c.name} <span className="text-xs text-muted-foreground">({c.code})</span></span>
-                    <Button variant="ghost" size="icon" onClick={() => removeCaliber(c.name)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                </div>
-                ))}
-            </div>
-            </CardContent>
-        </Card>
-
-        {/* --- UNIDADES --- */}
-        <Card>
-            <CardHeader>
-            <CardTitle>Unidades</CardTitle>
-            <CardDescription>Unidades de medida (Kilos, Cajas, etc.)</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-            <div className="flex gap-2">
-                <Input 
-                placeholder="Nueva Unidad" 
-                value={newUnit} 
-                onChange={(e) => setNewUnit(e.target.value)} 
-                />
-                <Button onClick={() => { if(newUnit) { addUnit(newUnit); setNewUnit(''); } }}>
-                <Plus className="h-4 w-4" />
-                </Button>
-            </div>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {units.map(u => (
-                <div key={u} className="flex justify-between items-center p-2 border rounded bg-muted/20">
-                    <span>{u}</span>
-                    <Button variant="ghost" size="icon" onClick={() => removeUnit(u)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                </div>
-                ))}
-            </div>
-            </CardContent>
-        </Card>
-
-        {/* --- ENVASES --- */}
-        <Card>
-            <CardHeader>
-            <CardTitle>Tipos de Envase</CardTitle>
-            <CardDescription>Bins, Cajas plásticas, etc.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-            <div className="flex gap-2">
-                <Input 
-                placeholder="Nuevo Envase" 
-                value={newPackaging} 
-                onChange={(e) => setNewPackaging(e.target.value.toUpperCase())} 
-                />
-                <Button onClick={() => { if(newPackaging) { addPackagingType(newPackaging); setNewPackaging(''); } }}>
-                <Plus className="h-4 w-4" />
-                </Button>
-            </div>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {packagingTypes.map(p => (
-                <div key={p} className="flex justify-between items-center p-2 border rounded bg-muted/20">
-                    <span className="text-sm">{p}</span>
-                    <Button variant="ghost" size="icon" onClick={() => removePackagingType(p)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                </div>
-                ))}
-            </div>
-            </CardContent>
-        </Card>
-      </div>
-
-      {/* --- SECCIÓN DE INFRAESTRUCTURA Y FINANZAS --- */}
-      <div className="grid gap-6 md:grid-cols-2">
-        
-        {/* --- BODEGAS --- */}
-        <Card className="md:col-span-1">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Warehouse className="h-5 w-5" /> Bodegas</CardTitle>
-                <CardDescription>Lugares de almacenamiento para control de inventario.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                    <Input 
-                        placeholder="Nombre Bodega (ej: Patio 1)" 
-                        value={newWarehouse} 
-                        onChange={(e) => setNewWarehouse(e.target.value)} 
-                    />
-                    <Button onClick={() => { if(newWarehouse) { addWarehouse(newWarehouse); setNewWarehouse(''); } }}>
-                        <Plus className="h-4 w-4" />
-                    </Button>
-                </div>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                    {warehouses.map(w => (
-                    <div key={w} className="flex justify-between items-center p-2 border rounded bg-muted/20">
-                        <span className="font-medium">{w}</span>
-                        <Button variant="ghost" size="icon" onClick={() => removeWarehouse(w)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                    </div>
-                    ))}
-                </div>
-            </CardContent>
-        </Card>
-
-        {/* --- CUENTAS BANCARIAS --- */}
         <Card className="md:col-span-2">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Landmark className="h-5 w-5" /> Cuentas Bancarias</CardTitle>
@@ -325,8 +131,8 @@ export function MasterDataManager() {
                 </div>
             </CardContent>
         </Card>
-
-      </div>
     </div>
   );
 }
+
+    

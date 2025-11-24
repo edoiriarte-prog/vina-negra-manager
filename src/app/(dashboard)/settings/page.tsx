@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, Package, Scale, Warehouse, Tags } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { MasterDataManager } from "@/components/settings/master-data-manager";
+import { ProductCaliberManager } from "@/components/settings/product-caliber-manager";
 
 export default function SettingsPage() {
   const {
@@ -42,7 +44,7 @@ export default function SettingsPage() {
       {/* HEADER */}
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-white">Configuración Maestra</h2>
-        <p className="text-slate-400 mt-1">Administra los catálogos globales del sistema.</p>
+        <p className="text-slate-400 mt-1">Administra los catálogos globales y las asociaciones del sistema.</p>
       </div>
 
       <Tabs defaultValue="products" className="space-y-6">
@@ -52,8 +54,16 @@ export default function SettingsPage() {
             <TabsTrigger value="warehouses" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-slate-400 hover:text-slate-200">Bodegas</TabsTrigger>
             <TabsTrigger value="packaging" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-slate-400 hover:text-slate-200">Envases</TabsTrigger>
         </TabsList>
-
-        {/* 1. PRODUCTOS */}
+        
+        <TabsContent value="associations">
+            <ProductCaliberManager />
+        </TabsContent>
+        
+        <TabsContent value="accounts">
+             <MasterDataManager />
+        </TabsContent>
+        
+        {/* OTHER TABS */}
         <TabsContent value="products">
             <Card className={cardClass}>
                 <CardHeader>
@@ -67,11 +77,10 @@ export default function SettingsPage() {
                     </div>
                     <Separator className="bg-slate-800" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {/* TIPADO AGREGADO AQUÍ: (item: string) */}
-                        {products.map((item: string) => (
-                            <div key={item} className={listClass}>
-                                <span className="font-medium text-slate-200">{item}</span>
-                                <Button variant="ghost" size="sm" onClick={() => removeProduct(item)} className="text-slate-500 hover:text-red-400"><Trash2 className="h-4 w-4"/></Button>
+                        {products.map((item) => (
+                            <div key={item.id} className={listClass}>
+                                <span className="font-medium text-slate-200">{item.name}</span>
+                                <Button variant="ghost" size="sm" onClick={() => removeProduct(item.id)} className="text-slate-500 hover:text-red-400"><Trash2 className="h-4 w-4"/></Button>
                             </div>
                         ))}
                     </div>
@@ -79,7 +88,6 @@ export default function SettingsPage() {
             </Card>
         </TabsContent>
 
-        {/* 2. CALIBRES */}
         <TabsContent value="calibers">
             <Card className={cardClass}>
                 <CardHeader>
@@ -93,14 +101,13 @@ export default function SettingsPage() {
                     </div>
                     <Separator className="bg-slate-800" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {/* TIPADO AGREGADO AQUÍ: (item: {name:string, code:string}) */}
-                        {calibers.map((item: { name: string; code: string }) => (
-                            <div key={item.name} className={listClass}>
+                        {calibers.map((item) => (
+                            <div key={item.id} className={listClass}>
                                 <div className="flex items-center gap-2">
                                     <span className="font-medium text-slate-200">{item.name}</span>
                                     <Badge variant="outline" className="text-[10px] border-slate-700 text-slate-500">{item.code}</Badge>
                                 </div>
-                                <Button variant="ghost" size="sm" onClick={() => removeCaliber(item.name)} className="text-slate-500 hover:text-red-400"><Trash2 className="h-4 w-4"/></Button>
+                                <Button variant="ghost" size="sm" onClick={() => removeCaliber(item.id)} className="text-slate-500 hover:text-red-400"><Trash2 className="h-4 w-4"/></Button>
                             </div>
                         ))}
                     </div>
@@ -108,7 +115,6 @@ export default function SettingsPage() {
             </Card>
         </TabsContent>
 
-        {/* 3. BODEGAS */}
         <TabsContent value="warehouses">
             <Card className={cardClass}>
                 <CardHeader>
@@ -133,7 +139,6 @@ export default function SettingsPage() {
             </Card>
         </TabsContent>
 
-        {/* 4. ENVASES */}
         <TabsContent value="packaging">
             <Card className={cardClass}>
                 <CardHeader>
@@ -159,8 +164,13 @@ export default function SettingsPage() {
         </TabsContent>
 
       </Tabs>
+
+      <div className="grid grid-cols-1 gap-8">
+        <ProductCaliberManager />
+        <MasterDataManager />
+      </div>
     </div>
   );
 }
-    
+
     

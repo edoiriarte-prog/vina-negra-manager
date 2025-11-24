@@ -282,6 +282,135 @@
       "required": [
         "name"
       ]
+    },
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a type of product.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the product."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "Caliber": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Caliber",
+      "type": "object",
+      "description": "Represents a product caliber.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the caliber."
+        },
+        "code": {
+          "type": "string",
+          "description": "Code for the caliber."
+        }
+      },
+      "required": [
+        "name",
+        "code"
+      ]
+    },
+    "Unit": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Unit",
+      "type": "object",
+      "description": "Represents a unit of measure.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the unit."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "ProductCaliberAssociation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ProductCaliberAssociation",
+      "type": "object",
+      "description": "Associates a product with its available calibers.",
+      "properties": {
+        "productId": {
+          "type": "string",
+          "description": "ID of the product."
+        },
+        "caliberIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of caliber IDs associated with the product."
+        }
+      },
+      "required": [
+        "productId",
+        "caliberIds"
+      ]
+    },
+    "BankAccount": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BankAccount",
+      "type": "object",
+      "description": "Represents a bank account.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the bank account."
+        },
+        "name": {
+          "type": "string",
+          "description": "Alias or name for the account."
+        },
+        "bankName": {
+          "type": "string",
+          "description": "Name of the bank."
+        },
+        "accountType": {
+          "type": "string",
+          "description": "Type of account."
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Account number."
+        },
+        "initialBalance": {
+          "type": "number",
+          "description": "Initial balance of the account."
+        },
+        "owner": {
+          "type": "string",
+          "description": "Owner of the account."
+        },
+        "ownerRUT": {
+          "type": "string",
+          "description": "RUT of the account owner."
+        },
+        "ownerEmail": {
+          "type": "string",
+          "description": "Email of the account owner."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the account."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "bankName",
+        "accountType",
+        "accountNumber",
+        "status"
+      ]
     }
   },
   "auth": {
@@ -299,13 +428,7 @@
           "schema": {
             "$ref": "#/backend/entities/Contact"
           },
-          "description": "Stores contact information. Each contact is independently accessible, and authorization depends on the user's access rights.",
-          "params": [
-            {
-              "name": "contactId",
-              "description": "Unique identifier for the contact."
-            }
-          ]
+          "description": "Stores contact information."
         }
       },
       {
@@ -315,13 +438,7 @@
           "schema": {
             "$ref": "#/backend/entities/PurchaseOrder"
           },
-          "description": "Stores purchase order data. Includes a 'supplierId' field referencing the Contact, enabling efficient querying and joins.",
-          "params": [
-            {
-              "name": "purchaseOrderId",
-              "description": "Unique identifier for the purchase order."
-            }
-          ]
+          "description": "Stores purchase order data."
         }
       },
       {
@@ -331,13 +448,7 @@
           "schema": {
             "$ref": "#/backend/entities/SalesOrder"
           },
-          "description": "Stores sales order data. Includes a 'clientId' field referencing the Contact for easy access and management.",
-          "params": [
-            {
-              "name": "salesOrderId",
-              "description": "Unique identifier for the sales order."
-            }
-          ]
+          "description": "Stores sales order data."
         }
       },
       {
@@ -347,13 +458,7 @@
           "schema": {
             "$ref": "#/backend/entities/ServiceOrder"
           },
-          "description": "Stores service order data, linked to a PurchaseOrder using the 'purchaseOrderId' field.",
-          "params": [
-            {
-              "name": "serviceOrderId",
-              "description": "Unique identifier for the service order."
-            }
-          ]
+          "description": "Stores service order data."
         }
       },
       {
@@ -363,13 +468,7 @@
           "schema": {
             "$ref": "#/backend/entities/FinancialMovement"
           },
-          "description": "Records financial transactions. Includes references to SalesOrder, PurchaseOrder, and ServiceOrder as applicable.",
-          "params": [
-            {
-              "name": "financialMovementId",
-              "description": "Unique identifier for the financial movement."
-            }
-          ]
+          "description": "Records financial transactions."
         }
       },
       {
@@ -379,13 +478,7 @@
           "schema": {
             "$ref": "#/backend/entities/Inventory"
           },
-          "description": "Maintains inventory levels. Tracks product names, caliber, and quantities.",
-          "params": [
-            {
-              "name": "inventoryId",
-              "description": "Unique identifier for the inventory item."
-            }
-          ]
+          "description": "Maintains inventory levels."
         }
       },
       {
@@ -395,13 +488,7 @@
           "schema": {
             "$ref": "#/backend/entities/Warehouse"
           },
-          "description": "Stores warehouse information.",
-          "params": [
-            {
-              "name": "warehouseId",
-              "description": "Unique identifier for the warehouse."
-            }
-          ]
+          "description": "Stores warehouse information."
         }
       },
       {
@@ -411,13 +498,57 @@
           "schema": {
             "$ref": "#/backend/entities/PackagingType"
           },
-          "description": "Stores packaging types.",
-          "params": [
-            {
-              "name": "packagingTypeId",
-              "description": "Unique identifier for the packaging type."
-            }
-          ]
+          "description": "Stores packaging types."
+        }
+      },
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product types."
+        }
+      },
+      {
+        "path": "/calibers/{caliberId}",
+        "definition": {
+          "entityName": "Caliber",
+          "schema": {
+            "$ref": "#/backend/entities/Caliber"
+          },
+          "description": "Stores product calibers."
+        }
+      },
+      {
+        "path": "/units/{unitId}",
+        "definition": {
+          "entityName": "Unit",
+          "schema": {
+            "$ref": "#/backend/entities/Unit"
+          },
+          "description": "Stores units of measure."
+        }
+      },
+      {
+        "path": "/productCaliberAssociations/{assocId}",
+        "definition": {
+          "entityName": "ProductCaliberAssociation",
+          "schema": {
+            "$ref": "#/backend/entities/ProductCaliberAssociation"
+          },
+          "description": "Stores associations between products and calibers."
+        }
+      },
+      {
+        "path": "/bankAccounts/{accountId}",
+        "definition": {
+          "entityName": "BankAccount",
+          "schema": {
+            "$ref": "#/backend/entities/BankAccount"
+          },
+          "description": "Stores bank account information."
         }
       }
     ],
