@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -46,31 +47,31 @@ export default function AiSummary({ financialData }: { financialData: string }) 
          <p className="text-sm text-muted-foreground">
             Utilice la inteligencia artificial para generar un resumen ejecutivo del estado financiero actual de la empresa.
         </p>
-        <Button onClick={handleGenerateSummary} disabled={isLoading}>
+        <Button onClick={handleGenerateSummary} disabled={isLoading} variant="outline" className="w-full border-blue-500/30 bg-blue-950/30 text-blue-300 hover:bg-blue-950/80 hover:text-blue-200">
           {isLoading ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Sparkles className="mr-2 h-4 w-4" />
           )}
-          Generar Resumen
+          Generar Resumen con IA
         </Button>
       </div>
 
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-slate-900 border-slate-800 text-slate-100">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-headline flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
+            <AlertDialogTitle className="flex items-center gap-2 text-white">
+                <Sparkles className="h-5 w-5 text-blue-500" />
                 Resumen Financiero Ejecutivo
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
                 {isLoading ? (
                   <div className="flex items-center justify-center p-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                   </div>
                 ) : (
-                  <div className="mt-4 text-foreground whitespace-pre-wrap font-body leading-relaxed">
+                  <div className="mt-4 text-slate-300 whitespace-pre-wrap leading-relaxed border-l-2 border-blue-500 pl-4">
                       {summary}
                   </div>
                 )}

@@ -30,6 +30,24 @@ const formatCurrency = (value: number) =>
 
 const formatKilos = (value: number) =>
   `${new Intl.NumberFormat('es-CL').format(value)} kg`;
+  
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="p-2 bg-slate-900 border border-slate-800 rounded-lg shadow-lg text-xs">
+        <p className="label font-bold text-slate-200">{`${label}`}</p>
+        {payload.map((pld: any) => (
+             <p key={pld.dataKey} style={{ color: pld.fill }}>
+                {`${pld.name}: ${pld.value.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`}
+            </p>
+        ))}
+      </div>
+    );
+  }
+
+  return null;
+};
+
 
 // Weekly Purchases Chart
 export function WeeklyPurchasesChart({ data }: { data: PurchaseOrder[] }) {
@@ -49,14 +67,12 @@ export function WeeklyPurchasesChart({ data }: { data: PurchaseOrder[] }) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={chartData}>
-        <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
-        <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
         <Tooltip
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            borderColor: 'hsl(var(--border))',
-          }}
-          formatter={(value: number) => formatCurrency(value)}
+          content={<CustomTooltip />}
+          cursor={{fill: 'hsl(var(--accent))'}}
         />
         <Legend wrapperStyle={{fontSize: "12px"}}/>
         <Bar dataKey="Compras" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
@@ -68,7 +84,7 @@ export function WeeklyPurchasesChart({ data }: { data: PurchaseOrder[] }) {
 // Weekly Sales Chart
 export function WeeklySalesChart({ data }: { data: SalesOrder[] }) {
   const weeklyData = data
-    .filter((order) => order.status === 'completed')
+    .filter((order) => order.status === 'completed' || order.status === 'dispatched')
     .reduce((acc, order) => {
       const week = getWeek(parseISO(order.date), { locale: es });
       acc[week] = (acc[week] || 0) + order.totalAmount;
@@ -83,14 +99,12 @@ export function WeeklySalesChart({ data }: { data: SalesOrder[] }) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={chartData}>
-        <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
-        <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
         <Tooltip
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            borderColor: 'hsl(var(--border))',
-          }}
-          formatter={(value: number) => formatCurrency(value)}
+          content={<CustomTooltip />}
+          cursor={{fill: 'hsl(var(--accent))'}}
         />
         <Legend wrapperStyle={{fontSize: "12px"}}/>
         <Bar dataKey="Ventas" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
@@ -104,7 +118,6 @@ export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
     const { calibers: masterCalibers } = useMasterData();
     const allCalibersInOrders = Array.from(new Set(data.flatMap(order => order.items.map(item => item.caliber))));
     
-    // Sort the discovered calibers according to the master data order
     const calibers = masterCalibers
       .filter(mc => allCalibersInOrders.includes(mc.name))
       .map(mc => mc.name);
@@ -112,7 +125,7 @@ export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
     const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
     const chartData = data
-        .filter(order => order.status === 'completed')
+        .filter(order => order.status === 'completed' || order.status === 'dispatched')
         .map(order => {
             const orderData: { [key: string]: string | number } = { name: order.id };
             calibers.forEach(caliber => {
@@ -125,21 +138,18 @@ export function SalesByOrderChart({ data }: { data: SalesOrder[] }) {
             });
             return orderData;
         })
-        .filter(d => Object.keys(d).length > 1) // Only include orders with items
+        .filter(d => Object.keys(d).length > 1) 
         .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
-        <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))"/>
+        <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
         <Tooltip
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            borderColor: 'hsl(var(--border))',
-          }}
-          formatter={(value: number, name: string) => [`${formatKilos(value)}`, name]}
+          content={<CustomTooltip />}
+          cursor={{fill: 'hsl(var(--accent))'}}
         />
         <Legend />
         {calibers.map((caliber, index) => (
@@ -175,14 +185,12 @@ export function IncomeVsExpenseChart({ data }: { data: FinancialMovement[] }) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={chartData}>
-        <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
-        <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
         <Tooltip
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            borderColor: 'hsl(var(--border))',
-          }}
-          formatter={(value: number) => formatCurrency(value)}
+          content={<CustomTooltip />}
+          cursor={{fill: 'hsl(var(--accent))'}}
         />
         <Legend wrapperStyle={{fontSize: "12px"}}/>
         <Bar dataKey="Ingresos" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
@@ -205,15 +213,12 @@ export function CaliberDistributionChart({ data }: { data: InventoryItem[] }) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={chartData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" stroke="hsl(var(--foreground))" fontSize={10} angle={-45} textAnchor="end" height={80} interval={0} />
-        <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))"/>
+        <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} angle={-45} textAnchor="end" height={80} interval={0} />
+        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
         <Tooltip
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            borderColor: 'hsl(var(--border))',
-          }}
-          formatter={(value: number) => formatKilos(value)}
+          content={<CustomTooltip />}
+          cursor={{fill: 'hsl(var(--accent))'}}
         />
         <Bar dataKey="value" name="Stock" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
       </BarChart>
@@ -227,27 +232,24 @@ export function PurchasesBySupplierChart({ data, suppliers }: { data: PurchaseOr
     .filter((order) => order.status === 'completed')
     .reduce((acc, order) => {
       const supplierName = suppliers.find(s => s.id === order.supplierId)?.name || 'Desconocido';
-      acc[supplierName] = (acc[supplierName] || 0) + order.totalKilos;
+      acc[supplierName] = (acc[supplierName] || 0) + (order.totalKilos || 0);
       return acc;
     }, {} as { [name: string]: number });
 
   const chartData = Object.entries(supplierData).map(([name, total]) => ({
     name,
     Kilos: total,
-  })).sort((a, b) => b.Kilos - a.Kilos);
+  })).sort((a, b) => b.Kilos - a.Kilos).slice(0, 5); // Top 5
 
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={chartData} layout="vertical">
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
-        <YAxis type="category" dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} width={120} />
+      <BarChart data={chartData} layout="vertical" margin={{ left: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${Number(value) / 1000}k`} />
+        <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} width={100} interval={0} />
         <Tooltip
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            borderColor: 'hsl(var(--border))',
-          }}
-          formatter={(value: number) => formatKilos(value)}
+          content={<CustomTooltip />}
+          cursor={{fill: 'hsl(var(--accent))'}}
         />
         <Bar dataKey="Kilos" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
       </BarChart>
@@ -274,15 +276,12 @@ export function PurchasesByProductCaliberChart({ data }: { data: PurchaseOrder[]
   return (
     <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 30)}>
       <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
-        <YAxis type="category" dataKey="name" stroke="hsl(var(--foreground))" fontSize={12} />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))"/>
+        <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `$${Number(value) / 1000000}M`} />
+        <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} interval={0}/>
         <Tooltip
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            borderColor: 'hsl(var(--border))',
-          }}
-          formatter={(value: number) => formatCurrency(value)}
+          content={<CustomTooltip />}
+          cursor={{fill: 'hsl(var(--accent))'}}
         />
         <Bar dataKey="Monto" fill="hsl(var(--chart-5))" radius={[0, 4, 4, 0]} />
       </BarChart>
