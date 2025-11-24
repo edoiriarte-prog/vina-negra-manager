@@ -202,7 +202,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                 <Select value={selectedProduct} onValueChange={setSelectedProduct}>
                     <SelectTrigger className="h-10 border-slate-700 bg-slate-950 text-slate-100 focus:ring-blue-500/20"><SelectValue placeholder="Seleccione producto..." /></SelectTrigger>
                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                        {products.map(p => <SelectItem key={p} value={p} className="focus:bg-slate-800 focus:text-white">{p}</SelectItem>)}
+                        {products.map(p => <SelectItem key={p.id} value={p.name} className="focus:bg-slate-800 focus:text-white">{p.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>
@@ -232,7 +232,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                                     <div className="col-span-2">
                                         <Select value={row.packagingType} onValueChange={(v) => handleRowChange(idx, 'packagingType', v)}>
                                             <SelectTrigger className="h-8 text-xs bg-slate-950 border-slate-800 text-slate-400"><SelectValue /></SelectTrigger>
-                                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes.map(pt => <SelectItem key={pt} value={pt}>{pt}</SelectItem>)}</SelectContent>
+                                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes.map(pt => <SelectItem key={pt.id} value={pt.name}>{pt.name}</SelectItem>)}</SelectContent>
                                         </Select>
                                     </div>
 

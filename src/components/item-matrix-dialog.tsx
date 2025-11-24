@@ -165,7 +165,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                 </SelectTrigger>
                 <SelectContent>
                 {products.map(product => (
-                    <SelectItem key={product} value={product}>{product}</SelectItem>
+                    <SelectItem key={product.id} value={product.name}>{product.name}</SelectItem>
                 ))}
                 </SelectContent>
             </Select>
@@ -212,7 +212,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                       >
                         <SelectTrigger><SelectValue/></SelectTrigger>
                         <SelectContent>
-                          {units.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                          {units.map(u => <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -231,7 +231,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                         >
                             <SelectTrigger><SelectValue placeholder="Envase"/></SelectTrigger>
                             <SelectContent>
-                             {packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                             {packagingTypes.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </TableCell>
