@@ -77,7 +77,7 @@ const getInitialFormData = (order: SalesOrder | null, type: 'sale' | 'dispatch')
 };
 
 export function NewSalesOrderSheet({ 
-    isOpen, onOpenChange, onSave, order, clients, carriers, inventory, salesOrders, sheetType, purchaseOrders, inventoryAdjustments, contacts
+    isOpen, onOpenChange, onSave, order, clients, carriers, inventory, salesOrders, sheetType, purchaseOrders, inventoryAdjustments, contacts 
 }: NewSalesOrderSheetProps) {
   
   const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order, sheetType));
@@ -246,7 +246,7 @@ export function NewSalesOrderSheet({
         carrierId: formData.carrierId || null,
         driverName: formData.driverName || null,
         licensePlate: formData.licensePlate || null,
-        orderType: formData.orderType || 'sales',
+        orderType: formData.orderType,
         advanceDueDate: formData.advanceDueDate || null,
         balanceDueDate: formData.balanceDueDate || null,
         notes: formData.notes || null,
@@ -636,4 +636,3 @@ export function NewSalesOrderSheet({
   );
 }
 
-    
