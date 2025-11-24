@@ -1,5 +1,5 @@
 
-import { firestore as db } from "@/firebase";
+import { firestore } from "@/firebase";
 import { PurchaseOrder, SalesOrder } from "@/lib/types";
 import { collection, doc, runTransaction, query, where, getDocs } from "firebase/firestore";
 
@@ -30,11 +30,11 @@ export async function processOrderStockMovement(
   // Si no hay cambio de stock (ej: de pending a cancelled), salimos.
   if (multiplier === 0) return;
 
-  const inventoryRef = collection(db, 'inventory');
+  const inventoryRef = collection(firestore, 'inventory');
 
   // Ejecutamos una transacción para asegurar que los datos no se corrompan si hay concurrencia
   try {
-    await runTransaction(db, async (transaction) => {
+    await runTransaction(firestore, async (transaction) => {
       for (const item of order.items) {
         // Generamos un ID Determinístico para encontrar el ítem fácil: BODEGA_PRODUCTO_CALIBRE
         // Esto evita duplicados.

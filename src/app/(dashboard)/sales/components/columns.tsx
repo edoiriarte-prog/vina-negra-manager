@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -23,13 +24,14 @@ import {
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { doc, updateDoc } from "firebase/firestore";
-import { firestore as db } from "@/firebase"; 
+import { useFirebase } from "@/firebase"; 
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { processOrderStockMovement } from "@/lib/inventory-actions"; 
 
 // --- COMPONENTE DE CELDA DE ESTADO (VENTAS) ---
 const StatusCell = ({ order }: { order: SalesOrder }) => {
+  const { firestore } = useFirebase();
   const [status, setStatus] = useState(order.status);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -59,7 +61,7 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
 
     try {
       // 1. Referencia a salesOrders
-      const orderRef = doc(db, "salesOrders", order.id);
+      const orderRef = doc(firestore, "salesOrders", order.id);
       const updateData: any = { status: newStatus };
 
       // TRAZABILIDAD: Fecha de Despacho

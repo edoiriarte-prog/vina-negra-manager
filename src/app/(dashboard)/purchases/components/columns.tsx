@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -26,10 +27,11 @@ import { doc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { processOrderStockMovement } from "@/lib/inventory-actions"; 
-import { firestore as db } from "@/firebase"; 
+import { useFirebase } from "@/firebase"; 
 
 // --- COMPONENTE DE CELDA DE ESTADO (INTERACTIVO) ---
 const StatusCell = ({ order }: { order: PurchaseOrder }) => {
+  const { firestore } = useFirebase();
   const [status, setStatus] = useState(order.status);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -68,7 +70,7 @@ const StatusCell = ({ order }: { order: PurchaseOrder }) => {
     setIsLoading(true);
 
     try {
-      const orderRef = doc(db, "purchaseOrders", order.id);
+      const orderRef = doc(firestore, "purchaseOrders", order.id);
       const updateData: any = { status: newStatus };
 
       // Si pasa a Recepcionada, guardamos la fecha real de ingreso

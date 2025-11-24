@@ -1,3 +1,4 @@
+
 "use client";
 
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
@@ -27,11 +28,13 @@ import { useCollection } from './firestore/use-collection';
 import { useDoc } from './firestore/use-doc';
 
 // --- INICIALIZACIÓN ---
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+export const firestore = getFirestore(app);
+export const auth = getAuth(app);
+
+
 function initializeFirebase() {
-    const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-    return { firebaseApp: app, firestore: db, auth };
+    return { firebaseApp: app, firestore, auth };
 }
 
 
