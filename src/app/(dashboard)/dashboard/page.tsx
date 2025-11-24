@@ -22,6 +22,8 @@ import {
     TrendingUp, 
     Warehouse,
 } from "lucide-react";
+import { getInventory } from '@/lib/inventory';
+
 
 // --- HELPERS ---
 const formatCurrency = (value: number) =>
@@ -37,7 +39,6 @@ const formatKilos = (value: number) =>
 export default function DashboardPage() {
   // 1. Datos Maestros (Inventario, Contactos)
   const { 
-      inventory,
       contacts,
       isLoading: loadingMaster 
   } = useMasterData();
@@ -47,8 +48,11 @@ export default function DashboardPage() {
       purchaseOrders,
       salesOrders,
       financialMovements,
+      inventoryAdjustments,
       isLoading: loadingOps
   } = useOperations();
+  
+  const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, inventoryAdjustments), [purchaseOrders, salesOrders, inventoryAdjustments]);
 
   const isLoading = loadingMaster || loadingOps;
 

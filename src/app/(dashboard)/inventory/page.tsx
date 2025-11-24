@@ -2,15 +2,13 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-// Usamos los hooks de la librería principal de tu proyecto
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase'; 
-import { collection } from 'firebase/firestore';
 import { PurchaseOrder, SalesOrder, InventoryAdjustment, Contact } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterData } from '@/hooks/use-master-data';
+import { useOperations } from '@/hooks/use-operations';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -19,8 +17,8 @@ import { CalendarIcon, Eye, Download, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO, startOfMonth, endOfMonth, isAfter, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { InventoryHistoryDialog } from './components/inventory-history-dialog'; // Asume que este componente maneja el modo oscuro internamente
-import { InventoryReportPreview } from './components/inventory-report-preview'; // Asume que este componente maneja el modo oscuro internamente
+import { InventoryHistoryDialog } from './components/inventory-history-dialog';
+import { InventoryReportPreview } from './components/inventory-report-preview';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { useReactToPrint } from 'react-to-print';
@@ -76,23 +74,12 @@ const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(
 
 // Helpers para verificar estados válidos
 const isValidPurchase = (status: string) => status === 'completed' || status === 'received';
-const isValidSale = (status: string) => status === 'dispatched' || status === 'invoiced' || status === 'pending';
+const isValidSale = (status: string) => status === 'dispatched' || so.status === 'invoiced' || so.status === 'completed';
 
 export default function InventoryPage() {
-    const { firestore } = useFirebase();
-    const purchaseOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
-    const salesOrdersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
-    const inventoryAdjustmentsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'inventoryAdjustments') : null, [firestore]);
-    const contactsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
-
-    const { data: purchaseOrders, isLoading: isLoadingPO } = useCollection<PurchaseOrder>(purchaseOrdersQuery);
-    const { data: salesOrders, isLoading: isLoadingSO } = useCollection<SalesOrder>(salesOrdersQuery);
-    const { data: inventoryAdjustments, isLoading: isLoadingIA } = useCollection<InventoryAdjustment>(inventoryAdjustmentsQuery);
-    const { data: contacts, isLoading: isLoadingContacts } = useCollection<Contact>(contactsQuery);
+    const { contacts, calibers: masterCalibers, warehouses, products: masterProducts, isLoading: isLoadingMaster } = useMasterData();
+    const { purchaseOrders, salesOrders, inventoryAdjustments, isLoading: isLoadingOps } = useOperations();
     
-    // Obtenemos los datos maestros (productos, calibres, bodegas)
-    const { calibers: masterCalibers, warehouses, products: masterProducts } = useMasterData();
-
     const [isClient, setIsClient] = useState(false);
     const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
         from: startOfMonth(new Date()),
@@ -109,7 +96,6 @@ export default function InventoryPage() {
     const { toast } = useToast();
     const printRef = useRef<HTMLDivElement>(null);
     
-    // Esto es necesario si el hook useReactToPrint no está bien tipado o si estamos en un contexto no React nativo
     const handlePrint = useReactToPrint({
         content: () => printRef.current,
     } as any);
@@ -118,7 +104,7 @@ export default function InventoryPage() {
         setIsClient(true);
     }, []);
 
-    const isLoading = isLoadingPO || isLoadingSO || isLoadingIA || isLoadingContacts;
+    const isLoading = isLoadingMaster || isLoadingOps;
 
     useEffect(() => {
       if (isClient && !isLoading && masterProducts.length > 0 && purchaseOrders && salesOrders && inventoryAdjustments) {
@@ -987,10 +973,10 @@ export default function InventoryPage() {
                     item={viewingHistory}
                     isOpen={!!viewingHistory}
                     onOpenChange={() => setViewingHistory(null)}
-                    purchaseOrders={purchaseOrders || []}
-                    salesOrders={salesOrders || []}
-                    inventoryAdjustments={inventoryAdjustments || []}
-                    contacts={contacts || []}
+                    purchaseOrders={purchaseOrders}
+                    salesOrders={salesOrders}
+                    inventoryAdjustments={inventoryAdjustments}
+                    contacts={contacts}
                 />
             )}
             {isPreviewOpen && (

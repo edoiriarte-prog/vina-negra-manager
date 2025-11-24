@@ -18,7 +18,7 @@ export default function PurchasesPage() {
   // Hooks de datos
   const { orders, loading, createOrder, updateOrder, deleteOrder } = usePurchases();
   
-  const { contacts, inventory } = useMasterData() as any; 
+  const { contacts } = useMasterData();
   
   const suppliers = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('supplier')) : [];
 

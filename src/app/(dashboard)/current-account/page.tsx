@@ -3,6 +3,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useMasterData } from '@/hooks/use-master-data';
+import { useOperations } from '@/hooks/use-operations';
 import { Contact, SalesOrder, PurchaseOrder, FinancialMovement, ServiceOrder } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -65,7 +66,10 @@ type DetailedMovement = {
 };
 
 export default function CurrentAccountPage() {
-  const { contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements, isLoading } = useMasterData();
+  const { contacts, isLoading: l1 } = useMasterData();
+  const { salesOrders, purchaseOrders, serviceOrders, financialMovements, isLoading: l2 } = useOperations();
+
+  const isLoading = l1 || l2;
 
   // Estados de UI
   const [searchTerm, setSearchTerm] = useState("");
@@ -73,7 +77,7 @@ export default function CurrentAccountPage() {
 
   // 2. PROCESAMIENTO INTELIGENTE DE DATOS
   const { clientsData, suppliersData } = useMemo(() => {
-    if (!contacts || !salesOrders || !purchaseOrders || !serviceOrders || !financialMovements) {
+    if (isLoading || !contacts || !salesOrders || !purchaseOrders || !serviceOrders || !financialMovements) {
         return { clientsData: [], suppliersData: [] };
     }
 
@@ -118,7 +122,7 @@ export default function CurrentAccountPage() {
 
     return { clientsData: clients, suppliersData: suppliers };
 
-  }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements]);
+  }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements, isLoading]);
 
   // Filtrado por búsqueda
   const filterAccounts = (list: AccountSummary[]) => {
@@ -376,5 +380,3 @@ function AccountDetailSheet({ account, isOpen, onOpenChange }: { account: Accoun
         </Sheet>
     )
 }
-
-    

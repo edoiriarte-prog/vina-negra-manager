@@ -2,12 +2,11 @@
 
 "use client";
 
-import { useState, useEffect, createContext, useContext, ReactNode, useMemo } from 'react';
-import { useLocalStorage } from './use-local-storage';
+import { useState, useMemo, createContext, useContext, ReactNode } from 'react';
 import { BankAccount, Contact, InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment } from '@/lib/types';
 import { useCollection, useFirebase, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
-import { getInventory } from '@/lib/inventory'; // Make sure to have this helper
+import { getInventory } from '@/lib/inventory'; 
 
 // --- TYPES ---
 export type ProductCaliberAssociation = {
@@ -38,10 +37,6 @@ type MasterDataContextType = {
     updateBankAccount: (account: BankAccount) => void;
     removeBankAccount: (id: string) => void;
     contacts: Contact[];
-    inventory: InventoryItem[];
-    purchaseOrders: PurchaseOrder[];
-    salesOrders: SalesOrder[];
-    inventoryAdjustments: InventoryAdjustment[];
     internalConcepts: { name: string }[];
     costCenters: { name: string }[];
     isLoading: boolean;
@@ -86,26 +81,9 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     const contactsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
     const { data: contactsData, isLoading: l8 } = useCollection<Contact>(contactsCollection);
     const contacts = contactsData || [];
+
+    const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8;
     
-    const purchaseOrdersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'purchaseOrders') : null, [firestore]);
-    const { data: purchaseOrdersData, isLoading: l10 } = useCollection<PurchaseOrder>(purchaseOrdersCollection);
-    const purchaseOrders = purchaseOrdersData || [];
-    
-    const salesOrdersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'salesOrders') : null, [firestore]);
-    const { data: salesOrdersData, isLoading: l11 } = useCollection<SalesOrder>(salesOrdersCollection);
-    const salesOrders = salesOrdersData || [];
-
-    const inventoryAdjustmentsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventoryAdjustments') : null, [firestore]);
-    const { data: inventoryAdjustmentsData, isLoading: l12 } = useCollection<InventoryAdjustment>(inventoryAdjustmentsCollection);
-    const inventoryAdjustments = inventoryAdjustmentsData || [];
-
-
-    const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8 || l10 || l11 || l12;
-    
-    const inventory = useMemo(() => {
-        return getInventory(purchaseOrders, salesOrders, inventoryAdjustments);
-    }, [purchaseOrders, salesOrders, inventoryAdjustments]);
-
     // --- CRUD FUNCTIONS ---
     const addProduct = (name: string) => { if (firestore && name) addDocumentNonBlocking(collection(firestore, 'products'), { name }); };
     const removeProduct = (id: string) => { if (firestore) deleteDocumentNonBlocking(doc(firestore, 'products', id)); };
@@ -149,8 +127,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
         units, addUnit, removeUnit,
         packagingTypes, addPackagingType, removePackagingType,
         productCaliberAssociations, updateProductCalibers,
-        inventory, contacts, bankAccounts, addBankAccount, updateBankAccount, removeBankAccount,
-        purchaseOrders, salesOrders, inventoryAdjustments,
+        contacts, bankAccounts, addBankAccount, updateBankAccount, removeBankAccount,
         internalConcepts, costCenters,
         isLoading
     };

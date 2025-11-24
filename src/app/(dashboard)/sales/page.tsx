@@ -1,12 +1,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { SalesOrder, Contact, PurchaseOrder, InventoryAdjustment, OrderItem } from "@/lib/types"; 
 import { getColumns } from "./components/columns"; 
 import { DataTable } from "./components/data-table"; 
 import { useSalesOrders } from "@/hooks/use-sales-orders"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
+import { useOperations } from "@/hooks/use-operations";
 import { Button } from "@/components/ui/button";
 import { Plus, TrendingUp, Clock, Truck, Search } from "lucide-react";
 import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
@@ -23,20 +24,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { getInventory } from "@/lib/inventory";
 
 export default function SalesPage() {
   const { orders, createOrder, updateOrder, deleteOrder } = useSalesOrders();
   
-  const { contacts, inventory, purchaseOrders, inventoryAdjustments } = useMasterData(); 
+  const { contacts } = useMasterData(); 
+  const { purchaseOrders, inventoryAdjustments } = useOperations();
   
   const clients = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('client')) : [];
   const carrierList = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('carrier')) : [];
-
+  
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [previewOrder, setPreviewOrder] = useState<SalesOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+
+  const inventory = useMemo(() => getInventory(purchaseOrders, orders, inventoryAdjustments, editingOrder), [purchaseOrders, orders, inventoryAdjustments, editingOrder]);
 
   const totalAmount = orders.reduce((sum: number, o: SalesOrder) => sum + (o.totalAmount || 0), 0);
   const pendingCount = orders.filter((o: SalesOrder) => o.status === 'pending' || o.status === 'draft').length;
@@ -178,13 +183,12 @@ export default function SalesPage() {
         order={editingOrder}
         clients={clients}
         carriers={carrierList}
-        inventory={inventory || []}
-        nextOrderId=""
+        inventory={inventory}
         salesOrders={orders}
         sheetType="sale"
-        purchaseOrders={purchaseOrders || []}
-        inventoryAdjustments={inventoryAdjustments || []}
-        contacts={contacts || []}
+        purchaseOrders={purchaseOrders}
+        inventoryAdjustments={inventoryAdjustments}
+        contacts={contacts}
       />
 
       {previewOrder && (

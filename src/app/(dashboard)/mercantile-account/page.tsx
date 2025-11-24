@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -98,7 +99,7 @@ export default function MercantileAccountPage() {
             // 2. Abonos (Pagos recibidos - Income)
             financialMovements
               .filter(fm => fm.contactId === contact.id && fm.type === 'income')
-              .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: Number(p.amount) || 0, relatedDocumentId: p.relatedOrderId }));
+              .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: Number(p.amount) || 0, relatedDocumentId: p.relatedDocument?.id }));
 
         } else { 
             // --- PROVEEDORES ---
@@ -115,7 +116,7 @@ export default function MercantileAccountPage() {
             // 3. Abonos (Pagos realizados - Expense)
             financialMovements
               .filter(fm => fm.contactId === contact.id && fm.type === 'expense')
-              .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: Number(p.amount) || 0, relatedDocumentId: p.relatedOrderId }));
+              .forEach(p => payments.push({ id: p.id, date: p.date, description: p.description, amount: Number(p.amount) || 0, relatedDocumentId: p.relatedDocument?.id }));
         }
 
         const totalBilled = documents.reduce((sum, doc) => sum + doc.amount, 0);

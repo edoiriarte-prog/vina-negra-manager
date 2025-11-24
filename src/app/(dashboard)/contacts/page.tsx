@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -16,13 +17,11 @@ import { Contact, Interaction } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useMasterData } from "@/hooks/use-master-data";
-import { useContactsCRUD } from "@/hooks/use-contacts-crud"; // <-- 1. IMPORTAMOS EL NUEVO HOOK
+import { useContactsCRUD } from "@/hooks/use-contacts-crud";
 
 export default function ContactsPage() {
-  // Obtenemos los datos y el estado de carga del hook maestro
   const { contacts: data, isLoading: loading } = useMasterData();
   
-  // 2. Usamos el nuevo hook para obtener las funciones CRUD
   const { createContact, updateContact, deleteContact, handleDeleteInteraction: deleteInteractionFn } = useContactsCRUD();
   
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -66,7 +65,6 @@ export default function ContactsPage() {
     }
   };
   
-  // 3. ACTUALIZAMOS EL MANEJADOR onSave
   const handleSave = async (contactData: Contact | Omit<Contact, "id">, newInteraction?: Omit<Interaction, "id">) => {
     if ("id" in contactData) {
       // CASO: ACTUALIZAR CONTACTO EXISTENTE
@@ -93,7 +91,6 @@ export default function ContactsPage() {
     setIsSheetOpen(false);
   };
 
-  // 4. MANEJADOR DE ELIMINACIÓN DE INTERACCIÓN
   const handleDeleteInteraction = async (contactId: string, interactionId: string) => {
       const contact = data.find(c => c.id === contactId);
       if (contact) {
@@ -205,5 +202,3 @@ export default function ContactsPage() {
     </div>
   );
 }
-
-    
