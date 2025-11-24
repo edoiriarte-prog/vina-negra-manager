@@ -29,16 +29,10 @@ export function useSalesOrders() {
   const loading = result.loading !== undefined ? result.loading : result.isLoading;
 
   // 3. CRUD Actions
-  const createOrder = async (order: Omit<SalesOrder, "id"> & { id?: string }) => {
+  const createOrder = async (order: Omit<SalesOrder, "id">) => {
     if (!firestore) return;
-    
     const colRef = collection(firestore, "salesOrders");
-    
-    if (order.id) {
-        await setDoc(doc(firestore, "salesOrders", order.id), order);
-    } else {
-        await addDocumentNonBlocking(colRef, order);
-    }
+    await addDocumentNonBlocking(colRef, order);
   };
 
   const updateOrder = async (order: SalesOrder) => {
@@ -63,5 +57,3 @@ export function useSalesOrders() {
     deleteOrder
   };
 }
-
-    

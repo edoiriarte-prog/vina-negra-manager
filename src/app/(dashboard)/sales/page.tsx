@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { SalesOrder, Contact, PurchaseOrder, InventoryAdjustment } from "@/lib/types"; 
+import { SalesOrder, Contact, PurchaseOrder, InventoryAdjustment, OrderItem } from "@/lib/types"; 
 import { getColumns } from "./components/columns"; 
 import { DataTable } from "./components/data-table"; 
 import { useSalesOrders } from "@/hooks/use-sales-orders"; 
@@ -54,6 +54,22 @@ export default function SalesPage() {
     setEditingOrder(null);
     setIsSheetOpen(true);
   };
+  
+  const handleSave = (orderData: SalesOrder, newItems: OrderItem[] = []) => {
+    const finalData = { ...orderData, items: [...orderData.items, ...newItems] };
+
+    if (editingOrder) {
+      updateOrder(finalData);
+    } else {
+      // Para un nuevo pedido, `orderData` contiene todos los datos necesarios del formulario.
+      // `finalData` combina los items del formulario con los nuevos de la matriz.
+      // El id se asignará en la base de datos, por lo que no lo necesitamos aquí.
+      createOrder(finalData);
+    }
+    setIsSheetOpen(false);
+    setEditingOrder(null);
+  };
+
 
   const handleDelete = async (orderToDelete: SalesOrder) => {
       if (confirm(`¿Estás seguro de eliminar la orden de venta ${orderToDelete.id}?`)) {
@@ -160,14 +176,7 @@ export default function SalesPage() {
       <NewSalesOrderSheet
         isOpen={isSheetOpen}
         onOpenChange={handleCloseSheet}
-        onSave={(data, newItems) => {
-            if (editingOrder) {
-                updateOrder({ ...editingOrder, ...data, items: [...(data.items || []), ...(newItems || [])] });
-            } else {
-                createOrder({ ...data, items: [...(data.items || []), ...(newItems || [])] } as any);
-            }
-            setIsSheetOpen(false);
-        }}
+        onSave={handleSave}
         order={editingOrder}
         clients={clients}
         carriers={carrierList}
