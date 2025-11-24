@@ -38,6 +38,7 @@ type NewSalesOrderSheetProps = {
 
 type SalesOrderFormData = Omit<SalesOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'>;
 
+// Define la base para las Órdenes de Venta
 const BASE_OV_ID = 2099;
 
 const getInitialFormData = (order: SalesOrder | null, type: 'sale' | 'dispatch'): SalesOrderFormData => {
