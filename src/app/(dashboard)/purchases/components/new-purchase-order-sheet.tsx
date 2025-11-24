@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -204,8 +205,8 @@ export function NewPurchaseOrderSheet({
         paymentMethod: formData.paymentMethod,
         warehouse: formData.warehouse,
         orderType: formData.orderType || 'purchase',
-        advanceDueDate: formData.advanceDueDate || null,
-        balanceDueDate: formData.balanceDueDate || null,
+        advanceDueDate: formData.advanceDueDate ? formData.advanceDueDate : null,
+        balanceDueDate: formData.balanceDueDate ? formData.balanceDueDate : null,
         notes: formData.notes || null,
         creditDays: Number(formData.creditDays || 0),
         advancePercentage: Number(formData.advancePercentage || 0),
