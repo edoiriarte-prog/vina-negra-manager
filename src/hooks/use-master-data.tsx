@@ -4,8 +4,8 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useLocalStorage } from './use-local-storage';
 import { BankAccount, Contact, InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment } from '@/lib/types';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useCollection, useFirebase, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
 
 // --- TYPES ---
 export type ProductCaliberAssociation = {
@@ -20,9 +20,9 @@ type MasterDataContextType = {
     calibers: { name: string; code: string }[];
     addCaliber: (c: { name: string; code: string }) => void;
     removeCaliber: (name: string) => void;
-    warehouses: string[];
+    warehouses: { id: string; name: string }[];
     addWarehouse: (w: string) => void;
-    removeWarehouse: (w: string) => void;
+    removeWarehouse: (id: string) => void;
     units: string[];
     addUnit: (u: string) => void;
     removeUnit: (u: string) => void;
@@ -57,10 +57,14 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     const [calibers, setCalibers] = useLocalStorage<{ name: string; code: string }[]>('calibers', [
         { name: 'PAL_EXTRA', code: '50' }, { name: 'PAL_PRIMERA', code: '60' },
     ]);
-    const [warehouses, setWarehouses] = useLocalStorage<string[]>('warehouses', ['BODEGA CENTRAL', 'BODEGA 2', 'PRODUCTOR']);
     const [units, setUnits] = useLocalStorage<string[]>('units', ['Kilos', 'Cajas']);
     const [packagingTypes, setPackagingTypes] = useLocalStorage<string[]>('packagingTypes', ['CAJA PL 10KG', 'CAJA CARTÓN 15KG', 'BIN 400KG']);
     const [productCaliberAssociations, setProductCaliberAssociations] = useLocalStorage<ProductCaliberAssociation[]>('productCaliberAssociations', []);
+
+    // Warehouses from Firestore
+    const warehousesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'warehouses') : null, [firestore]);
+    const { data: warehousesData, isLoading: l1 } = useCollection<{name: string}>(warehousesCollection);
+    const warehouses = warehousesData || [];
 
     // Bank Accounts from Firestore
     const accountsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'bankAccounts') : null, [firestore]);
@@ -91,7 +95,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     const inventoryAdjustments = inventoryAdjustmentsData || [];
 
 
-    const isLoading = l2 || l3 || l4 || l5 || l6 || l7;
+    const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7;
 
     // --- CRUD FUNCTIONS (Sin cambios aquí) ---
     const addProduct = (p: string) => !products.includes(p) && setProducts([...products, p]);
@@ -100,8 +104,16 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     const addCaliber = (c: { name: string; code: string }) => !calibers.some(cal => cal.name === c.name) && setCalibers([...calibers, c]);
     const removeCaliber = (name: string) => setCalibers(calibers.filter(item => item.name !== name));
     
-    const addWarehouse = (w: string) => !warehouses.includes(w) && setWarehouses([...warehouses, w]);
-    const removeWarehouse = (w: string) => setWarehouses(warehouses.filter(item => item !== w));
+    const addWarehouse = (name: string) => {
+        if (firestore && name && !warehouses.some(w => w.name === name)) {
+            addDocumentNonBlocking(collection(firestore, 'warehouses'), { name });
+        }
+    };
+    const removeWarehouse = (id: string) => {
+        if (firestore) {
+            deleteDocumentNonBlocking(doc(firestore, 'warehouses', id));
+        }
+    };
 
     const addUnit = (u: string) => !units.includes(u) && setUnits([...units, u]);
     const removeUnit = (u: string) => setUnits(units.filter(item => item !== u));
@@ -132,7 +144,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     ];
     
     // --- VALUE PARA EL PROVIDER ---
-    const value = {
+    const value: MasterDataContextType = {
         products, addProduct, removeProduct,
         calibers, addCaliber, removeCaliber,
         warehouses, addWarehouse, removeWarehouse,
@@ -160,3 +172,5 @@ export function useMasterData() {
     }
     return context;
 }
+
+    

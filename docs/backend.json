@@ -252,6 +252,21 @@
         "kilosSold",
         "kilosAvailable"
       ]
+    },
+    "Warehouse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Warehouse",
+      "type": "object",
+      "description": "Represents a storage location.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the warehouse."
+        }
+      },
+      "required": [
+        "name"
+      ]
     }
   },
   "auth": {
@@ -357,8 +372,25 @@
             }
           ]
         }
+      },
+      {
+        "path": "/warehouses/{warehouseId}",
+        "definition": {
+          "entityName": "Warehouse",
+          "schema": {
+            "$ref": "#/backend/entities/Warehouse"
+          },
+          "description": "Stores warehouse information.",
+          "params": [
+            {
+              "name": "warehouseId",
+              "description": "Unique identifier for the warehouse."
+            }
+          ]
+        }
       }
     ],
     "reasoning": "The Firestore structure is designed to manage contacts, purchase orders, sales orders, service orders, financial movements, and inventory for Viña Negra Manager. User authentication is handled by Firebase Auth, and access control is implemented through Firestore security rules based on user ownership and role-based access. The structure prioritizes Authorization Independence by denormalizing access control information, which eliminates the need for `get()` calls in security rules, ensuring atomic operations and easier debugging. Segregation is achieved by creating separate collections for different entities, each with its own security needs, simplifying rules. Path-based ownership is used for user-specific data. The structure ensures that all documents within a collection share the same security requirements.\n\n**Authorization Independence**: Achieved through path-based ownership for Contacts and by storing the owner's ID directly within each document. This avoids complex `get()` calls to parent documents in security rules, simplifying rule logic and ensuring atomic operations.\n\n**QAPs Support**: Supported by structural segregation. Each top-level collection can have its own security rules, which ensure that listing operations (`list` queries) are secure and that users can only access the data they are authorized to view."
   }
 }
+    
