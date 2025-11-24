@@ -121,7 +121,7 @@ export default function InventoryPage() {
     
     useEffect(() => {
         if (isClient && masterProducts.length > 0 && !selectedProduct) {
-            setSelectedProduct(masterProducts[0]);
+            setSelectedProduct(masterProducts[0].name);
         }
     }, [isClient, masterProducts, selectedProduct]);
 
@@ -756,7 +756,7 @@ export default function InventoryPage() {
                             <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
                                 <SelectItem value="All">Todas las Bodegas</SelectItem>
                                 {warehouses.map(w => (
-                                    <SelectItem key={w} value={w}>{w}</SelectItem>
+                                    <SelectItem key={w.id} value={w.name}>{w.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -907,7 +907,7 @@ export default function InventoryPage() {
                                         </SelectTrigger>
                                         <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
                                             {masterProducts.map(p => (
-                                                <SelectItem key={p} value={p}>{p}</SelectItem>
+                                                <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -921,7 +921,7 @@ export default function InventoryPage() {
                                         <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
                                             <SelectItem value="All">Todas las Bodegas</SelectItem>
                                             {warehouses.map(w => (
-                                                <SelectItem key={w} value={w}>{w}</SelectItem>
+                                                <SelectItem key={w.id} value={w.name}>{w.name}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
