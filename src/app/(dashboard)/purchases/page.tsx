@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { PurchaseOrder, Contact } from "@/lib/types"; 
-import { getColumns } from "./components/columns"; // CORREGIDO: Importamos la función generadora
+import { getColumns } from "./components/columns";
 import { DataTable } from "@/components/ui/data-table"; 
-import { usePurchases } from "@/hooks/use-purchases"; // CORREGIDO: Nombre correcto del hook
+import { usePurchases } from "@/hooks/use-purchases"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { Button } from "@/components/ui/button";
 import { Plus, ShoppingCart, Clock, CheckCircle2, Search } from "lucide-react";
@@ -17,13 +17,10 @@ export default function PurchasesPage() {
   // Hooks de datos
   const { orders, loading, createOrder, updateOrder, deleteOrder } = usePurchases();
   
-  // CORREGIDO: Casteamos el retorno de useMasterData a 'any' temporalmente si el hook no está actualizado,
-  // o confiamos en que devolverá los datos correctos.
-  // Si 'contacts' o 'inventory' siguen dando error, actualiza el hook useMasterData (ver Paso 2).
   const { contacts, inventory } = useMasterData() as any; 
   
-  // Filtramos solo los proveedores. Agregamos el tipo explícito (c: Contact)
-  const suppliers = contacts ? contacts.filter((c: Contact) => c.type === 'supplier') : [];
+  // CORRECCIÓN: Ahora buscamos en el array 'type' en lugar de comparar un string
+  const suppliers = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('supplier')) : [];
 
   // Estados
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -36,11 +33,13 @@ export default function PurchasesPage() {
   const pendingCount = orders.filter((o: PurchaseOrder) => o.status === 'pending').length;
   const completedCount = orders.filter((o: PurchaseOrder) => o.status === 'completed').length;
 
-  // Filtrado de órdenes con tipo explícito
-  const filteredOrders = orders.filter((o: PurchaseOrder) => 
-    o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    suppliers.find((s: Contact) => s.id === o.supplierId)?.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filtrado de órdenes
+  const filteredOrders = orders.filter((o: PurchaseOrder) => {
+    const supplierName = suppliers.find((s: Contact) => s.id === o.supplierId)?.name || '';
+    return o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           supplierName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
 
   // Handlers
   const handleEdit = (order: PurchaseOrder) => {
@@ -68,7 +67,6 @@ export default function PurchasesPage() {
     if (!open) setEditingOrder(null);
   };
 
-  // CORREGIDO: Generamos las columnas llamando a la función getColumns
   const columns = getColumns({
       onEdit: handleEdit,
       onDelete: (order) => handleDelete(order.id),
@@ -80,12 +78,12 @@ export default function PurchasesPage() {
   const cardClass = "bg-slate-900 border-slate-800 shadow-sm hover:border-slate-700 transition-all";
 
   return (
-    <div className="p-8 space-y-8 bg-slate-950 min-h-screen text-slate-100">
+    <div className="p-3 md:p-6 space-y-6 bg-slate-950 min-h-screen text-slate-100">
       
       {/* --- HEADER & ACCIONES --- */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Gestión de Compras</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Gestión de Compras</h2>
           <p className="text-slate-400 mt-1">Administra tus adquisiciones y recepciones de stock.</p>
         </div>
         <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 font-semibold">
@@ -94,15 +92,15 @@ export default function PurchasesPage() {
       </div>
 
       {/* --- KPIs RESUMEN --- */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-              <ShoppingCart className="h-8 w-8 text-blue-500" />
+              <ShoppingCart className="h-6 w-6 md:h-8 md:w-8 text-blue-500" />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Compras</p>
-              <h3 className="text-2xl font-bold text-white">
+              <h3 className="text-xl md:text-2xl font-bold text-white">
                 {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(totalAmount)}
               </h3>
             </div>
@@ -112,11 +110,11 @@ export default function PurchasesPage() {
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
-              <Clock className="h-8 w-8 text-yellow-500" />
+              <Clock className="h-6 w-6 md:h-8 md:w-8 text-yellow-500" />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Pendientes</p>
-              <h3 className="text-2xl font-bold text-white">{pendingCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
+              <h3 className="text-xl md:text-2xl font-bold text-white">{pendingCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
             </div>
           </CardContent>
         </Card>
@@ -124,11 +122,11 @@ export default function PurchasesPage() {
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-              <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+              <CheckCircle2 className="h-6 w-6 md:h-8 md:w-8 text-emerald-500" />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Recepcionadas</p>
-              <h3 className="text-2xl font-bold text-white">{completedCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
+              <h3 className="text-xl md:text-2xl font-bold text-white">{completedCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
             </div>
           </CardContent>
         </Card>
@@ -146,7 +144,7 @@ export default function PurchasesPage() {
             />
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg p-1">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg p-1 overflow-x-auto">
             <DataTable 
                 columns={columns} 
                 data={filteredOrders} 
