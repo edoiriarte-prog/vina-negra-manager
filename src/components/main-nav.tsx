@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -13,8 +14,8 @@ import {
   Settings,
   PackageCheck,
   Boxes,
-  Wallet,    // Nuevo para Tesorería
-  Landmark,  // Nuevo para Cta Corriente
+  Wallet,
+  Landmark,
 } from "lucide-react"
 
 import {
@@ -27,22 +28,14 @@ import { cn } from "@/lib/utils"
 const menuItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contacts", label: "Contactos", icon: Users },
-  
-  // Operaciones
   { href: "/purchases", label: "Compras (O/C)", icon: ShoppingBag },
   { href: "/sales", label: "Ventas (O/V)", icon: ShoppingCart },
   { href: "/dispatches", label: "Orden de Salida", icon: PackageCheck },
   { href: "/services", label: "Servicios (O/S)", icon: Truck },
-  
-  // Logística
   { href: "/inventory", label: "Inventario", icon: Boxes },
   { href: "/inventory-adjustments", label: "Ajustes de Stock", icon: FileSliders },
-  
-  // Finanzas (Nuevos Módulos)
-  { href: "/current-account", label: "Cuenta Corriente", icon: Landmark },
+  { href: "/mercantile-account", label: "Cuenta Corriente", icon: Landmark },
   { href: "/financials", label: "Tesorería", icon: Wallet },
-  
-  // Sistema
   { href: "/settings", label: "Configuración", icon: Settings },
   { href: "/help", label: "Ayuda", icon: HelpCircle },
 ]
@@ -51,7 +44,7 @@ export function MainNav({ className }: { className?: string }) {
   const pathname = usePathname()
 
   return (
-    <nav className={cn("flex flex-col", className)}>
+    <nav className={cn("flex flex-col p-2", className)}>
       <SidebarMenu>
         {menuItems.map((item) => (
           <SidebarMenuItem key={item.href}>
