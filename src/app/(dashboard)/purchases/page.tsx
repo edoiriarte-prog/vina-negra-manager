@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useState } from "react";
 import { PurchaseOrder, Contact } from "@/lib/types"; 
 import { getColumns } from "./components/columns";
-import { DataTable } from "@/components/ui/data-table"; 
+import { DataTable } from "./components/data-table"; 
 import { usePurchases } from "@/hooks/use-purchases"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,6 @@ export default function PurchasesPage() {
   
   const { contacts, inventory } = useMasterData() as any; 
   
-  // CORRECCIÓN: Ahora buscamos en el array 'type' en lugar de comparar un string
   const suppliers = contacts ? contacts.filter((c: Contact) => Array.isArray(c.type) && c.type.includes('supplier')) : [];
 
   // Estados
@@ -149,11 +149,6 @@ export default function PurchasesPage() {
                 columns={columns} 
                 data={filteredOrders} 
                 searchKey="id"
-                meta={{
-                    onEdit: handleEdit,
-                    onDelete: (order: PurchaseOrder) => handleDelete(order.id),
-                    onView: setPreviewOrder
-                }}
             />
         </div>
       </div>
@@ -169,8 +164,6 @@ export default function PurchasesPage() {
         }}
         order={editingOrder}
         suppliers={suppliers}
-        inventory={inventory || []}
-        nextOrderId="" 
         purchaseOrders={orders}
       />
 

@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { SalesOrder, Contact, PurchaseOrder, InventoryAdjustment } from "@/lib/types"; 
 import { getColumns } from "./components/columns"; 
-import { DataTable } from "@/components/ui/data-table"; 
+import { DataTable } from "./components/data-table"; 
 import { useSalesOrders } from "@/hooks/use-sales-orders"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { Button } from "@/components/ui/button";
