@@ -7,74 +7,65 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, CalendarIcon, User, Truck, Warehouse, CreditCard, Info, PackageCheck, DollarSign, MapPin } from 'lucide-react';
+import { Plus, Trash2, CalendarIcon, Truck, Warehouse, CreditCard, Info, PackageCheck, DollarSign, Barcode } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SalesOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
+import { PurchaseOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
 import { format, addDays, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent } from '@/components/ui/card';
-import { ItemMatrixDialog } from './item-matrix-dialog'; 
+import { ItemMatrixDialog } from '../../sales/components/item-matrix-dialog'; 
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 
-type NewSalesOrderSheetProps = {
+type NewPurchaseOrderSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (order: SalesOrder) => void;
-  order: SalesOrder | null;
-  clients: Contact[];
-  carriers: Contact[];
+  onSave: (order: PurchaseOrder) => void;
+  order: PurchaseOrder | null;
+  suppliers: Contact[];
   inventory: InventoryItem[];
   nextOrderId: string;
-  salesOrders: SalesOrder[];
+  purchaseOrders: PurchaseOrder[];
 };
 
-// Ajustamos el tipo para que acepte los nuevos status
-type SalesOrderFormData = Omit<SalesOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'> & {
-    status: 'draft' | 'pending' | 'dispatched' | 'invoiced' | 'cancelled';
+// Definimos el tipo extendido para incluir status en el formulario
+type PurchaseOrderFormData = Omit<PurchaseOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'> & {
+    status: 'draft' | 'pending' | 'received' | 'completed' | 'cancelled';
 };
 
-// ID BASE PARA VENTAS
-const BASE_OV_ID = 2099;
-
-const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
+const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData => {
     if (order) {
         return {
             ...order,
             date: format(new Date(order.date), 'yyyy-MM-dd'),
             advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : undefined,
             balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
-            status: (order.status as any) === 'completed' ? 'dispatched' : order.status,
+            status: order.status,
         };
     }
     return {
-        clientId: '',
+        supplierId: '',
         date: format(new Date(), 'yyyy-MM-dd'),
         items: [],
         status: 'pending',
         paymentMethod: 'Contado',
-        saleType: 'Venta Firme',
         creditDays: 0,
         advancePercentage: 0,
         advanceDueDate: undefined,
         balanceDueDate: undefined,
-        warehouse: 'Bodega Central', 
-        destinationWarehouse: '',
-        carrierId: '',
-        driverName: '',
-        licensePlate: '',
-        orderType: 'sales',
+        warehouse: 'Bodega Central',
+        orderType: 'purchase',
         notes: '',
     };
 };
 
-export function NewSalesOrderSheet({ 
-    isOpen, onOpenChange, onSave, order, clients, carriers, inventory, salesOrders 
-}: NewSalesOrderSheetProps) {
+export function NewPurchaseOrderSheet({ 
+    isOpen, onOpenChange, onSave, order, suppliers, inventory, purchaseOrders 
+}: NewPurchaseOrderSheetProps) {
   
-  const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order));
+  const [formData, setFormData] = useState<PurchaseOrderFormData>(() => getInitialFormData(order));
   const [includeVat, setIncludeVat] = useState(true); 
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [nextIdDisplay, setNextIdDisplay] = useState('');
@@ -98,39 +89,46 @@ export function NewSalesOrderSheet({
       return { netTotal: net, vatAmount: 0, finalTotal: net };
   }, [grossTotal, includeVat]);
 
-  // Lógica ID
+  const advanceAmount = useMemo(() => {
+    if (formData.paymentMethod !== 'Pago con Anticipo y Saldo' || !formData.advancePercentage) return 0;
+    return finalTotal * (formData.advancePercentage / 100);
+  }, [finalTotal, formData.paymentMethod, formData.advancePercentage]);
+
+  const balanceAmount = useMemo(() => {
+     if (formData.paymentMethod !== 'Pago con Anticipo y Saldo') return 0;
+     return finalTotal - advanceAmount;
+  }, [finalTotal, advanceAmount, formData.paymentMethod]);
+
+  // Lógica ID (Base 1100)
   useEffect(() => {
     if (isOpen) {
-        if (!order) {
-            const existingIds = (salesOrders || [])
-                .map(o => {
-                    const match = o.id.match(/OV-(\d+)/);
-                    return match ? parseInt(match[1], 10) : 0;
-                })
-                .filter(n => !isNaN(n));
-            
-            const maxId = existingIds.length > 0 ? Math.max(...existingIds) : BASE_OV_ID;
-            const nextNum = maxId < BASE_OV_ID ? BASE_OV_ID + 1 : maxId + 1;
-            const newId = `OV-${nextNum}`;
-            
-            setNextIdDisplay(newId);
-            if (!hasInitialized) {
+        if (!hasInitialized) {
+            if (!order) {
+                const existingIds = (purchaseOrders || [])
+                    .map(o => {
+                        const match = o.id.match(/OC-(\d+)/);
+                        return match ? parseInt(match[1], 10) : 0;
+                    })
+                    .filter(n => !isNaN(n));
+                
+                const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 1099;
+                const nextNum = maxId < 1099 ? 1100 : maxId + 1;
+                const newId = `OC-${nextNum}`;
+                
+                setNextIdDisplay(newId);
                 setFormData(getInitialFormData(null));
                 setIncludeVat(true); 
-                setHasInitialized(true);
-            }
-        } else {
-            if (!hasInitialized) {
+            } else {
                 setNextIdDisplay(order.id);
                 setFormData(getInitialFormData(order));
                 setIncludeVat(true); 
-                setHasInitialized(true);
             }
+            setHasInitialized(true);
         }
     } else {
         setHasInitialized(false);
     }
-  }, [isOpen, order, hasInitialized, salesOrders]);
+  }, [isOpen, order, hasInitialized, purchaseOrders]);
 
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
     const newItems = [...formData.items];
@@ -161,7 +159,6 @@ export function NewSalesOrderSheet({
     }
   };
 
-  // Vencimiento automático
   useEffect(() => {
       if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {
           const dueDate = addDays(parseISO(formData.date), formData.creditDays);
@@ -185,19 +182,15 @@ export function NewSalesOrderSheet({
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formData.date) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione una fecha.' });
-    if (!formData.clientId) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un cliente.' });
+    if (!formData.supplierId) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un proveedor.' });
     if (formData.items.length === 0) return toast({ variant: 'destructive', title: 'Error', description: 'Agregue al menos un ítem.' });
     
-    if (formData.saleType === 'Traslado Bodega Interna' && !formData.destinationWarehouse) {
-        return toast({ variant: 'destructive', title: 'Falta Destino', description: 'Para traslados internos debe seleccionar una Bodega de Destino.' });
-    }
-
     const sanitizedItems = formData.items.map(item => ({
         ...item,
-        // CORRECCIÓN CLAVE: Usamos undefined para opcionales, no null
+        // CORRECCIÓN: Usamos undefined para tipos estrictos
         packagingType: item.packagingType || undefined,
         packagingQuantity: Number(item.packagingQuantity) || 0,
-        lotNumber: item.lotNumber || undefined,
+        lotNumber: item.lotNumber || undefined, // IMPORTANTE: Guardamos el lote
         quantity: Number(item.quantity) || 0,
         price: Number(item.price) || 0,
     }));
@@ -205,9 +198,9 @@ export function NewSalesOrderSheet({
     const calculatedTotalPackages = sanitizedItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const calculatedTotalKilos = sanitizedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
-    const finalOrder: SalesOrder = {
+    const finalOrder: PurchaseOrder = {
         id: order ? order.id : nextIdDisplay,
-        clientId: formData.clientId,
+        supplierId: formData.supplierId,
         date: formData.date,
         items: sanitizedItems,
         totalPackages: calculatedTotalPackages,
@@ -215,15 +208,8 @@ export function NewSalesOrderSheet({
         totalAmount: finalTotal,
         status: formData.status,
         paymentMethod: formData.paymentMethod,
-        saleType: formData.saleType,
         warehouse: formData.warehouse,
-        destinationWarehouse: formData.destinationWarehouse || null,
-        carrierId: formData.carrierId || null,
-        driverName: formData.driverName || null,
-        licensePlate: formData.licensePlate || null,
-        orderType: formData.orderType || 'sales',
-        
-        // CAMPOS FINANCIEROS (Ahora reconocidos por types.ts)
+        orderType: formData.orderType || 'purchase',
         advanceDueDate: formData.advanceDueDate || null,
         balanceDueDate: formData.balanceDueDate || null,
         notes: formData.notes || null,
@@ -234,13 +220,13 @@ export function NewSalesOrderSheet({
     onSave(finalOrder);
   };
 
-  const title = order ? `Editar OV ${order.id}` : `Nueva Venta`;
+  const title = order ? `Editar OC ${order.id}` : `Nueva Compra`;
 
-  // Helpers visuales
+  // Helpers visuales de estado
   const getStatusColor = (status: string) => {
       switch(status) {
-          case 'dispatched': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
-          case 'invoiced': return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+          case 'completed': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+          case 'received': return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
           case 'draft': return 'bg-slate-500/10 text-slate-400 border-slate-500/30';
           case 'cancelled': return 'bg-red-500/10 text-red-400 border-red-500/30';
           default: return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
@@ -249,11 +235,11 @@ export function NewSalesOrderSheet({
 
   const getStatusLabel = (status: string) => {
       switch(status) {
-          case 'dispatched': return 'Despachada';
-          case 'invoiced': return 'Facturada';
+          case 'completed': return 'Recepcionada';
+          case 'received': return 'En Tránsito'; // O Recibida Parcial
           case 'draft': return 'Borrador';
           case 'pending': return 'Pendiente';
-          case 'cancelled': return 'Cancelada';
+          case 'cancelled': return 'Anulada';
           default: return status;
       }
   };
@@ -294,17 +280,17 @@ export function NewSalesOrderSheet({
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
             <div className="p-6 space-y-8">
               
-              {/* SECCIÓN 1: GENERAL */}
-              <div className="grid md:grid-cols-4 gap-5">
-                <Card className={`${darkCardClass} md:col-span-2`}>
+              {/* SECCIÓN 1: DATOS GENERALES */}
+              <div className="grid md:grid-cols-3 gap-5">
+                <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <User className="h-4 w-4 text-blue-500" /> Cliente
+                            <Truck className="h-4 w-4 text-blue-500" /> Proveedor
                         </div>
-                        <Select required onValueChange={(value) => handleSelectChange('clientId', value)} value={formData.clientId}>
+                        <Select required onValueChange={(value) => handleSelectChange('supplierId', value)} value={formData.supplierId}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {clients.map(c => (<SelectItem key={c.id} value={c.id} className="focus:bg-slate-800 focus:text-slate-100">{c.name}</SelectItem>))}
+                                {suppliers.map(s => (<SelectItem key={s.id} value={s.id} className="focus:bg-slate-800 focus:text-slate-100">{s.name}</SelectItem>))}
                             </SelectContent>
                         </Select>
                     </CardContent>
@@ -322,7 +308,7 @@ export function NewSalesOrderSheet({
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Warehouse className="h-4 w-4 text-emerald-500" /> Bodega Origen
+                            <Warehouse className="h-4 w-4 text-emerald-500" /> Bodega Destino
                         </div>
                         <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
@@ -334,65 +320,14 @@ export function NewSalesOrderSheet({
                 </Card>
               </div>
 
-              {/* SECCIÓN 2: TRANSPORTE */}
-              <div className="grid md:grid-cols-3 gap-5">
-                 <Card className={darkCardClass}>
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Truck className="h-4 w-4 text-purple-500" /> Transportista
-                        </div>
-                        <Select onValueChange={(v) => handleSelectChange('carrierId', v)} value={formData.carrierId || ''}>
-                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Opcional" /></SelectTrigger>
-                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                <SelectItem value="none">Ninguno</SelectItem>
-                                {carriers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </CardContent>
-                 </Card>
-                 <Card className={darkCardClass}>
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <User className="h-4 w-4 text-slate-500" /> Chofer
-                        </div>
-                        <Input name="driverName" value={formData.driverName || ''} onChange={handleInputChange} placeholder="Ej: Juan Pérez" className={darkInputClass} />
-                    </CardContent>
-                 </Card>
-                 
-                 {formData.saleType === 'Traslado Bodega Interna' ? (
-                     <Card className={`${darkCardClass} border-blue-500/30`}>
-                        <CardContent className="p-4 space-y-3">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
-                                <Warehouse className="h-4 w-4" /> Bodega Destino
-                            </div>
-                            <Select required onValueChange={(v) => handleSelectChange('destinationWarehouse', v)} value={formData.destinationWarehouse || ''}>
-                                <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                    {warehouses.filter(w => w.name !== formData.warehouse).map(w => <SelectItem key={w.id} value={w.name}>{w.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </CardContent>
-                     </Card>
-                 ) : (
-                     <Card className={darkCardClass}>
-                        <CardContent className="p-4 space-y-3">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                                <MapPin className="h-4 w-4 text-red-500" /> Patente
-                            </div>
-                            <Input name="licensePlate" value={formData.licensePlate || ''} onChange={handleInputChange} placeholder="Ej: AB-CD-12" className={darkInputClass} />
-                        </CardContent>
-                     </Card>
-                 )}
-              </div>
-
-              {/* SECCIÓN 3: ITEMS */}
+              {/* SECCIÓN 2: ITEMS */}
               <div className={`rounded-xl border border-slate-800 overflow-hidden ${darkCardClass}`}>
                 <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                     <h3 className="font-semibold text-slate-200 flex items-center gap-2">
                         <Info className="h-4 w-4 text-blue-400" /> Detalle de Productos
                     </h3>
                     <Button type="button" onClick={() => setIsMatrixOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md shadow-blue-900/20 transition-all">
-                        <Plus className="mr-2 h-4 w-4" /> Agregar Items (Matriz)
+                        <Plus className="mr-2 h-4 w-4" /> Carga Masiva (Matriz)
                     </Button>
                 </div>
 
@@ -401,7 +336,7 @@ export function NewSalesOrderSheet({
                         <div className="py-16 text-center text-slate-500 bg-slate-950/50 flex flex-col items-center">
                             <PackageCheck className="h-12 w-12 mb-3 opacity-20" />
                             <p className="text-lg font-medium">No hay productos agregados</p>
-                            <p className="text-sm opacity-70">Use el botón para agregar productos.</p>
+                            <p className="text-sm opacity-70">Use el botón de "Carga Masiva" para comenzar.</p>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -410,6 +345,8 @@ export function NewSalesOrderSheet({
                                     <tr>
                                         <th className="px-4 py-3 font-semibold">Producto</th>
                                         <th className="px-4 py-3 font-semibold">Calibre</th>
+                                        {/* NUEVA COLUMNA: LOTE */}
+                                        <th className="px-4 py-3 font-semibold w-[120px]">Lote</th> 
                                         <th className="px-4 py-3 font-semibold">Envase</th>
                                         <th className="px-4 py-3 text-center font-semibold">Cant.</th>
                                         <th className="px-4 py-3 text-center font-semibold">Kilos</th>
@@ -435,6 +372,18 @@ export function NewSalesOrderSheet({
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-slate-400 focus:ring-0"><SelectValue /></SelectTrigger>
                                                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{calibers.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
                                                     </Select>
+                                                </td>
+                                                {/* INPUT DE LOTE */}
+                                                <td className="px-4 py-2">
+                                                    <div className="flex items-center gap-1">
+                                                        <Barcode className="h-3 w-3 text-slate-500" />
+                                                        <Input 
+                                                            value={item.lotNumber || ''} 
+                                                            onChange={(e) => handleItemChange(index, 'lotNumber', e.target.value)} 
+                                                            className="h-7 text-xs bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-300 uppercase placeholder:text-slate-700" 
+                                                            placeholder="LOTE-001"
+                                                        />
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-2">
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.packagingType`, v)} value={item.packagingType || ''}>
@@ -472,44 +421,31 @@ export function NewSalesOrderSheet({
                 </div>
               </div>
 
-              {/* SECCIÓN 4: PIE DE PÁGINA (FINANZAS) */}
+              {/* SECCIÓN 3: PIE DE PÁGINA */}
               <div className="grid md:grid-cols-12 gap-6 items-start">
                   
-                  {/* Condiciones */}
+                  {/* Izquierda: Condiciones */}
                   <div className="md:col-span-7 space-y-4">
                       <Card className={darkCardClass}>
                           <CardContent className="p-5 space-y-5">
                               <div className='flex justify-between items-center border-b border-slate-800 pb-2 mb-4'>
-                                <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                                    <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones de Venta
-                                </h4>
-                                <Select onValueChange={(v: any) => handleSelectChange('status', v)} value={formData.status}>
-                                    <SelectTrigger className="h-7 w-36 text-xs bg-slate-950 border-slate-800"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                        <SelectItem value="draft">Borrador</SelectItem>
-                                        <SelectItem value="pending">Pendiente</SelectItem>
-                                        <SelectItem value="dispatched">Despachada</SelectItem>
-                                        <SelectItem value="invoiced">Facturada</SelectItem>
-                                        <SelectItem value="cancelled">Cancelada</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                  <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                                      <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones Comerciales
+                                  </h4>
+                                  {/* SELECTOR DE ESTADO (NUEVO) */}
+                                  <Select onValueChange={(v: any) => handleSelectChange('status', v)} value={formData.status}>
+                                      <SelectTrigger className="h-7 w-36 text-xs bg-slate-950 border-slate-800"><SelectValue /></SelectTrigger>
+                                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                          <SelectItem value="draft">Borrador</SelectItem>
+                                          <SelectItem value="pending">Pendiente</SelectItem>
+                                          <SelectItem value="received">En Tránsito</SelectItem>
+                                          <SelectItem value="completed">Recepcionada</SelectItem>
+                                          <SelectItem value="cancelled">Anulada</SelectItem>
+                                      </SelectContent>
+                                  </Select>
                               </div>
 
                               <div className="grid grid-cols-2 gap-5">
-                                  <div className="space-y-2">
-                                      <Label className={labelClass}>Tipo de Venta</Label>
-                                      <Select onValueChange={(v: any) => handleSelectChange('saleType', v)} value={formData.saleType}>
-                                          <SelectTrigger className={darkInputClass}><SelectValue /></SelectTrigger>
-                                          <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                              <SelectItem value="Venta Firme">Venta Firme</SelectItem>
-                                              <SelectItem value="Consignación">Consignación</SelectItem>
-                                              <SelectItem value="Mínimo Garantizado">Mínimo Garantizado</SelectItem>
-                                              <SelectItem value="Precio Fijo">Precio Fijo</SelectItem>
-                                              <SelectItem value="Libre Consignación">Libre Consignación</SelectItem>
-                                              <SelectItem value="Traslado Bodega Interna">Traslado Bodega Interna</SelectItem>
-                                          </SelectContent>
-                                      </Select>
-                                  </div>
                                   <div className="space-y-2">
                                       <Label className={labelClass}>Método de Pago</Label>
                                       <Select onValueChange={(v: any) => handleSelectChange('paymentMethod', v)} value={formData.paymentMethod}>
@@ -521,18 +457,17 @@ export function NewSalesOrderSheet({
                                           </SelectContent>
                                       </Select>
                                   </div>
-                              </div>
-
-                              {/* Crédito / Vencimiento */}
-                              {(formData.paymentMethod === 'Crédito' || formData.paymentMethod === 'Pago con Anticipo y Saldo') && (
-                                  <div className="space-y-2">
-                                      <Label className={labelClass}>Días Crédito / Vencimiento</Label>
-                                      <div className="flex gap-2">
-                                          <Input type="number" placeholder="Días" value={formData.creditDays || ''} onChange={(e) => handleSelectChange('creditDays', Number(e.target.value))} className={`${darkInputClass} w-20 text-center`} />
-                                          <Input type="date" className={`${darkInputClass} flex-1 [color-scheme:dark]`} value={formData.balanceDueDate || ''} onChange={(e) => handleSelectChange('balanceDueDate', e.target.value)} />
+                                  
+                                  {(formData.paymentMethod === 'Crédito' || formData.paymentMethod === 'Pago con Anticipo y Saldo') && (
+                                      <div className="space-y-2">
+                                          <Label className={labelClass}>Días Crédito / Vencimiento</Label>
+                                          <div className="flex gap-2">
+                                              <Input type="number" placeholder="Días" value={formData.creditDays || ''} onChange={(e) => handleSelectChange('creditDays', Number(e.target.value))} className={`${darkInputClass} w-20 text-center`} />
+                                              <Input type="date" className={`${darkInputClass} flex-1 [color-scheme:dark]`} value={formData.balanceDueDate || ''} onChange={(e) => handleSelectChange('balanceDueDate', e.target.value)} />
+                                          </div>
                                       </div>
-                                  </div>
-                              )}
+                                  )}
+                              </div>
 
                               {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
                                   <div className="grid grid-cols-2 gap-4 bg-blue-950/30 p-3 rounded-lg border border-blue-900/50">
@@ -554,14 +489,14 @@ export function NewSalesOrderSheet({
                                       value={formData.notes || ''} 
                                       onChange={handleInputChange} 
                                       className="min-h-[80px] resize-none bg-slate-950 border-slate-800 text-slate-300 focus:border-slate-600"
-                                      placeholder="Instrucciones de despacho..."
+                                      placeholder="Instrucciones especiales para recepción..."
                                   />
                               </div>
                           </CardContent>
                       </Card>
                   </div>
 
-                  {/* Resumen Financiero */}
+                  {/* Derecha: Resumen Financiero */}
                   <div className="md:col-span-5">
                       <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 shadow-xl relative overflow-hidden">
                           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-emerald-500"></div>
@@ -593,6 +528,19 @@ export function NewSalesOrderSheet({
                                       <span className="text-2xl font-bold text-white tracking-tight">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(finalTotal)}</span>
                                   </div>
                               </div>
+
+                              {formData.paymentMethod === 'Pago con Anticipo y Saldo' && (
+                                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                                      <div className="bg-blue-950/20 border border-blue-900/30 p-2 rounded text-center">
+                                          <p className="text-blue-400 mb-1 uppercase font-bold text-[10px]">Anticipo</p>
+                                          <p className="font-bold text-blue-100 text-sm">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(advanceAmount)}</p>
+                                      </div>
+                                      <div className="bg-red-950/20 border border-red-900/30 p-2 rounded text-center">
+                                          <p className="text-red-400 mb-1 uppercase font-bold text-[10px]">Saldo Final</p>
+                                          <p className="font-bold text-red-100 text-sm">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(balanceAmount)}</p>
+                                      </div>
+                                  </div>
+                              )}
                           </CardContent>
                       </Card>
                   </div>
@@ -600,11 +548,11 @@ export function NewSalesOrderSheet({
 
             </div>
 
-            {/* FOOTER */}
+            {/* FOOTER DE ACCIONES FIJO */}
             <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
               <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
               <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={formData.items.length === 0}>
-                  Guardar Venta
+                  Guardar Orden
               </Button>
             </SheetFooter>
           </form>
@@ -615,8 +563,8 @@ export function NewSalesOrderSheet({
         isOpen={isMatrixOpen}
         onOpenChange={setIsMatrixOpen}
         onSave={handleMatrixSave}
-        orderType="sale"
-        inventory={inventory.filter(i => i.warehouse === formData.warehouse)}
+        orderType="purchase"
+        inventory={inventory}
       />
     </>
   );
