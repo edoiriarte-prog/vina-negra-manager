@@ -18,28 +18,31 @@ import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { LotSelectionDialog } from './lot-selection-dialog';
 
 type NewSalesOrderSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (order: SalesOrder) => void;
+  onSave: (order: SalesOrder, newItems?: OrderItem[]) => void;
   order: SalesOrder | null;
   clients: Contact[];
   carriers: Contact[];
   inventory: InventoryItem[];
   nextOrderId: string;
   salesOrders: SalesOrder[];
+  sheetType: 'sale' | 'dispatch';
+  purchaseOrders: any[];
+  inventoryAdjustments: any[];
+  contacts: Contact[];
 };
 
-// Ajustamos el tipo para que acepte los nuevos status
 type SalesOrderFormData = Omit<SalesOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'> & {
     status: 'draft' | 'pending' | 'dispatched' | 'invoiced' | 'cancelled';
 };
 
-// ID BASE PARA VENTAS
 const BASE_OV_ID = 2099;
 
-const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
+const getInitialFormData = (order: SalesOrder | null, type: 'sale' | 'dispatch'): SalesOrderFormData => {
     if (order) {
         return {
             ...order,
@@ -47,6 +50,7 @@ const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
             advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : undefined,
             balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
             status: (order.status as any) === 'completed' ? 'dispatched' : order.status,
+            orderType: type
         };
     }
     return {
@@ -55,7 +59,7 @@ const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
         items: [],
         status: 'pending',
         paymentMethod: 'Contado',
-        saleType: 'Venta Firme',
+        saleType: type === 'dispatch' ? 'Traslado Bodega Interna' : 'Venta Firme',
         creditDays: 0,
         advancePercentage: 0,
         advanceDueDate: undefined,
@@ -65,72 +69,72 @@ const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
         carrierId: '',
         driverName: '',
         licensePlate: '',
-        orderType: 'sales',
+        orderType: type,
         notes: '',
+        includeVat: true,
     };
 };
 
 export function NewSalesOrderSheet({ 
-    isOpen, onOpenChange, onSave, order, clients, carriers, inventory, salesOrders 
+    isOpen, onOpenChange, onSave, order, clients, carriers, inventory, salesOrders, sheetType, purchaseOrders, inventoryAdjustments, contacts
 }: NewSalesOrderSheetProps) {
   
-  const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order));
-  const [includeVat, setIncludeVat] = useState(true); 
+  const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order, sheetType));
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
+  const [isLotSelectionOpen, setIsLotSelectionOpen] = useState(false);
   const [nextIdDisplay, setNextIdDisplay] = useState('');
   const [hasInitialized, setHasInitialized] = useState(false);
 
   const { products, calibers, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
 
-  // Cálculos
   const grossTotal = useMemo(() => {
     return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
   }, [formData.items]);
   
   const { netTotal, vatAmount, finalTotal } = useMemo(() => {
       const net = grossTotal; 
-      if (includeVat) {
+      if (formData.includeVat) {
           const vat = net * 0.19;
           const total = net + vat;
           return { netTotal: net, vatAmount: vat, finalTotal: total };
       }
       return { netTotal: net, vatAmount: 0, finalTotal: net };
-  }, [grossTotal, includeVat]);
+  }, [grossTotal, formData.includeVat]);
 
-  // Lógica ID
   useEffect(() => {
     if (isOpen) {
         if (!order) {
+            const idPrefix = sheetType === 'sale' ? 'OV' : 'TR';
+            const baseId = sheetType === 'sale' ? BASE_OV_ID : 0;
             const existingIds = (salesOrders || [])
+                .filter(o => o.orderType === sheetType)
                 .map(o => {
-                    const match = o.id.match(/OV-(\d+)/);
+                    const match = o.id.match(new RegExp(`${idPrefix}-(\\d+)`));
                     return match ? parseInt(match[1], 10) : 0;
                 })
                 .filter(n => !isNaN(n));
             
-            const maxId = existingIds.length > 0 ? Math.max(...existingIds) : BASE_OV_ID;
-            const nextNum = maxId < BASE_OV_ID ? BASE_OV_ID + 1 : maxId + 1;
-            const newId = `OV-${nextNum}`;
+            const maxId = existingIds.length > 0 ? Math.max(...existingIds) : baseId;
+            const nextNum = maxId <= baseId ? baseId + 1 : maxId + 1;
+            const newId = `${idPrefix}-${nextNum}`;
             
             setNextIdDisplay(newId);
             if (!hasInitialized) {
-                setFormData(getInitialFormData(null));
-                setIncludeVat(true); 
+                setFormData(getInitialFormData(null, sheetType));
                 setHasInitialized(true);
             }
         } else {
             if (!hasInitialized) {
                 setNextIdDisplay(order.id);
-                setFormData(getInitialFormData(order));
-                setIncludeVat(true); 
+                setFormData(getInitialFormData(order, sheetType));
                 setHasInitialized(true);
             }
         }
     } else {
         setHasInitialized(false);
     }
-  }, [isOpen, order, hasInitialized, salesOrders]);
+  }, [isOpen, order, hasInitialized, salesOrders, sheetType]);
 
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
     const newItems = [...formData.items];
@@ -161,7 +165,6 @@ export function NewSalesOrderSheet({
     }
   };
 
-  // Vencimiento automático
   useEffect(() => {
       if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {
           const dueDate = addDays(parseISO(formData.date), formData.creditDays);
@@ -178,9 +181,31 @@ export function NewSalesOrderSheet({
         ...item,
         id: `temp-${Date.now()}-${Math.random()}`,
     }));
-    setFormData(prev => ({...prev, items: [...prev.items, ...newItems]}));
-    setIsMatrixOpen(false);
+    onSave(formData, newItems);
   }
+  
+  const handleLotSave = (newItem: OrderItem) => {
+    const existingItemIndex = formData.items.findIndex(
+      (item) =>
+        item.product === newItem.product &&
+        item.caliber === newItem.caliber &&
+        item.lotNumber === newItem.lotNumber &&
+        item.price === newItem.price
+    );
+
+    let newItems;
+    if (existingItemIndex > -1) {
+      // Update existing item
+      newItems = [...formData.items];
+      newItems[existingItemIndex].quantity += newItem.quantity;
+      newItems[existingItemIndex].packagingQuantity = (newItems[existingItemIndex].packagingQuantity || 0) + (newItem.packagingQuantity || 0);
+    } else {
+      // Add new item
+      newItems = [...formData.items, { ...newItem, id: `temp-lot-${Date.now()}` }];
+    }
+    setFormData(prev => ({ ...prev, items: newItems }));
+  };
+
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -194,10 +219,9 @@ export function NewSalesOrderSheet({
 
     const sanitizedItems = formData.items.map(item => ({
         ...item,
-        // CORRECCIÓN CLAVE: Usamos undefined para opcionales, no null
-        packagingType: item.packagingType || undefined,
+        packagingType: item.packagingType || null,
         packagingQuantity: Number(item.packagingQuantity) || 0,
-        lotNumber: item.lotNumber || undefined,
+        lotNumber: item.lotNumber || null,
         quantity: Number(item.quantity) || 0,
         price: Number(item.price) || 0,
     }));
@@ -222,21 +246,19 @@ export function NewSalesOrderSheet({
         driverName: formData.driverName || null,
         licensePlate: formData.licensePlate || null,
         orderType: formData.orderType || 'sales',
-        
-        // CAMPOS FINANCIEROS (Ahora reconocidos por types.ts)
         advanceDueDate: formData.advanceDueDate || null,
         balanceDueDate: formData.balanceDueDate || null,
         notes: formData.notes || null,
         creditDays: Number(formData.creditDays || 0),
         advancePercentage: Number(formData.advancePercentage || 0),
+        includeVat: formData.includeVat,
     };
 
     onSave(finalOrder);
   };
 
-  const title = order ? `Editar OV ${order.id}` : `Nueva Venta`;
+  const title = order ? `Editar ${sheetType === 'sale' ? `OV ${order.id}` : `TR ${order.id}`}` : `Nueva ${sheetType === 'sale' ? 'Venta' : 'Orden de Traspaso'}`;
 
-  // Helpers visuales
   const getStatusColor = (status: string) => {
       switch(status) {
           case 'dispatched': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
@@ -269,7 +291,6 @@ export function NewSalesOrderSheet({
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="sm:max-w-7xl w-[95vw] overflow-y-auto p-0 flex flex-col gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
           
-          {/* HEADER */}
           <SheetHeader className="bg-slate-900 border-b border-slate-800 px-6 py-4 sticky top-0 z-10">
              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
@@ -294,7 +315,6 @@ export function NewSalesOrderSheet({
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
             <div className="p-6 space-y-8">
               
-              {/* SECCIÓN 1: GENERAL */}
               <div className="grid md:grid-cols-4 gap-5">
                 <Card className={`${darkCardClass} md:col-span-2`}>
                     <CardContent className="p-4 space-y-3">
@@ -327,14 +347,13 @@ export function NewSalesOrderSheet({
                         <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {warehouses.map(w => <SelectItem key={w.id} value={w.name} className="focus:bg-slate-800 focus:text-slate-100">{w.name}</SelectItem>)}
+                                {warehouses.map(w => <SelectItem key={w.id} value={w.name}>{w.name}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </CardContent>
                 </Card>
               </div>
 
-              {/* SECCIÓN 2: TRANSPORTE */}
               <div className="grid md:grid-cols-3 gap-5">
                  <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
@@ -385,15 +404,19 @@ export function NewSalesOrderSheet({
                  )}
               </div>
 
-              {/* SECCIÓN 3: ITEMS */}
               <div className={`rounded-xl border border-slate-800 overflow-hidden ${darkCardClass}`}>
                 <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                     <h3 className="font-semibold text-slate-200 flex items-center gap-2">
                         <Info className="h-4 w-4 text-blue-400" /> Detalle de Productos
                     </h3>
-                    <Button type="button" onClick={() => setIsMatrixOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md shadow-blue-900/20 transition-all">
-                        <Plus className="mr-2 h-4 w-4" /> Agregar Items (Matriz)
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button type="button" onClick={() => setIsLotSelectionOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-md shadow-emerald-900/20 transition-all">
+                            <Plus className="mr-2 h-4 w-4" /> Agregar por Lote
+                        </Button>
+                        <Button type="button" onClick={() => setIsMatrixOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md shadow-blue-900/20 transition-all">
+                            <Plus className="mr-2 h-4 w-4" /> Carga Masiva (Matriz)
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="p-0">
@@ -410,8 +433,8 @@ export function NewSalesOrderSheet({
                                     <tr>
                                         <th className="px-4 py-3 font-semibold">Producto</th>
                                         <th className="px-4 py-3 font-semibold">Calibre</th>
-                                        <th className="px-4 py-3 font-semibold">Envase</th>
-                                        <th className="px-4 py-3 text-center font-semibold">Cant.</th>
+                                        <th className="px-4 py-3 font-semibold">Lote</th>
+                                        <th className="px-4 py-3 text-center font-semibold">Cant. Env.</th>
                                         <th className="px-4 py-3 text-center font-semibold">Kilos</th>
                                         <th className="px-4 py-3 text-right text-blue-400 font-semibold">P. Neto</th>
                                         <th className="px-4 py-3 text-right text-emerald-400 font-semibold">P. c/IVA</th>
@@ -422,31 +445,18 @@ export function NewSalesOrderSheet({
                                 <tbody className="divide-y divide-slate-800 bg-slate-900/30">
                                     {formData.items.map((item, index) => {
                                         const subtotal = (item.quantity || 0) * (item.price || 0);
+                                        const availableStock = inventory.find(i => i.product === item.product && i.caliber === item.caliber)?.stock || 0;
+                                        const hasEnoughStock = item.quantity <= availableStock;
                                         return (
                                             <tr key={index} className="hover:bg-slate-800/50 transition-colors group">
-                                                <td className="px-4 py-2">
-                                                    <Select onValueChange={(v) => handleSelectChange(`items.${index}.product`, v)} value={item.product}>
-                                                        <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 font-medium text-slate-200 focus:ring-0"><SelectValue /></SelectTrigger>
-                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{products.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}</SelectContent>
-                                                    </Select>
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <Select onValueChange={(v) => handleSelectChange(`items.${index}.caliber`, v)} value={item.caliber}>
-                                                        <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-slate-400 focus:ring-0"><SelectValue /></SelectTrigger>
-                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{calibers.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
-                                                    </Select>
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <Select onValueChange={(v) => handleSelectChange(`items.${index}.packagingType`, v)} value={item.packagingType || ''}>
-                                                        <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-xs text-slate-400 focus:ring-0"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}</SelectContent>
-                                                    </Select>
-                                                </td>
+                                                <td className="px-4 py-2">{item.product}</td>
+                                                <td className="px-4 py-2">{item.caliber}</td>
+                                                <td className="px-4 py-2"><Badge variant="secondary">{item.lotNumber}</Badge></td>
                                                 <td className="px-4 py-2">
                                                     <Input type="number" value={item.packagingQuantity || ''} onChange={(e) => handleItemChange(index, 'packagingQuantity', Number(e.target.value))} className="h-7 text-center bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-300" />
                                                 </td>
                                                 <td className="px-4 py-2">
-                                                    <Input type="number" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))} className="h-7 text-center font-bold bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-100" />
+                                                    <Input type="number" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))} className={`h-7 text-center font-bold bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 ${hasEnoughStock ? 'text-slate-100' : 'text-red-400 border-red-500/50'}`} />
                                                 </td>
                                                 <td className="px-4 py-2">
                                                     <Input type="number" value={item.price || ''} onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500" />
@@ -472,10 +482,8 @@ export function NewSalesOrderSheet({
                 </div>
               </div>
 
-              {/* SECCIÓN 4: PIE DE PÁGINA (FINANZAS) */}
               <div className="grid md:grid-cols-12 gap-6 items-start">
                   
-                  {/* Condiciones */}
                   <div className="md:col-span-7 space-y-4">
                       <Card className={darkCardClass}>
                           <CardContent className="p-5 space-y-5">
@@ -503,9 +511,6 @@ export function NewSalesOrderSheet({
                                           <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                               <SelectItem value="Venta Firme">Venta Firme</SelectItem>
                                               <SelectItem value="Consignación">Consignación</SelectItem>
-                                              <SelectItem value="Mínimo Garantizado">Mínimo Garantizado</SelectItem>
-                                              <SelectItem value="Precio Fijo">Precio Fijo</SelectItem>
-                                              <SelectItem value="Libre Consignación">Libre Consignación</SelectItem>
                                               <SelectItem value="Traslado Bodega Interna">Traslado Bodega Interna</SelectItem>
                                           </SelectContent>
                                       </Select>
@@ -523,7 +528,6 @@ export function NewSalesOrderSheet({
                                   </div>
                               </div>
 
-                              {/* Crédito / Vencimiento */}
                               {(formData.paymentMethod === 'Crédito' || formData.paymentMethod === 'Pago con Anticipo y Saldo') && (
                                   <div className="space-y-2">
                                       <Label className={labelClass}>Días Crédito / Vencimiento</Label>
@@ -561,7 +565,6 @@ export function NewSalesOrderSheet({
                       </Card>
                   </div>
 
-                  {/* Resumen Financiero */}
                   <div className="md:col-span-5">
                       <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 shadow-xl relative overflow-hidden">
                           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-emerald-500"></div>
@@ -571,7 +574,7 @@ export function NewSalesOrderSheet({
                                       <DollarSign className="h-4 w-4 text-emerald-500" /> Totales
                                   </h4>
                                   <div className="flex items-center gap-2 bg-slate-950/50 px-3 py-1 rounded-full border border-slate-800">
-                                      <Switch id="includeVat" checked={includeVat} onCheckedChange={setIncludeVat} className="data-[state=checked]:bg-emerald-500" />
+                                      <Switch id="includeVat" checked={formData.includeVat} onCheckedChange={v => setFormData(p => ({...p, includeVat: v}))} className="data-[state=checked]:bg-emerald-500" />
                                       <Label htmlFor="includeVat" className="text-[10px] cursor-pointer text-slate-400 uppercase font-bold">Ver con IVA</Label>
                                   </div>
                               </div>
@@ -581,7 +584,7 @@ export function NewSalesOrderSheet({
                                       <span>Subtotal Neto</span>
                                       <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(netTotal)}</span>
                                   </div>
-                                  {includeVat && (
+                                  {formData.includeVat && (
                                       <div className="flex justify-between text-slate-400 text-sm">
                                           <span>IVA (19%)</span>
                                           <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(vatAmount)}</span>
@@ -600,7 +603,6 @@ export function NewSalesOrderSheet({
 
             </div>
 
-            {/* FOOTER */}
             <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
               <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
               <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={formData.items.length === 0}>
@@ -614,9 +616,20 @@ export function NewSalesOrderSheet({
       <ItemMatrixDialog 
         isOpen={isMatrixOpen}
         onOpenChange={setIsMatrixOpen}
-        onSave={handleMatrixSave}
+        onSave={(items) => onSave(formData, items)}
         orderType="sale"
         inventory={inventory.filter(i => i.warehouse === formData.warehouse)}
+      />
+
+       <LotSelectionDialog
+        isOpen={isLotSelectionOpen}
+        onOpenChange={setIsLotSelectionOpen}
+        onSave={handleLotSave}
+        purchaseOrders={purchaseOrders}
+        salesOrders={salesOrders}
+        inventoryAdjustments={inventoryAdjustments}
+        warehouse={formData.warehouse}
+        contacts={contacts}
       />
     </>
   );

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, CalendarIcon, Truck, Warehouse, CreditCard, Info, PackageCheck, DollarSign, Barcode } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PurchaseOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
+import { PurchaseOrder, OrderItem, Contact } from '@/lib/types';
 import { format, addDays, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,12 +25,9 @@ type NewPurchaseOrderSheetProps = {
   onSave: (order: PurchaseOrder) => void;
   order: PurchaseOrder | null;
   suppliers: Contact[];
-  inventory: InventoryItem[];
-  nextOrderId: string;
   purchaseOrders: PurchaseOrder[];
 };
 
-// Definimos el tipo extendido para incluir status en el formulario
 type PurchaseOrderFormData = Omit<PurchaseOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'> & {
     status: 'draft' | 'pending' | 'received' | 'completed' | 'cancelled';
 };
@@ -62,7 +59,7 @@ const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData 
 };
 
 export function NewPurchaseOrderSheet({ 
-    isOpen, onOpenChange, onSave, order, suppliers, inventory, purchaseOrders 
+    isOpen, onOpenChange, onSave, order, suppliers, purchaseOrders 
 }: NewPurchaseOrderSheetProps) {
   
   const [formData, setFormData] = useState<PurchaseOrderFormData>(() => getInitialFormData(order));
@@ -71,10 +68,9 @@ export function NewPurchaseOrderSheet({
   const [nextIdDisplay, setNextIdDisplay] = useState('');
   const [hasInitialized, setHasInitialized] = useState(false);
 
-  const { products, calibers, packagingTypes, warehouses } = useMasterData();
+  const { products, calibers, packagingTypes, warehouses, inventory } = useMasterData();
   const { toast } = useToast();
 
-  // Cálculos
   const grossTotal = useMemo(() => {
     return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
   }, [formData.items]);
@@ -99,7 +95,6 @@ export function NewPurchaseOrderSheet({
      return finalTotal - advanceAmount;
   }, [finalTotal, advanceAmount, formData.paymentMethod]);
 
-  // Lógica ID (Base 1100)
   useEffect(() => {
     if (isOpen) {
         if (!hasInitialized) {
@@ -187,10 +182,9 @@ export function NewPurchaseOrderSheet({
     
     const sanitizedItems = formData.items.map(item => ({
         ...item,
-        // CORRECCIÓN: Usamos undefined para tipos estrictos
-        packagingType: item.packagingType || undefined,
+        packagingType: item.packagingType || null,
         packagingQuantity: Number(item.packagingQuantity) || 0,
-        lotNumber: item.lotNumber || undefined, // IMPORTANTE: Guardamos el lote
+        lotNumber: item.lotNumber || null,
         quantity: Number(item.quantity) || 0,
         price: Number(item.price) || 0,
     }));
@@ -222,7 +216,6 @@ export function NewPurchaseOrderSheet({
 
   const title = order ? `Editar OC ${order.id}` : `Nueva Compra`;
 
-  // Helpers visuales de estado
   const getStatusColor = (status: string) => {
       switch(status) {
           case 'completed': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
@@ -236,7 +229,7 @@ export function NewPurchaseOrderSheet({
   const getStatusLabel = (status: string) => {
       switch(status) {
           case 'completed': return 'Recepcionada';
-          case 'received': return 'En Tránsito'; // O Recibida Parcial
+          case 'received': return 'En Tránsito';
           case 'draft': return 'Borrador';
           case 'pending': return 'Pendiente';
           case 'cancelled': return 'Anulada';
@@ -255,7 +248,6 @@ export function NewPurchaseOrderSheet({
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="sm:max-w-7xl w-[95vw] overflow-y-auto p-0 flex flex-col gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
           
-          {/* HEADER */}
           <SheetHeader className="bg-slate-900 border-b border-slate-800 px-6 py-4 sticky top-0 z-10">
              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
@@ -280,7 +272,6 @@ export function NewPurchaseOrderSheet({
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
             <div className="p-6 space-y-8">
               
-              {/* SECCIÓN 1: DATOS GENERALES */}
               <div className="grid md:grid-cols-3 gap-5">
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
@@ -320,7 +311,6 @@ export function NewPurchaseOrderSheet({
                 </Card>
               </div>
 
-              {/* SECCIÓN 2: ITEMS */}
               <div className={`rounded-xl border border-slate-800 overflow-hidden ${darkCardClass}`}>
                 <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                     <h3 className="font-semibold text-slate-200 flex items-center gap-2">
@@ -345,7 +335,6 @@ export function NewPurchaseOrderSheet({
                                     <tr>
                                         <th className="px-4 py-3 font-semibold">Producto</th>
                                         <th className="px-4 py-3 font-semibold">Calibre</th>
-                                        {/* NUEVA COLUMNA: LOTE */}
                                         <th className="px-4 py-3 font-semibold w-[120px]">Lote</th> 
                                         <th className="px-4 py-3 font-semibold">Envase</th>
                                         <th className="px-4 py-3 text-center font-semibold">Cant.</th>
@@ -373,7 +362,6 @@ export function NewPurchaseOrderSheet({
                                                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{calibers.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
                                                     </Select>
                                                 </td>
-                                                {/* INPUT DE LOTE */}
                                                 <td className="px-4 py-2">
                                                     <div className="flex items-center gap-1">
                                                         <Barcode className="h-3 w-3 text-slate-500" />
@@ -421,10 +409,8 @@ export function NewPurchaseOrderSheet({
                 </div>
               </div>
 
-              {/* SECCIÓN 3: PIE DE PÁGINA */}
               <div className="grid md:grid-cols-12 gap-6 items-start">
                   
-                  {/* Izquierda: Condiciones */}
                   <div className="md:col-span-7 space-y-4">
                       <Card className={darkCardClass}>
                           <CardContent className="p-5 space-y-5">
@@ -432,7 +418,6 @@ export function NewPurchaseOrderSheet({
                                   <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
                                       <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones Comerciales
                                   </h4>
-                                  {/* SELECTOR DE ESTADO (NUEVO) */}
                                   <Select onValueChange={(v: any) => handleSelectChange('status', v)} value={formData.status}>
                                       <SelectTrigger className="h-7 w-36 text-xs bg-slate-950 border-slate-800"><SelectValue /></SelectTrigger>
                                       <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
@@ -496,7 +481,6 @@ export function NewPurchaseOrderSheet({
                       </Card>
                   </div>
 
-                  {/* Derecha: Resumen Financiero */}
                   <div className="md:col-span-5">
                       <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 shadow-xl relative overflow-hidden">
                           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-emerald-500"></div>
@@ -548,7 +532,6 @@ export function NewPurchaseOrderSheet({
 
             </div>
 
-            {/* FOOTER DE ACCIONES FIJO */}
             <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
               <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
               <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={formData.items.length === 0}>
