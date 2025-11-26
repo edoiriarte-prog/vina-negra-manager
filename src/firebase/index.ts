@@ -1,60 +1,30 @@
-
 "use client";
 
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { 
-    getFirestore, 
-    collection, 
-    doc, 
-    addDoc, 
-    updateDoc, 
-    deleteDoc, 
-    onSnapshot, 
-    Query, 
-    DocumentReference, 
-    setDoc, 
-    runTransaction, 
-    getDoc, 
-    query, 
-    orderBy, 
-    where,
-    Firestore
-} from "firebase/firestore";
-import { getAuth, onAuthStateChanged, Auth } from "firebase/auth";
-import { useState, useEffect, useRef, useMemo } from "react";
-import { firebaseConfig } from "./config";
-import { useUser, useAuth as useFirebaseAuth, useFirebase, useFirestore as useFs, useFirebaseApp, FirebaseProvider, useMemoFirebase } from './provider';
-import { useCollection } from './firestore/use-collection';
-import { useDoc } from './firestore/use-doc';
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
-// --- INICIALIZACIÓN ---
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-export const firestore = getFirestore(app);
+// --- 1. TUS CREDENCIALES REALES ---
+const firebaseConfig = {
+  apiKey: "AIzaSyBg9y45BP2hD4C1VxRujKpMlspMxt-yyDE",
+  authDomain: "studio-1617125356-dde41.firebaseapp.com",
+  projectId: "studio-1617125356-dde41",
+  storageBucket: "studio-1617125356-dde41.firebasestorage.app",
+  messagingSenderId: "856243097775",
+  appId: "1:856243097775:web:42c472ad506fc5766f845a"
+};
+
+// --- 2. INICIALIZACIÓN (Singleton para no repetir conexión) ---
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+// --- 3. EXPORTAR LAS INSTANCIAS ---
+export const firebaseApp = app; 
 export const auth = getAuth(app);
+export const firestore = getFirestore(app);
 
+// --- 4. EXPORTAR LOS MÓDULOS DE AYUDA (CORREGIDO) ---
+// Aquí estaba el error. Ahora importamos nombres específicos de 'provider'
+// para evitar el conflicto de 'useMemoFirebase'.
 
-function initializeFirebase() {
-    return { firebaseApp: app, firestore, auth };
-}
-
-
-// --- HOOKS Y HELPERS ---
-
-// Exporta la función de inicialización
-export { initializeFirebase };
-
-// Exporta los hooks del provider
-export { useUser, useFirebaseAuth as useAuth, useFirebase, useFs as useFirestore, useFirebaseApp, FirebaseProvider, useMemoFirebase };
-
-// Exporta los hooks de data
-export { useCollection, useDoc };
-
-
-// --- HELPERS CRUD (Non-blocking) ---
-// Estos ya están en su propio archivo, pero los exportamos desde aquí para un único punto de entrada
-export { 
-    addDocumentNonBlocking, 
-    updateDocumentNonBlocking, 
-    deleteDocumentNonBlocking, 
-    setDocumentNonBlocking 
-} from './non-blocking-updates';
+export { FirebaseProvider, useFirebase } from './provider'; 
+export * from './hooks';
