@@ -1,23 +1,28 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // 1. Ignorar errores de TypeScript para poder publicar YA
+  // 1. Ignorar errores de TypeScript y ESLint (Mantener esto es útil para desarrollo rápido)
   typescript: {
     ignoreBuildErrors: true,
   },
-  // 2. Ignorar advertencias de estilo (ESLint)
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // 3. Arreglo técnico para que la IA (Genkit) no se queje del "fs"
-  experimental: {
-    turbo: {
-      resolveAlias: {
-        "fs": "false",
-        "net": "false",
-        "tls": "false",
-      },
-    },
+
+  // 2. SOLUCIÓN DEFINITIVA PARA EL ERROR 'fs' (Webpack)
+  // Esto le dice al navegador que ignore las librerías de servidor cuando compile.
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        child_process: false,
+        perf_hooks: false, 
+      };
+    }
+    return config;
   },
 };
 

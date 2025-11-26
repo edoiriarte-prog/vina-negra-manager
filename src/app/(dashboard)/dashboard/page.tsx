@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useMasterData } from '@/hooks/use-master-data';
-import { useOperations } from '@/hooks/use-operations'; // <--- IMPORTAMOS EL NUEVO HOOK
+import { useOperations } from '@/hooks/use-operations'; 
 import KpiCard from './components/kpi-card';
 import { 
   WeeklyPurchasesChart, 
@@ -22,8 +22,7 @@ import {
     TrendingUp, 
     Warehouse,
 } from "lucide-react";
-import { getInventory } from '@/lib/inventory';
-
+import { InventoryItem } from '@/lib/types';
 
 // --- HELPERS ---
 const formatCurrency = (value: number) =>
@@ -37,13 +36,13 @@ const formatKilos = (value: number) =>
   new Intl.NumberFormat('es-CL').format(value);
 
 export default function DashboardPage() {
-  // 1. Datos Maestros (Inventario, Contactos)
+  // 1. Datos Maestros (Solo Contactos para nombres de proveedores)
   const { 
       contacts,
       isLoading: loadingMaster 
   } = useMasterData();
 
-  // 2. Datos Operacionales (Ventas, Compras, Finanzas) - NUEVO HOOK
+  // 2. Datos Operacionales (Ventas, Compras, Finanzas)
   const {
       purchaseOrders,
       salesOrders,
@@ -52,24 +51,86 @@ export default function DashboardPage() {
       isLoading: loadingOps
   } = useOperations();
   
-  const inventory = useMemo(() => getInventory(purchaseOrders, salesOrders, inventoryAdjustments), [purchaseOrders, salesOrders, inventoryAdjustments]);
-
   const isLoading = loadingMaster || loadingOps;
 
-  const { kpis, financialDataString } = useMemo(() => {
-    // Verificamos que todo esté cargado
-    if (isLoading || !purchaseOrders || !salesOrders || !financialMovements || !inventory) {
-        return { kpis: null, financialDataString: '' };
-    }
+  // 3. CÁLCULO DE INVENTARIO EN TIEMPO REAL (Derivado de Operaciones)
+  const calculatedInventory = useMemo(() => {
+      const stockMap = new Map<string, number>();
 
-    // Filtramos solo las completadas para los cálculos
+      // A. Sumar Entradas (Compras)
+      purchaseOrders.forEach(order => {
+          if (order.status === 'completed' || order.status === 'received') {
+              order.items.forEach(item => {
+                  // Clave única: Producto + Calibre
+                  const key = `${item.product}-${item.caliber || 'S/C'}`; 
+                  const current = stockMap.get(key) || 0;
+                  stockMap.set(key, current + item.quantity);
+              });
+          }
+      });
+
+      // B. Restar Salidas (Ventas)
+      salesOrders.forEach(order => {
+          if (order.status === 'completed' || order.status === 'dispatched' || order.status === 'invoiced') {
+              order.items.forEach(item => {
+                  const key = `${item.product}-${item.caliber || 'S/C'}`;
+                  const current = stockMap.get(key) || 0;
+                  stockMap.set(key, current - item.quantity);
+              });
+          }
+      });
+
+      // C. Aplicar Ajustes Manuales
+      inventoryAdjustments.forEach(adj => {
+          const key = `${adj.product}-${adj.caliber || 'S/C'}`;
+          const current = stockMap.get(key) || 0;
+          if (adj.type === 'increase') {
+              stockMap.set(key, current + adj.quantity);
+          } else {
+              stockMap.set(key, current - adj.quantity);
+          }
+      });
+
+      // Convertir a formato InventoryItem para los gráficos
+      const inventoryList: InventoryItem[] = [];
+      stockMap.forEach((stock, key) => {
+          if (stock > 0) { // Solo mostramos stock positivo
+              const [product, caliber] = key.split('-');
+              inventoryList.push({
+                  id: key,
+                  name: product, // Usamos 'name' para compatibilidad con el gráfico
+                  caliber: caliber,
+                  stock: stock,
+                  category: 'fruit',
+                  unit: 'Kilos',
+                  minStock: 0,
+                  cost: 0
+              });
+          }
+      });
+
+      return inventoryList;
+  }, [purchaseOrders, salesOrders, inventoryAdjustments]);
+
+
+  // 4. CÁLCULO DE KPIs
+  const { kpis, financialDataString } = useMemo(() => {
+    if (isLoading) return { kpis: null, financialDataString: '' };
+
+    // Filtros
     const completedPurchases = purchaseOrders.filter(o => o.status === 'completed' || o.status === 'received');
     const completedSales = salesOrders.filter(o => o.status === 'completed' || o.status === 'dispatched' || o.status === 'invoiced');
 
-    const totalKilosPurchased = completedPurchases.reduce((sum, order) => sum + (order.totalKilos || 0), 0);
-    const totalKilosSold = completedSales.reduce((sum, order) => sum + (order.totalKilos || 0), 0);
+    // Kilos
+    const totalKilosPurchased = completedPurchases.reduce((sum, order) => {
+        return sum + order.items.reduce((s, i) => s + (i.quantity || 0), 0);
+    }, 0);
     
-    // Sumas monetarias
+    const totalKilosSold = completedSales.reduce((sum, order) => {
+        return sum + order.items.reduce((s, i) => s + (i.quantity || 0), 0);
+    }, 0);
+    
+    // Dinero
     const totalPurchaseAmount = completedPurchases.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     const totalSalesAmount = completedSales.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     
@@ -77,8 +138,8 @@ export default function DashboardPage() {
     const totalExpense = financialMovements.filter(m => m.type === 'expense').reduce((sum, m) => sum + (m.amount || 0), 0);
     const netCashflow = totalIncome - totalExpense;
 
-    // Stock
-    const availableStock = inventory.reduce((sum, item) => sum + (item.stock || 0), 0);
+    // Stock Total (Usamos el calculado arriba)
+    const availableStock = calculatedInventory.reduce((sum, item) => sum + (item.stock || 0), 0);
 
     const kpiData = {
       totalSalesAmount,
@@ -94,16 +155,16 @@ export default function DashboardPage() {
     const financialString = `
         Ventas Totales: ${formatCurrency(totalSalesAmount)}
         Compras Totales: ${formatCurrency(totalPurchaseAmount)}
-        Ingresos Registrados: ${formatCurrency(totalIncome)}
-        Egresos Registrados: ${formatCurrency(totalExpense)}
-        Flujo de Caja Neto: ${formatCurrency(netCashflow)}
+        Ingresos: ${formatCurrency(totalIncome)}
+        Egresos: ${formatCurrency(totalExpense)}
+        Flujo Neto: ${formatCurrency(netCashflow)}
         Kilos Vendidos: ${formatKilos(totalKilosSold)} kg
         Kilos Comprados: ${formatKilos(totalKilosPurchased)} kg
         Stock Disponible: ${formatKilos(availableStock)} kg
     `;
     
     return { kpis: kpiData, financialDataString: financialString.trim() };
-  }, [purchaseOrders, salesOrders, financialMovements, inventory, isLoading]);
+  }, [purchaseOrders, salesOrders, financialMovements, calculatedInventory, isLoading]);
 
 
   if (isLoading || !kpis) {
@@ -235,7 +296,8 @@ export default function DashboardPage() {
                 <CardDescription className="text-slate-400">Distribución de Kilos disponibles en inventario.</CardDescription>
             </CardHeader>
             <CardContent>
-                <CaliberDistributionChart data={inventory} />
+                {/* Aquí usamos el inventario calculado en tiempo real */}
+                <CaliberDistributionChart data={calculatedInventory} />
             </CardContent>
         </Card>
       </div>
