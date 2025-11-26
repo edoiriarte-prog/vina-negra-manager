@@ -10,14 +10,14 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   // 3. Arreglo técnico para que la IA (Genkit) no se queje del "fs"
-  webpack: (config) => {
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
-    };
-    return config;
+  experimental: {
+    turbo: {
+      resolveAlias: {
+        "fs": "false",
+        "net": "false",
+        "tls": "false",
+      },
+    },
   },
 };
 
