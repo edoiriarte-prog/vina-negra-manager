@@ -72,7 +72,7 @@ export interface OrderItem {
   unit?: string;
   lotNumber?: string; 
   format?: string; 
-  packagingType?: string; // Alias para format
+  packagingType?: string; 
 }
 
 export interface PurchaseOrder {
@@ -85,10 +85,19 @@ export interface PurchaseOrder {
   items: OrderItem[];
   totalAmount: number;
   totalKilos?: number; 
+  totalPackages?: number;
   notes?: string;
   number?: string;
+  
+  // Financiero
+  paymentMethod?: string;
+  creditDays?: number;
+  advancePercentage?: number;
+  advanceDueDate?: string | null;
+  balanceDueDate?: string | null;
   paymentCondition?: string;
-  includeVat?: boolean; // <--- PROPIEDAD AGREGADA
+  includeVat?: boolean;
+  orderType?: string;
 }
 
 export interface SalesOrder {
@@ -101,25 +110,28 @@ export interface SalesOrder {
   items: OrderItem[];
   totalAmount: number;
   totalKilos?: number; 
-  totalPackages?: number; // <--- PROPIEDAD AGREGADA
+  totalPackages?: number; 
   notes?: string;
   number?: string;
   saleType?: string; 
-  includeVat?: boolean; // <--- PROPIEDAD AGREGADA
-  paymentStatus?: string; // <--- PROPIEDAD AGREGADA
-  orderType?: 'sale' | 'dispatch'; // Para diferenciar en lógica interna
+  includeVat?: boolean; 
+  paymentStatus?: string; 
+  orderType?: 'sale' | 'dispatch'; 
 }
 
-// Servicos (Placeholder)
+// --- 4. FINANZAS Y SERVICIOS ---
+
 export interface ServiceOrder {
     id: string;
     supplierId: string;
     date: string;
     cost: number;
+    description?: string; // Agregado para evitar errores
+    provider?: string;    // Agregado para evitar errores
 }
 
-// --- 4. FINANZAS ---
-export type MovementType = 'income' | 'expense';
+// Ampliamos MovementType para incluir 'traspaso'
+export type MovementType = 'income' | 'expense' | 'traspaso';
 
 export interface FinancialMovement {
   id: string;
@@ -127,14 +139,28 @@ export interface FinancialMovement {
   description: string;
   amount: number;
   type: MovementType;
-  category: string;
+  category?: string; // Ahora opcional
+  
+  // Relaciones
   relatedOrderId?: string;
   contactId?: string;
+  relatedDocument?: { 
+      id: string; 
+      type: 'OV' | 'OC' | 'OS'; 
+  };
+
   status?: 'paid' | 'pending';
-  relatedDocument?: { id: string };
+
+  // Nuevos campos requeridos por Tesorería Avanzada
+  paymentMethod?: string;
+  sourceAccountId?: string;      // Cuenta origen (egresos/traspasos)
+  destinationAccountId?: string; // Cuenta destino (ingresos/traspasos)
+  reference?: string;            // Nro. cheque, operación, etc.
+  internalConcept?: string;
+  productId?: string;
 }
 
-// --- 5. CONFIGURACIÓN Y OTROS ---
+// --- 5. CONFIGURACIÓN Y BANCAS ---
 export interface BankAccount {
     id: string;
     name: string;
@@ -143,4 +169,6 @@ export interface BankAccount {
     type: 'Corriente' | 'Vista' | 'Ahorro';
     currency: 'CLP' | 'USD';
     initialBalance: number;
+    status?: 'Activa' | 'Inactiva';
+    bankName?: string; // Alias para bank
 }

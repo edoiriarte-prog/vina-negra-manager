@@ -1,11 +1,10 @@
-
 "use client";
 
 import { useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { SalesOrder, Contact } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit, Trash2, Eye, CalendarCheck, ArrowUpDown, FileText } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, Eye, CalendarCheck, ArrowUpDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +26,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { useFirebase } from "@/firebase"; 
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { processOrderStockMovement } from "@/lib/inventory-actions"; 
+import { Badge } from "@/components/ui/badge";
 
 // --- COMPONENTE DE CELDA DE ESTADO (VENTAS) ---
 const StatusCell = ({ order }: { order: SalesOrder }) => {
@@ -54,42 +53,39 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
   };
 
   const handleStatusChange = async (newStatus: string) => {
+    if (!firestore) return;
     const oldStatus = status;
-    // Forzamos el tipado para evitar errores con strings genéricos
-    setStatus(newStatus as any);
+    // @ts-ignore
+    setStatus(newStatus);
     setIsLoading(true);
 
     try {
-      // 1. Referencia a salesOrders
+      // 1. Referencia a la orden en Firebase
       const orderRef = doc(firestore, "salesOrders", order.id);
       const updateData: any = { status: newStatus };
 
-      // TRAZABILIDAD: Fecha de Despacho
-      // Se activa cuando pasa a 'dispatched' (antes era 'completed')
+      // Si se marca como despachada, guardamos la fecha
       if (newStatus === "dispatched" && oldStatus !== "dispatched") {
         updateData.dispatchedAt = new Date().toISOString();
       }
 
+      // 2. Actualizamos solo el estado. 
+      // El inventario se recalculará automáticamente en el Dashboard gracias a los hooks.
       await updateDoc(orderRef, updateData);
-      
-      // 2. MOVIMIENTO DE INVENTARIO
-      // Si tienes una función auxiliar, asegúrate de que maneje los nuevos strings ('dispatched', 'invoiced')
-      if (processOrderStockMovement) {
-          await processOrderStockMovement(order, newStatus, oldStatus);
-      }
 
       toast({
         title: "Estado Actualizado",
-        description: `La orden ${order.id} ahora está ${getStatusLabel(newStatus)}.`,
+        description: `La orden ahora está ${getStatusLabel(newStatus)}.`,
         className: "bg-slate-900 text-white border-slate-800"
       });
 
     } catch (error) {
       console.error("Error updating status:", error);
-      setStatus(oldStatus as any);
+      // @ts-ignore
+      setStatus(oldStatus);
       toast({
         title: "Error",
-        description: "No se pudo actualizar el estado en la base de datos.",
+        description: "No se pudo actualizar el estado.",
         variant: "destructive",
       });
     } finally {
@@ -124,7 +120,6 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
       </Select>
 
       {/* TOOLTIP DE DESPACHO */}
-      {/* Mostramos el ícono si está despachada O facturada */}
       {(status === 'dispatched' || status === 'invoiced') && (order as any).dispatchedAt && (
         <TooltipProvider>
           <Tooltip>
@@ -161,7 +156,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: ColumnsProp
           N° Venta <ArrowUpDown className="ml-2 h-3 w-3" />
         </Button>
     ),
-    cell: ({ row }) => <div className="font-mono font-bold text-slate-200">{row.getValue("id")}</div>,
+    cell: ({ row }) => <div className="font-mono font-bold text-slate-200">{row.original.number || row.original.id.substring(0,8)}</div>,
   },
   {
     accessorKey: "date",
@@ -214,7 +209,6 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: ColumnsProp
               <Eye className="mr-2 h-4 w-4 text-blue-500" /> Vista Previa
             </DropdownMenuItem>
             
-            {/* Solo permitimos editar si no está facturada (opcional, pero buena práctica) */}
             <DropdownMenuItem onClick={() => onEdit(order)} className="cursor-pointer focus:bg-slate-800 focus:text-white">
               <Edit className="mr-2 h-4 w-4 text-amber-500" /> Editar
             </DropdownMenuItem>

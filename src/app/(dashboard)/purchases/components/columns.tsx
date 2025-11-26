@@ -1,19 +1,21 @@
+"use client"
 
-"use client";
-
-import { useState } from "react";
-import { ColumnDef } from "@tanstack/react-table";
-import { PurchaseOrder, Contact } from "@/lib/types";
-import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit, Trash2, Eye, CalendarCheck, ArrowUpDown, Truck } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { useState } from "react"
+import { ColumnDef } from "@tanstack/react-table"
+import { PurchaseOrder, Contact } from "@/lib/types"
+import { Button } from "@/components/ui/button"
+import { ArrowUpDown, MoreHorizontal, Eye, Edit, Trash2, CheckCircle2 } from "lucide-react"
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu"
+import { format, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
+import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -21,15 +23,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import { doc, updateDoc } from "firebase/firestore";
-import { useToast } from "@/hooks/use-toast";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { processOrderStockMovement } from "@/lib/inventory-actions"; 
 import { useFirebase } from "@/firebase"; 
+import { useToast } from "@/hooks/use-toast";
 
-// --- COMPONENTE DE CELDA DE ESTADO (INTERACTIVO) ---
+// Helper para moneda
+const formatCurrency = (value: number) => 
+  new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+
+// --- COMPONENTE DE CELDA DE ESTADO (COMPRAS) ---
 const StatusCell = ({ order }: { order: PurchaseOrder }) => {
   const { firestore } = useFirebase();
   const [status, setStatus] = useState(order.status);
@@ -38,14 +40,12 @@ const StatusCell = ({ order }: { order: PurchaseOrder }) => {
 
   const getStatusStyles = (currentStatus: string) => {
     switch (currentStatus) {
-      case "completed": // Recepcionada
-        return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 hover:text-emerald-600";
-      case "received": // En Tránsito
+      case "received":
         return "bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-600";
+      case "completed":
+        return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 hover:text-emerald-600";
       case "pending":
-        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20 hover:bg-yellow-500/20 hover:text-yellow-700";
-      case "draft":
-        return "bg-slate-500/10 text-slate-500 border-slate-500/20 hover:bg-slate-500/20 hover:text-slate-400";
+        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20 hover:text-yellow-600";
       case "cancelled":
         return "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20 hover:text-red-600";
       default:
@@ -55,9 +55,8 @@ const StatusCell = ({ order }: { order: PurchaseOrder }) => {
 
   const getStatusLabel = (s: string) => {
       switch(s) {
-          case 'draft': return 'Borrador';
           case 'pending': return 'Pendiente';
-          case 'received': return 'En Tránsito';
+          case 'received': return 'En Tránsito'; // O "Recibida Parcial" según tu lógica
           case 'completed': return 'Recepcionada';
           case 'cancelled': return 'Anulada';
           default: return s;
@@ -65,35 +64,27 @@ const StatusCell = ({ order }: { order: PurchaseOrder }) => {
   };
 
   const handleStatusChange = async (newStatus: string) => {
+    if (!firestore) return;
     const oldStatus = status;
-    setStatus(newStatus as any);
+    // @ts-ignore
+    setStatus(newStatus);
     setIsLoading(true);
 
     try {
+      // Actualizamos directo en Firebase
       const orderRef = doc(firestore, "purchaseOrders", order.id);
-      const updateData: any = { status: newStatus };
-
-      // Si pasa a Recepcionada, guardamos la fecha real de ingreso
-      if (newStatus === "completed" && oldStatus !== "completed") {
-        updateData.receivedAt = new Date().toISOString();
-      }
-
-      await updateDoc(orderRef, updateData);
-      
-      // Movimiento de Inventario (Actualiza stock si corresponde)
-      if (processOrderStockMovement) {
-          await processOrderStockMovement(order, newStatus, oldStatus);
-      }
+      await updateDoc(orderRef, { status: newStatus });
 
       toast({
         title: "Estado Actualizado",
-        description: `Orden ${order.id} marcada como ${getStatusLabel(newStatus)}. Stock actualizado.`,
+        description: `La orden ahora está ${getStatusLabel(newStatus)}.`,
         className: "bg-slate-900 text-white border-slate-800"
       });
 
     } catch (error) {
       console.error("Error updating status:", error);
-      setStatus(oldStatus as any);
+      // @ts-ignore
+      setStatus(oldStatus);
       toast({
         title: "Error",
         description: "No se pudo actualizar el estado.",
@@ -107,70 +98,44 @@ const StatusCell = ({ order }: { order: PurchaseOrder }) => {
   return (
     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
       <Select value={status} onValueChange={handleStatusChange} disabled={isLoading}>
-        <SelectTrigger className={`h-7 w-[135px] text-xs font-semibold border rounded-full px-3 transition-all ${getStatusStyles(status)}`}>
+        <SelectTrigger className={`h-7 w-[130px] text-xs font-semibold border rounded-full px-3 transition-all ${getStatusStyles(status)}`}>
           <SelectValue>{getStatusLabel(status)}</SelectValue>
         </SelectTrigger>
         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-          <SelectItem value="draft" className="text-slate-400 focus:bg-slate-800 cursor-pointer">Borrador</SelectItem>
           <SelectItem value="pending" className="text-yellow-400 focus:bg-slate-800 cursor-pointer">Pendiente</SelectItem>
           <SelectItem value="received" className="text-blue-400 focus:bg-slate-800 cursor-pointer">En Tránsito</SelectItem>
           <SelectItem value="completed" className="text-emerald-400 focus:bg-slate-800 cursor-pointer">Recepcionada</SelectItem>
           <SelectItem value="cancelled" className="text-red-400 focus:bg-slate-800 cursor-pointer">Anulada</SelectItem>
         </SelectContent>
       </Select>
-
-      {/* TOOLTIP DE TRAZABILIDAD */}
-      {/* Icono Verde para Recepcionada (Ingreso OK) */}
-      {status === 'completed' && (order as any).receivedAt && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <CalendarCheck className="h-4 w-4 text-emerald-500/70 hover:text-emerald-500 transition-colors cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent className="bg-slate-900 border-slate-800 text-xs text-slate-300">
-              <p>Recepcionado el:</p>
-              <p className="font-bold text-emerald-400">
-                {format(parseISO((order as any).receivedAt), "dd/MM/yyyy HH:mm", { locale: es })}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-
-      {/* Icono Azul para En Tránsito */}
-      {status === 'received' && (
-         <TooltipProvider>
-         <Tooltip>
-           <TooltipTrigger asChild>
-             <Truck className="h-4 w-4 text-blue-500/70 hover:text-blue-500 transition-colors cursor-help" />
-           </TooltipTrigger>
-           <TooltipContent className="bg-slate-900 border-slate-800 text-xs text-slate-300">
-             <p>Mercadería en ruta</p>
-           </TooltipContent>
-         </Tooltip>
-       </TooltipProvider>
-      )}
     </div>
   );
 };
 
-// --- DEFINICIÓN DE COLUMNAS ---
+// --- COLUMNAS ---
 
-interface ColumnsProps {
+interface GetColumnsProps {
   onEdit: (order: PurchaseOrder) => void;
   onDelete: (order: PurchaseOrder) => void;
   onPreview: (order: PurchaseOrder) => void;
   suppliers: Contact[];
 }
 
-export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: ColumnsProps): ColumnDef<PurchaseOrder>[] => [
+export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumnsProps): ColumnDef<PurchaseOrder>[] => [
   {
     accessorKey: "id",
-    header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-0 hover:bg-transparent hover:text-slate-700">
-          N° Orden <ArrowUpDown className="ml-2 h-3 w-3" />
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-0 hover:bg-transparent hover:text-slate-700"
+        >
+          N° Orden
+          <ArrowUpDown className="ml-2 h-3 w-3" />
         </Button>
-    ),
+      )
+    },
     cell: ({ row }) => <div className="font-mono font-bold text-slate-200">{row.getValue("id")}</div>,
   },
   {
@@ -183,33 +148,32 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: ColumnsPr
     },
   },
   {
-    accessorKey: "supplierId", 
+    accessorKey: "supplierId",
     header: "Proveedor",
     cell: ({ row }) => {
-        const supplier = suppliers.find(s => s.id === row.original.supplierId);
-        return <div className="font-medium text-slate-200 capitalize">{supplier ? supplier.name : <span className="text-slate-500 italic">Desconocido</span>}</div>
+      const supplierId = row.getValue("supplierId") as string;
+      const supplier = suppliers.find(s => s.id === supplierId);
+      return <div className="font-medium text-slate-200 capitalize">{supplier ? supplier.name : "Desconocido"}</div>
     },
   },
   {
     accessorKey: "status",
-    header: "Estado / Trazabilidad",
+    header: "Estado",
     cell: ({ row }) => <StatusCell order={row.original} />,
   },
   {
     accessorKey: "totalAmount",
-    header: ({ column }) => (
-        <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total</div>
-    ),
+    header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL</div>,
     cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("totalAmount"));
-      const formatted = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(amount);
-      return <div className="text-right font-bold text-emerald-400">{formatted}</div>;
+      const amount = parseFloat(row.getValue("totalAmount"))
+      return <div className="text-right font-bold font-mono text-emerald-400">{formatCurrency(amount)}</div>
     },
   },
   {
     id: "actions",
     cell: ({ row }) => {
-      const order = row.original;
+      const order = row.original
+ 
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -221,21 +185,18 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: ColumnsPr
           <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200 shadow-lg">
             <DropdownMenuLabel className="text-xs text-slate-500 uppercase">Acciones</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => onPreview(order)} className="cursor-pointer focus:bg-slate-800 focus:text-white">
-              <Eye className="mr-2 h-4 w-4 text-blue-500" /> Vista Previa
+              <Eye className="mr-2 h-4 w-4 text-blue-500" /> Ver detalle
             </DropdownMenuItem>
-            
-            {/* Solo permitir editar si no está recepcionada completamente (Opcional) */}
             <DropdownMenuItem onClick={() => onEdit(order)} className="cursor-pointer focus:bg-slate-800 focus:text-white">
               <Edit className="mr-2 h-4 w-4 text-amber-500" /> Editar
             </DropdownMenuItem>
-            
             <DropdownMenuSeparator className="bg-slate-800" />
             <DropdownMenuItem onClick={() => onDelete(order)} className="cursor-pointer text-red-500 focus:bg-red-900/20 focus:text-red-400">
               <Trash2 className="mr-2 h-4 w-4" /> Eliminar
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      );
+      )
     },
   },
-];
+]
