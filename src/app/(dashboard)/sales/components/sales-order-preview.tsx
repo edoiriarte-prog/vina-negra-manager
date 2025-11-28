@@ -14,17 +14,24 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Separator } from "@/components/ui/separator";
 import { Download, Printer } from "lucide-react";
+// Nuevas importaciones
+import { useMasterData } from "@/hooks/use-master-data";
+import { PDFDownloadButton } from "@/components/pdf/pdf-download-button";
 
-// AQUÍ AGREGAMOS 'onExportRequest' PARA QUE NO FALLE
 interface SalesOrderPreviewProps {
   order: SalesOrder | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onExportRequest?: () => void; // <--- ESTA LÍNEA ES LA CLAVE
+  onExportRequest?: () => void;
 }
 
 export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest }: SalesOrderPreviewProps) {
+  // Obtenemos los contactos para buscar el nombre y RUT del cliente
+  const { contacts } = useMasterData();
+  
   if (!order) return null;
+
+  const client = contacts.find(c => c.id === order.clientId);
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
@@ -43,11 +50,12 @@ export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="font-semibold text-slate-500">Cliente</p>
-              <p>{order.clientId}</p>
+              <p className="font-bold">{client?.name || 'Cliente General'}</p>
+              <p className="text-xs text-slate-400">{client?.rut || ''}</p>
             </div>
             <div className="text-right">
               <p className="font-semibold text-slate-500">Estado</p>
-              <p className="uppercase font-bold">{order.status}</p>
+              <p className="uppercase font-bold">{order.status === 'dispatched' ? 'Despachado' : order.status}</p>
             </div>
           </div>
 
@@ -73,16 +81,28 @@ export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest
           </div>
         </div>
 
-        <DialogFooter className="sm:justify-between">
+        <DialogFooter className="sm:justify-between flex-col sm:flex-row gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cerrar</Button>
-          <div className="flex gap-2">
+          
+          <div className="flex gap-2 flex-wrap justify-end">
+            {/* Botón PDF Nuevo */}
+            <PDFDownloadButton 
+                order={order}
+                clientName={client?.name || 'Cliente'}
+                clientRut={client?.rut}
+                type="VENTA"
+                fileName={`Venta_${order.number || order.id}.pdf`}
+            />
+
+            {/* Botón Excel Antiguo (Opcional) */}
             {onExportRequest && (
-                <Button onClick={onExportRequest} variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" /> Exportar
+                <Button onClick={onExportRequest} variant="outline" className="gap-2" title="Descargar Excel">
+                    <Download className="h-4 w-4" /> Excel
                 </Button>
             )}
-            <Button onClick={() => window.print()} className="gap-2">
-              <Printer className="h-4 w-4" /> Imprimir
+            
+            <Button onClick={() => window.print()} className="gap-2" variant="ghost" title="Impresión rápida">
+              <Printer className="h-4 w-4" />
             </Button>
           </div>
         </DialogFooter>

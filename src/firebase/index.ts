@@ -23,8 +23,7 @@ export const auth = getAuth(app);
 export const firestore = getFirestore(app);
 
 // --- 4. EXPORTAR LOS MÓDULOS DE AYUDA (CORREGIDO) ---
-// Aquí estaba el error. Ahora importamos nombres específicos de 'provider'
-// para evitar el conflicto de 'useMemoFirebase'.
-
-export { FirebaseProvider, useFirebase } from './provider'; 
-export * from './hooks';
+export { FirebaseProvider, useFirebase, useAuth, useFirestore, useFirebaseApp, useMemoFirebase, useUser } from './provider'; 
+export * from './non-blocking-updates';
+export * from './firestore/use-collection';
+export * from './firestore/use-doc';

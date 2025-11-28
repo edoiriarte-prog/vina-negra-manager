@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -38,6 +39,7 @@ import { useFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateD
 // Hooks
 import { useOperations } from '@/hooks/use-operations';
 import { useMasterData } from '@/hooks/use-master-data';
+import { useSalesOrdersCRUD } from '@/hooks/use-sales-orders-crud';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -52,6 +54,8 @@ export default function DispatchesPage() {
 
   const { salesOrders, purchaseOrders, isLoading: loadingOps } = useOperations();
   const { contacts, inventory, isLoading: loadingMaster } = useMasterData();
+  const { createSalesOrder, updateSalesOrder, deleteSalesOrder } = useSalesOrdersCRUD();
+
 
   const isLoading = loadingOps || loadingMaster;
 
@@ -158,11 +162,11 @@ export default function DispatchesPage() {
     };
 
     if ('id' in orderToSave) {
-        updateDocumentNonBlocking(doc(firestore, 'salesOrders', orderToSave.id), finalOrderData);
+        updateSalesOrder(orderToSave.id, finalOrderData as SalesOrder);
         toast({ title: 'Orden Actualizada', description: `La orden ${orderToSave.id} ha sido actualizada.` });
         setPreviewingOrder({ ...finalOrderData, id: orderToSave.id } as SalesOrder);
     } else {
-        addDocumentNonBlocking(collection(firestore, 'salesOrders'), finalOrderData).then(docRef => {
+        createSalesOrder(finalOrderData as SalesOrder).then(docRef => {
             if (docRef) {
                 toast({ title: 'Orden Creada', description: `La orden ${docRef.id} ha sido creada.` });
                 setPreviewingOrder({ ...finalOrderData, id: docRef.id } as SalesOrder);
@@ -192,7 +196,7 @@ export default function DispatchesPage() {
   
   const confirmDelete = () => {
     if (deletingOrder && firestore) {
-      deleteDocumentNonBlocking(doc(firestore, 'salesOrders', deletingOrder.id));
+      deleteSalesOrder(deletingOrder.id);
       toast({ variant: "destructive", title: 'Orden Eliminada', description: `La orden ${deletingOrder.id} ha sido eliminada.` });
       setDeletingOrder(null);
     }

@@ -16,12 +16,12 @@ import { doc, collection } from 'firebase/firestore';
 
 // --- TIPOS ---
 export type ProductCaliberAssociation = {
-  id: string;
-  calibers: string[];
+  id: string; // ID del producto (nombre)
+  calibers: string[]; // IDs de calibres (nombres)
 };
 
 type MasterSettings = {
-  products: string[]; // Usamos strings simples para compatibilidad total
+  products: string[]; 
   calibers: { name: string; code: string }[];
   warehouses: string[];
   units: string[];
@@ -53,6 +53,9 @@ type MasterDataContextType = {
   removeUnit: (u: string) => void;
   addPackagingType: (p: string) => void;
   removePackagingType: (p: string) => void;
+  
+  // --- ESTA LÍNEA FALTABA EN TU CÓDIGO ---
+  updateProductCalibers: (productId: string, caliberIds: string[]) => void;
   
   addBankAccount: (account: BankAccount) => void;
   updateBankAccount: (account: BankAccount) => void;
@@ -121,6 +124,19 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
   const addPackagingType = (p: string) => { if (!packagingTypes.includes(p)) updateSettingList('packagingTypes', [...packagingTypes, p]); };
   const removePackagingType = (p: string) => updateSettingList('packagingTypes', packagingTypes.filter(item => item !== p));
 
+  // ASOCIACIONES
+  const updateProductCalibers = (productName: string, caliberNames: string[]) => {
+    const index = productCaliberAssociations.findIndex(a => a.id === productName);
+    let newAssociations = [...productCaliberAssociations];
+    
+    if (index >= 0) {
+      newAssociations[index] = { id: productName, calibers: caliberNames };
+    } else {
+      newAssociations.push({ id: productName, calibers: caliberNames });
+    }
+    updateSettingList('productCaliberAssociations', newAssociations);
+  };
+
   // Gestión de Cuentas Bancarias
   const addBankAccount = (account: BankAccount) => {
     if (!firestore) return;
@@ -156,6 +172,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     units, addUnit, removeUnit,
     packagingTypes, addPackagingType, removePackagingType,
     productCaliberAssociations,
+    updateProductCalibers, // <--- ESTÁ AQUÍ
     inventory,
     contacts,
     bankAccounts, addBankAccount, updateBankAccount, removeBankAccount,

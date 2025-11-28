@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sidebar"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image" // <--- IMPORTANTE: Importamos componente de imagen
 
 // Menú de navegación
 const navMain = [
@@ -49,14 +50,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="icon" {...props} className="border-r border-slate-800 bg-slate-950">
-      <SidebarHeader className="border-b border-slate-800 bg-slate-950">
-        <div className="flex h-12 items-center px-4 font-bold text-white text-lg">
-           <span className="text-blue-500 mr-1">VN</span> Manager
+      <SidebarHeader className="border-b border-slate-800 bg-slate-950 h-16 flex justify-center">
+        {/* LOGO Y NOMBRE DE LA APP */}
+        <div className="flex items-center gap-3 px-2 w-full">
+            <div className="relative h-10 w-10 min-w-[40px] overflow-hidden rounded-md bg-white flex items-center justify-center">
+                {/* Asegúrate de que la imagen se llame 'logo-avn.png' en la carpeta public */}
+                <Image 
+                    src="/logo-avn.png" 
+                    alt="AVN Logo" 
+                    width={40} 
+                    height={40} 
+                    className="object-contain p-1"
+                />
+            </div>
+            <div className="flex flex-col group-data-[collapsible=icon]:hidden transition-all duration-300">
+                <span className="font-bold text-white text-lg leading-none tracking-tight">AVN</span>
+                <span className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">Manager</span>
+            </div>
         </div>
       </SidebarHeader>
-      <SidebarContent className="bg-slate-950">
+
+      <SidebarContent className="bg-slate-950 pt-4">
         <SidebarGroup>
-            <SidebarGroupLabel className="text-slate-500">Menu</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Navegación</SidebarGroupLabel>
             <SidebarMenu>
             {navMain.map((item) => {
                 const isActive = pathname === item.url;
@@ -66,10 +82,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         asChild 
                         tooltip={item.title} 
                         isActive={isActive}
-                        className={isActive ? "bg-blue-600 text-white hover:bg-blue-500 hover:text-white" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"}
+                        className={`h-10 transition-all duration-200 ${isActive 
+                            ? "bg-blue-600 text-white hover:bg-blue-500 hover:text-white shadow-md shadow-blue-900/20 font-medium" 
+                            : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                        }`}
                     >
-                    <Link href={item.url}>
-                        <item.icon className={isActive ? "text-white" : "text-slate-500"} />
+                    <Link href={item.url} className="flex items-center gap-3">
+                        <item.icon className={isActive ? "text-white" : "text-slate-500"} size={18} />
                         <span>{item.title}</span>
                     </Link>
                     </SidebarMenuButton>
@@ -79,10 +98,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+      
       <SidebarFooter className="border-t border-slate-800 bg-slate-950 p-4">
-        <button className="flex items-center gap-2 text-sm text-slate-500 hover:text-red-400 w-full px-2 transition-colors">
-            <LogOut className="h-4 w-4" />
-            <span>Cerrar Sesión</span>
+        <button className="flex items-center gap-3 text-sm text-slate-500 hover:text-red-400 w-full px-2 py-2 rounded-md hover:bg-slate-900 transition-all group">
+            <LogOut className="h-4 w-4 group-hover:scale-110 transition-transform" />
+            <span className="group-data-[collapsible=icon]:hidden">Cerrar Sesión</span>
         </button>
       </SidebarFooter>
       <SidebarRail />

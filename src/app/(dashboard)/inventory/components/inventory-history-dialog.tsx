@@ -1,16 +1,15 @@
-
 "use client";
 
 import { useMemo, useRef, forwardRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment, Contact } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
-import { Printer, Download } from 'lucide-react';
+import { Printer, Download, Package } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -28,7 +27,7 @@ type InventoryHistoryDialogProps = {
 type Transaction = {
   date: string;
   orderId: string;
-  type: 'Entrada' | 'Salida' | 'Ajuste Aumento' | 'Ajuste Disminución';
+  type: 'Entrada' | 'Salida' | 'Ajuste Aumento' | 'Ajuste Disminución' | 'Traslado (Entrada)' | 'Traslado (Salida)';
   contact: string;
   inflow: number;
   outflow: number;
@@ -40,6 +39,7 @@ const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(val
 const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
 
 
+// --- COMPONENTE IMPRIMIBLE ---
 type PrintableContentProps = {
   history: (Transaction & { balance: number, balancePackages: number })[];
   item: InventoryItem;
@@ -47,50 +47,62 @@ type PrintableContentProps = {
 
 const PrintableContent = forwardRef<HTMLDivElement, PrintableContentProps>(({ history, item }, ref) => {
     return (
-        <div ref={ref} className="max-h-[60vh] overflow-y-auto p-1">
-            <h3 className="text-lg font-semibold print:block hidden mb-2">Historial: {item.product} - {item.caliber}</h3>
-            <div className="border rounded-md">
+        <div ref={ref} className="p-1 text-slate-900 dark:text-slate-100">
+            {/* Encabezado solo visible al imprimir */}
+            <div className="hidden print:block mb-4">
+                <h1 className="text-xl font-bold">Kardex de Inventario</h1>
+                {/* CORRECCIÓN: Usamos item.name en lugar de item.product */}
+                <p>Producto: {item.name} | Calibre: {item.caliber}</p>
+                <p>Bodega: {item.warehouse}</p>
+                <p>Fecha Reporte: {format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+            </div>
+
+            <div className="rounded-md border border-slate-800 overflow-hidden">
                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Documento/Motivo</TableHead>
-                            <TableHead>Contacto/Origen</TableHead>
-                            <TableHead className="text-right">Mov. Envase</TableHead>
-                            <TableHead className="text-right">Mov. Kilos</TableHead>
-                            <TableHead className="text-right">Saldo Envase</TableHead>
-                            <TableHead className="text-right">Saldo Kilos</TableHead>
+                    <TableHeader className="bg-slate-900">
+                        <TableRow className="border-slate-800 hover:bg-slate-900">
+                            <TableHead className="text-slate-300 font-bold">Fecha</TableHead>
+                            <TableHead className="text-slate-300 font-bold">Tipo</TableHead>
+                            <TableHead className="text-slate-300 font-bold">Documento</TableHead>
+                            <TableHead className="text-slate-300 font-bold">Origen / Destino</TableHead>
+                            <TableHead className="text-right text-slate-300 font-bold">Entrada</TableHead>
+                            <TableHead className="text-right text-slate-300 font-bold">Salida</TableHead>
+                            <TableHead className="text-right text-white font-bold">Saldo</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {history.length === 0 && <TableRow><TableCell colSpan={8} className="h-24 text-center">Sin transacciones.</TableCell></TableRow>}
+                        {history.length === 0 && (
+                            <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">Sin movimientos registrados.</TableCell></TableRow>
+                        )}
                         {history.map((tx, index) => (
-                            <TableRow key={index}>
-                                <TableCell className="font-medium">{format(parseISO(tx.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
+                            <TableRow key={index} className="border-slate-800 hover:bg-slate-900/50">
+                                <TableCell className="font-medium text-slate-400">
+                                    {format(parseISO(tx.date), 'dd-MM-yy')}
+                                </TableCell>
                                 <TableCell>
                                     <Badge 
-                                        variant={
-                                            tx.type === 'Entrada' ? 'secondary' : 
-                                            tx.type === 'Salida' ? 'destructive' :
-                                            tx.type === 'Ajuste Aumento' ? 'default' : 'outline'
-                                        }
+                                        variant="outline"
+                                        className={cn(
+                                            "border-opacity-50 whitespace-nowrap",
+                                            (tx.type === 'Entrada' || tx.type === 'Ajuste Aumento' || tx.type === 'Traslado (Entrada)') 
+                                                ? 'text-emerald-400 border-emerald-500 bg-emerald-950/30' 
+                                                : 'text-red-400 border-red-500 bg-red-950/30'
+                                        )}
                                     >
-                                        {tx.type}
+                                        {tx.type.replace('Ajuste ', 'Aj. ')}
                                     </Badge>
                                 </TableCell>
-                                <TableCell>{tx.orderId}</TableCell>
-                                <TableCell>{tx.contact}</TableCell>
-                                <TableCell className="text-right text-muted-foreground">
-                                    {tx.inflowPackages > 0 ? `+${formatPackages(tx.inflowPackages)}` : tx.outflowPackages > 0 ? `-${formatPackages(tx.outflowPackages)}` : '-'}
+                                <TableCell className="text-xs font-mono text-slate-300">{tx.orderId}</TableCell>
+                                <TableCell className="text-xs text-slate-400 max-w-[150px] truncate" title={tx.contact}>
+                                    {tx.contact}
                                 </TableCell>
-                                <TableCell className="text-right text-muted-foreground">
-                                    {tx.inflow > 0 ? `+${formatKilos(tx.inflow)}` : tx.outflow > 0 ? `-${formatKilos(tx.outflow)}` : '-'}
+                                <TableCell className="text-right text-emerald-400/70 font-mono text-xs">
+                                    {tx.inflow > 0 ? `+${formatKilos(tx.inflow)}` : '-'}
                                 </TableCell>
-                                <TableCell className="text-right font-bold text-primary">
-                                    {formatPackages(tx.balancePackages)}
+                                <TableCell className="text-right text-red-400/70 font-mono text-xs">
+                                    {tx.outflow > 0 ? `-${formatKilos(tx.outflow)}` : '-'}
                                 </TableCell>
-                                <TableCell className="text-right font-bold text-primary">
+                                <TableCell className="text-right font-bold text-white font-mono text-sm bg-slate-900/30">
                                     {formatKilos(tx.balance)}
                                 </TableCell>
                             </TableRow>
@@ -103,12 +115,18 @@ const PrintableContent = forwardRef<HTMLDivElement, PrintableContentProps>(({ hi
 });
 PrintableContent.displayName = 'PrintableContent';
 
-export function InventoryHistoryDialog({ item, isOpen, onOpenChange, purchaseOrders, salesOrders, inventoryAdjustments, contacts }: InventoryHistoryDialogProps) {
-  const { toast } = useToast();
 
+// --- COMPONENTE PRINCIPAL ---
+export function InventoryHistoryDialog({ 
+    item, isOpen, onOpenChange, purchaseOrders, salesOrders, inventoryAdjustments, contacts 
+}: InventoryHistoryDialogProps) {
+  const { toast } = useToast();
   const componentRef = useRef<HTMLDivElement>(null);
+  
+  // Configuración de impresión
   const handlePrint = useReactToPrint({
-    content: () => componentRef.current,
+    contentRef: componentRef, // CORRECCIÓN: Sintaxis nueva de react-to-print
+    documentTitle: `Kardex_${item?.name}_${item?.caliber}`,
   });
   
   const transactionHistory = useMemo(() => {
@@ -116,20 +134,20 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange, purchaseOrd
 
     const allTransactions: Transaction[] = [];
 
-    // Aggregate inflows from purchase orders
+    // 1. COMPRAS (Entradas)
     purchaseOrders
       .filter(po => (item.warehouse === 'All' || po.warehouse === item.warehouse) && (po.status === 'completed' || po.status === 'received'))
       .forEach(po => {
         po.items
-          .filter(i => i.product === item.product && i.caliber === item.caliber)
+          .filter(i => i.product === item.name && i.caliber === item.caliber) // CORRECCIÓN: item.name
           .forEach(i => {
-            const supplier = (contacts as any[]).find(c => c.id === po.supplierId);
+            const supplier = contacts.find(c => c.id === po.supplierId);
             allTransactions.push({
               date: po.date,
-              orderId: po.id,
+              orderId: `OC-${po.number || po.id.substring(0,6)}`,
               type: 'Entrada',
-              contact: supplier?.name || 'N/A',
-              inflow: i.unit === 'Kilos' ? i.quantity : 0,
+              contact: supplier?.name || 'Proveedor Desconocido',
+              inflow: i.quantity || 0,
               outflow: 0,
               inflowPackages: i.packagingQuantity || 0,
               outflowPackages: 0,
@@ -137,65 +155,90 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange, purchaseOrd
           });
       });
 
-    // Aggregate outflows from sales orders
+    // 2. VENTAS (Salidas)
     salesOrders
-      .filter(so => (item.warehouse === 'All' || so.warehouse === item.warehouse) && (so.status === 'completed' || so.status === 'pending' || so.status === 'dispatched' || so.status === 'invoiced'))
+      .filter(so => (so.status === 'completed' || so.status === 'dispatched' || so.status === 'invoiced'))
       .forEach(so => {
-        so.items
-          .filter(i => i.product === item.product && i.caliber === item.caliber)
-          .forEach(i => {
-            const client = (contacts as any[]).find(c => c.id === so.clientId);
-            allTransactions.push({
-              date: so.date,
-              orderId: so.id,
-              type: 'Salida',
-              contact: client?.name || 'N/A',
-              inflow: 0,
-              outflow: i.unit === 'Kilos' ? i.quantity : 0,
-              inflowPackages: 0,
-              outflowPackages: i.packagingQuantity || 0,
-            });
-          });
+        // Caso especial: Traspaso Interno
+        if (so.saleType === 'Traslado Bodega Interna') {
+            // Si mi bodega actual es la de ORIGEN -> Es Salida
+            if (item.warehouse === 'All' || so.warehouse === item.warehouse) {
+                so.items.filter(i => i.product === item.name && i.caliber === item.caliber).forEach(i => {
+                    allTransactions.push({
+                        date: so.date,
+                        orderId: `TRAS-${so.number || so.id.substring(0,6)}`,
+                        type: 'Traslado (Salida)',
+                        contact: `Hacia: ${so.destinationWarehouse}`,
+                        inflow: 0,
+                        outflow: i.quantity,
+                        inflowPackages: 0,
+                        outflowPackages: i.packagingQuantity || 0,
+                    });
+                });
+            }
+            // Si mi bodega actual es el DESTINO -> Es Entrada
+            if (item.warehouse === 'All' || so.destinationWarehouse === item.warehouse) {
+                 so.items.filter(i => i.product === item.name && i.caliber === item.caliber).forEach(i => {
+                    allTransactions.push({
+                        date: so.date,
+                        orderId: `TRAS-${so.number || so.id.substring(0,6)}`,
+                        type: 'Traslado (Entrada)',
+                        contact: `Desde: ${so.warehouse}`,
+                        inflow: i.quantity,
+                        outflow: 0,
+                        inflowPackages: i.packagingQuantity || 0,
+                        outflowPackages: 0,
+                    });
+                });
+            }
+        } else {
+            // Venta Normal (Salida)
+            if (item.warehouse === 'All' || so.warehouse === item.warehouse) {
+                 so.items.filter(i => i.product === item.name && i.caliber === item.caliber).forEach(i => {
+                    const client = contacts.find(c => c.id === so.clientId);
+                    allTransactions.push({
+                        date: so.date,
+                        orderId: `OV-${so.number || so.id.substring(0,6)}`,
+                        type: 'Salida',
+                        contact: client?.name || 'Cliente General',
+                        inflow: 0,
+                        outflow: i.quantity,
+                        inflowPackages: 0,
+                        outflowPackages: i.packagingQuantity || 0,
+                    });
+                });
+            }
+        }
       });
       
-    // Aggregate adjustments
+    // 3. AJUSTES (Ambos)
     inventoryAdjustments
-      .filter(adj => (item.warehouse === 'All' || adj.warehouse === item.warehouse) && adj.product === item.product && adj.caliber === item.caliber)
+      .filter(adj => (item.warehouse === 'All' || adj.warehouse === item.warehouse) && adj.product === item.name && adj.caliber === item.caliber)
       .forEach(adj => {
+          const isInc = adj.type === 'increase';
           allTransactions.push({
-              date: adj.date,
-              orderId: adj.reason,
-              type: adj.type === 'increase' ? 'Ajuste Aumento' : 'Ajuste Disminución',
-              contact: 'Ajuste Interno',
-              inflow: adj.type === 'increase' ? adj.quantity : 0,
-              outflow: adj.type === 'decrease' ? adj.quantity : 0,
-              inflowPackages: adj.type === 'increase' ? (adj.packagingQuantity || 0) : 0,
-              outflowPackages: adj.type === 'decrease' ? (adj.packagingQuantity || 0) : 0,
+            date: adj.date,
+            orderId: 'AJUSTE',
+            type: isInc ? 'Ajuste Aumento' : 'Ajuste Disminución',
+            contact: adj.reason || 'Sin motivo',
+            inflow: isInc ? adj.quantity : 0,
+            outflow: !isInc ? adj.quantity : 0,
+            inflowPackages: isInc ? (adj.packagingQuantity || 0) : 0,
+            outflowPackages: !isInc ? (adj.packagingQuantity || 0) : 0,
           });
       });
 
-    // Sort transactions: by date, then by type ('Entrada' and 'Ajuste Aumento' first)
-    allTransactions.sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      if (dateA !== dateB) {
-        return dateA - dateB;
-      }
-      // Inflows first
-      const aIsInflow = a.type === 'Entrada' || a.type === 'Ajuste Aumento';
-      const bIsInflow = b.type === 'Entrada' || b.type === 'Ajuste Aumento';
-      if (aIsInflow && !bIsInflow) return -1;
-      if (!aIsInflow && bIsInflow) return 1;
-      return 0;
-    });
+    // Ordenar por fecha
+    allTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    // Calcular saldo acumulado
     let runningBalance = 0;
     let runningBalancePackages = 0;
     return allTransactions.map(tx => {
         runningBalance += tx.inflow - tx.outflow;
         runningBalancePackages += tx.inflowPackages - tx.outflowPackages;
         return { ...tx, balance: runningBalance, balancePackages: runningBalancePackages };
-    });
+    }).reverse(); // Mostrar lo más reciente arriba
 
   }, [item, purchaseOrders, salesOrders, inventoryAdjustments, contacts]);
   
@@ -207,45 +250,55 @@ export function InventoryHistoryDialog({ item, isOpen, onOpenChange, purchaseOrd
     const dataForSheet = transactionHistory.map(tx => ({
       'Fecha': format(parseISO(tx.date), 'dd-MM-yyyy'),
       'Tipo': tx.type,
-      'Documento/Motivo': tx.orderId,
-      'Contacto/Origen': tx.contact,
+      'Documento': tx.orderId,
+      'Entidad': tx.contact,
       'Entradas (kg)': tx.inflow,
       'Salidas (kg)': tx.outflow,
       'Saldo (kg)': tx.balance,
-      'Entradas (envases)': tx.inflowPackages,
-      'Salidas (envases)': tx.outflowPackages,
-      'Saldo (envases)': tx.balancePackages,
     }));
     const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, `Historial_${item.product}_${item.caliber}`);
-    XLSX.writeFile(workbook, `Historial_Inventario_${item.product}_${item.caliber}.xlsx`);
-    toast({ title: 'Exportación Exitosa', description: 'El historial del ítem ha sido exportado.' });
+    XLSX.utils.book_append_sheet(workbook, worksheet, `Kardex`);
+    // CORRECCIÓN: item.name
+    XLSX.writeFile(workbook, `Kardex_${item.name}_${item.caliber}.xlsx`);
+    toast({ title: 'Exportación Exitosa' });
   }
 
   if (!item) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
-        <DialogHeader>
-          <DialogTitle>Seguimiento Histórico: {item.product} - {item.caliber}</DialogTitle>
-          <DialogDescription>
-            Historial de transacciones y balance de stock para este ítem en la bodega: {item.warehouse}.
-          </DialogDescription>
+      <DialogContent className="sm:max-w-5xl bg-slate-950 border-slate-800 text-slate-100 p-0 flex flex-col max-h-[85vh]">
+        <DialogHeader className="px-6 py-4 border-b border-slate-800">
+          <div className="flex items-center gap-4">
+              <div className="p-2 bg-purple-500/20 rounded text-purple-400">
+                  <Package className="h-6 w-6" />
+              </div>
+              <div>
+                  {/* CORRECCIÓN: item.name */}
+                  <DialogTitle className="text-xl text-white">Kardex: {item.name} {item.caliber}</DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    Movimientos en bodega: <span className="text-white font-mono">{item.warehouse}</span>
+                  </DialogDescription>
+              </div>
+          </div>
         </DialogHeader>
-        <PrintableContent ref={componentRef} history={transactionHistory} item={item}/>
-        <DialogFooter className="no-print gap-2">
-          <Button type="button" variant="outline" onClick={handleExportHistory}>
+        
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+            <PrintableContent ref={componentRef} history={transactionHistory} item={item}/>
+        </div>
+
+        <DialogFooter className="px-6 py-4 border-t border-slate-800 bg-slate-900/50 gap-2">
+          <Button type="button" variant="outline" onClick={handleExportHistory} className="border-slate-700 text-slate-300 hover:bg-slate-800">
             <Download className="mr-2 h-4 w-4" />
-            Exportar a Excel
+            Excel
           </Button>
-          <Button onClick={handlePrint} variant="outline">
+          <Button onClick={handlePrint} variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
             <Printer className="mr-2 h-4 w-4" />
-            Imprimir Historial
+            Imprimir
           </Button>
           <DialogClose asChild>
-            <Button type="button">Cerrar</Button>
+            <Button type="button" className="bg-blue-600 hover:bg-blue-500 text-white">Cerrar</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>

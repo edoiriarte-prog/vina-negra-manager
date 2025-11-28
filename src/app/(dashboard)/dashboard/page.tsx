@@ -5,13 +5,10 @@ import { useMasterData } from '@/hooks/use-master-data';
 import { useOperations } from '@/hooks/use-operations'; 
 import KpiCard from './components/kpi-card';
 import { 
-  WeeklyPurchasesChart, 
-  WeeklySalesChart, 
-  IncomeVsExpenseChart, 
-  PurchasesBySupplierChart,
-  CaliberDistributionChart,
-  PurchasesByProductCaliberChart,
-  SalesByOrderChart
+  ComparativeFinancialChart,
+  ProductFlowChart,
+  CashFlowTrendChart,
+  TopSuppliersChart
 } from './components/charts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import AiSummary from './components/ai-summary';
@@ -21,116 +18,37 @@ import {
     ShoppingCart, 
     TrendingUp, 
     Warehouse,
+    BarChart3,
+    PieChart,
+    Activity
 } from "lucide-react";
 import { InventoryItem } from '@/lib/types';
 
-// --- HELPERS ---
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value);
-
+  new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
 const formatKilos = (value: number) =>
   new Intl.NumberFormat('es-CL').format(value);
 
 export default function DashboardPage() {
-  // 1. Datos Maestros (Solo Contactos para nombres de proveedores)
-  const { 
-      contacts,
-      isLoading: loadingMaster 
-  } = useMasterData();
-
-  // 2. Datos Operacionales (Ventas, Compras, Finanzas)
-  const {
-      purchaseOrders,
-      salesOrders,
-      financialMovements,
-      inventoryAdjustments,
-      isLoading: loadingOps
-  } = useOperations();
-  
+  const { contacts, isLoading: loadingMaster } = useMasterData();
+  const { purchaseOrders, salesOrders, financialMovements, inventoryAdjustments, isLoading: loadingOps } = useOperations();
   const isLoading = loadingMaster || loadingOps;
 
-  // 3. CÁLCULO DE INVENTARIO EN TIEMPO REAL (Derivado de Operaciones)
-  const calculatedInventory = useMemo(() => {
-      const stockMap = new Map<string, number>();
-
-      // A. Sumar Entradas (Compras)
-      purchaseOrders.forEach(order => {
-          if (order.status === 'completed' || order.status === 'received') {
-              order.items.forEach(item => {
-                  // Clave única: Producto + Calibre
-                  const key = `${item.product}-${item.caliber || 'S/C'}`; 
-                  const current = stockMap.get(key) || 0;
-                  stockMap.set(key, current + item.quantity);
-              });
-          }
-      });
-
-      // B. Restar Salidas (Ventas)
-      salesOrders.forEach(order => {
-          if (order.status === 'completed' || order.status === 'dispatched' || order.status === 'invoiced') {
-              order.items.forEach(item => {
-                  const key = `${item.product}-${item.caliber || 'S/C'}`;
-                  const current = stockMap.get(key) || 0;
-                  stockMap.set(key, current - item.quantity);
-              });
-          }
-      });
-
-      // C. Aplicar Ajustes Manuales
-      inventoryAdjustments.forEach(adj => {
-          const key = `${adj.product}-${adj.caliber || 'S/C'}`;
-          const current = stockMap.get(key) || 0;
-          if (adj.type === 'increase') {
-              stockMap.set(key, current + adj.quantity);
-          } else {
-              stockMap.set(key, current - adj.quantity);
-          }
-      });
-
-      // Convertir a formato InventoryItem para los gráficos
-      const inventoryList: InventoryItem[] = [];
-      stockMap.forEach((stock, key) => {
-          if (stock > 0) { // Solo mostramos stock positivo
-              const [product, caliber] = key.split('-');
-              inventoryList.push({
-                  id: key,
-                  name: product, // Usamos 'name' para compatibilidad con el gráfico
-                  caliber: caliber,
-                  stock: stock,
-                  category: 'fruit',
-                  unit: 'Kilos',
-                  minStock: 0,
-                  cost: 0
-              });
-          }
-      });
-
-      return inventoryList;
+  // Cálculo de Stock en tiempo real
+  const availableStock = useMemo(() => {
+      let stock = 0;
+      purchaseOrders.forEach(o => { if(o.status === 'completed' || o.status === 'received') o.items.forEach(i => stock += i.quantity) });
+      salesOrders.forEach(o => { if(o.status === 'completed' || o.status === 'dispatched' || o.status === 'invoiced') o.items.forEach(i => stock -= i.quantity) });
+      inventoryAdjustments.forEach(a => { stock += (a.type === 'increase' ? a.quantity : -a.quantity) });
+      return stock;
   }, [purchaseOrders, salesOrders, inventoryAdjustments]);
 
-
-  // 4. CÁLCULO DE KPIs
   const { kpis, financialDataString } = useMemo(() => {
     if (isLoading) return { kpis: null, financialDataString: '' };
 
-    // Filtros
     const completedPurchases = purchaseOrders.filter(o => o.status === 'completed' || o.status === 'received');
     const completedSales = salesOrders.filter(o => o.status === 'completed' || o.status === 'dispatched' || o.status === 'invoiced');
 
-    // Kilos
-    const totalKilosPurchased = completedPurchases.reduce((sum, order) => {
-        return sum + order.items.reduce((s, i) => s + (i.quantity || 0), 0);
-    }, 0);
-    
-    const totalKilosSold = completedSales.reduce((sum, order) => {
-        return sum + order.items.reduce((s, i) => s + (i.quantity || 0), 0);
-    }, 0);
-    
-    // Dinero
     const totalPurchaseAmount = completedPurchases.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     const totalSalesAmount = completedSales.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     
@@ -138,170 +56,104 @@ export default function DashboardPage() {
     const totalExpense = financialMovements.filter(m => m.type === 'expense').reduce((sum, m) => sum + (m.amount || 0), 0);
     const netCashflow = totalIncome - totalExpense;
 
-    // Stock Total (Usamos el calculado arriba)
-    const availableStock = calculatedInventory.reduce((sum, item) => sum + (item.stock || 0), 0);
-
     const kpiData = {
       totalSalesAmount,
       totalPurchaseAmount,
-      totalKilosSold,
-      totalKilosPurchased,
       netCashflow,
       availableStock,
       completedSalesCount: completedSales.length,
       completedPurchasesCount: completedPurchases.length,
     };
 
-    const financialString = `
-        Ventas Totales: ${formatCurrency(totalSalesAmount)}
-        Compras Totales: ${formatCurrency(totalPurchaseAmount)}
-        Ingresos: ${formatCurrency(totalIncome)}
-        Egresos: ${formatCurrency(totalExpense)}
-        Flujo Neto: ${formatCurrency(netCashflow)}
-        Kilos Vendidos: ${formatKilos(totalKilosSold)} kg
-        Kilos Comprados: ${formatKilos(totalKilosPurchased)} kg
-        Stock Disponible: ${formatKilos(availableStock)} kg
-    `;
+    // Texto para la IA
+    const financialString = `Ventas: ${formatCurrency(totalSalesAmount)}. Compras: ${formatCurrency(totalPurchaseAmount)}. Flujo Neto: ${formatCurrency(netCashflow)}. Stock: ${formatKilos(availableStock)}kg.`;
     
-    return { kpis: kpiData, financialDataString: financialString.trim() };
-  }, [purchaseOrders, salesOrders, financialMovements, calculatedInventory, isLoading]);
+    return { kpis: kpiData, financialDataString: financialString };
+  }, [purchaseOrders, salesOrders, financialMovements, availableStock, isLoading]);
 
 
   if (isLoading || !kpis) {
-      return (
-        <div className="p-8 pt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-40 rounded-xl bg-slate-800" />)}
-            <Skeleton className="h-80 rounded-xl md:col-span-2 lg:col-span-4 bg-slate-800" />
-            <Skeleton className="h-80 rounded-xl md:col-span-2 lg:col-span-2 bg-slate-800" />
-            <Skeleton className="h-80 rounded-xl md:col-span-2 lg:col-span-2 bg-slate-800" />
-        </div>
-      )
+      return <div className="p-8"><Skeleton className="h-96 w-full rounded-xl bg-slate-800" /></div>
   }
 
+  const cardStyle = "bg-slate-900 border-slate-800 shadow-lg hover:border-slate-700 transition-all";
+
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 bg-slate-950 min-h-screen">
-      <div className="flex items-center justify-between space-y-2">
+    <div className="flex-1 space-y-6 p-6 bg-slate-950 min-h-screen">
+      {/* Header */}
+      <div className="flex justify-between items-end">
         <div>
-            <h2 className="text-3xl font-bold tracking-tight text-white">Dashboard</h2>
-            <p className="text-slate-400">Una vista general y en tiempo real de su operación.</p>
+            <h2 className="text-3xl font-bold tracking-tight text-white">Dashboard Gerencial</h2>
+            <p className="text-slate-400">Resumen estratégico de operaciones y finanzas.</p>
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* 1. KPIs Principales */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          title="Ventas Totales"
-          value={formatCurrency(kpis.totalSalesAmount)}
-          description={`${kpis.completedSalesCount} órdenes completadas`}
-          icon={<TrendingUp className="text-emerald-500" />}
-          isLoading={isLoading}
-        />
-        <KpiCard
-          title="Compras Totales"
-          value={formatCurrency(kpis.totalPurchaseAmount)}
-          description={`${kpis.completedPurchasesCount} órdenes completadas`}
-          icon={<ShoppingCart className="text-blue-500" />}
-          isLoading={isLoading}
-        />
-        <KpiCard
-          title="Flujo de Caja Neto"
-          value={formatCurrency(kpis.netCashflow)}
-          description="Ingresos menos egresos"
-          icon={<DollarSign className="text-amber-500" />}
-          isLoading={isLoading}
-        />
-        <KpiCard
-          title="Stock Total Disponible"
-          value={`${formatKilos(kpis.availableStock)} kg`}
-          description="En todas las bodegas"
-          icon={<Warehouse className="text-slate-500" />}
-          isLoading={isLoading}
-        />
+        <KpiCard title="Ventas Totales" value={formatCurrency(kpis.totalSalesAmount)} description={`${kpis.completedSalesCount} OP completadas`} icon={<TrendingUp className="text-blue-500" />} isLoading={isLoading} />
+        <KpiCard title="Compras Totales" value={formatCurrency(kpis.totalPurchaseAmount)} description={`${kpis.completedPurchasesCount} OC recepcionadas`} icon={<ShoppingCart className="text-amber-500" />} isLoading={isLoading} />
+        <KpiCard title="Flujo de Caja Neto" value={formatCurrency(kpis.netCashflow)} description="Ingresos reales - Egresos" icon={<DollarSign className={kpis.netCashflow >= 0 ? "text-emerald-500" : "text-red-500"} />} isLoading={isLoading} />
+        <KpiCard title="Stock Disponible" value={`${formatKilos(kpis.availableStock)} kg`} description="Inventario actual global" icon={<Warehouse className="text-purple-500" />} isLoading={isLoading} />
       </div>
 
+      {/* 2. Gráficos Estratégicos (Fila Superior) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna Izquierda (más ancha) */}
-          <div className="lg:col-span-2 space-y-6">
-             <Card className="bg-slate-900 border-slate-800">
+          {/* Gráfico Grande: Comparativa Comercial */}
+          <div className="lg:col-span-2">
+             <Card className={cardStyle}>
                   <CardHeader>
-                    <CardTitle className="text-white">Flujo de Caja Semanal</CardTitle>
-                    <CardDescription className="text-slate-400">Comparativa de ingresos y egresos registrados por semana.</CardDescription>
+                    <CardTitle className="text-white flex items-center gap-2"><BarChart3 className="h-5 w-5 text-blue-500"/> Rendimiento Comercial</CardTitle>
+                    <CardDescription className="text-slate-400">Comparativa semanal de Ventas (Línea) vs. Compras (Barras).</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <IncomeVsExpenseChart data={financialMovements} />
+                    <ComparativeFinancialChart sales={salesOrders} purchases={purchaseOrders} />
                   </CardContent>
               </Card>
-               <Card className="bg-slate-900 border-slate-800">
-                <CardHeader>
-                    <CardTitle className="text-white">Ventas por Calibre (Kilos)</CardTitle>
-                    <CardDescription className="text-slate-400">Kilos vendidos de cada calibre por orden de venta completada.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <SalesByOrderChart data={salesOrders} />
-                </CardContent>
-              </Card>
           </div>
-          {/* Columna Derecha */}
+          
+          {/* Columna Derecha: IA + Proveedores */}
           <div className="space-y-6">
-              <Card className="bg-slate-900 border-slate-800">
+              <Card className="bg-gradient-to-br from-slate-900 to-blue-950 border-blue-900/50">
                   <CardHeader>
-                    <CardTitle className="text-white">Resumen Ejecutivo IA</CardTitle>
+                    <CardTitle className="text-white flex items-center gap-2"><Activity className="h-5 w-5 text-blue-400"/> Análisis IA</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <AiSummary financialData={financialDataString} />
                   </CardContent>
               </Card>
-              <Card className="bg-slate-900 border-slate-800">
+              <Card className={cardStyle}>
                   <CardHeader>
-                    <CardTitle className="text-white">Compras por Proveedor (Top 5)</CardTitle>
-                    <CardDescription className="text-slate-400">Total de Kilos comprados a cada proveedor.</CardDescription>
+                    <CardTitle className="text-white flex items-center gap-2"><PieChart className="h-5 w-5 text-amber-500"/> Top Proveedores (Kg)</CardTitle>
                   </CardHeader>
                   <CardContent>
-                      <PurchasesBySupplierChart data={purchaseOrders} suppliers={contacts}/>
+                      <TopSuppliersChart data={purchaseOrders} suppliers={contacts}/>
                   </CardContent>
               </Card>
           </div>
       </div>
       
-      {/* Fila inferior de gráficos */}
-      <div className="grid gap-6 md:grid-cols-2">
-         <Card className="bg-slate-900 border-slate-800">
-          <CardHeader>
-            <CardTitle className="text-white">Compras Semanales ($)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <WeeklyPurchasesChart data={purchaseOrders} />
-          </CardContent>
-        </Card>
-        <Card className="bg-slate-900 border-slate-800">
-          <CardHeader>
-            <CardTitle className="text-white">Ventas Semanales ($)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <WeeklySalesChart data={salesOrders} />
-          </CardContent>
-        </Card>
-         <Card className="bg-slate-900 border-slate-800">
+      {/* 3. Gráficos Operativos (Fila Inferior) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+         <Card className={cardStyle}>
             <CardHeader>
-                <CardTitle className="text-white">Monto de Compras por Producto-Calibre</CardTitle>
-                <CardDescription className="text-slate-400">Monto total gastado en cada tipo de producto y calibre.</CardDescription>
-            </CardHeader>
-            <CardContent className="max-h-[400px] overflow-y-auto">
-                <PurchasesByProductCaliberChart data={purchaseOrders} />
-            </CardContent>
-        </Card>
-        <Card className="bg-slate-900 border-slate-800">
-            <CardHeader>
-                <CardTitle className="text-white">Stock Actual por Calibre</CardTitle>
-                <CardDescription className="text-slate-400">Distribución de Kilos disponibles en inventario.</CardDescription>
+                <CardTitle className="text-white flex items-center gap-2"><Warehouse className="h-5 w-5 text-purple-500"/> Rotación de Inventario (Kilos)</CardTitle>
+                <CardDescription className="text-slate-400">Productos más comprados vs. vendidos.</CardDescription>
             </CardHeader>
             <CardContent>
-                {/* Aquí usamos el inventario calculado en tiempo real */}
-                <CaliberDistributionChart data={calculatedInventory} />
+                <ProductFlowChart sales={salesOrders} purchases={purchaseOrders} />
             </CardContent>
         </Card>
-      </div>
 
+        <Card className={cardStyle}>
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2"><DollarSign className="h-5 w-5 text-emerald-500"/> Flujo de Caja Real</CardTitle>
+            <CardDescription className="text-slate-400">Ingresos y Egresos de Tesorería.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CashFlowTrendChart data={financialMovements} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
