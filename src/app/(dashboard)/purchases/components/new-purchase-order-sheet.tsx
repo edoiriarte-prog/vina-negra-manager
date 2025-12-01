@@ -312,7 +312,7 @@ export function NewPurchaseOrderSheet({
                         <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {warehouses.map(w => <SelectItem key={w.id} value={w.name} className="focus:bg-slate-800 focus:text-slate-100">{w.name}</SelectItem>)}
+                                {warehouses.map(w => <SelectItem key={w} value={w} className="focus:bg-slate-800 focus:text-slate-100">{w}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </CardContent>
