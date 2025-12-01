@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -20,6 +21,7 @@ import {
   InventoryAdjustment 
 } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { useMasterData } from "@/hooks/use-master-data"; // Import the master data hook
 
 interface NewSalesOrderSheetProps {
   isOpen: boolean;
@@ -48,6 +50,7 @@ export function NewSalesOrderSheet({
 }: NewSalesOrderSheetProps) {
   
   const { toast } = useToast();
+  const { products: masterProducts } = useMasterData(); // Get products from master data
   const isDispatch = sheetType === 'dispatch';
 
   // Estado inicial del formulario
@@ -95,7 +98,7 @@ export function NewSalesOrderSheet({
   // --- MANEJO DE ITEMS ---
 
   // Productos únicos disponibles en el inventario seleccionado
-  const availableProducts = Array.from(new Set(inventory.map(i => i.name)));
+  const availableProducts = masterProducts.map(p => p.name); // Use master products
   
   // Calibres disponibles para el producto seleccionado
   const availableCalibers = inventory
@@ -260,8 +263,8 @@ export function NewSalesOrderSheet({
                                 <SelectValue placeholder="Producto" />
                             </SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {availableProducts.map(p => (
-                                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                                {masterProducts.map(p => (
+                                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
