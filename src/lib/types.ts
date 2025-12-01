@@ -172,3 +172,19 @@ export interface BankAccount {
     status?: 'Activa' | 'Inactiva';
     bankName?: string; // Alias para bank
 }
+
+// --- 6. PLANIFICACIÓN COMERCIAL ---
+export type PlanningStatus = 'borrador' | 'confirmado' | 'entregado' | 'cancelado';
+
+export interface PlannedOrder {
+  id: string;
+  date: string;           // Fecha de registro
+  deliveryDate: string;   // Fecha prometida de entrega
+  clientId: string;
+  status: PlanningStatus;
+  items: OrderItem[];     // Reusamos OrderItem (producto, calibre, precio, cantidad)
+  totalAmount: number;
+  totalKilos: number;
+  notes?: string;
+  createdBy?: string;     // Nombre del vendedor
+}

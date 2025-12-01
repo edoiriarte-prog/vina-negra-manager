@@ -12,7 +12,8 @@ import {
   Settings,
   LogOut,
   Briefcase,
-  ClipboardList
+  ClipboardList,
+  Calendar
 } from "lucide-react"
 
 import {
@@ -34,6 +35,7 @@ import Image from "next/image" // <--- IMPORTANTE: Importamos componente de imag
 // Menú de navegación
 const navMain = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Planificación", url: "/planning", icon: Calendar },
   { title: "Compras (O/C)", url: "/purchases", icon: ShoppingCart },
   { title: "Ventas (O/V)", url: "/sales", icon: Truck },
   { title: "Despachos", url: "/dispatches", icon: ClipboardList },
