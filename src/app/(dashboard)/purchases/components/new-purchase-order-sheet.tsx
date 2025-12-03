@@ -375,7 +375,7 @@ export function NewPurchaseOrderSheet({
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 font-medium text-slate-200 focus:ring-0"><SelectValue /></SelectTrigger>
                                                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                                             {products?.map((p, idx) => (
-                                                                <SelectItem key={idx} value={p}>
+                                                                <SelectItem key={p} value={p}>
                                                                     {p}
                                                                 </SelectItem>
                                                             ))}
@@ -581,9 +581,9 @@ export function NewPurchaseOrderSheet({
         isOpen={isMatrixOpen}
         onOpenChange={setIsMatrixOpen}
         onSave={handleMatrixSave}
+        orderType="purchase"
+        inventory={inventory}
       />
     </>
   );
 }
-
-    

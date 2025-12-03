@@ -72,6 +72,7 @@ export function NewSalesOrderSheet({
   });
 
   const [items, setItems] = useState<OrderItem[]>([]);
+  const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   
   const [currentItem, setCurrentItem] = useState<Partial<OrderItem>>({
     product: "",
@@ -111,7 +112,10 @@ export function NewSalesOrderSheet({
 
   // --- MANEJO DE ITEMS ---
 
-  // CORRECCIÓN PRINCIPAL: Si no hay calibres en inventario, usa la lista DEFAULT_CALIBERS
+  const availableProducts = useMemo(() => {
+    return masterProducts || [];
+  }, [masterProducts]);
+
   const availableCalibers = useMemo(() => {
     if (!currentItem.product) return [];
     
@@ -132,19 +136,19 @@ export function NewSalesOrderSheet({
     i.caliber === currentItem.caliber && 
     i.warehouse === formData.warehouse
   );
+  
+  const handleMatrixSave = (matrixItems: Omit<OrderItem, 'id'>[]) => {
+    const newItems: OrderItem[] = matrixItems.map(item => ({
+        ...item,
+        id: `temp-${Date.now()}-${Math.random()}`,
+    }));
+    setItems(prev => ([...prev, ...newItems]));
+    setIsMatrixOpen(false);
+  }
 
   const addItem = () => {
-    // Validación explicita para que el usuario sepa por qué falla
-    if (!currentItem.product) {
-      toast({ variant: "destructive", title: "Falta información", description: "Selecciona un producto." });
-      return;
-    }
-    if (!currentItem.caliber) {
-      toast({ variant: "destructive", title: "Falta información", description: "Selecciona un calibre." });
-      return;
-    }
-    if (!currentItem.quantity || currentItem.quantity <= 0) {
-      toast({ variant: "destructive", title: "Falta información", description: "Ingresa una cantidad válida." });
+    if (!currentItem.product || !currentItem.caliber || !currentItem.quantity || currentItem.quantity <= 0) {
+      toast({ variant: "destructive", title: "Faltan datos", description: "Completa producto, calibre y cantidad." });
       return;
     }
 
@@ -169,7 +173,6 @@ export function NewSalesOrderSheet({
     };
 
     setItems([...items, newItem]);
-    // Resetear solo cantidades, mantener producto para agilizar carga
     setCurrentItem(prev => ({ ...prev, caliber: "", quantity: 0, packagingQuantity: 0 }));
   };
 
@@ -177,21 +180,18 @@ export function NewSalesOrderSheet({
     setItems(items.filter((_, i) => i !== index));
   };
 
-  // --- GUARDAR ---
   const handleSubmit = () => {
     if (!formData.clientId && !isDispatch) {
         toast({ variant: "destructive", title: "Falta Cliente", description: "Selecciona un cliente." });
         return;
     }
     
-    // INTENTO DE AUTO-GUARDADO: Si el usuario llenó los datos pero olvidó dar click en "Agregar Item"
     if (items.length === 0 && currentItem.product && currentItem.quantity && currentItem.quantity > 0) {
        toast({ 
          variant: "default", 
          title: "Item agregado automáticamente", 
          description: "Se agregó el producto que estaba en edición." 
        });
-       // Creamos el item al vuelo
        const autoItem: OrderItem = {
           product: currentItem.product,
           caliber: currentItem.caliber || "Sin Calibre",
@@ -213,7 +213,7 @@ export function NewSalesOrderSheet({
     }
 
     if (items.length === 0) {
-        toast({ variant: "destructive", title: "Orden Vacía", description: "Agrega al menos un producto con el botón 'Agregar Item'." });
+        toast({ variant: "destructive", title: "Orden Vacía", description: "Agrega al menos un producto." });
         return;
     }
 
@@ -307,9 +307,14 @@ export function NewSalesOrderSheet({
 
             <Separator className="bg-slate-800" />
 
-            {/* --- AGREGAR PRODUCTOS --- */}
             <div className="space-y-4">
-                <h4 className="font-medium text-slate-200">Agregar Productos</h4>
+                <div className="flex justify-between items-center">
+                    <h4 className="font-medium text-slate-200">Agregar Productos</h4>
+                    <Button onClick={() => setIsMatrixOpen(true)} variant="link" className="text-blue-500">
+                        <Plus className="h-4 w-4 mr-1"/> Carga Rápida (Matriz)
+                    </Button>
+                </div>
+                
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label className="text-xs text-slate-400">Producto</Label>
@@ -321,8 +326,8 @@ export function NewSalesOrderSheet({
                                 <SelectValue placeholder="Producto" />
                             </SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {masterProducts.map((p, index) => (
-                                    <SelectItem key={index} value={p as string}>{p as string}</SelectItem>
+                                {availableProducts.map((p, index) => (
+                                    <SelectItem key={p} value={p as string}>{p as string}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -392,11 +397,10 @@ export function NewSalesOrderSheet({
                 </Button>
             </div>
 
-            {/* --- LISTA DE ITEMS --- */}
             <div className="space-y-2">
                 {items.length === 0 ? (
                    <div className="text-center p-4 border border-dashed border-slate-800 rounded text-slate-500 text-sm">
-                      No hay productos agregados. Usa el botón "Agregar Item".
+                      No hay productos agregados.
                    </div>
                 ) : (
                   items.map((item, idx) => (
@@ -438,6 +442,14 @@ export function NewSalesOrderSheet({
           </Button>
         </SheetFooter>
       </SheetContent>
+
+      <ItemMatrixDialog
+        isOpen={isMatrixOpen}
+        onOpenChange={setIsMatrixOpen}
+        onSave={handleMatrixSave}
+        orderType={sheetType}
+        inventory={inventory}
+      />
     </Sheet>
   );
 }

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -25,6 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { useMasterData } from '@/hooks/use-master-data';
 import { OrderItem, InventoryItem } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type ItemMatrixDialogProps = {
   isOpen: boolean;
@@ -85,17 +85,9 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [],
           }
       }));
     } else {
-        // CORRECCIÓN: Evitar loop si ya está vacío
         setMatrixData((prev) => (prev.length > 0 ? [] : prev));
     }
-  // CORRECCIÓN: Usamos JSON.stringify para dependencias complejas
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    selectedProduct, 
-    JSON.stringify(productCaliberAssociations), 
-    JSON.stringify(calibers), 
-    JSON.stringify(inventory)
-  ]);
+  }, [selectedProduct, productCaliberAssociations, calibers, inventory]);
 
 
   const handleMatrixChange = (index: number, field: keyof MatrixRow, value: string | number) => {
@@ -123,6 +115,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [],
   const reset = () => {
       setSelectedProduct('');
       setMatrixData([]);
+      onOpenChange(false);
   }
 
   const handleOpenChange = (open: boolean) => {
@@ -148,60 +141,62 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [],
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-5xl bg-slate-950 border-slate-800 text-slate-100">
         <DialogHeader>
           <DialogTitle>Agregar Ítems por Matriz de Calibres</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-slate-400">
             Seleccione un producto para ver sus calibres y agregar cantidades rápidamente.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-4 items-center gap-4 my-4">
-            <Label htmlFor="product-matrix" className="text-right">
+            <Label htmlFor="product-matrix" className="text-right text-slate-300">
                 Producto
             </Label>
             <Select onValueChange={setSelectedProduct} value={selectedProduct}>
-                <SelectTrigger id="product-matrix" className="col-span-3">
+                <SelectTrigger id="product-matrix" className="col-span-3 bg-slate-900 border-slate-700 text-slate-100">
                 <SelectValue placeholder="Seleccione un producto" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                 {products.map((product) => (
-                    <SelectItem key={product} value={product}>{product}</SelectItem>
+                    <SelectItem key={product} value={product} className="focus:bg-slate-800">{product}</SelectItem>
                 ))}
                 </SelectContent>
             </Select>
         </div>
 
         {selectedProduct && (
-          <div className="max-h-[50vh] overflow-y-auto">
+          <ScrollArea className="max-h-[50vh] overflow-y-auto border border-slate-800 rounded-md">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Calibre</TableHead>
-                  <TableHead className="w-[120px]">Stock Disp.</TableHead>
-                  <TableHead className='w-[100px]'>Cantidad</TableHead>
-                  <TableHead className='w-[120px]'>Unidad</TableHead>
-                  <TableHead className='w-[120px]'>Precio</TableHead>
-                  <TableHead className='w-[150px]'>Tipo Envase</TableHead>
-                  <TableHead className='w-[100px]'>Cant. Envases</TableHead>
+              <TableHeader className="bg-slate-900 sticky top-0">
+                <TableRow className="border-b-slate-800">
+                  <TableHead className="text-slate-300">Calibre</TableHead>
+                  {orderType === 'sale' && <TableHead className="w-[120px] text-slate-300">Stock Disp.</TableHead>}
+                  <TableHead className='w-[100px] text-slate-300'>Cantidad</TableHead>
+                  <TableHead className='w-[120px] text-slate-300'>Unidad</TableHead>
+                  <TableHead className='w-[120px] text-slate-300'>Precio</TableHead>
+                  <TableHead className='w-[150px] text-slate-300'>Tipo Envase</TableHead>
+                  <TableHead className='w-[100px] text-slate-300'>Cant. Envases</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {matrixData.map((row, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{getCaliberDisplayName(row.caliber)}</TableCell>
-                    <TableCell>
-                        <Badge variant={row.stock > 0 ? 'secondary' : 'destructive'}>
-                            {row.stock.toLocaleString('es-CL')} kg
-                        </Badge>
-                    </TableCell>
+                  <TableRow key={index} className="border-b-slate-800">
+                    <TableCell className="font-medium text-slate-200">{getCaliberDisplayName(row.caliber)}</TableCell>
+                    {orderType === 'sale' && 
+                        <TableCell>
+                            <Badge variant={row.stock > 0 ? 'secondary' : 'destructive'} className="border-slate-700">
+                                {row.stock.toLocaleString('es-CL')} kg
+                            </Badge>
+                        </TableCell>
+                    }
                     <TableCell>
                       <Input
                         type="number"
                         value={row.quantity || ''}
                         onChange={(e) => handleMatrixChange(index, 'quantity', e.target.value)}
                         placeholder="0"
-                        className={row.quantity > row.stock ? 'border-destructive' : ''}
+                        className={`bg-slate-900 border-slate-700 ${row.quantity > row.stock && orderType === 'sale' ? 'border-destructive' : ''}`}
                       />
                     </TableCell>
                      <TableCell>
@@ -209,9 +204,9 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [],
                         value={row.unit}
                         onValueChange={(value: 'Kilos' | 'Cajas') => handleMatrixChange(index, 'unit', value)}
                       >
-                        <SelectTrigger><SelectValue/></SelectTrigger>
-                        <SelectContent>
-                          {units.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                        <SelectTrigger className="bg-slate-900 border-slate-700"><SelectValue/></SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                          {units.map(u => <SelectItem key={u} value={u} className="focus:bg-slate-800">{u}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -221,6 +216,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [],
                         value={row.price || ''}
                         onChange={(e) => handleMatrixChange(index, 'price', e.target.value)}
                         placeholder="0"
+                        className="bg-slate-900 border-slate-700"
                       />
                     </TableCell>
                     <TableCell>
@@ -228,9 +224,9 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [],
                             value={row.packagingType}
                             onValueChange={(value) => handleMatrixChange(index, 'packagingType', value)}
                         >
-                            <SelectTrigger><SelectValue placeholder="Envase"/></SelectTrigger>
-                            <SelectContent>
-                             {packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                            <SelectTrigger className="bg-slate-900 border-slate-700"><SelectValue placeholder="Envase"/></SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                             {packagingTypes.map(p => <SelectItem key={p} value={p} className="focus:bg-slate-800">{p}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </TableCell>
@@ -240,33 +236,33 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [],
                             value={row.packagingQuantity || ''}
                             onChange={(e) => handleMatrixChange(index, 'packagingQuantity', e.target.value)}
                             placeholder="0"
+                            className="bg-slate-900 border-slate-700"
                         />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-              <TableFooter>
-                  <TableRow>
-                      <TableCell colSpan={5} className="text-right font-bold">Subtotales:</TableCell>
-                      <TableCell className="text-right font-bold">{formatPackages(totals.totalPackages)}</TableCell>
-                      <TableCell colSpan={1} className="text-right font-bold">{formatKilos(totals.totalKilos)}</TableCell>
+              <TableFooter className="bg-slate-900">
+                  <TableRow className="border-t-slate-800">
+                      <TableCell colSpan={orderType === 'sale' ? 6 : 5} className="text-right font-bold text-slate-300">Subtotales:</TableCell>
+                      <TableCell className="text-right font-bold text-slate-200">{formatPackages(totals.totalPackages)}</TableCell>
                   </TableRow>
                    <TableRow>
-                      <TableCell colSpan={6} className="text-right font-bold text-lg">Monto Total</TableCell>
-                      <TableCell colSpan={1} className="text-right font-bold text-lg">{formatCurrency(totals.totalAmount)}</TableCell>
+                      <TableCell colSpan={6} className="text-right font-bold text-lg text-slate-300">Monto Total</TableCell>
+                      <TableCell className="text-right font-bold text-lg text-emerald-400">{formatCurrency(totals.totalAmount)}</TableCell>
                   </TableRow>
               </TableFooter>
             </Table>
-          </div>
+          </ScrollArea>
         )}
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button type="button" variant="outline">
+            <Button type="button" variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
               Cancelar
             </Button>
           </DialogClose>
-          <Button onClick={handleSaveMatrix} disabled={!selectedProduct || matrixData.every(row => row.quantity === 0)}>
+          <Button onClick={handleSaveMatrix} disabled={!selectedProduct || matrixData.every(row => row.quantity === 0)} className="bg-blue-600 hover:bg-blue-500 text-white">
             Agregar y Guardar
           </Button>
         </DialogFooter>
