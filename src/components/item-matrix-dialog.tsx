@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -29,7 +30,6 @@ type ItemMatrixDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSave: (items: Omit<OrderItem, 'id'>[]) => void;
-  orderType: 'sale' | 'purchase';
   inventory?: InventoryItem[];
 };
 
@@ -54,7 +54,7 @@ const formatCurrency = (value: number) =>
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
 
-export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inventory = [] }: ItemMatrixDialogProps) {
+export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [] }: ItemMatrixDialogProps) {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [matrixData, setMatrixData] = useState<MatrixRow[]>([]);
   const { products, units, packagingTypes, calibers, productCaliberAssociations } = useMasterData();
@@ -164,8 +164,8 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                 <SelectValue placeholder="Seleccione un producto" />
                 </SelectTrigger>
                 <SelectContent>
-                {products.map(product => (
-                    <SelectItem key={product.id} value={product.name}>{product.name}</SelectItem>
+                {products.map((product, index) => (
+                    <SelectItem key={product} value={product}>{product}</SelectItem>
                 ))}
                 </SelectContent>
             </Select>
@@ -177,7 +177,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
               <TableHeader>
                 <TableRow>
                   <TableHead>Calibre</TableHead>
-                  {orderType === 'sale' && <TableHead className="w-[120px]">Stock Disp.</TableHead>}
+                  <TableHead className="w-[120px]">Stock Disp.</TableHead>
                   <TableHead className='w-[100px]'>Cantidad</TableHead>
                   <TableHead className='w-[120px]'>Unidad</TableHead>
                   <TableHead className='w-[120px]'>Precio</TableHead>
@@ -189,20 +189,18 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                 {matrixData.map((row, index) => (
                   <TableRow key={index}>
                     <TableCell className="font-medium">{getCaliberDisplayName(row.caliber)}</TableCell>
-                     {orderType === 'sale' && (
-                        <TableCell>
-                            <Badge variant={row.stock > 0 ? 'secondary' : 'destructive'}>
-                                {row.stock.toLocaleString('es-CL')} kg
-                            </Badge>
-                        </TableCell>
-                     )}
+                    <TableCell>
+                        <Badge variant={row.stock > 0 ? 'secondary' : 'destructive'}>
+                            {row.stock.toLocaleString('es-CL')} kg
+                        </Badge>
+                    </TableCell>
                     <TableCell>
                       <Input
                         type="number"
                         value={row.quantity || ''}
                         onChange={(e) => handleMatrixChange(index, 'quantity', e.target.value)}
                         placeholder="0"
-                        className={orderType === 'sale' && row.quantity > row.stock ? 'border-destructive' : ''}
+                        className={row.quantity > row.stock ? 'border-destructive' : ''}
                       />
                     </TableCell>
                      <TableCell>
@@ -212,7 +210,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                       >
                         <SelectTrigger><SelectValue/></SelectTrigger>
                         <SelectContent>
-                          {units.map(u => <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>)}
+                          {units.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -231,7 +229,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                         >
                             <SelectTrigger><SelectValue placeholder="Envase"/></SelectTrigger>
                             <SelectContent>
-                             {packagingTypes.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                             {packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </TableCell>
@@ -248,12 +246,12 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
               </TableBody>
               <TableFooter>
                   <TableRow>
-                      <TableCell colSpan={orderType === 'sale' ? 5 : 4} className="text-right font-bold">Subtotales:</TableCell>
+                      <TableCell colSpan={5} className="text-right font-bold">Subtotales:</TableCell>
                       <TableCell className="text-right font-bold">{formatPackages(totals.totalPackages)}</TableCell>
                       <TableCell colSpan={1} className="text-right font-bold">{formatKilos(totals.totalKilos)}</TableCell>
                   </TableRow>
                    <TableRow>
-                      <TableCell colSpan={orderType === 'sale' ? 6 : 5} className="text-right font-bold text-lg">Monto Total</TableCell>
+                      <TableCell colSpan={6} className="text-right font-bold text-lg">Monto Total</TableCell>
                       <TableCell colSpan={1} className="text-right font-bold text-lg">{formatCurrency(totals.totalAmount)}</TableCell>
                   </TableRow>
               </TableFooter>
