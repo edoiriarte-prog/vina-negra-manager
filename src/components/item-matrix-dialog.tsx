@@ -128,15 +128,21 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
   };
 
   const totals = useMemo(() => {
-      return rows.reduce((acc, row) => {
-          const kilos = Number(row.quantity) || 0;
-          const net = Number(row.price) || 0;
-          return {
-              kilos: acc.kilos + kilos,
-              amount: acc.amount + (kilos * net)
-          };
-      }, { kilos: 0, amount: 0 });
+    return rows.reduce((acc, row) => {
+        const kilos = Number(row.quantity) || 0;
+        const netPrice = Number(row.price) || 0;
+        const lineTotal = kilos * netPrice;
+        
+        acc.kilos += kilos;
+        acc.net += lineTotal;
+        
+        return acc;
+    }, { kilos: 0, net: 0 });
   }, [rows]);
+
+  const totalVat = totals.net * 0.19;
+  const totalGross = totals.net + totalVat;
+
 
   const handleConfirm = () => {
       const itemsToSave = rows
@@ -224,9 +230,23 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
             )}
         </div>
         <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-between items-center">
-            <div className="flex gap-8 text-sm">
-                <div><span className="text-slate-500 text-xs uppercase font-bold mr-2 block">Total Kilos</span><span className="font-bold text-xl text-white">{new Intl.NumberFormat('es-CL').format(totals.kilos)} <span className="text-sm text-slate-500">kg</span></span></div>
-                <div><span className="text-slate-500 text-xs uppercase font-bold mr-2 block">Neto Estimado</span><span className="font-bold text-xl text-blue-400">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(totals.amount)}</span></div>
+            <div className="flex gap-6 text-sm">
+                <div>
+                    <span className="text-slate-500 text-xs uppercase font-bold mr-2 block">Total Kilos</span>
+                    <span className="font-bold text-xl text-white">{new Intl.NumberFormat('es-CL').format(totals.kilos)} <span className="text-sm text-slate-500">kg</span></span>
+                </div>
+                <div className="border-l border-slate-800 pl-6">
+                    <span className="text-slate-500 text-xs uppercase font-bold mr-2 block">Subtotal Neto</span>
+                    <span className="font-bold text-md text-blue-400">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(totals.net)}</span>
+                </div>
+                 <div className="border-l border-slate-800 pl-6">
+                    <span className="text-slate-500 text-xs uppercase font-bold mr-2 block">IVA (19%)</span>
+                    <span className="font-bold text-md text-slate-400">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(totalVat)}</span>
+                </div>
+                <div className="border-l border-slate-800 pl-6">
+                    <span className="text-slate-500 text-xs uppercase font-bold mr-2 block">Total c/IVA</span>
+                    <span className="font-bold text-xl text-emerald-400">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(totalGross)}</span>
+                </div>
             </div>
             <div className="flex gap-3">
                 <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-slate-400 hover:text-white hover:bg-slate-800">Cancelar</Button>
