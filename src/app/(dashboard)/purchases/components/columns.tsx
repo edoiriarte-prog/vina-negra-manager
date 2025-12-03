@@ -174,7 +174,6 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
     cell: ({ row }) => {
       const order = row.original;
       const netAmount = order.totalAmount || 0;
-      // Si includeVat no está definido (para datos viejos), asumimos que sí lo tiene
       const grossAmount = order.includeVat !== false ? Math.round(netAmount * 1.19) : netAmount;
       return <div className="text-right font-bold font-mono text-emerald-400">{formatCurrency(grossAmount)}</div>
     },

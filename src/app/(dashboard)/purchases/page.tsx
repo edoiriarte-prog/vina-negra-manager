@@ -20,7 +20,7 @@ export default function PurchasesPage() {
   const { toast } = useToast();
 
   const { purchaseOrders, isLoading: loadingOps } = useOperations();
-  const { contacts, inventory, isLoading: loadingMaster } = useMasterData();
+  const { contacts, isLoading: loadingMaster } = useMasterData();
   const { createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder } = usePurchasesCRUD();
   
   const isLoading = loadingOps || loadingMaster;
@@ -36,9 +36,8 @@ export default function PurchasesPage() {
     if (!purchaseOrders) return { totalNetAmount: 0, totalGrossAmount: 0 };
     
     return purchaseOrders.reduce((acc, order) => {
-      const netAmount = order.totalAmount || 0; // totalAmount es siempre neto
+      const netAmount = order.totalAmount || 0;
       acc.totalNetAmount += netAmount;
-      // Si `includeVat` no está definido, asumimos el comportamiento antiguo (que era true) por retrocompatibilidad
       if (order.includeVat !== false) {
         acc.totalGrossAmount += netAmount * 1.19;
       } else {
@@ -55,7 +54,7 @@ export default function PurchasesPage() {
            supplierName.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const handleSave = (orderData: PurchaseOrder | Omit<PurchaseOrder, "id">) => {
+  const handleSave = async (orderData: PurchaseOrder | Omit<PurchaseOrder, "id">) => {
     const totalKilos = orderData.items.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0);
     
     const finalOrderData: any = {
@@ -64,21 +63,38 @@ export default function PurchasesPage() {
         status: orderData.status || 'received' 
     };
 
-    if ('id' in orderData && orderData.id) {
-        updatePurchaseOrder(orderData.id, finalOrderData);
-    } else {
-        createPurchaseOrder(finalOrderData);
+    try {
+        // En lugar de `id`, usamos `number` que es el ID del documento
+        if ('id' in orderData && orderData.id) {
+            await updatePurchaseOrder(orderData.id, finalOrderData);
+        } else {
+            await createPurchaseOrder(finalOrderData);
+        }
+        setIsSheetOpen(false);
+        setEditingOrder(null);
+    } catch (error) {
+        console.error("Error al guardar:", error);
+        toast({ variant: "destructive", title: "Error", description: "No se pudo guardar la orden." });
     }
-    setIsSheetOpen(false);
-    setEditingOrder(null);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("¿Estás seguro de eliminar esta orden de compra? Se descontará el stock asociado.")) {
-      deletePurchaseOrder(id);
-      toast({ variant: "destructive", title: "Compra Eliminada", description: "La orden ha sido eliminada." });
+  const handleDelete = async (order: PurchaseOrder) => {
+    const idToDelete = order.id || order.number;
+    if (!idToDelete) {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo identificar el ID del documento para eliminar." });
+      return;
     }
-  }
+  
+    if (confirm(`¿Estás seguro de eliminar la orden ${idToDelete}?\nEsta acción no se puede deshacer.`)) {
+      try {
+        await deletePurchaseOrder(idToDelete);
+        toast({ variant: "default", title: "Compra Eliminada", description: `La orden ${idToDelete} ha sido eliminada.` });
+      } catch (error) {
+        console.error("Error al eliminar:", error);
+        toast({ variant: "destructive", title: "Error", description: "Falló la eliminación. Revisa la consola." });
+      }
+    }
+  };
 
   const handleEdit = (order: PurchaseOrder) => {
     setEditingOrder(order);
@@ -97,7 +113,7 @@ export default function PurchasesPage() {
 
   const columns = useMemo(() => getColumns({
       onEdit: handleEdit,
-      onDelete: (order) => handleDelete(order.id),
+      onDelete: handleDelete,
       onPreview: setPreviewOrder,
       suppliers: suppliers
   }), [suppliers]);
@@ -172,8 +188,6 @@ export default function PurchasesPage() {
         onSave={handleSave}
         order={editingOrder}
         suppliers={suppliers}
-        inventory={inventory}
-        nextOrderId=""
         purchaseOrders={purchaseOrders}
       />
 

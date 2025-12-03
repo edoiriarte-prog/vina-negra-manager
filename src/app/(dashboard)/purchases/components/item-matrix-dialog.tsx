@@ -10,10 +10,12 @@ import { useMasterData } from "@/hooks/use-master-data";
 import { Package, Calculator, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+// --- CORRECCIÓN: Agregar orderType a la interfaz ---
 interface ItemMatrixDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (items: any[]) => void;
+  orderType?: string; // Propiedad añadida para evitar el error de TS
 }
 
 // Tipo interno para la fila de carga
@@ -26,13 +28,13 @@ type RowData = {
     grossPrice: string;
 };
 
-export function ItemMatrixDialog({ isOpen, onOpenChange, onSave }: ItemMatrixDialogProps) {
+export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType = 'purchase' }: ItemMatrixDialogProps) {
   const { products, calibers, packagingTypes, productCaliberAssociations } = useMasterData();
   
   const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [rows, setRows] = useState<RowData[]>([]);
 
-  // Al abrir o cambiar producto, generamos las filas según los calibres asociados (o todos si no hay asociación)
+  // Al abrir o cambiar producto, generamos las filas según los calibres asociados
   useEffect(() => {
     if (isOpen && products.length > 0 && !selectedProduct) {
         setSelectedProduct(products[0]);

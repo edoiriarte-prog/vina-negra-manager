@@ -41,7 +41,7 @@ const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData 
             balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
             status: order.status,
             notes: order.notes || '',
-            includeVat: order.includeVat ?? true,
+            number: order.number || order.id || '',
         };
     }
     return {
@@ -105,7 +105,7 @@ export function NewPurchaseOrderSheet({
                 const nextNum = maxId < 1101 ? 1102 : maxId + 1;
                 const newId = `OC-${nextNum}`;
                 
-                setFormData(prev => ({...getInitialFormData(null), number: newId}));
+                setFormData({...getInitialFormData(null), number: newId});
             } else {
                 setFormData(getInitialFormData(order));
             }
@@ -170,39 +170,44 @@ export function NewPurchaseOrderSheet({
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    
     if (!formData.date) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione una fecha.' });
     if (!formData.supplierId) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un proveedor.' });
     if (formData.items.length === 0) return toast({ variant: 'destructive', title: 'Error', description: 'Agregue al menos un ítem.' });
     
+    const safeNumber = formData.number || order?.number || order?.id || `OC-${Date.now().toString().slice(-6)}`;
+
     const sanitizedItems = formData.items.map(item => ({
         ...item,
-        packagingType: item.packagingType || null,
+        packagingType: item.packagingType || null, 
         packagingQuantity: Number(item.packagingQuantity) || 0,
         lotNumber: item.lotNumber || null,
         quantity: Number(item.quantity) || 0,
         price: Number(item.price) || 0,
+        format: item.format || null,
+        unit: item.unit || 'Kilos'
     }));
 
     const calculatedTotalPackages = sanitizedItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const calculatedTotalKilos = sanitizedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const calculatedNetAmount = netTotal;
-
-    const finalId = order?.id || formData.number || `OC-${Date.now()}`;
 
     const finalOrder: any = {
-        id: finalId,
-        number: formData.number,
+        id: safeNumber,
+        number: safeNumber,      
         supplierId: formData.supplierId,
         date: formData.date,
         items: sanitizedItems,
+        
         totalPackages: calculatedTotalPackages,
         totalKilos: calculatedTotalKilos,
-        totalAmount: calculatedNetAmount, 
-        includeVat: formData.includeVat,
-        status: formData.status,
-        paymentMethod: formData.paymentMethod,
-        warehouse: formData.warehouse,
+        totalAmount: netTotal,   
+        
+        includeVat: formData.includeVat ?? true,
+        status: formData.status || 'pending',
+        paymentMethod: formData.paymentMethod || 'Contado',
+        warehouse: formData.warehouse || 'Bodega Central',
         orderType: formData.orderType || 'purchase',
+        
         advanceDueDate: formData.advanceDueDate || null,
         balanceDueDate: formData.balanceDueDate || null,
         notes: formData.notes || null,
@@ -210,10 +215,16 @@ export function NewPurchaseOrderSheet({
         advancePercentage: Number(formData.advancePercentage || 0),
     };
 
+    Object.keys(finalOrder).forEach(key => {
+        if (finalOrder[key] === undefined) {
+            delete finalOrder[key];
+        }
+    });
+
     onSave(finalOrder);
   };
 
-  const title = order ? `Editar OC ${order.number}` : `Nueva Compra`;
+  const title = order ? `Editar OC ${order.number || order.id}` : `Nueva Compra`;
 
   const getStatusColor = (status: string) => {
       switch(status) {
@@ -401,7 +412,7 @@ export function NewPurchaseOrderSheet({
                                                     <Input type="number" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))} className="h-7 text-center font-bold bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-100" />
                                                 </td>
                                                 <td className="px-4 py-2">
-                                                    <Input type="number" value={item.price || ''} onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500" />
+                                                    <Input type="number" value={item.price || ''} onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-100" />
                                                 </td>
                                                 <td className="px-4 py-2">
                                                     <Input type="number" value={item.price ? Math.round(item.price * 1.19) : ''} onChange={(e) => handleItemChange(index, 'price', Math.round(Number(e.target.value) / 1.19))} className="h-7 text-right font-mono text-emerald-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-emerald-500" />
