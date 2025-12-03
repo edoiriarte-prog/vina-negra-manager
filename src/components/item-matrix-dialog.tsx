@@ -25,21 +25,41 @@ import { Package, Calculator, X } from 'lucide-react';
 
 const SmartInput = ({ value, onChange, className, placeholder }: { value: number; onChange: (val: number) => void; className?: string; placeholder?: string; }) => {
     const [inputValue, setInputValue] = useState<string>(value === 0 ? '' : value.toString());
-    useEffect(() => { if (value !== parseFloat(inputValue || '0')) { setInputValue(value === 0 ? '' : value.toString()); } }, [value]);
+    useEffect(() => {
+        const numericValue = parseFloat(inputValue) || 0;
+        if (value !== numericValue) {
+            setInputValue(value === 0 ? '' : value.toString());
+        }
+    }, [value]);
+
     const handleBlur = () => {
         try {
             let expression = inputValue.toLowerCase().replace(/x/g, '*').replace(/,/g, '.');
             if (!expression.trim()) { onChange(0); return; }
             if (/^[\d\s\+\-\*\/\(\)\.]+$/.test(expression)) {
-                const result = new Function(`return ${expression}`)();
-                if (!isNaN(result) && isFinite(result)) { const finalVal = Math.round(result * 100) / 100; setInputValue(finalVal.toString()); onChange(finalVal); } 
-                else { setInputValue(value.toString()); }
+                // Use a safe evaluation method
+                const result = new Function(`try { return ${expression} } catch { return NaN; }`)();
+                if (!isNaN(result) && isFinite(result)) {
+                    // Do not round here, let the state handle formatting
+                    onChange(result);
+                    setInputValue(result.toString());
+                } else {
+                    setInputValue(value.toString());
+                }
             } else {
                 const num = parseFloat(expression);
-                if(!isNaN(num)) { onChange(num); setInputValue(num.toString()); } else { setInputValue(value.toString()); }
+                if(!isNaN(num)) { 
+                    onChange(num); 
+                    setInputValue(num.toString()); 
+                } else { 
+                    setInputValue(value.toString()); 
+                }
             }
-        } catch (e) { setInputValue(value.toString()); }
+        } catch (e) {
+            setInputValue(value.toString());
+        }
     };
+
     return ( <Input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onBlur={handleBlur} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} className={className} placeholder={placeholder} /> );
 };
 
@@ -95,11 +115,11 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
       if (field === 'price') {
           const net = Number(value);
           row.price = net;
-          row.grossPrice = Math.round(net * 1.19);
+          row.grossPrice = net * 1.19; // No rounding
       } else if (field === 'grossPrice') {
           const gross = Number(value);
           row.grossPrice = gross;
-          row.price = Math.round(gross / 1.19);
+          row.price = gross / 1.19; // No rounding
       } else {
           (row as any)[field] = value;
       }
@@ -160,7 +180,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                 <Select value={selectedProduct} onValueChange={setSelectedProduct}>
                     <SelectTrigger className="h-10 border-slate-700 bg-slate-950 text-slate-100 focus:ring-blue-500/20"><SelectValue placeholder="Seleccione producto..." /></SelectTrigger>
                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                        {products.map((p, index) => (
+                        {products.map((p) => (
                            <SelectItem key={p} value={p} className="focus:bg-slate-800 focus:text-white">{p}</SelectItem>
                         ))}
                     </SelectContent>
