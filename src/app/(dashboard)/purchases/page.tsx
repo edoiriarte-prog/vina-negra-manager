@@ -13,18 +13,16 @@ import { PurchaseOrderPreview } from "./components/purchase-order-preview";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-// --- FIREBASE IMPORTS ---
-import { useFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { usePurchasesCRUD } from "@/hooks/use-purchases-crud";
 
 export default function PurchasesPage() {
-  const { firestore } = useFirebase();
   const { toast } = useToast();
 
   // 1. CARGAR DATOS DE LA NUBE
   const { purchaseOrders, isLoading: loadingOps } = useOperations();
   const { contacts, inventory, isLoading: loadingMaster } = useMasterData();
+  const { createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder } = usePurchasesCRUD();
   
   const isLoading = loadingOps || loadingMaster;
 
@@ -44,15 +42,13 @@ export default function PurchasesPage() {
 
   const filteredOrders = purchaseOrders.filter((o) => {
     const supplierName = suppliers.find((s) => s.id === o.supplierId)?.name || '';
-    return o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    return (o.id?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
            supplierName.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   // --- HANDLERS (CRUD FIREBASE) ---
 
   const handleSave = (orderData: PurchaseOrder | Omit<PurchaseOrder, "id">) => {
-    if (!firestore) return;
-
     // Calculamos totales para guardar en la BD y que el Dashboard los lea rápido
     const totalKilos = orderData.items.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0);
     
@@ -63,23 +59,20 @@ export default function PurchasesPage() {
         status: orderData.status || 'received' 
     };
 
-    if ('id' in orderData) {
+    if ('id' in orderData && orderData.id) {
         // EDICIÓN
-        updateDocumentNonBlocking(doc(firestore, 'purchaseOrders', orderData.id), finalOrderData);
-        toast({ title: "Compra Actualizada", description: "La orden se ha guardado correctamente." });
+        updatePurchaseOrder(orderData.id, finalOrderData);
     } else {
         // CREACIÓN
-        addDocumentNonBlocking(collection(firestore, 'purchaseOrders'), finalOrderData);
-        toast({ title: "Compra Creada", description: "El stock ha sido ingresado al sistema." });
+        createPurchaseOrder(finalOrderData);
     }
     setIsSheetOpen(false);
     setEditingOrder(null);
   };
 
   const handleDelete = async (id: string) => {
-    if (!firestore) return;
     if (confirm("¿Estás seguro de eliminar esta orden de compra? Se descontará el stock asociado.")) {
-      await deleteDocumentNonBlocking(doc(firestore, 'purchaseOrders', id));
+      deletePurchaseOrder(id);
       toast({ variant: "destructive", title: "Compra Eliminada", description: "La orden ha sido eliminada." });
     }
   }
@@ -211,3 +204,4 @@ export default function PurchasesPage() {
     </div>
   );
 }
+    

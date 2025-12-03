@@ -13,7 +13,7 @@ import { PurchaseOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
 import { format, addDays, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent } from '@/components/ui/card';
-import { ItemMatrixDialog } from '../../sales/components/item-matrix-dialog'; 
+import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -321,12 +321,9 @@ export function NewPurchaseOrderSheet({
                         <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {warehouses?.map((w, index) => {
-                                    const wName = typeof w === 'string' ? w : (w as any).name || 'Bodega';
-                                    return (
-                                        <SelectItem key={index} value={wName} className="focus:bg-slate-800 focus:text-slate-100">{wName}</SelectItem>
-                                    );
-                                })}
+                                {warehouses.map((w, index) => (
+                                    <SelectItem key={index} value={w} className="focus:bg-slate-800 focus:text-slate-100">{w}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </CardContent>
@@ -378,8 +375,8 @@ export function NewPurchaseOrderSheet({
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 font-medium text-slate-200 focus:ring-0"><SelectValue /></SelectTrigger>
                                                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                                             {products?.map((p, idx) => (
-                                                                <SelectItem key={idx} value={typeof p === 'string' ? p : (p as any).name}>
-                                                                    {typeof p === 'string' ? p : (p as any).name}
+                                                                <SelectItem key={idx} value={p}>
+                                                                    {p}
                                                                 </SelectItem>
                                                             ))}
                                                         </SelectContent>
@@ -580,13 +577,13 @@ export function NewPurchaseOrderSheet({
         </SheetContent>
       </Sheet>
 
-      <ItemMatrixDialog 
+      <ItemMatrixDialog
         isOpen={isMatrixOpen}
         onOpenChange={setIsMatrixOpen}
         onSave={handleMatrixSave}
-        orderType="purchase"
-        inventory={inventory}
       />
     </>
   );
 }
+
+    
