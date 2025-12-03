@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, ReactNode } from 'react';
@@ -57,7 +58,7 @@ type MasterDataContextType = {
   // --- ESTA LÍNEA FALTABA EN TU CÓDIGO ---
   updateProductCalibers: (productId: string, caliberIds: string[]) => void;
   
-  addBankAccount: (account: BankAccount) => void;
+  addBankAccount: (account: Omit<BankAccount, 'id'>) => void;
   updateBankAccount: (account: BankAccount) => void;
   removeBankAccount: (id: string) => void;
   
@@ -138,10 +139,9 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
   };
 
   // Gestión de Cuentas Bancarias
-  const addBankAccount = (account: BankAccount) => {
+  const addBankAccount = (account: Omit<BankAccount, 'id'>) => {
     if (!firestore) return;
-    if (account.id) setDocumentNonBlocking(doc(firestore, 'bankAccounts', account.id), account, { merge: true });
-    else addDocumentNonBlocking(collection(firestore, 'bankAccounts'), account);
+    addDocumentNonBlocking(collection(firestore, 'bankAccounts'), account);
   };
   
   const updateBankAccount = (account: BankAccount) => {
@@ -165,14 +165,14 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
       { name: 'Administración' }, { name: 'Campo' }, { name: 'Packing' }, { name: 'Comercial' }, { name: 'Logística' }
   ];
 
-  const value = {
+  const value: MasterDataContextType = {
     products, addProduct, removeProduct,
     calibers, addCaliber, removeCaliber,
     warehouses, addWarehouse, removeWarehouse,
     units, addUnit, removeUnit,
     packagingTypes, addPackagingType, removePackagingType,
     productCaliberAssociations,
-    updateProductCalibers, // <--- ESTÁ AQUÍ
+    updateProductCalibers, // <--- FUNCIÓN AGREGADA
     inventory,
     contacts,
     bankAccounts, addBankAccount, updateBankAccount, removeBankAccount,

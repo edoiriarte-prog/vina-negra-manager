@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useMasterData, ProductCaliberAssociation } from '@/hooks/use-master-data';
+import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,6 +13,11 @@ import { Save, RotateCcw, Eraser, CheckSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils'; 
 
+type ProductCaliberAssociation = {
+  id: string;
+  calibers: string[];
+}
+
 export function ProductCaliberManager() {
   const { products, calibers, productCaliberAssociations, updateProductCalibers } = useMasterData();
   const [localAssociations, setLocalAssociations] = useState<ProductCaliberAssociation[]>([]);
@@ -19,31 +25,32 @@ export function ProductCaliberManager() {
 
   useEffect(() => {
     if (products.length > 0) {
-       const initialMap = products.map(p => {
-         const existing = productCaliberAssociations.find(a => a.id === p.id);
-         return existing ? { ...existing, calibers: [...existing.calibers] } : { id: p.id, calibers: [] };
+       const initialMap = products.map(pName => {
+         const pId = pName; // Assuming name is the id for now
+         const existing = productCaliberAssociations.find(a => a.id === pId);
+         return existing ? { ...existing, calibers: [...existing.calibers] } : { id: pId, calibers: [] };
        });
        setLocalAssociations(initialMap);
     }
   }, [products, productCaliberAssociations]);
 
 
-  const handleToggleCaliber = useCallback((productId: string, caliberId: string, isChecked: boolean) => {
+  const handleToggleCaliber = useCallback((productId: string, caliberName: string, isChecked: boolean) => {
     setLocalAssociations(prev => prev.map(item => {
       if (item.id !== productId) return item;
       
       const newCalibers = isChecked 
-        ? [...item.calibers, caliberId]
-        : item.calibers.filter(c => c !== caliberId);
+        ? [...item.calibers, caliberName]
+        : item.calibers.filter(c => c !== caliberName);
       
       return { ...item, calibers: newCalibers };
     }));
   }, []);
 
   const handleSelectAll = (productId: string) => {
-    const allCaliberIds = calibers.map(c => c.id);
+    const allCaliberNames = calibers.map(c => c.name);
     setLocalAssociations(prev => prev.map(item => 
-      item.id === productId ? { ...item, calibers: allCaliberIds } : item
+      item.id === productId ? { ...item, calibers: allCaliberNames } : item
     ));
   };
 
@@ -72,8 +79,8 @@ export function ProductCaliberManager() {
       toast({ title: "Restaurado", description: `Se han descartado los cambios.` });
   };
 
-  const isCaliberSelectedLocal = (productId: string, caliberId: string) => {
-    return localAssociations.find(a => a.id === productId)?.calibers.includes(caliberId) || false;
+  const isCaliberSelectedLocal = (productId: string, caliberName: string) => {
+    return localAssociations.find(a => a.id === productId)?.calibers.includes(caliberName) || false;
   };
 
   const getCountLocal = (productId: string) => {
@@ -111,15 +118,16 @@ export function ProductCaliberManager() {
           </div>
         ) : (
           <Accordion type="single" collapsible className="w-full space-y-2">
-            {products.map((product) => {
-              const changed = hasProductChanged(product.id);
-              const count = getCountLocal(product.id);
+            {products.map((productName) => {
+              const productId = productName;
+              const changed = hasProductChanged(productId);
+              const count = getCountLocal(productId);
               
               return (
-                <AccordionItem key={product.id} value={product.id} className="border rounded-lg bg-card px-2">
+                <AccordionItem key={productId} value={productId} className="border rounded-lg bg-card px-2">
                   <AccordionTrigger className="hover:no-underline py-3 px-2">
                     <div className="flex items-center gap-4 w-full">
-                      <span className="font-semibold text-lg">{product.name}</span>
+                      <span className="font-semibold text-lg">{productName}</span>
                       <div className="flex items-center gap-2 ml-auto mr-4">
                         {changed && (
                             <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 animate-in fade-in">
@@ -136,17 +144,17 @@ export function ProductCaliberManager() {
                     
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-2 bg-muted/30 rounded-md border">
                         <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => handleSelectAll(product.id)} title="Seleccionar Todos">
+                            <Button size="sm" variant="ghost" onClick={() => handleSelectAll(productId)} title="Seleccionar Todos">
                                 <CheckSquare className="mr-2 h-3.5 w-3.5" /> Todos
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => handleClearProduct(product.id)} title="Limpiar Selección">
+                            <Button size="sm" variant="ghost" onClick={() => handleClearProduct(productId)} title="Limpiar Selección">
                                 <Eraser className="mr-2 h-3.5 w-3.5" /> Ninguno
                             </Button>
                         </div>
                         <div className="flex gap-2">
                             <Button 
                                 size="sm" variant="ghost" 
-                                onClick={() => handleRestoreProduct(product.id)} 
+                                onClick={() => handleRestoreProduct(productId)} 
                                 disabled={!changed}
                                 className="text-muted-foreground"
                             >
@@ -154,7 +162,7 @@ export function ProductCaliberManager() {
                             </Button>
                             <Button 
                                 size="sm" 
-                                onClick={() => handleSaveProduct(product.id)} 
+                                onClick={() => handleSaveProduct(productId)} 
                                 disabled={!changed}
                                 className={cn(changed && "bg-amber-600 hover:bg-amber-700 text-white")}
                             >
@@ -166,21 +174,21 @@ export function ProductCaliberManager() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                       {calibers.map((caliber) => (
                         <div 
-                          key={`${product.id}-${caliber.id}`} 
+                          key={`${productId}-${caliber.name}`} 
                           className={cn(
                               "flex items-start space-x-2 p-2 rounded-md border transition-all",
-                              isCaliberSelectedLocal(product.id, caliber.id) 
+                              isCaliberSelectedLocal(productId, caliber.name) 
                                 ? "bg-primary/5 border-primary/20" 
                                 : "bg-background hover:bg-muted/50 border-transparent"
                           )}
                         >
                           <Checkbox 
-                            id={`${product.id}-${caliber.id}`} 
-                            checked={isCaliberSelectedLocal(product.id, caliber.id)}
-                            onCheckedChange={(checked) => handleToggleCaliber(product.id, caliber.id, checked as boolean)}
+                            id={`${productId}-${caliber.name}`} 
+                            checked={isCaliberSelectedLocal(productId, caliber.name)}
+                            onCheckedChange={(checked) => handleToggleCaliber(productId, caliber.name, checked as boolean)}
                           />
                           <Label 
-                            htmlFor={`${product.id}-${caliber.id}`}
+                            htmlFor={`${productId}-${caliber.name}`}
                             className="text-sm cursor-pointer w-full"
                           >
                             <div className="font-medium">{caliber.name}</div>
@@ -199,5 +207,3 @@ export function ProductCaliberManager() {
     </Card>
   );
 }
-
-    

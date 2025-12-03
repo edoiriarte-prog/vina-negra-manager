@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -77,7 +78,7 @@ export function MasterDataManager() {
                             </div>
                             <div>
                                 <Label>Saldo Inicial ($)</Label>
-                                <Input type="number" placeholder="0" value={newAccount.initialBalance} onChange={e => setNewAccount({...newAccount, initialBalance: Number(e.target.value)})} />
+                                <Input type="number" placeholder="0" value={newAccount.initialBalance || ''} onChange={e => setNewAccount({...newAccount, initialBalance: Number(e.target.value)})} />
                             </div>
                             <div className="col-span-2">
                                 <Label>Titular (Opcional)</Label>
@@ -134,5 +135,3 @@ export function MasterDataManager() {
     </div>
   );
 }
-
-    
