@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { PurchaseOrder, Contact } from "@/lib/types"; 
 import { getColumns } from "./components/columns";
 import { DataTable } from "./components/data-table"; 
@@ -17,14 +18,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { usePurchasesCRUD } from "@/hooks/use-purchases-crud";
 
-// --- IMPORTACIONES DIRECTAS DE FIREBASE PARA ELIMINACIÓN SEGURA ---
 import { doc, deleteDoc } from "firebase/firestore";
 import { useFirebase } from "@/firebase";
-// ------------------------------------------------------------------
 
 export default function PurchasesPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
+  const router = useRouter(); // Importado para refrescar datos
 
   const { purchaseOrders, isLoading: loadingOps } = useOperations();
   const { contacts, isLoading: loadingMaster } = useMasterData();
@@ -43,23 +43,25 @@ export default function PurchasesPage() {
     if (!purchaseOrders) return { totalNetAmount: 0, totalGrossAmount: 0 };
     
     return purchaseOrders.reduce((acc, order) => {
-      const netAmount = order.totalAmount || 0; 
-      acc.totalNetAmount += netAmount;
-      if (order.includeVat !== false) {
-        acc.totalGrossAmount += netAmount * 1.19;
-      } else {
-        acc.totalGrossAmount += netAmount;
-      }
-      return acc;
+        const netAmount = order.totalAmount || 0;
+        acc.totalNetAmount += netAmount;
+        if (order.includeVat) {
+            acc.totalGrossAmount += netAmount * 1.19;
+        } else {
+            acc.totalGrossAmount += netAmount;
+        }
+        return acc;
     }, { totalNetAmount: 0, totalGrossAmount: 0 });
   }, [purchaseOrders]);
 
-
-  const filteredOrders = purchaseOrders.filter((o) => {
-    const supplierName = suppliers.find((s) => s.id === o.supplierId)?.name || '';
-    return (o.id?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-           supplierName.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  const filteredOrders = useMemo(() => {
+      if (!purchaseOrders) return [];
+      return purchaseOrders.filter((o) => {
+        const supplierName = suppliers.find((s) => s.id === o.supplierId)?.name || '';
+        return (o.number?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            supplierName.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+  }, [purchaseOrders, suppliers, searchTerm]);
 
   const handleSave = async (orderData: PurchaseOrder | Omit<PurchaseOrder, "id">) => {
     const totalKilos = orderData.items.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0);
@@ -76,34 +78,29 @@ export default function PurchasesPage() {
         } else {
             await createPurchaseOrder(finalOrderData);
         }
-        setIsSheetOpen(false);
-        setEditingOrder(null);
+        router.refresh(); // Refresca los datos en la página
     } catch (error) {
         console.error("Error al guardar:", error);
         toast({ variant: "destructive", title: "Error", description: "No se pudo guardar la orden." });
+    } finally {
+        // Esto se ejecuta siempre, haya error o no.
+        setIsSheetOpen(false);
+        setEditingOrder(null);
     }
   };
 
-  // --- FUNCIÓN NUCLEAR DE ELIMINACIÓN ---
   const handleDelete = async (id: string) => {
     if (!firestore) return;
-    // 1. Diagnóstico visual inmediato
     if (!id) {
-        alert("ERROR CRÍTICO: El botón no encontró un ID válido para esta fila. El documento podría estar corrupto en la base de datos.");
+        alert("ERROR CRÍTICO: El botón no encontró un ID válido para esta fila.");
         return;
     }
 
-    // 2. Confirmación explícita
-    if (window.confirm(`¿Estás seguro de eliminar la orden con ID: ${id}?\n\nEsta acción borrará el documento directamente de la base de datos.`)) {
+    if (window.confirm(`¿Estás seguro de eliminar la orden con ID: ${id}?\n\nEsta acción es permanente.`)) {
       try {
-          // 3. Borrado directo sin intermediarios (Hooks)
           await deleteDoc(doc(firestore, "purchaseOrders", id));
-          
-          alert("¡Orden eliminada correctamente!");
-          
-          // 4. Recarga forzada para limpiar la tabla visualmente
-          window.location.reload(); 
-          
+          toast({ title: "Orden Eliminada", description: "La orden ha sido borrada exitosamente."});
+          router.refresh(); // Refresca los datos después de eliminar
       } catch (error: any) {
           console.error("Error fatal al eliminar:", error);
           alert(`NO SE PUDO ELIMINAR.\n\nError técnico: ${error.message}`);
