@@ -22,7 +22,7 @@ interface PurchaseOrderPreviewProps {
   order: PurchaseOrder | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  supplier?: Contact | null; // Mantenemos prop por compatibilidad
+  supplier?: Contact | null; 
 }
 
 export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOrderPreviewProps) {
@@ -30,7 +30,6 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
   
   if (!order) return null;
 
-  // Buscamos el proveedor actualizado
   const supplierData = contacts.find(c => c.id === order.supplierId);
 
   const formatCurrency = (val: number) => 
@@ -39,12 +38,10 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
   const formatKilos = (val: number) => 
     new Intl.NumberFormat('es-CL').format(val) + ' kg';
 
-  // Cálculos seguros para evitar NaN
   const calculateItemTotal = (item: any) => {
       const qty = Number(item.quantity) || 0;
       const price = Number(item.price) || 0;
-      // Si el item ya tiene un total guardado, úsalo, si no, calcúlalo
-      return item.total || (qty * price);
+      return qty * price;
   };
 
   const getStatusBadge = (status: string) => {
@@ -57,11 +54,14 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
       }
   };
 
+  const netAmount = order.totalAmount || 0;
+  const vatAmount = order.includeVat !== false ? netAmount * 0.19 : 0;
+  const grossAmount = netAmount + vatAmount;
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] bg-slate-950 border border-slate-800 text-slate-100 p-0 overflow-hidden flex flex-col max-h-[90vh]">
         
-        {/* --- CABECERA TIPO DOCUMENTO --- */}
         <div className="bg-slate-900 p-6 border-b border-slate-800 flex justify-between items-start">
             <div className="flex items-center gap-4">
                 <div className="h-12 w-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
@@ -83,10 +83,8 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
         </div>
 
         <div className="flex-1 overflow-y-auto p-8">
-            {/* --- SECCIÓN DE DATOS (GRID) --- */}
             <div className="grid grid-cols-2 gap-12 mb-8">
                 
-                {/* Columna Izquierda: PROVEEDOR */}
                 <div className="space-y-3">
                     <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-2">
                         <Building2 className="h-3 w-3" /> Datos del Proveedor
@@ -99,7 +97,6 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
                     </div>
                 </div>
 
-                {/* Columna Derecha: LOGÍSTICA Y PAGO */}
                 <div className="space-y-3">
                     <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-2">
                         <FileText className="h-3 w-3" /> Detalles de la Operación
@@ -125,7 +122,6 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
 
             <Separator className="bg-slate-800 my-6" />
 
-            {/* --- TABLA DE ITEMS --- */}
             <div className="rounded-lg border border-slate-800 overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-slate-900/50 text-slate-400 text-xs uppercase font-bold">
@@ -162,35 +158,25 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
                 </table>
             </div>
 
-            {/* --- TOTALES --- */}
             <div className="mt-6 flex justify-end">
                 <div className="w-64 space-y-2">
                     <div className="flex justify-between text-sm text-slate-400">
-                        <span>Subtotal</span>
-                        <span className="font-mono text-slate-200">
-                            {/* Si tiene IVA incluido, lo desglosamos visualmente */}
-                            {order.includeVat 
-                                ? formatCurrency(Math.round(order.totalAmount / 1.19))
-                                : formatCurrency(order.totalAmount)
-                            }
-                        </span>
+                        <span>Subtotal Neto</span>
+                        <span className="font-mono text-slate-200">{formatCurrency(netAmount)}</span>
                     </div>
-                    {order.includeVat && (
+                    {order.includeVat !== false && (
                         <div className="flex justify-between text-sm text-slate-400">
                             <span>IVA (19%)</span>
-                            <span className="font-mono text-slate-200">
-                                {formatCurrency(order.totalAmount - Math.round(order.totalAmount / 1.19))}
-                            </span>
+                            <span className="font-mono text-slate-200">{formatCurrency(vatAmount)}</span>
                         </div>
                     )}
                     <div className="flex justify-between items-center pt-3 border-t border-slate-800">
                         <span className="text-base font-bold text-white uppercase">Total a Pagar</span>
-                        <span className="text-xl font-bold text-blue-400 font-mono">{formatCurrency(order.totalAmount)}</span>
+                        <span className="text-xl font-bold text-blue-400 font-mono">{formatCurrency(grossAmount)}</span>
                     </div>
                 </div>
             </div>
 
-            {/* --- OBSERVACIONES --- */}
             {order.notes && (
                 <div className="mt-8 bg-slate-900/50 border border-slate-800 p-4 rounded-lg">
                     <h5 className="text-xs font-bold text-slate-500 uppercase mb-1">Observaciones / Notas</h5>
@@ -199,7 +185,6 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
             )}
         </div>
 
-        {/* --- FOOTER DE ACCIONES --- */}
         <DialogFooter className="bg-slate-900 border-t border-slate-800 p-4 sm:justify-between items-center">
           <div className="text-xs text-slate-500 hidden sm:block">
              Documento generado por Sistema AVN Manager

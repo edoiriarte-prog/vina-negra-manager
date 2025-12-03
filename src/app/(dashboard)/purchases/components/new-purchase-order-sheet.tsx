@@ -13,7 +13,7 @@ import { PurchaseOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
 import { format, addDays, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent } from '@/components/ui/card';
-import { ItemMatrixDialog } from './item-matrix-dialog';
+import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,8 +25,6 @@ type NewPurchaseOrderSheetProps = {
   onSave: (order: PurchaseOrder) => void;
   order: PurchaseOrder | null;
   suppliers: Contact[];
-  inventory: InventoryItem[];
-  nextOrderId: string;
   purchaseOrders: PurchaseOrder[];
 };
 
@@ -65,7 +63,7 @@ const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData 
 };
 
 export function NewPurchaseOrderSheet({ 
-    isOpen, onOpenChange, onSave, order, suppliers, inventory, purchaseOrders 
+    isOpen, onOpenChange, onSave, order, suppliers, purchaseOrders 
 }: NewPurchaseOrderSheetProps) {
   
   const [formData, setFormData] = useState<PurchaseOrderFormData>(() => getInitialFormData(order));
@@ -96,7 +94,6 @@ export function NewPurchaseOrderSheet({
      return finalTotalWithVat - advanceAmount;
   }, [finalTotalWithVat, advanceAmount, formData.paymentMethod]);
 
-  // Lógica ID (Base 1100)
   useEffect(() => {
     if (isOpen) {
         if (!hasInitialized) {
@@ -142,15 +139,13 @@ export function NewPurchaseOrderSheet({
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = event.target;
-    const isCheckbox = type === 'checkbox';
 
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'packagingQuantity'].includes(field) ? Number(value) : value);
     } else if (name === 'includeVat') {
-        // @ts-ignore
-        setFormData(prev => ({ ...prev, includeVat: event.target.checked }));
+        setFormData(prev => ({ ...prev, includeVat: (event.target as HTMLInputElement).checked }));
     } else {
         setFormData((prev) => ({ ...prev, [name]: ['advancePercentage', 'creditDays'].includes(name) ? Number(value) : value }));
     }
@@ -205,8 +200,8 @@ export function NewPurchaseOrderSheet({
         items: sanitizedItems,
         totalPackages: calculatedTotalPackages,
         totalKilos: calculatedTotalKilos,
-        totalAmount: calculatedNetAmount, // SIEMPRE GUARDAMOS EL NETO
-        includeVat: formData.includeVat, // GUARDAMOS EL ESTADO DEL SWITCH
+        totalAmount: calculatedNetAmount, 
+        includeVat: formData.includeVat,
         status: formData.status,
         paymentMethod: formData.paymentMethod,
         warehouse: formData.warehouse,
@@ -367,7 +362,7 @@ export function NewPurchaseOrderSheet({
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.product`, v)} value={item.product}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 font-medium text-slate-200 focus:ring-0"><SelectValue /></SelectTrigger>
                                                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                                            {products?.map((p, idx) => (
+                                                            {products?.map((p) => (
                                                                 <SelectItem key={p} value={p}>
                                                                     {p}
                                                                 </SelectItem>
@@ -379,8 +374,8 @@ export function NewPurchaseOrderSheet({
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.caliber`, v)} value={item.caliber}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-slate-400 focus:ring-0"><SelectValue /></SelectTrigger>
                                                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                                            {calibers?.map((c, idx) => (
-                                                                <SelectItem key={idx} value={c.name}>{c.name}</SelectItem>
+                                                            {calibers?.map((c) => (
+                                                                <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
                                                             ))}
                                                         </SelectContent>
                                                     </Select>
@@ -399,7 +394,7 @@ export function NewPurchaseOrderSheet({
                                                 <td className="px-4 py-2">
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.packagingType`, v)} value={item.packagingType || ''}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-xs text-slate-400 focus:ring-0"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes?.map((p, idx) => <SelectItem key={idx} value={p}>{p}</SelectItem>)}</SelectContent>
+                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes?.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                                     </Select>
                                                 </td>
                                                 <td className="px-4 py-2">
@@ -569,8 +564,6 @@ export function NewPurchaseOrderSheet({
         isOpen={isMatrixOpen}
         onOpenChange={setIsMatrixOpen}
         onSave={handleMatrixSave}
-        orderType="purchase"
-        inventory={inventory}
       />
     </>
   );
