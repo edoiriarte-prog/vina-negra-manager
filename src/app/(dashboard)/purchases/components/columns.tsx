@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 
 // Helper para moneda
 const formatCurrency = (value: number) => 
-  new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+  new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
 
 // --- COMPONENTE DE CELDA DE ESTADO (COMPRAS) ---
 const StatusCell = ({ order }: { order: PurchaseOrder }) => {
@@ -136,7 +136,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
         </Button>
       )
     },
-    cell: ({ row }) => <div className="font-mono font-bold text-slate-200">{row.getValue("id")}</div>,
+    cell: ({ row }) => <div className="font-mono font-bold text-slate-200">{row.original.number || row.original.id}</div>,
   },
   {
     accessorKey: "date",
@@ -162,11 +162,21 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
     cell: ({ row }) => <StatusCell order={row.original} />,
   },
   {
-    accessorKey: "totalAmount",
-    header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL</div>,
+    accessorKey: 'netAmount',
+    header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL NETO</div>,
     cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("totalAmount"))
-      return <div className="text-right font-bold font-mono text-emerald-400">{formatCurrency(amount)}</div>
+      const order = row.original;
+      const netAmount = order.includeVat ? Math.round(order.totalAmount / 1.19) : order.totalAmount;
+      return <div className="text-right font-mono text-slate-300">{formatCurrency(netAmount)}</div>
+    },
+  },
+  {
+    accessorKey: "totalAmount",
+    header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL C/IVA</div>,
+    cell: ({ row }) => {
+      const order = row.original;
+      const grossAmount = order.includeVat ? order.totalAmount : Math.round(order.totalAmount * 1.19);
+      return <div className="text-right font-bold font-mono text-emerald-400">{formatCurrency(grossAmount)}</div>
     },
   },
   {
