@@ -1,19 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation"; // Agregamos useRouter
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, Users, ShoppingCart, Truck, 
   Package, Settings, FileText, LogOut,
-  Landmark, // Icono Tesorería
-  BookOpen,  // Icono Cta. Corriente
+  Landmark, 
+  BookOpen, 
   FileSliders,
   PackageCheck
 } from "lucide-react";
 
+// --- CORRECCIÓN DE IMPORTACIÓN ---
+// No importamos 'app' porque no está exportada. Usamos 'auth' directo.
+import { signOut } from "firebase/auth";
+import { auth } from "@/firebase"; 
+
 export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
   const pathname = usePathname();
+  const router = useRouter(); // Hook para redireccionar
 
   const routes = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, active: pathname === "/dashboard" },
@@ -21,13 +27,24 @@ export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElemen
     { href: "/purchases", label: "Compras (O/C)", icon: ShoppingCart, active: pathname.includes("/purchases") },
     { href: "/sales", label: "Ventas (O/V)", icon: Truck, active: pathname.includes("/sales") },
     { href: "/inventory", label: "Inventario", icon: Package, active: pathname.includes("/inventory") },
-    { href: "/inventory-adjustments", label: "Ajustes de Stock", icon: FileSliders },
-    { href: "/dispatches", label: "Orden de Salida", icon: PackageCheck },
+    { href: "/inventory-adjustments", label: "Ajustes de Stock", icon: FileSliders, active: pathname.includes("/inventory-adjustments") },
+    { href: "/dispatches", label: "Orden de Salida", icon: PackageCheck, active: pathname.includes("/dispatches") },
     { href: "/financials", label: "Tesorería", icon: Landmark, active: pathname.includes("/financials") },
     { href: "/mercantile-account", label: "Cta. Corriente", icon: BookOpen, active: pathname.includes("/mercantile-account") },
     { href: "/reports", label: "Reportes", icon: FileText, active: pathname.includes("/reports") },
     { href: "/settings", label: "Configuración", icon: Settings, active: pathname.includes("/settings") },
   ];
+
+  // --- FUNCIÓN LOGOUT ---
+  const handleLogout = async () => {
+    try {
+      await signOut(auth); // Usamos la instancia 'auth' importada
+      console.log("Sesión cerrada");
+      router.push("/"); // Redirige al login o home
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
+  };
 
   return (
     <nav className={cn("flex flex-col h-full bg-slate-900 border-r border-slate-800 w-64 fixed left-0 top-0 bottom-0 z-50", className)} {...props}>
@@ -52,15 +69,15 @@ export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElemen
             href={route.href}
             className={cn(
               "flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 group relative",
-              pathname.startsWith(route.href) && route.href !== "/" || pathname === route.href
+              route.active 
                 ? "bg-blue-600/10 text-blue-400 shadow-sm border border-blue-600/20" 
                 : "text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-transparent"
             )}
           >
-            {(pathname.startsWith(route.href) && route.href !== "/" || pathname === route.href) && (
+            {route.active && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-blue-500 rounded-r-full" />
             )}
-            <route.icon className={cn("mr-3 h-5 w-5 transition-colors", (pathname.startsWith(route.href) && route.href !== "/" || pathname === route.href) ? "text-blue-400" : "text-slate-500 group-hover:text-slate-300")} />
+            <route.icon className={cn("mr-3 h-5 w-5 transition-colors", route.active ? "text-blue-400" : "text-slate-500 group-hover:text-slate-300")} />
             {route.label}
           </Link>
         ))}
@@ -68,7 +85,10 @@ export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElemen
 
       {/* FOOTER */}
       <div className="p-4 border-t border-slate-800 bg-slate-900/50">
-        <button className="flex items-center w-full px-3 py-2 text-sm font-medium text-slate-400 rounded-md hover:bg-red-900/20 hover:text-red-400 transition-colors">
+        <button 
+            onClick={handleLogout}
+            className="flex items-center w-full px-3 py-2 text-sm font-medium text-slate-400 rounded-md hover:bg-red-900/20 hover:text-red-400 transition-colors cursor-pointer"
+        >
             <LogOut className="mr-3 h-5 w-5" />
             Cerrar Sesión
         </button>

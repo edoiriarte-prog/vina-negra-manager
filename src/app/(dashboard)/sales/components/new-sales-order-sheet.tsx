@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose 
 } from "@/components/ui/sheet";
@@ -11,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Plus, ShoppingCart, Truck } from "lucide-react";
+import { Trash2, Plus, ShoppingCart, Truck, AlertCircle } from "lucide-react";
 import { 
   SalesOrder, 
   Contact, 
@@ -21,7 +20,15 @@ import {
   InventoryAdjustment 
 } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { useMasterData } from "@/hooks/use-master-data"; // Import the master data hook
+import { useMasterData } from "@/hooks/use-master-data";
+
+// LISTA DE RESPALDO DE CALIBRES (Por si no hay en inventario)
+const DEFAULT_CALIBERS = [
+  "Sin Calibre", "Pre-calibre", 
+  "12", "14", "16", "18", "20", "22", "24", "26", "28", "30", "32", "34", "36", 
+  "40", "50", "60", "70", "80", "90", 
+  "Cat. I", "Cat. II", "Descarte"
+];
 
 interface NewSalesOrderSheetProps {
   isOpen: boolean;
@@ -29,14 +36,14 @@ interface NewSalesOrderSheetProps {
   onSave: (orderData: SalesOrder | Omit<SalesOrder, "id">) => void;
   order: SalesOrder | null;
   clients: Contact[];
-  carriers?: Contact[]; // Opcional
-  inventory: InventoryItem[]; // Ahora recibimos el inventario real
+  inventory: InventoryItem[]; 
+  sheetType?: 'sale' | 'dispatch'; 
+  carriers?: Contact[]; 
   nextOrderId?: string;
   purchaseOrders?: PurchaseOrder[];
   salesOrders?: SalesOrder[];
   inventoryAdjustments?: InventoryAdjustment[];
   contacts?: Contact[];
-  sheetType?: 'sale' | 'dispatch'; // Para diferenciar Venta de Traspaso
 }
 
 export function NewSalesOrderSheet({
@@ -46,27 +53,25 @@ export function NewSalesOrderSheet({
   order,
   clients,
   inventory,
-  sheetType = 'sale' // Por defecto es venta
+  sheetType = 'sale' 
 }: NewSalesOrderSheetProps) {
   
   const { toast } = useToast();
-  const { products: masterProducts } = useMasterData(); // Get products from master data
+  const { products: masterProducts, warehouses } = useMasterData(); 
   const isDispatch = sheetType === 'dispatch';
 
-  // Estado inicial del formulario
   const [formData, setFormData] = useState<Partial<SalesOrder>>({
     clientId: "",
-    warehouse: "Principal", // Bodega de origen
+    warehouse: "", 
     date: new Date().toISOString().split('T')[0],
     status: isDispatch ? "dispatched" : "pending",
     includeVat: false,
     items: [],
-    destinationWarehouse: "", // Solo para traspasos
+    destinationWarehouse: "", 
   });
 
   const [items, setItems] = useState<OrderItem[]>([]);
   
-  // Estados para el item que se está agregando
   const [currentItem, setCurrentItem] = useState<Partial<OrderItem>>({
     product: "",
     caliber: "",
@@ -76,16 +81,24 @@ export function NewSalesOrderSheet({
     price: 0,
   });
 
-  // Cargar datos si estamos editando
+  const availableWarehouses = useMemo(() => {
+    return warehouses || ["Principal"]; 
+  }, [warehouses]);
+
+  useEffect(() => {
+    if (availableWarehouses.length > 0 && !formData.warehouse) {
+        setFormData(prev => ({...prev, warehouse: typeof availableWarehouses[0] === 'string' ? availableWarehouses[0] : (availableWarehouses[0] as any).name }));
+    }
+  }, [availableWarehouses, formData.warehouse]);
+
   useEffect(() => {
     if (order) {
       setFormData({ ...order });
       setItems(order.items || []);
     } else {
-      // Resetear al abrir nuevo
       setFormData({
         clientId: "",
-        warehouse: "Principal",
+        warehouse: typeof availableWarehouses[0] === 'string' ? availableWarehouses[0] : (availableWarehouses[0] as any).name || "Principal",
         date: new Date().toISOString().split('T')[0],
         status: isDispatch ? "dispatched" : "pending",
         includeVat: false,
@@ -93,19 +106,26 @@ export function NewSalesOrderSheet({
       });
       setItems([]);
     }
-  }, [order, isOpen, isDispatch]);
+  }, [order, isOpen, isDispatch, availableWarehouses]);
 
   // --- MANEJO DE ITEMS ---
 
-  // Productos únicos disponibles en el inventario seleccionado
-  const availableProducts = masterProducts.map(p => p.name); // Use master products
-  
-  // Calibres disponibles para el producto seleccionado
-  const availableCalibers = inventory
-    .filter(i => i.name === currentItem.product && i.warehouse === formData.warehouse)
-    .map(i => i.caliber);
+  // CORRECCIÓN PRINCIPAL: Si no hay calibres en inventario, usa la lista DEFAULT_CALIBERS
+  const availableCalibers = useMemo(() => {
+    if (!currentItem.product) return [];
+    
+    // 1. Buscamos en el inventario real
+    const relevantItems = inventory.filter(i => i.name === currentItem.product);
+    const inventoryCalibers = Array.from(new Set(relevantItems.map(i => i.caliber).filter(Boolean)));
+    
+    // 2. Si hay calibres en inventario, los usamos. Si no, usamos la lista estándar.
+    if (inventoryCalibers.length > 0) {
+      return inventoryCalibers.sort();
+    } else {
+      return DEFAULT_CALIBERS;
+    }
+  }, [inventory, currentItem.product]);
 
-  // Stock actual del producto/calibre seleccionado
   const currentStockItem = inventory.find(i => 
     i.name === currentItem.product && 
     i.caliber === currentItem.caliber && 
@@ -113,16 +133,26 @@ export function NewSalesOrderSheet({
   );
 
   const addItem = () => {
-    if (!currentItem.product || !currentItem.caliber || !currentItem.quantity) return;
+    // Validación explicita para que el usuario sepa por qué falla
+    if (!currentItem.product) {
+      toast({ variant: "destructive", title: "Falta información", description: "Selecciona un producto." });
+      return;
+    }
+    if (!currentItem.caliber) {
+      toast({ variant: "destructive", title: "Falta información", description: "Selecciona un calibre." });
+      return;
+    }
+    if (!currentItem.quantity || currentItem.quantity <= 0) {
+      toast({ variant: "destructive", title: "Falta información", description: "Ingresa una cantidad válida." });
+      return;
+    }
 
-    // Validar stock (simple)
     if (currentStockItem && currentItem.quantity! > currentStockItem.stock) {
         toast({
             variant: "destructive",
-            title: "Stock Insuficiente",
-            description: `Solo quedan ${currentStockItem.stock} kg disponibles.`
+            title: "Advertencia de Stock",
+            description: `En ${formData.warehouse} solo hay ${currentStockItem.stock} kg. Se permitirá la venta.`
         });
-        return;
     }
 
     const newItem: OrderItem = {
@@ -134,11 +164,11 @@ export function NewSalesOrderSheet({
       total: Number(currentItem.quantity) * Number(currentItem.price || 0),
       unit: 'Kilos',
       format: currentItem.format || 'Estándar',
-      lotNumber: currentItem.lotNumber || '' // Opcional: lógica de lotes
+      lotNumber: currentItem.lotNumber || '' 
     };
 
     setItems([...items, newItem]);
-    // Resetear item actual pero mantener producto para agilizar carga
+    // Resetear solo cantidades, mantener producto para agilizar carga
     setCurrentItem(prev => ({ ...prev, caliber: "", quantity: 0, packagingQuantity: 0 }));
   };
 
@@ -152,23 +182,49 @@ export function NewSalesOrderSheet({
         toast({ variant: "destructive", title: "Falta Cliente", description: "Selecciona un cliente." });
         return;
     }
+    
+    // INTENTO DE AUTO-GUARDADO: Si el usuario llenó los datos pero olvidó dar click en "Agregar Item"
+    if (items.length === 0 && currentItem.product && currentItem.quantity && currentItem.quantity > 0) {
+       toast({ 
+         variant: "default", 
+         title: "Item agregado automáticamente", 
+         description: "Se agregó el producto que estaba en edición." 
+       });
+       // Creamos el item al vuelo
+       const autoItem: OrderItem = {
+          product: currentItem.product,
+          caliber: currentItem.caliber || "Sin Calibre",
+          quantity: Number(currentItem.quantity),
+          packagingQuantity: Number(currentItem.packagingQuantity || 0),
+          price: Number(currentItem.price || 0),
+          total: Number(currentItem.quantity) * Number(currentItem.price || 0),
+          unit: 'Kilos',
+          format: currentItem.format || 'Estándar',
+          lotNumber: currentItem.lotNumber || '' 
+       };
+       const finalOrder: any = {
+          ...formData,
+          items: [autoItem],
+          clientId: formData.clientId || (isDispatch ? 'internal_transfer' : ''), 
+      };
+      onSave(finalOrder);
+      return;
+    }
+
     if (items.length === 0) {
-        toast({ variant: "destructive", title: "Orden Vacía", description: "Agrega al menos un producto." });
+        toast({ variant: "destructive", title: "Orden Vacía", description: "Agrega al menos un producto con el botón 'Agregar Item'." });
         return;
     }
 
-    // Preparar objeto final
     const finalOrder: any = {
         ...formData,
         items: items,
-        // Si es traspaso interno, usamos un ID genérico si no hay cliente
         clientId: formData.clientId || (isDispatch ? 'internal_transfer' : ''), 
     };
 
     onSave(finalOrder);
   };
 
-  // Totales
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const totalAmount = formData.includeVat ? subtotal * 1.19 : subtotal;
 
@@ -200,8 +256,8 @@ export function NewSalesOrderSheet({
                             <SelectValue placeholder="Seleccionar..." />
                         </SelectTrigger>
                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                            {clients.map(c => (
-                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            {clients.map((c, index) => (
+                                <SelectItem key={c.id || index} value={c.id}>{c.name}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -228,10 +284,11 @@ export function NewSalesOrderSheet({
                             <SelectValue placeholder="Seleccionar..." />
                         </SelectTrigger>
                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                            {/* Idealmente traer bodegas de useMasterData, hardcodeado por ahora para simplicidad */}
-                            <SelectItem value="Principal">Principal</SelectItem>
-                            <SelectItem value="Cámara Frío 1">Cámara Frío 1</SelectItem>
-                            <SelectItem value="Patio Techado">Patio Techado</SelectItem>
+                            {availableWarehouses.map((w, index) => (
+                                <SelectItem key={index} value={typeof w === 'string' ? w : (w as any).name || 'Bodega'}>
+                                    {typeof w === 'string' ? w : (w as any).name || 'Bodega'}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>
@@ -263,8 +320,10 @@ export function NewSalesOrderSheet({
                                 <SelectValue placeholder="Producto" />
                             </SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {masterProducts.map(p => (
-                                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                                {masterProducts.map((productName, index) => (
+                                    <SelectItem key={index} value={productName as string}>
+                                        {productName as string}
+                                    </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -279,9 +338,11 @@ export function NewSalesOrderSheet({
                             <SelectTrigger className="bg-slate-900 border-slate-800 text-slate-100 h-8">
                                 <SelectValue placeholder="Calibre" />
                             </SelectTrigger>
-                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {availableCalibers.map(c => (
-                                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100 max-h-60">
+                                {availableCalibers.map((c, index) => (
+                                    <SelectItem key={`${c}-${index}`} value={c as string}>
+                                        {c as string}
+                                    </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -298,8 +359,12 @@ export function NewSalesOrderSheet({
                             value={currentItem.quantity || ''}
                             onChange={(e) => setCurrentItem(prev => ({...prev, quantity: Number(e.target.value)}))}
                         />
-                        {currentStockItem && (
-                            <p className="text-[10px] text-slate-500 text-right">Max: {currentStockItem.stock}</p>
+                        {currentStockItem ? (
+                            <p className="text-[10px] text-slate-500 text-right">Disponible: {currentStockItem.stock}</p>
+                        ) : (
+                            <p className="text-[10px] text-slate-500 text-right text-yellow-500 flex justify-end gap-1 items-center">
+                               <AlertCircle className="w-3 h-3"/> Sin stock (se permite venta)
+                            </p>
                         )}
                     </div>
                     <div className="space-y-2">
@@ -323,14 +388,19 @@ export function NewSalesOrderSheet({
                         />
                     </div>
                 </div>
-                <Button onClick={addItem} variant="secondary" className="w-full bg-slate-800 text-slate-200 hover:bg-slate-700" disabled={!currentItem.quantity}>
-                    <Plus className="h-4 w-4 mr-2"/> Agregar Item
+                <Button onClick={addItem} variant="secondary" className="w-full bg-slate-800 text-slate-200 hover:bg-slate-700">
+                    <Plus className="h-4 w-4 mr-2"/> Agregar Item a la lista
                 </Button>
             </div>
 
             {/* --- LISTA DE ITEMS --- */}
             <div className="space-y-2">
-                {items.map((item, idx) => (
+                {items.length === 0 ? (
+                   <div className="text-center p-4 border border-dashed border-slate-800 rounded text-slate-500 text-sm">
+                      No hay productos agregados. Usa el botón "Agregar Item".
+                   </div>
+                ) : (
+                  items.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-center p-3 bg-slate-900/50 rounded border border-slate-800 text-sm">
                         <div>
                             <span className="text-white font-medium">{item.product} {item.caliber}</span>
@@ -345,7 +415,9 @@ export function NewSalesOrderSheet({
                             </button>
                         </div>
                     </div>
-                ))}
+                  ))
+                )}
+                
                 {items.length > 0 && (
                     <div className="flex justify-between items-center pt-4 border-t border-slate-800">
                         <span className="text-lg font-bold text-white">Total</span>

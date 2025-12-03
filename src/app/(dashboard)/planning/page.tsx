@@ -3,29 +3,38 @@
 import { useState, useMemo } from "react";
 import { usePlanning } from "@/hooks/use-planning";
 import { useMasterData } from "@/hooks/use-master-data";
-import { PlannedOrder, Contact } from "@/lib/types";
+import { PlannedOrder } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Plus, Truck, DollarSign, User, CheckCircle2, Clock } from "lucide-react";
-import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval, addDays } from "date-fns";
+import { Calendar, Plus, Clock, CheckCircle2 } from "lucide-react";
+import { format, parseISO, endOfWeek, addDays } from "date-fns";
 import { es } from "date-fns/locale";
-import { NewSalesOrderSheet } from "../sales/components/new-sales-order-sheet"; // Reusamos el formulario de venta!
+import { NewSalesOrderSheet } from "../sales/components/new-sales-order-sheet"; 
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Helper
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
 
 export default function PlanningPage() {
-  const { plannedOrders, isLoading, createPlan, updatePlan, deletePlan } = usePlanning();
-  const { contacts, inventory } = useMasterData(); // Inventario para validar disponibilidad futura
+  const { plannedOrders, isLoading, createPlan, updatePlan } = usePlanning();
+  
+  // Datos maestros con valores por defecto
+  const { contacts = [], inventory = [] } = useMasterData(); 
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannedOrder | null>(null);
 
-  // Filtramos solo clientes
-  const clients = useMemo(() => contacts?.filter(c => c.type.includes('client')) || [], [contacts]);
+  // --- CORRECCIÓN DEL FILTRO DE CLIENTES ---
+  const clients = useMemo(() => {
+    if (!contacts) return [];
+    return contacts.filter(c => {
+      // Convertimos el tipo a string seguro, ya sea que venga como array o texto
+      const typeStr = Array.isArray(c.type) ? c.type.join(' ') : String(c.type || '');
+      return typeStr.toLowerCase().includes('client') || typeStr.toLowerCase().includes('cliente');
+    });
+  }, [contacts]);
 
   // --- LÓGICA DE VISUALIZACIÓN SEMANAL ---
   const weeklyView = useMemo(() => {
@@ -42,17 +51,14 @@ export default function PlanningPage() {
   }, [plannedOrders]);
 
   // --- HANDLER: Guardar Planificación ---
-  // Adaptamos el objeto que viene del formulario de Venta para guardarlo como Planificación
   const handleSavePlan = (data: any) => {
     const planData: any = {
         ...data,
-        // Mapeamos campos del formulario de venta a planificación
-        deliveryDate: data.date, // Usamos la fecha del formulario como fecha de entrega
-        status: editingPlan ? editingPlan.status : 'borrador', // Por defecto borrador
+        deliveryDate: data.date, 
+        status: editingPlan ? editingPlan.status : 'borrador', 
         totalKilos: data.items.reduce((acc: number, i: any) => acc + i.quantity, 0),
     };
 
-    // Limpiamos campos que no existen en PlannedOrder si vienen de SalesOrder
     delete planData.paymentStatus;
     delete planData.saleType;
 
@@ -65,7 +71,6 @@ export default function PlanningPage() {
     setEditingPlan(null);
   };
 
-  // Cambiar estado rápido
   const toggleStatus = (plan: PlannedOrder) => {
       const newStatus = plan.status === 'borrador' ? 'confirmado' : 'entregado';
       updatePlan(plan.id, { status: newStatus });
@@ -92,7 +97,6 @@ export default function PlanningPage() {
             <TabsTrigger value="list">Lista Completa</TabsTrigger>
         </TabsList>
 
-        {/* VISTA SEMANAL (KANBAN SIMPLIFICADO) */}
         <TabsContent value="week" className="grid md:grid-cols-2 gap-6">
             
             {/* COLUMNA: ESTA SEMANA */}
@@ -118,8 +122,8 @@ export default function PlanningPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 space-y-3">
-                     {weeklyView.nextWeek.length === 0 && <p className="text-slate-500 text-sm italic">Nada planificado aún.</p>}
-                     {weeklyView.nextWeek.map(plan => (
+                      {weeklyView.nextWeek.length === 0 && <p className="text-slate-500 text-sm italic">Nada planificado aún.</p>}
+                      {weeklyView.nextWeek.map(plan => (
                         <PlanCard key={plan.id} plan={plan} contacts={contacts} onToggle={() => toggleStatus(plan)} onEdit={() => { setEditingPlan(plan); setIsSheetOpen(true); }} />
                     ))}
                 </CardContent>
@@ -128,32 +132,29 @@ export default function PlanningPage() {
 
         <TabsContent value="list">
             <div className="rounded-md border border-slate-800 bg-slate-900">
-                {/* Aquí podrías poner una DataTable igual a la de Ventas si quieres ver todo el historial */}
                 <div className="p-8 text-center text-slate-500">Vista de lista completa (Histórico)</div>
             </div>
         </TabsContent>
       </Tabs>
 
-      {/* REUTILIZAMOS EL FORMULARIO DE VENTAS PERO LO GUARDAMOS COMO PLAN */}
       {isSheetOpen && (
         <NewSalesOrderSheet 
             isOpen={isSheetOpen}
             onOpenChange={(open) => !open && setIsSheetOpen(false)}
             onSave={handleSavePlan}
-            // @ts-ignore: Adaptamos el tipo on-the-fly
+            // @ts-ignore
             order={editingPlan ? { ...editingPlan, date: editingPlan.deliveryDate } : null}
-            clients={clients}
-            inventory={inventory}
-            sheetType="sale" // Usamos modo venta para la UI
+            clients={clients} 
+            inventory={inventory || []} 
+            sheetType="sale" 
         />
       )}
     </div>
   );
 }
 
-// Componente Tarjeta de Pedido
 function PlanCard({ plan, contacts, onToggle, onEdit }: any) {
-    const clientName = contacts.find((c: any) => c.id === plan.clientId)?.name || 'Desconocido';
+    const clientName = contacts?.find((c: any) => c.id === plan.clientId)?.name || 'Desconocido';
     const isConfirmed = plan.status === 'confirmado';
 
     return (
@@ -176,7 +177,6 @@ function PlanCard({ plan, contacts, onToggle, onEdit }: any) {
                 </div>
             </div>
             
-            {/* Resumen de productos */}
             <div className="space-y-1 mt-3 border-t border-slate-800 pt-2">
                 {plan.items.slice(0, 3).map((item: any, i: number) => (
                     <div key={i} className="flex justify-between text-xs text-slate-300">
@@ -187,7 +187,6 @@ function PlanCard({ plan, contacts, onToggle, onEdit }: any) {
                 {plan.items.length > 3 && <p className="text-[10px] text-slate-500 italic">+ {plan.items.length - 3} más...</p>}
             </div>
 
-            {/* Acciones */}
             <div className="mt-4 flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button size="sm" variant="ghost" onClick={onEdit} className="h-7 text-xs">Editar</Button>
                 {plan.status !== 'entregado' && (

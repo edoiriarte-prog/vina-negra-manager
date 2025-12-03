@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -31,9 +30,8 @@ type NewPurchaseOrderSheetProps = {
   purchaseOrders: PurchaseOrder[];
 };
 
-// Definimos el tipo extendido para incluir status en el formulario
-type PurchaseOrderFormData = Omit<PurchaseOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount'> & {
-    status: 'draft' | 'pending' | 'received' | 'completed' | 'cancelled';
+type PurchaseOrderFormData = Omit<PurchaseOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount' | 'status'> & {
+    status: any; 
 };
 
 const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData => {
@@ -44,6 +42,7 @@ const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData 
             advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : undefined,
             balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
             status: order.status,
+            notes: order.notes || '',
         };
     }
     return {
@@ -59,6 +58,7 @@ const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData 
         warehouse: 'Bodega Central',
         orderType: 'purchase',
         notes: '',
+        number: '', 
     };
 };
 
@@ -75,7 +75,6 @@ export function NewPurchaseOrderSheet({
   const { products, calibers, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
 
-  // Cálculos
   const grossTotal = useMemo(() => {
     return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
   }, [formData.items]);
@@ -105,13 +104,12 @@ export function NewPurchaseOrderSheet({
     if (isOpen) {
         if (!hasInitialized) {
             if (!order) {
-                // Corrected logic to use the `number` field for correlative IDs
                 const existingIds = (purchaseOrders || [])
                     .map(o => o.number ? parseInt(o.number.replace(/OC-|\D/g, ''), 10) : 0)
                     .filter(n => !isNaN(n) && n > 0);
                 
-                const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 1099;
-                const nextNum = maxId < 1100 ? 1100 : maxId + 1;
+                const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 1101;
+                const nextNum = maxId < 1101 ? 1102 : maxId + 1;
                 const newId = `OC-${nextNum}`;
                 
                 setNextIdDisplay(newId);
@@ -127,7 +125,7 @@ export function NewPurchaseOrderSheet({
     } else {
         setHasInitialized(false);
     }
-}, [isOpen, order, hasInitialized, purchaseOrders]);
+  }, [isOpen, order, hasInitialized, purchaseOrders]);
 
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
     const newItems = [...formData.items];
@@ -184,12 +182,12 @@ export function NewPurchaseOrderSheet({
     if (!formData.supplierId) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un proveedor.' });
     if (formData.items.length === 0) return toast({ variant: 'destructive', title: 'Error', description: 'Agregue al menos un ítem.' });
     
+    // CORRECCIÓN ITEMS: Usamos null en lugar de undefined
     const sanitizedItems = formData.items.map(item => ({
         ...item,
-        // CORRECCIÓN: Usamos undefined para tipos estrictos
-        packagingType: item.packagingType || undefined,
+        packagingType: item.packagingType || null,
         packagingQuantity: Number(item.packagingQuantity) || 0,
-        lotNumber: item.lotNumber || undefined, // IMPORTANTE: Guardamos el lote
+        lotNumber: item.lotNumber || null,
         quantity: Number(item.quantity) || 0,
         price: Number(item.price) || 0,
     }));
@@ -197,9 +195,13 @@ export function NewPurchaseOrderSheet({
     const calculatedTotalPackages = sanitizedItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const calculatedTotalKilos = sanitizedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
-    const finalOrder: PurchaseOrder = {
-        id: order ? order.id : '', // Firestore will generate the ID
-        number: order ? order.number : nextIdDisplay, // Save the correlative number
+    const finalId = order?.id || nextIdDisplay || `OC-${Date.now()}`;
+
+    // CORRECCIÓN OBJETO FINAL: Usamos 'any' para evitar que TS bloquee los 'null'
+    // Firebase NECESITA 'null' en lugar de 'undefined'
+    const finalOrder: any = {
+        id: finalId,
+        number: order ? order.number : nextIdDisplay,
         supplierId: formData.supplierId,
         date: formData.date,
         items: sanitizedItems,
@@ -210,9 +212,12 @@ export function NewPurchaseOrderSheet({
         paymentMethod: formData.paymentMethod,
         warehouse: formData.warehouse,
         orderType: formData.orderType || 'purchase',
+        
+        // AQUÍ ESTABA EL ERROR: Cambiamos undefined por null
         advanceDueDate: formData.advanceDueDate || null,
         balanceDueDate: formData.balanceDueDate || null,
         notes: formData.notes || null,
+        
         creditDays: Number(formData.creditDays || 0),
         advancePercentage: Number(formData.advancePercentage || 0),
     };
@@ -222,7 +227,6 @@ export function NewPurchaseOrderSheet({
 
   const title = order ? `Editar OC ${order.number}` : `Nueva Compra`;
 
-  // Helpers visuales de estado
   const getStatusColor = (status: string) => {
       switch(status) {
           case 'completed': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
@@ -236,7 +240,7 @@ export function NewPurchaseOrderSheet({
   const getStatusLabel = (status: string) => {
       switch(status) {
           case 'completed': return 'Recepcionada';
-          case 'received': return 'En Tránsito'; // O Recibida Parcial
+          case 'received': return 'En Tránsito';
           case 'draft': return 'Borrador';
           case 'pending': return 'Pendiente';
           case 'cancelled': return 'Anulada';
@@ -290,7 +294,11 @@ export function NewPurchaseOrderSheet({
                         <Select required onValueChange={(value) => handleSelectChange('supplierId', value)} value={formData.supplierId}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {suppliers.map(s => (<SelectItem key={s.id} value={s.id} className="focus:bg-slate-800 focus:text-slate-100">{s.name}</SelectItem>))}
+                                {suppliers?.map((s, idx) => (
+                                    <SelectItem key={s.id || idx} value={s.id || `temp-${idx}`} className="focus:bg-slate-800 focus:text-slate-100">
+                                        {s.name}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </CardContent>
@@ -313,7 +321,12 @@ export function NewPurchaseOrderSheet({
                         <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {warehouses.map(w => <SelectItem key={w} value={w} className="focus:bg-slate-800 focus:text-slate-100">{w}</SelectItem>)}
+                                {warehouses?.map((w, index) => {
+                                    const wName = typeof w === 'string' ? w : (w as any).name || 'Bodega';
+                                    return (
+                                        <SelectItem key={index} value={wName} className="focus:bg-slate-800 focus:text-slate-100">{wName}</SelectItem>
+                                    );
+                                })}
                             </SelectContent>
                         </Select>
                     </CardContent>
@@ -345,7 +358,6 @@ export function NewPurchaseOrderSheet({
                                     <tr>
                                         <th className="px-4 py-3 font-semibold">Producto</th>
                                         <th className="px-4 py-3 font-semibold">Calibre</th>
-                                        {/* NUEVA COLUMNA: LOTE */}
                                         <th className="px-4 py-3 font-semibold w-[120px]">Lote</th> 
                                         <th className="px-4 py-3 font-semibold">Envase</th>
                                         <th className="px-4 py-3 text-center font-semibold">Cant.</th>
@@ -364,16 +376,25 @@ export function NewPurchaseOrderSheet({
                                                 <td className="px-4 py-2">
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.product`, v)} value={item.product}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 font-medium text-slate-200 focus:ring-0"><SelectValue /></SelectTrigger>
-                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{products.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                                            {products?.map((p, idx) => (
+                                                                <SelectItem key={idx} value={typeof p === 'string' ? p : (p as any).name}>
+                                                                    {typeof p === 'string' ? p : (p as any).name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
                                                     </Select>
                                                 </td>
                                                 <td className="px-4 py-2">
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.caliber`, v)} value={item.caliber}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-slate-400 focus:ring-0"><SelectValue /></SelectTrigger>
-                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{calibers.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
+                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                                            {calibers?.map((c, idx) => (
+                                                                <SelectItem key={idx} value={c.name}>{c.name}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
                                                     </Select>
                                                 </td>
-                                                {/* INPUT DE LOTE */}
                                                 <td className="px-4 py-2">
                                                     <div className="flex items-center gap-1">
                                                         <Barcode className="h-3 w-3 text-slate-500" />
@@ -388,7 +409,7 @@ export function NewPurchaseOrderSheet({
                                                 <td className="px-4 py-2">
                                                     <Select onValueChange={(v) => handleSelectChange(`items.${index}.packagingType`, v)} value={item.packagingType || ''}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-xs text-slate-400 focus:ring-0"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes?.map((p, idx) => <SelectItem key={idx} value={p}>{p}</SelectItem>)}</SelectContent>
                                                     </Select>
                                                 </td>
                                                 <td className="px-4 py-2">
@@ -569,5 +590,3 @@ export function NewPurchaseOrderSheet({
     </>
   );
 }
-
-    
