@@ -120,7 +120,11 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
             <div className="flex justify-between items-start">
                 <div className="space-y-1">
                     <DialogTitle className="flex items-center gap-2 text-xl text-slate-100"><Package className="h-5 w-5 text-blue-500" /> Carga Masiva de Productos</DialogTitle>
-                    <DialogDescription className="text-slate-400 flex items-center gap-2">Seleccione un producto y complete las cantidades.</DialogDescription>
+                    <DialogDescription className="text-slate-400 flex items-center gap-2">Seleccione un producto y complete las cantidades.
+                      <span className="text-xs bg-blue-900/30 text-blue-300 px-2 py-0.5 rounded border border-blue-800 flex items-center gap-1">
+                          <Calculator className="h-3 w-3"/> Puedes usar fórmulas simples (ej. 10*5+2)
+                      </span>
+                    </DialogDescription>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="text-slate-400 hover:text-white hover:bg-slate-800"><X className="h-4 w-4" /></Button>
             </div>
