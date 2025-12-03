@@ -9,11 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, CalendarIcon, Truck, Warehouse, CreditCard, Info, PackageCheck, DollarSign, Barcode } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PurchaseOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
+import { PurchaseOrder, OrderItem, Contact } from '@/lib/types';
 import { format, addDays, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent } from '@/components/ui/card';
-import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
+import { ItemMatrixDialog } from './item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -68,7 +68,6 @@ export function NewPurchaseOrderSheet({
   
   const [formData, setFormData] = useState<PurchaseOrderFormData>(() => getInitialFormData(order));
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const [nextIdDisplay, setNextIdDisplay] = useState('');
   const [hasInitialized, setHasInitialized] = useState(false);
 
   const { products, calibers, packagingTypes, warehouses } = useMasterData();
@@ -106,10 +105,8 @@ export function NewPurchaseOrderSheet({
                 const nextNum = maxId < 1101 ? 1102 : maxId + 1;
                 const newId = `OC-${nextNum}`;
                 
-                setNextIdDisplay(newId);
                 setFormData(prev => ({...getInitialFormData(null), number: newId}));
             } else {
-                setNextIdDisplay(order.number || order.id);
                 setFormData(getInitialFormData(order));
             }
             setHasInitialized(true);
@@ -188,13 +185,13 @@ export function NewPurchaseOrderSheet({
 
     const calculatedTotalPackages = sanitizedItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const calculatedTotalKilos = sanitizedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const calculatedNetAmount = sanitizedItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
+    const calculatedNetAmount = netTotal;
 
-    const finalId = order?.id || nextIdDisplay || `OC-${Date.now()}`;
+    const finalId = order?.id || formData.number || `OC-${Date.now()}`;
 
     const finalOrder: any = {
         id: finalId,
-        number: order ? order.number : nextIdDisplay,
+        number: formData.number,
         supplierId: formData.supplierId,
         date: formData.date,
         items: sanitizedItems,
@@ -259,7 +256,7 @@ export function NewPurchaseOrderSheet({
                     <div>
                         <SheetTitle className="text-xl font-bold text-slate-100 tracking-tight">{title}</SheetTitle>
                         <SheetDescription className="text-xs text-slate-400 font-mono mt-0.5">
-                            {nextIdDisplay ? `ID: ${nextIdDisplay}` : 'Calculando ID...'}
+                            {formData.number ? `ID: ${formData.number}` : 'Calculando ID...'}
                         </SheetDescription>
                     </div>
                 </div>
@@ -564,6 +561,7 @@ export function NewPurchaseOrderSheet({
         isOpen={isMatrixOpen}
         onOpenChange={setIsMatrixOpen}
         onSave={handleMatrixSave}
+        orderType="purchase"
       />
     </>
   );
