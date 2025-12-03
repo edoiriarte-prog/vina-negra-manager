@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -7,7 +8,7 @@ import { DataTable } from "./components/data-table";
 import { useOperations } from "@/hooks/use-operations"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { Button } from "@/components/ui/button";
-import { Plus, ShoppingCart, Clock, CheckCircle2, Search } from "lucide-react";
+import { Plus, ShoppingCart, Clock, CheckCircle2, Search, DollarSign, FileText } from "lucide-react";
 import { NewPurchaseOrderSheet } from "./components/new-purchase-order-sheet";
 import { PurchaseOrderPreview } from "./components/purchase-order-preview";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,9 +37,22 @@ export default function PurchasesPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
   // KPIs
-  const totalAmount = purchaseOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
-  const pendingCount = purchaseOrders.filter((o) => o.status === 'pending').length;
-  const completedCount = purchaseOrders.filter((o) => o.status === 'completed' || o.status === 'received').length;
+  const { totalNetAmount, totalGrossAmount, pendingCount, completedCount } = useMemo(() => {
+    let net = 0;
+    let gross = 0;
+    
+    purchaseOrders.forEach(order => {
+      const orderNet = order.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+      const orderGross = order.includeVat ? orderNet * 1.19 : orderNet;
+      net += orderNet;
+      gross += orderGross;
+    });
+
+    const pending = purchaseOrders.filter((o) => o.status === 'pending').length;
+    const completed = purchaseOrders.filter((o) => o.status === 'completed' || o.status === 'received').length;
+
+    return { totalNetAmount: net, totalGrossAmount: gross, pendingCount: pending, completedCount: completed };
+  }, [purchaseOrders]);
 
   const filteredOrders = purchaseOrders.filter((o) => {
     const supplierName = suppliers.find((s) => s.id === o.supplierId)?.name || '';
@@ -123,16 +137,30 @@ export default function PurchasesPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-              <ShoppingCart className="h-6 w-6 md:h-8 md:w-8 text-blue-500" />
+              <FileText className="h-6 w-6 md:h-8 md:w-8 text-blue-500" />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Compras</p>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Neto</p>
               <h3 className="text-xl md:text-2xl font-bold text-white">
-                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalAmount)}
+                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalNetAmount)}
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className={cardClass}>
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+              <DollarSign className="h-6 w-6 md:h-8 md:w-8 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total c/IVA</p>
+              <h3 className="text-xl md:text-2xl font-bold text-white">
+                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalGrossAmount)}
               </h3>
             </div>
           </CardContent>
@@ -152,8 +180,8 @@ export default function PurchasesPage() {
 
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-              <CheckCircle2 className="h-6 w-6 md:h-8 md:w-8 text-emerald-500" />
+            <div className="p-3 bg-green-500/10 rounded-xl border border-green-500/20">
+              <CheckCircle2 className="h-6 w-6 md:h-8 md:w-8 text-green-500" />
             </div>
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Recepcionadas</p>
@@ -204,4 +232,3 @@ export default function PurchasesPage() {
     </div>
   );
 }
-    
