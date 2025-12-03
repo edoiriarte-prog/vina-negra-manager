@@ -33,17 +33,21 @@ export default function PurchasesPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const { totalNetAmount, totalGrossAmount } = useMemo(() => {
-    let net = 0;
-    let gross = 0;
+    if (!purchaseOrders) return { totalNetAmount: 0, totalGrossAmount: 0 };
     
-    purchaseOrders.forEach(order => {
-      const orderNet = order.totalAmount || 0; // totalAmount is now always net
-      net += orderNet;
-      gross += order.includeVat ? orderNet * 1.19 : orderNet;
-    });
-
-    return { totalNetAmount: net, totalGrossAmount: gross };
+    return purchaseOrders.reduce((acc, order) => {
+      const netAmount = order.totalAmount || 0; // totalAmount es siempre neto
+      acc.totalNetAmount += netAmount;
+      // Si `includeVat` no está definido, asumimos el comportamiento antiguo (que era true) por retrocompatibilidad
+      if (order.includeVat !== false) {
+        acc.totalGrossAmount += netAmount * 1.19;
+      } else {
+        acc.totalGrossAmount += netAmount;
+      }
+      return acc;
+    }, { totalNetAmount: 0, totalGrossAmount: 0 });
   }, [purchaseOrders]);
+
 
   const filteredOrders = purchaseOrders.filter((o) => {
     const supplierName = suppliers.find((s) => s.id === o.supplierId)?.name || '';

@@ -56,7 +56,7 @@ const StatusCell = ({ order }: { order: PurchaseOrder }) => {
   const getStatusLabel = (s: string) => {
       switch(s) {
           case 'pending': return 'Pendiente';
-          case 'received': return 'En Tránsito'; // O "Recibida Parcial" según tu lógica
+          case 'received': return 'En Tránsito';
           case 'completed': return 'Recepcionada';
           case 'cancelled': return 'Anulada';
           default: return s;
@@ -71,7 +71,6 @@ const StatusCell = ({ order }: { order: PurchaseOrder }) => {
     setIsLoading(true);
 
     try {
-      // Actualizamos directo en Firebase
       const orderRef = doc(firestore, "purchaseOrders", order.id);
       await updateDoc(orderRef, { status: newStatus });
 
@@ -165,7 +164,6 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
     id: 'netAmount',
     header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL NETO</div>,
     cell: ({ row }) => {
-      // totalAmount AHORA es el neto
       const netAmount = row.original.totalAmount || 0;
       return <div className="text-right font-mono text-slate-300">{formatCurrency(netAmount)}</div>
     },
@@ -175,8 +173,9 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
     header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL C/IVA</div>,
     cell: ({ row }) => {
       const order = row.original;
-      // Si el IVA estaba incluido en el cálculo original, lo calculamos sobre el neto
-      const grossAmount = order.includeVat ? Math.round(order.totalAmount * 1.19) : order.totalAmount;
+      const netAmount = order.totalAmount || 0;
+      // Si includeVat no está definido (para datos viejos), asumimos que sí lo tiene
+      const grossAmount = order.includeVat !== false ? Math.round(netAmount * 1.19) : netAmount;
       return <div className="text-right font-bold font-mono text-emerald-400">{formatCurrency(grossAmount)}</div>
     },
   },
