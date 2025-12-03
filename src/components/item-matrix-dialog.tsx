@@ -40,8 +40,7 @@ const SmartInput = ({ value, onChange, className, placeholder }: { value: number
                 // Use a safe evaluation method
                 const result = new Function(`try { return ${expression} } catch { return NaN; }`)();
                 if (!isNaN(result) && isFinite(result)) {
-                    // Do not round here, let the state handle formatting
-                    onChange(result);
+                    onChange(result); // Pass the precise value
                     setInputValue(result.toString());
                 } else {
                     setInputValue(value.toString());
@@ -115,11 +114,11 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
       if (field === 'price') {
           const net = Number(value);
           row.price = net;
-          row.grossPrice = net * 1.19; // No rounding
+          row.grossPrice = net * 1.19;
       } else if (field === 'grossPrice') {
           const gross = Number(value);
           row.grossPrice = gross;
-          row.price = gross / 1.19; // No rounding
+          row.price = gross / 1.19;
       } else {
           (row as any)[field] = value;
       }
