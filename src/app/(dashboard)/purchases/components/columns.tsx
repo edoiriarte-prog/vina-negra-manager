@@ -162,7 +162,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
     cell: ({ row }) => <StatusCell order={row.original} />,
   },
   {
-    accessorKey: 'netAmount',
+    id: 'netAmount',
     header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL NETO</div>,
     cell: ({ row }) => {
       const order = row.original;
@@ -171,7 +171,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
     },
   },
   {
-    accessorKey: "totalAmount",
+    id: "totalAmountWithVat",
     header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL C/IVA</div>,
     cell: ({ row }) => {
       const order = row.original;
