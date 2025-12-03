@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useFirebase, addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { useFirebase } from "@/firebase";
+import { collection, doc, setDoc, addDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { PurchaseOrder } from "@/lib/types";
 
@@ -13,24 +13,37 @@ export function usePurchasesCRUD() {
   const createPurchaseOrder = async (order: Omit<PurchaseOrder, 'id'>) => {
     if (!firestore) return;
     try {
-        const docRef = await addDocumentNonBlocking(collection(firestore, 'purchaseOrders'), order);
+        const docRef = await addDoc(collection(firestore, 'purchaseOrders'), order);
         toast({ title: "Compra Creada", description: "La orden se ha registrado exitosamente." });
         return docRef;
     } catch (e) {
         console.error(e);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la orden de compra.' });
+        throw e; // Re-throw para que el bloque catch en la página lo maneje
     }
   };
 
-  const updatePurchaseOrder = (id: string, data: Partial<PurchaseOrder>) => {
+  const updatePurchaseOrder = async (id: string, data: Partial<PurchaseOrder>) => {
     if (!firestore) return;
-    setDocumentNonBlocking(doc(firestore, 'purchaseOrders', id), data, { merge: true });
-    toast({ title: "Compra Actualizada", description: "Los cambios se han guardado." });
+    try {
+        await setDoc(doc(firestore, 'purchaseOrders', id), data, { merge: true });
+        toast({ title: "Compra Actualizada", description: "Los cambios se han guardado." });
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la orden de compra.' });
+        throw e; // Re-throw para que el bloque catch en la página lo maneje
+    }
   };
 
-  const deletePurchaseOrder = (id: string) => {
+  const deletePurchaseOrder = async (id: string) => {
     if (!firestore) return;
-    deleteDocumentNonBlocking(doc(firestore, 'purchaseOrders', id));
+     try {
+        await doc(firestore, 'purchaseOrders', id).delete();
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar la orden de compra.' });
+        throw e; // Re-throw para que el bloque catch en la página lo maneje
+    }
   };
 
   return {
