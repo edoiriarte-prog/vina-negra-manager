@@ -30,6 +30,7 @@ type ItemMatrixDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSave: (items: Omit<OrderItem, 'id'>[]) => void;
+  orderType: 'purchase' | 'sale';
   inventory?: InventoryItem[];
 };
 
@@ -54,7 +55,7 @@ const formatCurrency = (value: number) =>
 const formatKilos = (value: number) => new Intl.NumberFormat('es-CL').format(value) + ' kg';
 const formatPackages = (value: number) => new Intl.NumberFormat('es-CL').format(value);
 
-export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [] }: ItemMatrixDialogProps) {
+export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [], orderType }: ItemMatrixDialogProps) {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [matrixData, setMatrixData] = useState<MatrixRow[]>([]);
   const { products, units, packagingTypes, calibers, productCaliberAssociations } = useMasterData();
@@ -164,7 +165,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, inventory = [] 
                 <SelectValue placeholder="Seleccione un producto" />
                 </SelectTrigger>
                 <SelectContent>
-                {products.map((product, index) => (
+                {products.map((product) => (
                     <SelectItem key={product} value={product}>{product}</SelectItem>
                 ))}
                 </SelectContent>

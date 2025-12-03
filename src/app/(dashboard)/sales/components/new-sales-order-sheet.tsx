@@ -21,6 +21,7 @@ import {
 } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useMasterData } from "@/hooks/use-master-data";
+import { ItemMatrixDialog } from "@/components/item-matrix-dialog";
 
 // LISTA DE RESPALDO DE CALIBRES (Por si no hay en inventario)
 const DEFAULT_CALIBERS = [
@@ -320,10 +321,8 @@ export function NewSalesOrderSheet({
                                 <SelectValue placeholder="Producto" />
                             </SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {masterProducts.map((productName, index) => (
-                                    <SelectItem key={index} value={productName as string}>
-                                        {productName as string}
-                                    </SelectItem>
+                                {masterProducts.map((p, index) => (
+                                    <SelectItem key={index} value={p as string}>{p as string}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
