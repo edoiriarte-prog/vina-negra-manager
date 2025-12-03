@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -8,7 +7,7 @@ import { DataTable } from "./components/data-table";
 import { useOperations } from "@/hooks/use-operations"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { Button } from "@/components/ui/button";
-import { Plus, ShoppingCart, Clock, CheckCircle2, Search, DollarSign, FileText } from "lucide-react";
+import { Plus, DollarSign, FileText } from "lucide-react";
 import { NewPurchaseOrderSheet } from "./components/new-purchase-order-sheet";
 import { PurchaseOrderPreview } from "./components/purchase-order-preview";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,38 +19,30 @@ import { usePurchasesCRUD } from "@/hooks/use-purchases-crud";
 export default function PurchasesPage() {
   const { toast } = useToast();
 
-  // 1. CARGAR DATOS DE LA NUBE
   const { purchaseOrders, isLoading: loadingOps } = useOperations();
   const { contacts, inventory, isLoading: loadingMaster } = useMasterData();
   const { createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder } = usePurchasesCRUD();
   
   const isLoading = loadingOps || loadingMaster;
 
-  // Filtramos solo proveedores
   const suppliers = useMemo(() => contacts?.filter((c) => Array.isArray(c.type) ? c.type.includes('supplier') : c.type === 'supplier') || [], [contacts]);
 
-  // Estados
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [previewOrder, setPreviewOrder] = useState<PurchaseOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // KPIs
-  const { totalNetAmount, totalGrossAmount, pendingCount, completedCount } = useMemo(() => {
+  const { totalNetAmount, totalGrossAmount } = useMemo(() => {
     let net = 0;
     let gross = 0;
     
     purchaseOrders.forEach(order => {
-      const orderNet = order.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-      const orderGross = order.includeVat ? orderNet * 1.19 : orderNet;
+      const orderNet = order.totalAmount || 0; // totalAmount is now always net
       net += orderNet;
-      gross += orderGross;
+      gross += order.includeVat ? orderNet * 1.19 : orderNet;
     });
 
-    const pending = purchaseOrders.filter((o) => o.status === 'pending').length;
-    const completed = purchaseOrders.filter((o) => o.status === 'completed' || o.status === 'received').length;
-
-    return { totalNetAmount: net, totalGrossAmount: gross, pendingCount: pending, completedCount: completed };
+    return { totalNetAmount: net, totalGrossAmount: gross };
   }, [purchaseOrders]);
 
   const filteredOrders = purchaseOrders.filter((o) => {
@@ -60,24 +51,18 @@ export default function PurchasesPage() {
            supplierName.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  // --- HANDLERS (CRUD FIREBASE) ---
-
   const handleSave = (orderData: PurchaseOrder | Omit<PurchaseOrder, "id">) => {
-    // Calculamos totales para guardar en la BD y que el Dashboard los lea rápido
     const totalKilos = orderData.items.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0);
     
     const finalOrderData: any = {
         ...orderData,
         totalKilos,
-        // Si es nueva y no tiene status, asumimos 'received' para que sume stock al instante
         status: orderData.status || 'received' 
     };
 
     if ('id' in orderData && orderData.id) {
-        // EDICIÓN
         updatePurchaseOrder(orderData.id, finalOrderData);
     } else {
-        // CREACIÓN
         createPurchaseOrder(finalOrderData);
     }
     setIsSheetOpen(false);
@@ -137,15 +122,15 @@ export default function PurchasesPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-              <FileText className="h-6 w-6 md:h-8 md:w-8 text-blue-500" />
+              <FileText className="h-8 w-8 text-blue-500" />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Neto</p>
-              <h3 className="text-xl md:text-2xl font-bold text-white">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Neto Compras</p>
+              <h3 className="text-2xl font-bold text-white">
                 {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalNetAmount)}
               </h3>
             </div>
@@ -155,53 +140,19 @@ export default function PurchasesPage() {
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-              <DollarSign className="h-6 w-6 md:h-8 md:w-8 text-emerald-500" />
+              <DollarSign className="h-8 w-8 text-emerald-500" />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total c/IVA</p>
-              <h3 className="text-xl md:text-2xl font-bold text-white">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total c/IVA Compras</p>
+              <h3 className="text-2xl font-bold text-white">
                 {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalGrossAmount)}
               </h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={cardClass}>
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
-              <Clock className="h-6 w-6 md:h-8 md:w-8 text-yellow-500" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Pendientes</p>
-              <h3 className="text-xl md:text-2xl font-bold text-white">{pendingCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={cardClass}>
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-green-500/10 rounded-xl border border-green-500/20">
-              <CheckCircle2 className="h-6 w-6 md:h-8 md:w-8 text-green-500" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Recepcionadas</p>
-              <h3 className="text-xl md:text-2xl font-bold text-white">{completedCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
             </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-800 w-full max-w-md transition-all focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/20">
-            <Search className="h-4 w-4 text-slate-500 ml-2" />
-            <Input 
-                placeholder="Buscar por Orden # o Proveedor..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="border-none bg-transparent focus-visible:ring-0 text-slate-200 placeholder:text-slate-600 h-8"
-            />
-        </div>
-
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg p-1 overflow-x-auto">
             <DataTable 
                 columns={columns} 

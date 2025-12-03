@@ -165,8 +165,8 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
     id: 'netAmount',
     header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL NETO</div>,
     cell: ({ row }) => {
-      const order = row.original;
-      const netAmount = order.includeVat ? Math.round(order.totalAmount / 1.19) : order.totalAmount;
+      // totalAmount AHORA es el neto
+      const netAmount = row.original.totalAmount || 0;
       return <div className="text-right font-mono text-slate-300">{formatCurrency(netAmount)}</div>
     },
   },
@@ -175,7 +175,8 @@ export const getColumns = ({ onEdit, onDelete, onPreview, suppliers }: GetColumn
     header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL C/IVA</div>,
     cell: ({ row }) => {
       const order = row.original;
-      const grossAmount = order.includeVat ? order.totalAmount : Math.round(order.totalAmount * 1.19);
+      // Si el IVA estaba incluido en el cálculo original, lo calculamos sobre el neto
+      const grossAmount = order.includeVat ? Math.round(order.totalAmount * 1.19) : order.totalAmount;
       return <div className="text-right font-bold font-mono text-emerald-400">{formatCurrency(grossAmount)}</div>
     },
   },

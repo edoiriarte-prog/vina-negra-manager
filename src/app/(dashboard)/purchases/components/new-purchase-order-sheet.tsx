@@ -13,7 +13,7 @@ import { PurchaseOrder, OrderItem, Contact, InventoryItem } from '@/lib/types';
 import { format, addDays, parseISO } from 'date-fns';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent } from '@/components/ui/card';
-import { ItemMatrixDialog } from '@/components/item-matrix-dialog';
+import { ItemMatrixDialog } from './item-matrix-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,6 +43,7 @@ const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData 
             balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
             status: order.status,
             notes: order.notes || '',
+            includeVat: order.includeVat ?? true,
         };
     }
     return {
@@ -59,6 +60,7 @@ const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData 
         orderType: 'purchase',
         notes: '',
         number: '', 
+        includeVat: true,
     };
 };
 
@@ -67,7 +69,6 @@ export function NewPurchaseOrderSheet({
 }: NewPurchaseOrderSheetProps) {
   
   const [formData, setFormData] = useState<PurchaseOrderFormData>(() => getInitialFormData(order));
-  const [includeVat, setIncludeVat] = useState(true); 
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [nextIdDisplay, setNextIdDisplay] = useState('');
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -75,29 +76,25 @@ export function NewPurchaseOrderSheet({
   const { products, calibers, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
 
-  const grossTotal = useMemo(() => {
+  const netTotal = useMemo(() => {
     return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
   }, [formData.items]);
   
-  const { netTotal, vatAmount, finalTotal } = useMemo(() => {
-      const net = grossTotal; 
-      if (includeVat) {
-          const vat = net * 0.19;
-          const total = net + vat;
-          return { netTotal: net, vatAmount: vat, finalTotal: total };
-      }
-      return { netTotal: net, vatAmount: 0, finalTotal: net };
-  }, [grossTotal, includeVat]);
+  const { vatAmount, finalTotalWithVat } = useMemo(() => {
+      const vat = formData.includeVat ? netTotal * 0.19 : 0;
+      const total = netTotal + vat;
+      return { vatAmount: vat, finalTotalWithVat: total };
+  }, [netTotal, formData.includeVat]);
 
   const advanceAmount = useMemo(() => {
     if (formData.paymentMethod !== 'Pago con Anticipo y Saldo' || !formData.advancePercentage) return 0;
-    return finalTotal * (formData.advancePercentage / 100);
-  }, [finalTotal, formData.paymentMethod, formData.advancePercentage]);
+    return finalTotalWithVat * (formData.advancePercentage / 100);
+  }, [finalTotalWithVat, formData.paymentMethod, formData.advancePercentage]);
 
   const balanceAmount = useMemo(() => {
      if (formData.paymentMethod !== 'Pago con Anticipo y Saldo') return 0;
-     return finalTotal - advanceAmount;
-  }, [finalTotal, advanceAmount, formData.paymentMethod]);
+     return finalTotalWithVat - advanceAmount;
+  }, [finalTotalWithVat, advanceAmount, formData.paymentMethod]);
 
   // Lógica ID (Base 1100)
   useEffect(() => {
@@ -114,11 +111,9 @@ export function NewPurchaseOrderSheet({
                 
                 setNextIdDisplay(newId);
                 setFormData(prev => ({...getInitialFormData(null), number: newId}));
-                setIncludeVat(true); 
             } else {
                 setNextIdDisplay(order.number || order.id);
                 setFormData(getInitialFormData(order));
-                setIncludeVat(true); 
             }
             setHasInitialized(true);
         }
@@ -146,11 +141,16 @@ export function NewPurchaseOrderSheet({
   };
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
+    const { name, value, type } = event.target;
+    const isCheckbox = type === 'checkbox';
+
     if (name.startsWith('items.')) {
         const [_, indexStr, field] = name.split('.');
         const index = parseInt(indexStr);
         handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'packagingQuantity'].includes(field) ? Number(value) : value);
+    } else if (name === 'includeVat') {
+        // @ts-ignore
+        setFormData(prev => ({ ...prev, includeVat: event.target.checked }));
     } else {
         setFormData((prev) => ({ ...prev, [name]: ['advancePercentage', 'creditDays'].includes(name) ? Number(value) : value }));
     }
@@ -182,7 +182,6 @@ export function NewPurchaseOrderSheet({
     if (!formData.supplierId) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un proveedor.' });
     if (formData.items.length === 0) return toast({ variant: 'destructive', title: 'Error', description: 'Agregue al menos un ítem.' });
     
-    // CORRECCIÓN ITEMS: Usamos null en lugar de undefined
     const sanitizedItems = formData.items.map(item => ({
         ...item,
         packagingType: item.packagingType || null,
@@ -194,11 +193,10 @@ export function NewPurchaseOrderSheet({
 
     const calculatedTotalPackages = sanitizedItems.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const calculatedTotalKilos = sanitizedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const calculatedNetAmount = sanitizedItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
 
     const finalId = order?.id || nextIdDisplay || `OC-${Date.now()}`;
 
-    // CORRECCIÓN OBJETO FINAL: Usamos 'any' para evitar que TS bloquee los 'null'
-    // Firebase NECESITA 'null' en lugar de 'undefined'
     const finalOrder: any = {
         id: finalId,
         number: order ? order.number : nextIdDisplay,
@@ -207,17 +205,15 @@ export function NewPurchaseOrderSheet({
         items: sanitizedItems,
         totalPackages: calculatedTotalPackages,
         totalKilos: calculatedTotalKilos,
-        totalAmount: finalTotal,
+        totalAmount: calculatedNetAmount, // SIEMPRE GUARDAMOS EL NETO
+        includeVat: formData.includeVat, // GUARDAMOS EL ESTADO DEL SWITCH
         status: formData.status,
         paymentMethod: formData.paymentMethod,
         warehouse: formData.warehouse,
         orderType: formData.orderType || 'purchase',
-        
-        // AQUÍ ESTABA EL ERROR: Cambiamos undefined por null
         advanceDueDate: formData.advanceDueDate || null,
         balanceDueDate: formData.balanceDueDate || null,
         notes: formData.notes || null,
-        
         creditDays: Number(formData.creditDays || 0),
         advancePercentage: Number(formData.advancePercentage || 0),
     };
@@ -259,7 +255,6 @@ export function NewPurchaseOrderSheet({
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="sm:max-w-7xl w-[95vw] overflow-y-auto p-0 flex flex-col gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
           
-          {/* HEADER */}
           <SheetHeader className="bg-slate-900 border-b border-slate-800 px-6 py-4 sticky top-0 z-10">
              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
@@ -284,7 +279,6 @@ export function NewPurchaseOrderSheet({
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
             <div className="p-6 space-y-8">
               
-              {/* SECCIÓN 1: DATOS GENERALES */}
               <div className="grid md:grid-cols-3 gap-5">
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
@@ -330,7 +324,6 @@ export function NewPurchaseOrderSheet({
                 </Card>
               </div>
 
-              {/* SECCIÓN 2: ITEMS */}
               <div className={`rounded-xl border border-slate-800 overflow-hidden ${darkCardClass}`}>
                 <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                     <h3 className="font-semibold text-slate-200 flex items-center gap-2">
@@ -439,10 +432,8 @@ export function NewPurchaseOrderSheet({
                 </div>
               </div>
 
-              {/* SECCIÓN 3: PIE DE PÁGINA */}
               <div className="grid md:grid-cols-12 gap-6 items-start">
                   
-                  {/* Izquierda: Condiciones */}
                   <div className="md:col-span-7 space-y-4">
                       <Card className={darkCardClass}>
                           <CardContent className="p-5 space-y-5">
@@ -450,7 +441,6 @@ export function NewPurchaseOrderSheet({
                                   <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
                                       <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones Comerciales
                                   </h4>
-                                  {/* SELECTOR DE ESTADO (NUEVO) */}
                                   <Select onValueChange={(v: any) => handleSelectChange('status', v)} value={formData.status}>
                                       <SelectTrigger className="h-7 w-36 text-xs bg-slate-950 border-slate-800"><SelectValue /></SelectTrigger>
                                       <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
@@ -514,7 +504,6 @@ export function NewPurchaseOrderSheet({
                       </Card>
                   </div>
 
-                  {/* Derecha: Resumen Financiero */}
                   <div className="md:col-span-5">
                       <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 shadow-xl relative overflow-hidden">
                           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-emerald-500"></div>
@@ -524,7 +513,7 @@ export function NewPurchaseOrderSheet({
                                       <DollarSign className="h-4 w-4 text-emerald-500" /> Totales
                                   </h4>
                                   <div className="flex items-center gap-2 bg-slate-950/50 px-3 py-1 rounded-full border border-slate-800">
-                                      <Switch id="includeVat" checked={includeVat} onCheckedChange={setIncludeVat} className="data-[state=checked]:bg-emerald-500" />
+                                      <Switch id="includeVat" name="includeVat" checked={formData.includeVat} onCheckedChange={(checked) => setFormData(prev => ({...prev, includeVat: checked}))} className="data-[state=checked]:bg-emerald-500" />
                                       <Label htmlFor="includeVat" className="text-[10px] cursor-pointer text-slate-400 uppercase font-bold">Ver con IVA</Label>
                                   </div>
                               </div>
@@ -534,7 +523,7 @@ export function NewPurchaseOrderSheet({
                                       <span>Subtotal Neto</span>
                                       <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(netTotal)}</span>
                                   </div>
-                                  {includeVat && (
+                                  {formData.includeVat && (
                                       <div className="flex justify-between text-slate-400 text-sm">
                                           <span>IVA (19%)</span>
                                           <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(vatAmount)}</span>
@@ -543,7 +532,7 @@ export function NewPurchaseOrderSheet({
                                   
                                   <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 flex justify-between items-end mt-2">
                                       <span className="text-sm text-slate-400 font-medium uppercase tracking-wider mb-1">Total a Pagar</span>
-                                      <span className="text-2xl font-bold text-white tracking-tight">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(finalTotal)}</span>
+                                      <span className="text-2xl font-bold text-white tracking-tight">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(finalTotalWithVat)}</span>
                                   </div>
                               </div>
 
@@ -566,7 +555,6 @@ export function NewPurchaseOrderSheet({
 
             </div>
 
-            {/* FOOTER DE ACCIONES FIJO */}
             <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
               <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
               <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={formData.items.length === 0}>
