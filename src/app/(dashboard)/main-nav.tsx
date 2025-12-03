@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -15,11 +16,12 @@ import {
 // --- CORRECCIÓN DE IMPORTACIÓN ---
 // No importamos 'app' porque no está exportada. Usamos 'auth' directo.
 import { signOut } from "firebase/auth";
-import { auth } from "@/firebase"; 
+import { useAuth } from "@/firebase"; 
 
 export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
   const pathname = usePathname();
   const router = useRouter(); // Hook para redireccionar
+  const auth = useAuth(); // Hook para obtener la instancia de auth
 
   const routes = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, active: pathname === "/dashboard" },
@@ -38,7 +40,7 @@ export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElemen
   // --- FUNCIÓN LOGOUT ---
   const handleLogout = async () => {
     try {
-      await signOut(auth); // Usamos la instancia 'auth' importada
+      await signOut(auth); // Usamos la instancia 'auth' del hook
       console.log("Sesión cerrada");
       router.push("/"); // Redirige al login o home
     } catch (error) {

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -412,5 +413,3 @@ function AccountDetailSheet({ account, isOpen, onOpenChange }: { account: Accoun
         </Sheet>
     )
 }
-
-    

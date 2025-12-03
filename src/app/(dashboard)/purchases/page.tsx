@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -16,12 +17,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { usePurchasesCRUD } from "@/hooks/use-purchases-crud";
 
+// --- IMPORTACIONES DIRECTAS DE FIREBASE PARA ELIMINACIÓN SEGURA ---
+import { doc, deleteDoc } from "firebase/firestore";
+import { useFirebase } from "@/firebase";
+// ------------------------------------------------------------------
+
 export default function PurchasesPage() {
+  const { firestore } = useFirebase();
   const { toast } = useToast();
 
   const { purchaseOrders, isLoading: loadingOps } = useOperations();
   const { contacts, isLoading: loadingMaster } = useMasterData();
-  const { createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder } = usePurchasesCRUD();
+  const { createPurchaseOrder, updatePurchaseOrder } = usePurchasesCRUD();
   
   const isLoading = loadingOps || loadingMaster;
 
@@ -36,7 +43,7 @@ export default function PurchasesPage() {
     if (!purchaseOrders) return { totalNetAmount: 0, totalGrossAmount: 0 };
     
     return purchaseOrders.reduce((acc, order) => {
-      const netAmount = order.totalAmount || 0;
+      const netAmount = order.totalAmount || 0; 
       acc.totalNetAmount += netAmount;
       if (order.includeVat !== false) {
         acc.totalGrossAmount += netAmount * 1.19;
@@ -64,7 +71,6 @@ export default function PurchasesPage() {
     };
 
     try {
-        // En lugar de `id`, usamos `number` que es el ID del documento
         if ('id' in orderData && orderData.id) {
             await updatePurchaseOrder(orderData.id, finalOrderData);
         } else {
@@ -78,23 +84,32 @@ export default function PurchasesPage() {
     }
   };
 
-  const handleDelete = async (order: PurchaseOrder) => {
-    const idToDelete = order.id || order.number;
-    if (!idToDelete) {
-      toast({ variant: "destructive", title: "Error", description: "No se pudo identificar el ID del documento para eliminar." });
-      return;
+  // --- FUNCIÓN NUCLEAR DE ELIMINACIÓN ---
+  const handleDelete = async (id: string) => {
+    if (!firestore) return;
+    // 1. Diagnóstico visual inmediato
+    if (!id) {
+        alert("ERROR CRÍTICO: El botón no encontró un ID válido para esta fila. El documento podría estar corrupto en la base de datos.");
+        return;
     }
-  
-    if (confirm(`¿Estás seguro de eliminar la orden ${idToDelete}?\nEsta acción no se puede deshacer.`)) {
+
+    // 2. Confirmación explícita
+    if (window.confirm(`¿Estás seguro de eliminar la orden con ID: ${id}?\n\nEsta acción borrará el documento directamente de la base de datos.`)) {
       try {
-        await deletePurchaseOrder(idToDelete);
-        toast({ variant: "default", title: "Compra Eliminada", description: `La orden ${idToDelete} ha sido eliminada.` });
-      } catch (error) {
-        console.error("Error al eliminar:", error);
-        toast({ variant: "destructive", title: "Error", description: "Falló la eliminación. Revisa la consola." });
+          // 3. Borrado directo sin intermediarios (Hooks)
+          await deleteDoc(doc(firestore, "purchaseOrders", id));
+          
+          alert("¡Orden eliminada correctamente!");
+          
+          // 4. Recarga forzada para limpiar la tabla visualmente
+          window.location.reload(); 
+          
+      } catch (error: any) {
+          console.error("Error fatal al eliminar:", error);
+          alert(`NO SE PUDO ELIMINAR.\n\nError técnico: ${error.message}`);
       }
     }
-  };
+  }
 
   const handleEdit = (order: PurchaseOrder) => {
     setEditingOrder(order);
@@ -113,7 +128,7 @@ export default function PurchasesPage() {
 
   const columns = useMemo(() => getColumns({
       onEdit: handleEdit,
-      onDelete: handleDelete,
+      onDelete: (order) => handleDelete(order.id), 
       onPreview: setPreviewOrder,
       suppliers: suppliers
   }), [suppliers]);
