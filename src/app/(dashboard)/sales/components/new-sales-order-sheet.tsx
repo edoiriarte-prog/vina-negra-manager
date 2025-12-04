@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Plus, Users, Truck, Info, PackageCheck, DollarSign, CreditCard, CalendarIcon, Warehouse } from "lucide-react";
+import { Trash2, Plus, Users, Truck, Info, PackageCheck, DollarSign, CreditCard, CalendarIcon, Warehouse, Landmark } from "lucide-react";
 import { 
   SalesOrder, 
   Contact, 
@@ -24,7 +24,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useMasterData } from "@/hooks/use-master-data";
 import { ItemMatrixDialog } from "./item-matrix-dialog";
-import { format } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
 
 interface NewSalesOrderSheetProps {
   isOpen: boolean;
@@ -46,13 +46,17 @@ type SalesOrderFormData = Partial<Omit<SalesOrder, 'id' | 'items'>> & {
   items: OrderItem[];
 };
 
-
 const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder[]): SalesOrderFormData => {
     if (order) {
         return {
             ...order,
             date: order.date ? format(new Date(order.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-            items: (order.items || []).map(item => ({...item, total: (item.quantity || 0) * (item.price || 0)}))
+            items: (order.items || []).map(item => ({...item, total: (item.quantity || 0) * (item.price || 0)})),
+            // Aseguramos valores por defecto si no existen
+            saleType: order.saleType || 'Venta en Firme',
+            paymentMethod: order.paymentMethod || 'Contado',
+            // @ts-ignore
+            paymentDueDate: order.paymentDueDate ? format(new Date(order.paymentDueDate), 'yyyy-MM-dd') : undefined,
         };
     }
     
@@ -75,7 +79,11 @@ const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder
         paymentMethod: 'Contado',
         creditDays: 0,
         notes: '',
-        saleType: 'Venta Firme',
+        saleType: 'Venta en Firme',
+        // @ts-ignore
+        advanceAmount: 0,
+        // @ts-ignore
+        bankAccountId: '',
     };
 };
 
@@ -92,7 +100,8 @@ export function NewSalesOrderSheet({
 }: NewSalesOrderSheetProps) {
   
   const { toast } = useToast();
-  const { warehouses } = useMasterData(); 
+  // --- CARGA DE DATOS MAESTROS ---
+  const { warehouses, bankAccounts } = useMasterData(); 
   const isDispatch = sheetType === 'dispatch';
 
   const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order, salesOrders));
@@ -106,6 +115,15 @@ export function NewSalesOrderSheet({
       setItems(initialData.items || []);
     }
   }, [order, isOpen, salesOrders]);
+
+  // --- LÓGICA DE CÁLCULO DE VENCIMIENTO ---
+  useEffect(() => {
+      if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {
+          const dueDate = addDays(parseISO(formData.date), formData.creditDays);
+          // @ts-ignore
+          setFormData(prev => ({...prev, paymentDueDate: format(dueDate, 'yyyy-MM-dd')}))
+      }
+  }, [formData.creditDays, formData.date, formData.paymentMethod]);
 
 
   const handleItemChange = (index: number, field: keyof OrderItem, value: any) => {
@@ -133,7 +151,7 @@ export function NewSalesOrderSheet({
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = event.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: ['creditDays', 'advanceAmount'].includes(name) ? Number(value) : value }));
   };
 
 
@@ -327,7 +345,66 @@ export function NewSalesOrderSheet({
                              <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
                                 <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones Comerciales
                             </h4>
-                            <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className={labelClass}>Tipo de Venta</Label>
+                                    <Select name="saleType" onValueChange={(v) => handleSelectChange('saleType', v)} value={formData.saleType}>
+                                        <SelectTrigger className={darkInputClass}><SelectValue/></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                            <SelectItem value="Venta en Firme">Venta en Firme</SelectItem>
+                                            <SelectItem value="Consignación">Consignación</SelectItem>
+                                            <SelectItem value="Mínimo Garantizado">Mínimo Garantizado</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className={labelClass}>Forma de Pago</Label>
+                                    <Select name="paymentMethod" onValueChange={(v) => handleSelectChange('paymentMethod', v)} value={formData.paymentMethod}>
+                                        <SelectTrigger className={darkInputClass}><SelectValue/></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                            <SelectItem value="Contado">Contado</SelectItem>
+                                            <SelectItem value="Crédito">Crédito</SelectItem>
+                                            <SelectItem value="Anticipo + Saldo">Anticipo + Saldo</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            
+                            {formData.paymentMethod === 'Crédito' && (
+                                <div className="space-y-1">
+                                    <Label className={labelClass}>Vencimiento Crédito</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Input type="number" name="creditDays" placeholder="Días" value={formData.creditDays || ''} onChange={handleInputChange} className={`${darkInputClass} w-24 text-center`}/>
+                                        <Input type="date" name="paymentDueDate" value={formData.paymentDueDate || ''} onChange={handleInputChange} className={`${darkInputClass} flex-1 [color-scheme:dark]`}/>
+                                    </div>
+                                </div>
+                            )}
+
+                            {formData.paymentMethod === 'Anticipo + Saldo' && (
+                                <div className="space-y-1">
+                                    <Label className={labelClass}>Monto Anticipo</Label>
+                                    <Input type="number" name="advanceAmount" placeholder="$" value={formData.advanceAmount || ''} onChange={handleInputChange} className={darkInputClass}/>
+                                </div>
+                            )}
+
+                            <div className="space-y-1 pt-2">
+                                <Label className={labelClass}>Cuenta Destino Fondos</Label>
+                                <Select name="bankAccountId" onValueChange={(v) => handleSelectChange('bankAccountId', v)} value={formData.bankAccountId}>
+                                    <SelectTrigger className={darkInputClass}>
+                                        <div className="flex items-center gap-2">
+                                            <Landmark className="h-4 w-4 text-slate-500"/>
+                                            <SelectValue placeholder="Seleccione una cuenta..."/>
+                                        </div>
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                        {bankAccounts.map(acc => (
+                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} ({acc.bank})</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2 pt-2">
                                 <Label className={labelClass}>Notas / Observaciones</Label>
                                 <Textarea name="notes" value={formData.notes || ''} onChange={handleInputChange} className="min-h-[80px] resize-none bg-slate-950 border-slate-800 text-slate-300 focus:border-slate-600" placeholder="Instrucciones especiales para el despacho..." />
                             </div>
@@ -384,7 +461,6 @@ export function NewSalesOrderSheet({
         onOpenChange={setIsMatrixOpen}
         onSave={handleMatrixSave}
         orderType="sale"
-        inventory={inventory}
       />
     </>
   );
