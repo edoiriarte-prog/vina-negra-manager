@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
@@ -86,7 +85,6 @@ export default function InventoryPage() {
     
     // 2. Calculate movements WITHIN the date range
     if (interval) {
-        // **LOGIC CORRECTION**: Sumar compras a 'purchases'
         purchaseOrders.forEach(po => {
             if((po.status === 'completed' || po.status === 'received') && isWithinInterval(parseISO(po.date), interval)) {
                 po.items.forEach(item => {
@@ -97,7 +95,7 @@ export default function InventoryPage() {
                 });
             }
         });
-        // **LOGIC CORRECTION**: Sumar ventas a 'sales'
+
         salesOrders.forEach(so => {
             if((so.status === 'completed' || so.status === 'dispatched' || so.status === 'invoiced') && isWithinInterval(parseISO(so.date), interval)) {
                 so.items.forEach(item => {
@@ -108,6 +106,7 @@ export default function InventoryPage() {
                 });
             }
         });
+        
         inventoryAdjustments.forEach(adj => {
             if (isWithinInterval(parseISO(adj.date), interval)) {
                 const key = `${normalize(adj.product)}::${adj.caliber}::${adj.warehouse}`;
@@ -217,10 +216,10 @@ export default function InventoryPage() {
   const renderContent = () => {
     if (isLoading) return <Skeleton className="h-96 w-full" />;
     return (
-       <Card className="bg-slate-900 border-slate-800 overflow-hidden">
-        <div className="overflow-x-auto">
+       <Card className="bg-slate-900 border-slate-800 overflow-hidden shadow-lg">
+        <div className="overflow-x-auto relative">
             <Table>
-                <TableHeader className="bg-slate-950">
+                <TableHeader className="bg-slate-950/50 sticky top-0 z-10">
                     <TableRow className="border-slate-800 hover:bg-slate-900">
                         <TableHead className="text-slate-400 font-bold w-[250px]">Producto / Calibre</TableHead>
                         <TableHead className="text-slate-400 font-bold w-[150px]">Bodega</TableHead>
@@ -295,7 +294,7 @@ export default function InventoryPage() {
           <Card className="bg-slate-900 border-slate-800"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium text-blue-400">Rotación Neta</CardTitle><TrendingUp/></CardHeader><CardContent><div className="text-2xl font-bold">{formatKilos(netRotation)}</div></CardContent></Card>
       </div>
       
-      <Card className="bg-slate-900 border-slate-800">
+      <Card className="bg-slate-900 border-slate-800 shadow-lg">
         <CardContent className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="relative">
@@ -304,12 +303,12 @@ export default function InventoryPage() {
                 </div>
                 <Popover>
                     <PopoverTrigger asChild>
-                        <Button id="date" variant={"outline"} className={cn("justify-start text-left font-normal bg-slate-950 border-slate-800", !dateRange && "text-muted-foreground" )}>
+                        <Button id="date" variant={"outline"} className={cn("justify-start text-left font-normal bg-slate-950 border-slate-800 text-slate-200 hover:bg-slate-800 hover:text-white", !dateRange && "text-muted-foreground" )}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {dateRange?.from ? (dateRange.to ? (<>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>) : (format(dateRange.from, "LLL dd, y"))) : (<span>Seleccione rango</span>)}
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2}/></PopoverContent>
+                    <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-700" align="start"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2}/></PopoverContent>
                 </Popover>
                 <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}><SelectTrigger className="bg-slate-950 border-slate-800 text-slate-100"><div className="flex items-center gap-2"><Filter className="h-4 w-4 text-slate-500"/><SelectValue placeholder="Bodega" /></div></SelectTrigger><SelectContent className="bg-slate-900 border-slate-800 text-slate-100"><SelectItem value="All">Todas las Bodegas</SelectItem>{warehouses.map(w => (<SelectItem key={w} value={w}>{w}</SelectItem>))}</SelectContent></Select>
                 <Select value={selectedProduct} onValueChange={setSelectedProduct}><SelectTrigger className="bg-slate-950 border-slate-800 text-slate-100"><div className="flex items-center gap-2"><Package className="h-4 w-4 text-slate-500"/><SelectValue placeholder="Producto" /></div></SelectTrigger><SelectContent className="bg-slate-900 border-slate-800 text-slate-100"><SelectItem value="All">Todos los Productos</SelectItem>{products.map(p => (<SelectItem key={p} value={p}>{p}</SelectItem>))}</SelectContent></Select>
