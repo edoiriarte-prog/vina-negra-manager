@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
@@ -43,6 +44,18 @@ type InventoryReportItem = {
 // --- HELPERS ---
 const formatKilos = (val: number) => new Intl.NumberFormat('es-CL').format(Math.round(val)) + ' kg';
 
+// --- Helper functions from date-fns to avoid being undefined ---
+const startOfDay = (date: Date) => {
+  const newDate = new Date(date);
+  newDate.setHours(0, 0, 0, 0);
+  return newDate;
+}
+const endOfDay = (date: Date) => {
+    const newDate = new Date(date);
+    newDate.setHours(23, 59, 59, 999);
+    return newDate;
+}
+
 // --- COMPONENT ---
 export default function InventoryPage() {
   const { toast } = useToast();
@@ -72,15 +85,14 @@ export default function InventoryPage() {
     const normalize = (name: string) => (name || '').trim().toUpperCase();
 
     const allItems = [
-      ...purchaseOrders.flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse || 'Bodega Central'}))),
-      ...salesOrders.flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse || 'Bodega Central'}))),
-      ...inventoryAdjustments.map(a => ({...a})),
-      ...(inventory || []).map(i => ({...i})),
+      ...purchaseOrders.flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse || 'Bodega Central', date: o.date, status: o.status, type: 'purchase'}))),
+      ...salesOrders.flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse || 'Bodega Central', date: o.date, status: o.status, type: 'sale'}))),
+      ...inventoryAdjustments.map(a => ({...a, type: 'adjustment'})),
     ];
     
+    // Primero, poblamos el mapa con todos los productos que han tenido algún movimiento.
     allItems.forEach(item => {
-      if (!item.name && !item.product) return;
-      const productName = item.name || item.product;
+      const productName = item.product || item.name;
       if (!productName || !item.caliber || !item.warehouse) return;
 
       const key = `${normalize(productName)}::${item.caliber}::${item.warehouse}`;
@@ -92,34 +104,41 @@ export default function InventoryPage() {
       }
     });
 
-    const calculateMovements = (orders: (PurchaseOrder[] | SalesOrder[] | InventoryAdjustment[]), type: 'purchase' | 'sale' | 'adjustment') => {
-        orders.forEach((order: any) => {
-            if (!interval || !isWithinInterval(parseISO(order.date), interval)) return;
-            
-            const items = order.items || [order]; // Adjustments aren't in an 'items' array
-            
-            items.forEach((item: any) => {
-                if (!item.product || !item.caliber || !order.warehouse) return;
+    // Ahora, procesamos los movimientos dentro del rango de fechas
+    reportMap.forEach(reportItem => {
+        // Entradas (Compras)
+        const purchaseTx = purchaseOrders
+            .filter(o => o.status === 'completed' || o.status === 'received')
+            .flatMap(o => o.items.map(i => ({...i, date: o.date, warehouse: o.warehouse || 'Bodega Central'})))
+            .filter(i => 
+                normalize(i.product) === normalize(reportItem.product) && 
+                i.caliber === reportItem.caliber && 
+                i.warehouse === reportItem.warehouse &&
+                interval && isWithinInterval(parseISO(i.date), interval)
+            );
+        reportItem.purchases = purchaseTx.reduce((sum, item) => sum + item.quantity, 0);
 
-                const key = `${normalize(item.product)}::${item.caliber}::${order.warehouse}`;
-                if(reportMap.has(key)) {
-                    const reportItem = reportMap.get(key)!;
-                    if (type === 'purchase' && (order.status === 'completed' || order.status === 'received')) {
-                        reportItem.purchases += item.quantity;
-                    } else if (type === 'sale' && (order.status === 'completed' || order.status === 'dispatched' || order.status === 'invoiced')) {
-                        reportItem.sales += item.quantity;
-                    } else if (type === 'adjustment') {
-                        const multiplier = order.type === 'increase' ? 1 : -1;
-                        reportItem.adjustments += item.quantity * multiplier;
-                    }
-                }
-            });
-        });
-    };
-
-    calculateMovements(purchaseOrders, 'purchase');
-    calculateMovements(salesOrders, 'sale');
-    calculateMovements(inventoryAdjustments, 'adjustment');
+        // Salidas (Ventas)
+        const salesTx = salesOrders
+            .filter(o => o.status === 'completed' || o.status === 'dispatched' || o.status === 'invoiced')
+            .flatMap(o => o.items.map(i => ({...i, date: o.date, warehouse: o.warehouse || 'Bodega Central'})))
+            .filter(i => 
+                normalize(i.product) === normalize(reportItem.product) && 
+                i.caliber === reportItem.caliber && 
+                i.warehouse === reportItem.warehouse &&
+                interval && isWithinInterval(parseISO(i.date), interval)
+            );
+        reportItem.sales = salesTx.reduce((sum, item) => sum + item.quantity, 0);
+        
+        // Ajustes
+        const adjustmentTx = inventoryAdjustments.filter(a => 
+            normalize(a.product) === normalize(reportItem.product) &&
+            a.caliber === reportItem.caliber &&
+            a.warehouse === reportItem.warehouse &&
+            interval && isWithinInterval(parseISO(a.date), interval)
+        );
+        reportItem.adjustments = adjustmentTx.reduce((sum, item) => sum + (item.type === 'increase' ? item.quantity : -item.quantity), 0);
+    });
 
     reportMap.forEach(item => {
         const inventoryItem = inventory?.find(i => 
@@ -127,7 +146,7 @@ export default function InventoryPage() {
             i.caliber === item.caliber && 
             i.warehouse === item.warehouse
         );
-        item.finalStock = inventoryItem?.stock || 0; // Use live stock as final stock
+        item.finalStock = inventoryItem?.stock || 0; // Usar stock en vivo
         item.initialStock = item.finalStock - item.purchases + item.sales - item.adjustments;
     });
 
@@ -220,18 +239,6 @@ export default function InventoryPage() {
         toast({ variant: "destructive", title: "Error de Normalización", description: "Algunos productos no pudieron ser actualizados." });
       });
   };
-
-  // --- Helper functions from date-fns to avoid being undefined ---
-  const startOfDay = (date: Date) => {
-    const newDate = new Date(date);
-    newDate.setHours(0, 0, 0, 0);
-    return newDate;
-  }
-  const endOfDay = (date: Date) => {
-      const newDate = new Date(date);
-      newDate.setHours(23, 59, 59, 999);
-      return newDate;
-  }
 
 
   const renderContent = () => {
