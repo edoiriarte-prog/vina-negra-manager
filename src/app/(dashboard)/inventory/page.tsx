@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
@@ -64,7 +65,7 @@ export default function InventoryPage() {
 
   // 3. CORE LOGIC: INVENTORY CALCULATION ENGINE
   const inventoryReport = useMemo(() => {
-    if (isLoading || !inventory) return [];
+    if (isLoading || !inventory || !purchaseOrders || !salesOrders || !inventoryAdjustments) return [];
     
     const interval = dateRange?.from && dateRange.to ? { start: dateRange.from, end: dateRange.to } : null;
     
@@ -73,10 +74,11 @@ export default function InventoryPage() {
 
     // 1. Initialize map with all unique product/caliber/warehouse combinations from inventory
     inventory.forEach(item => {
+        if (!item.name || !item.caliber || !item.warehouse) return;
         const key = `${normalize(item.name)}::${item.caliber}::${item.warehouse}`;
         if (!reportMap.has(key)) {
             reportMap.set(key, {
-                id: key, product: item.name, caliber: item.caliber, warehouse: item.warehouse || 'Principal',
+                id: key, product: item.name, caliber: item.caliber, warehouse: item.warehouse,
                 initialStock: 0, purchases: 0, sales: 0, adjustments: 0, finalStock: item.stock || 0
             });
         }
@@ -84,19 +86,25 @@ export default function InventoryPage() {
     
     // 2. Calculate movements WITHIN the date range
     if (interval) {
+        // **LOGIC CORRECTION**: Sumar compras a 'purchases'
         purchaseOrders.forEach(po => {
             if((po.status === 'completed' || po.status === 'received') && isWithinInterval(parseISO(po.date), interval)) {
                 po.items.forEach(item => {
                     const key = `${normalize(item.product)}::${item.caliber}::${po.warehouse || 'Bodega Central'}`;
-                    if(reportMap.has(key)) reportMap.get(key)!.purchases += item.quantity;
+                    if(reportMap.has(key)) {
+                        reportMap.get(key)!.purchases += item.quantity;
+                    }
                 });
             }
         });
+        // **LOGIC CORRECTION**: Sumar ventas a 'sales'
         salesOrders.forEach(so => {
             if((so.status === 'completed' || so.status === 'dispatched' || so.status === 'invoiced') && isWithinInterval(parseISO(so.date), interval)) {
                 so.items.forEach(item => {
                     const key = `${normalize(item.product)}::${item.caliber}::${so.warehouse || 'Bodega Central'}`;
-                    if(reportMap.has(key)) reportMap.get(key)!.sales += item.quantity;
+                    if(reportMap.has(key)) {
+                         reportMap.get(key)!.sales += item.quantity;
+                    }
                 });
             }
         });
@@ -168,9 +176,8 @@ export default function InventoryPage() {
     const normalizationPromises: Promise<void>[] = [];
 
     inventory.forEach(item => {
-      // **FIX:** Add a guard clause to ensure item and item.name exist
       if (!item || !item.name) {
-        return; // Skip this item if it's invalid
+        return; 
       }
       
       let newName = item.name;
@@ -199,7 +206,6 @@ export default function InventoryPage() {
     Promise.all(normalizationPromises)
       .then(() => {
         toast({ title: "Normalización Completa", description: `${updatedCount} productos fueron actualizados.` });
-        // Consider a router.refresh() or similar if data isn't live updating fast enough
       })
       .catch(error => {
         console.error("Error durante la normalización:", error);
