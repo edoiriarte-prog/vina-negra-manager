@@ -68,52 +68,44 @@ export default function InventoryPage() {
     const reportMap = new Map<string, InventoryReportItem>();
 
     const allItems = new Set<string>();
-    [...purchaseOrders, ...salesOrders, ...inventoryAdjustments].forEach(op => {
-      op.items?.forEach((item: any) => {
-        const warehouse = (op as PurchaseOrder | SalesOrder).warehouse || (op as InventoryAdjustment).warehouse || 'Principal';
-        allItems.add(`${item.product}::${item.caliber}::${warehouse}`);
-      });
-      if ((op as InventoryAdjustment).product) {
-        const adj = op as InventoryAdjustment;
-        allItems.add(`${adj.product}::${adj.caliber}::${adj.warehouse}`);
-      }
-    });
     
-    // Initialize map with all combinations
-    allItems.forEach(keyStr => {
-       const [product, caliber, warehouse] = keyStr.split('::');
-       reportMap.set(keyStr, {
-          id: keyStr,
-          product,
-          caliber,
-          warehouse,
-          initialStock: 0,
-          purchases: 0,
-          sales: 0,
-          adjustments: 0,
-          finalStock: 0
-       });
+    const normalize = (name: string) => (name || '').trim().toUpperCase();
+
+    // Populate all unique items from all sources
+    [...(purchaseOrders || []), ...(salesOrders || []), ...(inventoryAdjustments || [])].forEach(op => {
+        (op.items || [op]).forEach((item: any) => {
+            if (!item.product) return;
+            const warehouse = (op as PurchaseOrder | SalesOrder).warehouse || (op as InventoryAdjustment).warehouse || 'Principal';
+            const key = `${normalize(item.product)}::${item.caliber}::${warehouse}`;
+            if (!allItems.has(key)) {
+                allItems.add(key);
+                reportMap.set(key, {
+                    id: key, product: item.product, caliber: item.caliber, warehouse,
+                    initialStock: 0, purchases: 0, sales: 0, adjustments: 0, finalStock: 0
+                });
+            }
+        });
     });
 
     // Calculate Final Stock (based on ALL history)
     purchaseOrders.forEach(po => {
         if(po.status === 'completed' || po.status === 'received') {
             po.items.forEach(item => {
-                const key = `${item.product}::${item.caliber}::${po.warehouse || 'Principal'}`;
+                const key = `${normalize(item.product)}::${item.caliber}::${po.warehouse || 'Principal'}`;
                 if (reportMap.has(key)) reportMap.get(key)!.finalStock += item.quantity;
             });
         }
     });
     salesOrders.forEach(so => {
-       if (so.status === 'completed' || so.status === 'dispatched') {
+       if (so.status === 'completed' || so.status === 'dispatched' || so.status === 'invoiced') {
             so.items.forEach(item => {
-                const key = `${item.product}::${item.caliber}::${so.warehouse || 'Principal'}`;
+                const key = `${normalize(item.product)}::${item.caliber}::${so.warehouse || 'Principal'}`;
                 if (reportMap.has(key)) reportMap.get(key)!.finalStock -= item.quantity;
             });
         }
     });
     inventoryAdjustments.forEach(adj => {
-        const key = `${adj.product}::${adj.caliber}::${adj.warehouse}`;
+        const key = `${normalize(adj.product)}::${adj.caliber}::${adj.warehouse}`;
         if (reportMap.has(key)) {
             const multiplier = adj.type === 'increase' ? 1 : -1;
             reportMap.get(key)!.finalStock += adj.quantity * multiplier;
@@ -125,22 +117,22 @@ export default function InventoryPage() {
         purchaseOrders.forEach(po => {
             if((po.status === 'completed' || po.status === 'received') && isWithinInterval(parseISO(po.date), interval)) {
                 po.items.forEach(item => {
-                    const key = `${item.product}::${item.caliber}::${po.warehouse || 'Principal'}`;
+                    const key = `${normalize(item.product)}::${item.caliber}::${po.warehouse || 'Principal'}`;
                     if(reportMap.has(key)) reportMap.get(key)!.purchases += item.quantity;
                 });
             }
         });
         salesOrders.forEach(so => {
-            if((so.status === 'completed' || so.status === 'dispatched') && isWithinInterval(parseISO(so.date), interval)) {
+            if((so.status === 'completed' || so.status === 'dispatched' || so.status === 'invoiced') && isWithinInterval(parseISO(so.date), interval)) {
                 so.items.forEach(item => {
-                    const key = `${item.product}::${item.caliber}::${so.warehouse || 'Principal'}`;
+                    const key = `${normalize(item.product)}::${item.caliber}::${so.warehouse || 'Principal'}`;
                     if(reportMap.has(key)) reportMap.get(key)!.sales += item.quantity;
                 });
             }
         });
         inventoryAdjustments.forEach(adj => {
             if (isWithinInterval(parseISO(adj.date), interval)) {
-                const key = `${adj.product}::${adj.caliber}::${adj.warehouse}`;
+                const key = `${normalize(adj.product)}::${adj.caliber}::${adj.warehouse}`;
                  if(reportMap.has(key)) {
                     const multiplier = adj.type === 'increase' ? 1 : -1;
                     reportMap.get(key)!.adjustments += adj.quantity * multiplier;

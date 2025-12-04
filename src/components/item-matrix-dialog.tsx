@@ -22,6 +22,7 @@ import { useMasterData } from '@/hooks/use-master-data';
 import { OrderItem, InventoryItem } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Package, Calculator, X } from 'lucide-react';
+import { useOperations } from '@/hooks/use-operations';
 
 const SmartInput = ({ value, onChange, className, placeholder }: { value: number; onChange: (val: number) => void; className?: string; placeholder?: string; }) => {
     const [inputValue, setInputValue] = useState<string>(value === 0 ? '' : value.toString());
@@ -68,7 +69,6 @@ type ItemMatrixDialogProps = {
   onOpenChange: (open: boolean) => void;
   onSave: (items: Omit<OrderItem, 'id'>[]) => void;
   orderType: 'purchase' | 'sale';
-  inventory?: InventoryItem[];
 };
 
 type MatrixRow = {
@@ -81,8 +81,9 @@ type MatrixRow = {
 };
 
 
-export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inventory = [] }: ItemMatrixDialogProps) {
+export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType }: ItemMatrixDialogProps) {
   const { products, calibers, packagingTypes, productCaliberAssociations } = useMasterData();
+  const { inventory } = useOperations(); // Get inventory from operations
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [rows, setRows] = useState<MatrixRow[]>([]);
 
@@ -130,8 +131,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
   const getAvailableStock = (caliber: string) => {
     if (!inventory || orderType !== 'sale' || !selectedProduct) return null;
     
-    // DEBUG: Console log para verificar datos de entrada.
-    console.log('Buscando stock para:', selectedProduct, 'Calibre:', caliber);
+    console.log('Buscando stock para:', selectedProduct, 'Calibre:', caliber, 'en inventario:', inventory);
 
     const normalizedSelectedProduct = selectedProduct.trim().toUpperCase();
 
