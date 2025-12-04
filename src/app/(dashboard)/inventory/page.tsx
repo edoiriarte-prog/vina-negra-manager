@@ -1,21 +1,19 @@
-
 "use client";
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useOperations } from '@/hooks/use-operations';
 import { useMasterData } from '@/hooks/use-master-data';
-import { InventoryItem, PurchaseOrder, SalesOrder, InventoryAdjustment, Contact } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRange } from 'react-day-picker';
-import { addDays, format, startOfMonth, endOfMonth, isWithinInterval, parseISO, isBefore } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isBefore, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   Search, Package, Filter, Download, History,
-  ArrowUp, ArrowDown, TrendingUp, Calendar as CalendarIcon, Wand2
+  ArrowUp, ArrowDown, Wand2, Calendar as CalendarIcon
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -24,11 +22,10 @@ import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
-import { useFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useFirebase } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
-
-// --- TYPES ---
+// TYPES
 type InventoryReportItem = {
     id: string;
     product: string;
@@ -41,28 +38,17 @@ type InventoryReportItem = {
     finalStock: number;
 };
 
-// --- HELPERS ---
+// HELPERS
 const formatKilos = (val: number) => new Intl.NumberFormat('es-CL').format(Math.round(val)) + ' kg';
+const normalize = (str?: string) => (str || '').trim().toUpperCase();
 
-// --- Helper functions from date-fns to avoid being undefined ---
-const startOfDay = (date: Date) => {
-  const newDate = new Date(date);
-  newDate.setHours(0, 0, 0, 0);
-  return newDate;
-}
-const endOfDay = (date: Date) => {
-    const newDate = new Date(date);
-    newDate.setHours(23, 59, 59, 999);
-    return newDate;
-}
-
-// --- COMPONENT ---
 export default function InventoryPage() {
   const { toast } = useToast();
   const { firestore } = useFirebase();
+  
   // 1. DATA LOADING
   const { purchaseOrders, salesOrders, inventoryAdjustments, isLoading: loadingOps } = useOperations();
-  const { warehouses, products, calibers, contacts, inventory, isLoading: loadingMaster } = useMasterData();
+  const { warehouses, products, contacts, isLoading: loadingMaster } = useMasterData();
   const isLoading = loadingOps || loadingMaster;
   
   // 2. FILTERS STATE
@@ -75,103 +61,121 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedItemForHistory, setSelectedItemForHistory] = useState<InventoryReportItem | null>(null);
 
-  // 3. CORE LOGIC: INVENTORY CALCULATION ENGINE
+  // 3. KARDEX CALCULATION ENGINE
   const inventoryReport = useMemo(() => {
     if (isLoading || !purchaseOrders || !salesOrders || !inventoryAdjustments) return [];
     
-    const startDate = dateRange?.from ? startOfDay(dateRange.from) : new Date(0);
-    const endDate = dateRange?.to ? endOfDay(dateRange.to) : new Date();
+    const start = dateRange?.from ? startOfDay(dateRange.from) : new Date(0);
+    const end = dateRange?.to ? endOfDay(dateRange.to) : new Date();
 
-    const normalize = (name?: string) => (name || '').trim().toUpperCase();
-    
     const reportMap = new Map<string, InventoryReportItem>();
 
-    const allItemsTx = [
-      ...purchaseOrders.filter(o => o.status === 'completed' || o.status === 'received').flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse, date: o.date, type: 'purchase' }))),
-      ...salesOrders.filter(o => o.status === 'completed' || o.status === 'dispatched' || o.status === 'invoiced').flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse, date: o.date, type: 'sale' }))),
-      ...inventoryAdjustments.map(a => ({...a, type: a.type === 'increase' ? 'adj_in' : 'adj_out'})),
+    const allMovements = [
+      // Purchase Orders (Entries)
+      ...purchaseOrders
+        .filter(o => o.status === 'received' || o.status === 'completed')
+        .flatMap(o => o.items.map(i => ({
+          date: new Date(o.date),
+          type: 'IN',
+          qty: Number(i.quantity || 0),
+          product: i.product,
+          caliber: i.caliber,
+          warehouse: o.warehouse
+        }))),
+      
+      // Sales Orders (Outputs)
+      ...salesOrders
+        .filter(o => o.status === 'dispatched' || o.status === 'completed' || o.status === 'invoiced')
+        .flatMap(o => {
+          if (o.saleType === 'Traslado Bodega Interna') {
+            return o.items.flatMap(i => [
+              { // Out from origin
+                date: new Date(o.date),
+                type: 'OUT',
+                qty: Number(i.quantity || 0),
+                product: i.product,
+                caliber: i.caliber,
+                warehouse: o.warehouse
+              },
+              { // In to destination
+                date: new Date(o.date),
+                type: 'IN',
+                qty: Number(i.quantity || 0),
+                product: i.product,
+                caliber: i.caliber,
+                warehouse: o.destinationWarehouse
+              }
+            ]);
+          }
+          // Normal Sale
+          return o.items.map(i => ({
+            date: new Date(o.date),
+            type: 'OUT',
+            qty: Number(i.quantity || 0),
+            product: i.product,
+            caliber: i.caliber,
+            warehouse: o.warehouse
+          }));
+        }),
+
+      // Manual Adjustments
+      ...inventoryAdjustments.map(adj => ({
+        date: new Date(adj.date),
+        type: adj.type === 'increase' ? 'IN' : 'OUT',
+        qty: Number(adj.quantity || 0),
+        product: adj.product,
+        caliber: adj.caliber,
+        warehouse: adj.warehouse
+      }))
     ];
 
-    // Populate map with all possible items from transactions
-    allItemsTx.forEach(tx => {
-        const productName = tx.product;
-        if (!productName || !tx.caliber || !tx.warehouse) return;
-        const key = `${normalize(productName)}::${tx.caliber}::${tx.warehouse}`;
-        if (!reportMap.has(key)) {
-            reportMap.set(key, {
-                id: key, product: productName, caliber: tx.caliber, warehouse: tx.warehouse,
-                initialStock: 0, purchases: 0, sales: 0, adjustments: 0, finalStock: 0
-            });
-        }
+    allMovements.forEach(mv => {
+      if (!mv.product || !mv.caliber || !mv.warehouse) return;
+      const key = `${normalize(mv.product)}::${normalize(mv.caliber)}::${normalize(mv.warehouse)}`;
+      
+      if (!reportMap.has(key)) {
+        reportMap.set(key, {
+            id: key, product: mv.product, caliber: mv.caliber, warehouse: mv.warehouse,
+            initialStock: 0, purchases: 0, sales: 0, adjustments: 0, finalStock: 0
+        });
+      }
+      const item = reportMap.get(key)!;
+
+      if (isBefore(mv.date, start)) { // Historical movement
+        item.initialStock += (mv.type === 'IN' ? mv.qty : -mv.qty);
+      } else if (!isAfter(mv.date, end)) { // Movement within period
+        if (mv.type === 'IN') item.purchases += mv.qty;
+        else item.sales += mv.qty;
+      }
     });
 
-    // Calculate Initial Stock
+    // Calculate final stock based on movements
     reportMap.forEach(item => {
-        const key = item.id;
-        let initial = 0;
-
-        const txsBeforePeriod = allItemsTx.filter(tx => {
-            const txKey = `${normalize(tx.product)}::${tx.caliber}::${tx.warehouse}`;
-            return txKey === key && isBefore(parseISO(tx.date), startDate);
-        });
-
-        txsBeforePeriod.forEach(tx => {
-            if (tx.type === 'purchase' || tx.type === 'adj_in') {
-                initial += tx.quantity;
-            } else if (tx.type === 'sale' || tx.type === 'adj_out') {
-                initial -= tx.quantity;
-            }
-        });
-        item.initialStock = initial;
-    });
-
-    // Calculate movements within the period
-    reportMap.forEach(item => {
-        const key = item.id;
-        const txsInPeriod = allItemsTx.filter(tx => {
-            const txKey = `${normalize(tx.product)}::${tx.caliber}::${tx.warehouse}`;
-            return txKey === key && isWithinInterval(parseISO(tx.date), { start: startDate, end: endDate });
-        });
-
-        txsInPeriod.forEach(tx => {
-            if (tx.type === 'purchase') {
-                item.purchases += tx.quantity;
-            } else if (tx.type === 'sale') {
-                item.sales += tx.quantity;
-            } else if (tx.type === 'adj_in') {
-                item.adjustments += tx.quantity;
-            } else if (tx.type === 'adj_out') {
-                item.adjustments -= tx.quantity;
-            }
-        });
-    });
-
-    // Calculate Final Stock
-    reportMap.forEach(item => {
-        item.finalStock = item.initialStock + item.purchases + item.sales + item.adjustments;
+        item.finalStock = item.initialStock + item.purchases - item.sales;
     });
 
     return Array.from(reportMap.values());
   }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, dateRange]);
   
 
-  // 4. Filtering for Display
-  const { filteredData, totalIn, totalOut, netRotation } = useMemo(() => {
+  // 4. Filtering for display
+  const { filteredData, totalIn, totalOut, netRotation, totalStockVal } = useMemo(() => {
     const data = inventoryReport.filter(item => {
         const matchWarehouse = selectedWarehouse === "All" || item.warehouse === selectedWarehouse;
-        const matchProduct = selectedProduct === "All" || item.product === selectedProduct;
+        const matchProduct = selectedProduct === "All" || normalize(item.product) === normalize(selectedProduct);
         const matchSearch = searchTerm === "" || 
                             item.product.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             item.caliber?.toLowerCase().includes(searchTerm.toLowerCase());
-        const hasMovement = item.initialStock !== 0 || item.purchases !== 0 || item.sales !== 0 || item.finalStock !== 0 || item.adjustments !== 0;
-        return matchWarehouse && matchProduct && matchSearch && hasMovement;
+        const hasData = item.initialStock !== 0 || item.purchases !== 0 || item.sales !== 0 || item.finalStock !== 0;
+        return matchWarehouse && matchProduct && matchSearch && hasData;
     }).sort((a,b) => a.product.localeCompare(b.product) || a.caliber.localeCompare(b.caliber));
 
     const totals = data.reduce((acc, item) => {
-        acc.totalIn += item.purchases + (item.adjustments > 0 ? item.adjustments : 0);
-        acc.totalOut += item.sales + (item.adjustments < 0 ? Math.abs(item.adjustments) : 0);
+        acc.totalIn += item.purchases;
+        acc.totalOut += item.sales;
+        acc.totalStockVal += item.finalStock;
         return acc;
-    }, { totalIn: 0, totalOut: 0 });
+    }, { totalIn: 0, totalOut: 0, totalStockVal: 0 });
 
     return { filteredData: data, ...totals, netRotation: totals.totalIn - totals.totalOut };
   }, [inventoryReport, selectedWarehouse, selectedProduct, searchTerm]);
@@ -180,13 +184,9 @@ export default function InventoryPage() {
   const handleExport = () => {
     toast({ title: "Exportando...", description: "Generando archivo Excel del reporte." });
     const dataToExport = filteredData.map(item => ({
-        'Producto': item.product,
-        'Calibre': item.caliber,
-        'Bodega': item.warehouse,
-        'Stock Inicial (Kg)': item.initialStock,
-        'Entradas (Kg)': item.purchases + (item.adjustments > 0 ? item.adjustments : 0),
-        'Salidas (Kg)': item.sales + (item.adjustments < 0 ? Math.abs(item.adjustments) : 0),
-        'Stock Final (Kg)': item.finalStock,
+        'Producto': item.product, 'Calibre': item.caliber, 'Bodega': item.warehouse,
+        'Stock Inicial (Kg)': item.initialStock, 'Entradas (Kg)': item.purchases,
+        'Salidas (Kg)': item.sales, 'Stock Final (Kg)': item.finalStock,
     }));
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
@@ -194,56 +194,46 @@ export default function InventoryPage() {
     XLSX.writeFile(workbook, `Reporte_Inventario_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
-  const handleNormalization = () => {
-    if (!firestore || !inventory) {
-      toast({ variant: "destructive", title: "Error", description: "Los datos de inventario no están listos." });
-      return;
-    }
-    
+  const handleNormalization = async () => {
+    if (!firestore || !purchaseOrders) return;
+    toast({ title: "Iniciando Normalización..." });
+
+    const updates: Promise<void>[] = [];
     let updatedCount = 0;
-    const normalizationPromises: Promise<void>[] = [];
 
-    inventory.forEach(item => {
-      if (!item || !item.name) {
-        return; 
-      }
-      
-      let newName = item.name;
-      const normalizedName = item.name.toUpperCase().trim();
+    purchaseOrders.forEach(po => {
+        let hasChanges = false;
+        const updatedItems = po.items.map(item => {
+            if (!item.product) return item;
+            let newName = item.product;
+            const normalized = normalize(item.product);
+            
+            if (normalized === 'PALTAS') newName = 'PALTA HASS';
+            if (normalized === 'MANDARINA') newName = 'MANDARINAS';
 
-      if (normalizedName === 'PALTAS') {
-        newName = 'PALTA HASS';
-      } else if (normalizedName === 'MANDARINA') {
-        newName = 'MANDARINAS';
-      }
+            if (newName !== item.product) {
+                hasChanges = true;
+                return { ...item, product: newName };
+            }
+            return item;
+        });
 
-      if (newName !== item.name) {
-        updatedCount++;
-        const itemRef = doc(firestore, 'inventory', item.id);
-        normalizationPromises.push(updateDocumentNonBlocking(itemRef, { name: newName }));
-      }
+        if (hasChanges) {
+            updatedCount++;
+            updates.push(updateDoc(doc(firestore, 'purchaseOrders', po.id), { items: updatedItems }));
+        }
     });
-
-    if (updatedCount === 0) {
-      toast({ title: "Sin cambios", description: "Los nombres de productos ya están normalizados." });
-      return;
+    
+    if (updates.length > 0) {
+        await Promise.all(updates);
+        toast({ title: "Normalización Completa", description: `${updatedCount} órdenes de compra actualizadas.` });
+    } else {
+        toast({ title: "Sin Cambios", description: "Los nombres de productos ya estaban normalizados." });
     }
-
-    toast({ title: "Normalizando...", description: `Actualizando ${updatedCount} registros...` });
-
-    Promise.all(normalizationPromises)
-      .then(() => {
-        toast({ title: "Normalización Completa", description: `${updatedCount} productos fueron actualizados.` });
-      })
-      .catch(error => {
-        console.error("Error durante la normalización:", error);
-        toast({ variant: "destructive", title: "Error de Normalización", description: "Algunos productos no pudieron ser actualizados." });
-      });
   };
 
-
   const renderContent = () => {
-    if (isLoading) return <Skeleton className="h-96 w-full" />;
+    if (isLoading) return <Skeleton className="h-96 w-full bg-slate-800" />;
     return (
        <Card className="bg-slate-900 border-slate-800 overflow-hidden shadow-lg">
         <div className="overflow-x-auto relative">
@@ -252,16 +242,16 @@ export default function InventoryPage() {
                     <TableRow className="border-slate-800 hover:bg-slate-900">
                         <TableHead className="text-slate-400 font-bold w-[250px]">Producto / Calibre</TableHead>
                         <TableHead className="text-slate-400 font-bold w-[150px]">Bodega</TableHead>
-                        <TableHead className="text-right text-slate-400 font-bold">Stock Inicial</TableHead>
+                        <TableHead className="text-right text-slate-500 font-bold">Stock Inicial</TableHead>
                         <TableHead className="text-right text-emerald-400 font-bold">Entradas</TableHead>
                         <TableHead className="text-right text-red-400 font-bold">Salidas</TableHead>
-                        <TableHead className="text-right text-blue-400 font-bold">Stock Final</TableHead>
-                        <TableHead className="text-center">Acciones</TableHead>
+                        <TableHead className="text-right text-blue-400 font-bold text-lg">Stock Final</TableHead>
+                        <TableHead className="text-center">Historial</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {filteredData.length === 0 ? (
-                        <TableRow><TableCell colSpan={7} className="text-center h-32 text-slate-500">Sin datos de inventario para los filtros seleccionados.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="text-center h-32 text-slate-500">Sin movimientos en este período.</TableCell></TableRow>
                     ) : (
                         filteredData.map((item) => (
                             <TableRow key={item.id} className="border-slate-800 hover:bg-slate-800/50 transition-colors">
@@ -277,10 +267,10 @@ export default function InventoryPage() {
                                 <TableCell className="text-slate-400 text-sm">{item.warehouse}</TableCell>
                                 <TableCell className="text-right font-mono text-slate-500">{formatKilos(item.initialStock)}</TableCell>
                                 <TableCell className="text-right font-mono text-emerald-400 flex justify-end items-center gap-1">
-                                    <ArrowUp size={14}/> {formatKilos(item.purchases + (item.adjustments > 0 ? item.adjustments : 0))}
+                                    {item.purchases > 0 && <ArrowUp size={14}/>} {formatKilos(item.purchases)}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-red-400 flex justify-end items-center gap-1">
-                                    <ArrowDown size={14}/> {formatKilos(item.sales + (item.adjustments < 0 ? Math.abs(item.adjustments) : 0))}
+                                    {item.sales > 0 && <ArrowDown size={14}/>} {formatKilos(item.sales)}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-lg text-blue-400 font-bold">{formatKilos(item.finalStock)}</TableCell>
                                 <TableCell className="text-center">
@@ -305,22 +295,22 @@ export default function InventoryPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h2 className="text-3xl font-bold tracking-tight text-white">Control de Stock (Kardex)</h2>
-            <p className="text-slate-400 mt-1">Análisis de movimientos y estado del inventario por período.</p>
+            <p className="text-slate-400 mt-1">Análisis de movimientos y trazabilidad del inventario.</p>
         </div>
         <div className="flex gap-2">
             <Button onClick={handleNormalization} variant="outline" className="border-purple-500/30 bg-purple-950/20 text-purple-300 hover:bg-purple-950/60 hover:text-purple-200">
-                <Wand2 className="mr-2 h-4 w-4" /> Normalizar Productos
+                <Wand2 className="mr-2 h-4 w-4" /> Normalizar Nombres
             </Button>
             <Button onClick={handleExport} variant="outline" className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800">
-                <Download className="mr-2 h-4 w-4" /> Exportar a Excel
+                <Download className="mr-2 h-4 w-4" /> Exportar Excel
             </Button>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-          <Card className="bg-slate-900 border-slate-800"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium text-emerald-400">Total Entradas</CardTitle><ArrowUp/></CardHeader><CardContent><div className="text-2xl font-bold">{formatKilos(totalIn)}</div></CardContent></Card>
-          <Card className="bg-slate-900 border-slate-800"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium text-red-400">Total Salidas</CardTitle><ArrowDown/></CardHeader><CardContent><div className="text-2xl font-bold">{formatKilos(totalOut)}</div></CardContent></Card>
-          <Card className="bg-slate-900 border-slate-800"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium text-blue-400">Rotación Neta</CardTitle><TrendingUp/></CardHeader><CardContent><div className="text-2xl font-bold">{formatKilos(netRotation)}</div></CardContent></Card>
+          <Card className="bg-slate-900 border-slate-800"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium text-emerald-400">Total Entradas (Periodo)</CardTitle><ArrowUp/></CardHeader><CardContent><div className="text-2xl font-bold">{formatKilos(totalIn)}</div></CardContent></Card>
+          <Card className="bg-slate-900 border-slate-800"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium text-red-400">Total Salidas (Periodo)</CardTitle><ArrowDown/></CardHeader><CardContent><div className="text-2xl font-bold">{formatKilos(totalOut)}</div></CardContent></Card>
+          <Card className="bg-slate-900 border-slate-800"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium text-blue-400">Stock Final Actual</CardTitle><Package/></CardHeader><CardContent><div className="text-2xl font-bold">{formatKilos(totalStockVal)}</div></CardContent></Card>
       </div>
       
       <Card className="bg-slate-900 border-slate-800 shadow-lg">

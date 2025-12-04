@@ -83,7 +83,7 @@ type MatrixRow = {
 
 export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType }: ItemMatrixDialogProps) {
   const { products, calibers, packagingTypes, productCaliberAssociations } = useMasterData();
-  const { inventory } = useOperations(); // Get inventory from operations
+  const { inventory } = useOperations(); // Correct: Get inventory from operations
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [rows, setRows] = useState<MatrixRow[]>([]);
 
@@ -131,16 +131,14 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType }: It
   const getAvailableStock = (caliber: string) => {
     if (!inventory || orderType !== 'sale' || !selectedProduct) return null;
     
-    console.log('Buscando stock para:', selectedProduct, 'Calibre:', caliber, 'en inventario:', inventory);
-
-    const normalizedSelectedProduct = selectedProduct.trim().toUpperCase();
+    const normalizedSelectedProduct = (selectedProduct || '').trim().toUpperCase();
 
     const stock = inventory
         .filter(item => 
             item &&
             item.name &&
             item.caliber &&
-            item.name.trim().toUpperCase() === normalizedSelectedProduct && 
+            (item.name || '').trim().toUpperCase() === normalizedSelectedProduct && 
             item.caliber === caliber
         )
         .reduce((sum, item) => sum + (item.stock || 0), 0);
