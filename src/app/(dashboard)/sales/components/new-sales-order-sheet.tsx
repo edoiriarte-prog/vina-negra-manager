@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, Users, Truck, Info, PackageCheck, DollarSign, CreditCard, CalendarIcon, Warehouse } from "lucide-react";
 import { 
   SalesOrder, 
@@ -25,7 +24,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useMasterData } from "@/hooks/use-master-data";
 import { ItemMatrixDialog } from "./item-matrix-dialog";
-import { format, addDays, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 interface NewSalesOrderSheetProps {
   isOpen: boolean;
@@ -53,7 +52,7 @@ const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder
         return {
             ...order,
             date: order.date ? format(new Date(order.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-            items: order.items.map(item => ({...item, total: (item.quantity || 0) * (item.price || 0)})) || [],
+            items: (order.items || []).map(item => ({...item, total: (item.quantity || 0) * (item.price || 0)}))
         };
     }
     
@@ -93,7 +92,7 @@ export function NewSalesOrderSheet({
 }: NewSalesOrderSheetProps) {
   
   const { toast } = useToast();
-  const { products: masterProducts, calibers, packagingTypes, warehouses } = useMasterData(); 
+  const { warehouses } = useMasterData(); 
   const isDispatch = sheetType === 'dispatch';
 
   const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order, salesOrders));
@@ -104,7 +103,7 @@ export function NewSalesOrderSheet({
     if (isOpen) {
       const initialData = getInitialFormData(order, salesOrders);
       setFormData(initialData);
-      setItems(initialData.items);
+      setItems(initialData.items || []);
     }
   }, [order, isOpen, salesOrders]);
 
@@ -305,7 +304,7 @@ export function NewSalesOrderSheet({
                                                 <Input type="number" value={item.price || ''} onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-slate-700 focus:border-blue-500" />
                                             </td>
                                             <td className="px-4 py-2 text-right font-medium text-slate-300 font-mono">
-                                                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(item.total)}
+                                                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(item.total || 0)}
                                             </td>
                                             <td className="px-4 py-2 text-center">
                                                 <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-7 w-7 text-slate-500 hover:text-red-400 hover:bg-red-950/30">
@@ -390,5 +389,3 @@ export function NewSalesOrderSheet({
     </>
   );
 }
-
-    

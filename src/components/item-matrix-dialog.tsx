@@ -21,7 +21,7 @@ import {
 import { useMasterData } from '@/hooks/use-master-data';
 import { OrderItem, InventoryItem } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Package, Calculator, X } from 'lucide-react';
+import { Package, Calculator, X, Warehouse } from 'lucide-react';
 
 const SmartInput = ({ value, onChange, className, placeholder }: { value: number; onChange: (val: number) => void; className?: string; placeholder?: string; }) => {
     const [inputValue, setInputValue] = useState<string>(value === 0 ? '' : value.toString());
@@ -126,6 +126,16 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
       newRows[index] = row;
       setRows(newRows);
   };
+  
+  const getAvailableStock = (caliber: string) => {
+    if (!inventory || orderType !== 'sale' || !selectedProduct) return null;
+    
+    const stock = inventory
+        .filter(item => item.name === selectedProduct && item.caliber === caliber)
+        .reduce((sum, item) => sum + item.stock, 0);
+        
+    return stock;
+  }
 
   const totals = useMemo(() => {
     return rows.reduce((acc, row) => {
@@ -167,7 +177,7 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col gap-0 p-0 bg-slate-950 border-slate-800 text-slate-100">
+      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col gap-0 p-0 bg-slate-950 border-slate-800 text-slate-100">
         <div className="px-6 py-4 border-b border-slate-800 bg-slate-900">
             <div className="flex justify-between items-start">
                 <div className="space-y-1">
@@ -198,17 +208,29 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                     <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-900/30">
                         <div className="grid grid-cols-12 gap-2 p-3 bg-slate-900 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-800 items-center tracking-wider">
                             <div className="col-span-2 pl-2">Calibre</div>
+                            {orderType === 'sale' && <div className="col-span-1 text-center text-white">Stock Disp.</div>}
                             <div className="col-span-3 text-center">Envase</div>
                             <div className="col-span-1 text-center">Cant. Env</div>
-                            <div className="col-span-2 text-center text-white">Kilos</div>
+                            <div className="col-span-1 text-center text-white">Kilos</div>
                             <div className="col-span-2 text-right text-blue-400 pr-2">P. Neto</div>
                             <div className="col-span-2 text-right text-emerald-400 pr-2">P. c/IVA</div>
                         </div>
                         <ScrollArea className="max-h-[400px]">
                             <div className="divide-y divide-slate-800">
-                                {rows.map((row, idx) => (
+                                {rows.map((row, idx) => {
+                                    const stock = getAvailableStock(row.caliber);
+                                    return (
                                     <div key={idx} className="grid grid-cols-12 gap-2 p-2 items-center hover:bg-slate-800/30 transition-colors group">
                                         <div className="col-span-2 font-medium text-sm pl-2 text-slate-300">{row.caliber}</div>
+                                        {orderType === 'sale' && (
+                                            <div className="col-span-1 text-center font-mono">
+                                                {stock !== null ? (
+                                                    <span className={stock > 0 ? 'text-emerald-400' : 'text-red-500'}>
+                                                        {new Intl.NumberFormat('es-CL').format(stock)} kg
+                                                    </span>
+                                                ) : '-'}
+                                            </div>
+                                        )}
                                         <div className="col-span-3">
                                             <Select value={row.packagingType} onValueChange={(v) => handleRowChange(idx, 'packagingType', v)}>
                                                 <SelectTrigger className="h-8 text-xs bg-slate-950 border-slate-800 text-slate-400"><SelectValue /></SelectTrigger>
@@ -216,11 +238,12 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
                                             </Select>
                                         </div>
                                         <div className="col-span-1"><SmartInput className={`${darkInput} text-center text-slate-400`} placeholder="0" value={row.packagingQuantity} onChange={(val) => handleRowChange(idx, 'packagingQuantity', val)} /></div>
-                                        <div className="col-span-2"><SmartInput className={`h-9 text-center font-bold text-sm border-slate-800 placeholder:text-slate-700 ${row.quantity > 0 ? 'bg-blue-950/30 border-blue-500/50 text-white' : 'bg-slate-950 text-slate-500'}`} placeholder="0" value={row.quantity} onChange={(val) => handleRowChange(idx, 'quantity', val)} /></div>
+                                        <div className="col-span-1"><SmartInput className={`h-9 text-center font-bold text-sm border-slate-800 placeholder:text-slate-700 ${row.quantity > 0 ? 'bg-blue-950/30 border-blue-500/50 text-white' : 'bg-slate-950 text-slate-500'}`} placeholder="0" value={row.quantity} onChange={(val) => handleRowChange(idx, 'quantity', val)} /></div>
                                         <div className="col-span-2"><SmartInput className={`${darkInput} text-blue-400`} placeholder="0" value={row.price} onChange={(val) => handleRowChange(idx, 'price', val)} /></div>
                                         <div className="col-span-2"><SmartInput className={`${darkInput} text-emerald-400 font-bold`} placeholder="0" value={row.grossPrice} onChange={(val) => handleRowChange(idx, 'grossPrice', val)} /></div>
                                     </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </ScrollArea>
                     </div>
