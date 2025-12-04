@@ -62,7 +62,12 @@ export function NewSalesOrderSheet({
     if (isOpen) {
         if (order) {
             setFormData({ ...order, date: order.date.split('T')[0] });
-            setItems(order.items || []);
+            // CORRECCIÓN: Calcular el total para cada ítem al cargar
+            const itemsWithTotal = order.items.map(item => ({
+              ...item,
+              total: (item.quantity || 0) * (item.price || 0)
+            }));
+            setItems(itemsWithTotal);
         } else {
             const existingIds = (salesOrders || [])
                 .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
@@ -219,7 +224,7 @@ export function NewSalesOrderSheet({
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
-                                <span className="text-emerald-400 font-mono">${(item.total).toLocaleString('es-CL')}</span>
+                                <span className="text-emerald-400 font-mono">${(item.total || 0).toLocaleString('es-CL')}</span>
                                 <button onClick={() => removeItem(idx)} className="text-slate-500 hover:text-red-400">
                                     <Trash2 className="h-4 w-4"/>
                                 </button>
