@@ -1,10 +1,9 @@
-
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useOperations } from '@/hooks/use-operations';
 import { useMasterData } from '@/hooks/use-master-data';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +13,7 @@ import { format, startOfMonth, endOfMonth, isBefore, isAfter, startOfDay, endOfD
 import { es } from 'date-fns/locale';
 import { 
   Search, Package, Filter, Download, History,
-  ArrowUp, ArrowDown, Calendar as CalendarIcon
+  ArrowUp, ArrowDown, Calendar as CalendarIcon, TrendingUp, TrendingDown, Boxes
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -26,8 +25,6 @@ import { useToast } from '@/hooks/use-toast';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
-import { InventoryItem } from '@/lib/types';
-
 
 // --- DEFINICIÓN DE TIPOS LIMPIA ---
 type InventoryReportItem = {
@@ -40,13 +37,23 @@ type InventoryReportItem = {
     salidas: number;
     stockFinal: number;
 };
+type ProductSummaryItem = {
+    name: string;
+    stockFinal: number;
+    entradas: number;
+    salidas: number;
+};
 type FilterMode = "day" | "range" | "month";
 
 // --- AYUDAS VISUALES ---
 const formatKilos = (val: number) => new Intl.NumberFormat('es-CL').format(Math.round(val)) + ' kg';
 const normalize = (str?: string) => (str || '').trim().toUpperCase();
-const parseDateAsLocal = (dateString: string) => new Date(`${dateString}T12:00:00`);
-
+const parseDateAsLocal = (dateString: string) => {
+    if (!dateString) return new Date(0);
+    // Agrega T12:00:00 para forzar la interpretación en la zona horaria local
+    // y evitar que se mueva al día anterior.
+    return new Date(`${dateString}T12:00:00`);
+};
 
 export default function InventoryPage() {
   const { toast } = useToast();
@@ -68,12 +75,11 @@ export default function InventoryPage() {
   const [busqueda, setBusqueda] = useState("");
   const [itemSeleccionado, setItemSeleccionado] = useState<InventoryReportItem | null>(null);
 
-  // 3. MOTOR DE CÁLCULO "AUDITABLE"
+  // 3. MOTOR DE CÁLCULO "TRANSACTIONAL PURO"
   const kardexData = useMemo(() => {
     if (isLoading || !purchaseOrders || !salesOrders || !inventoryAdjustments) return [];
     
     let fechaInicio: Date, fechaFin: Date;
-    
     switch (filterMode) {
         case 'day':
             fechaInicio = startOfDay(date || new Date());
@@ -103,22 +109,13 @@ export default function InventoryPage() {
         tipo: 'ENTRADA' | 'SALIDA'
     ) => {
         if (!producto || !calibre || !bodega || !fechaStr) return;
-        const prodNorm = normalize(producto);
-        const calNorm = normalize(calibre);
-        const bodNorm = normalize(bodega);
         
-        const clave = `${prodNorm}|${calNorm}|${bodNorm}`;
+        const clave = `${normalize(producto)}|${normalize(calibre)}|${normalize(bodega)}`;
 
         if (!mapaKardex.has(clave)) {
             mapaKardex.set(clave, {
-                id: clave,
-                product: producto, 
-                caliber: calibre,
-                warehouse: bodega,
-                stockInicial: 0,
-                entradas: 0,
-                salidas: 0,
-                stockFinal: 0
+                id: clave, product: producto, caliber: calibre, warehouse: bodega,
+                stockInicial: 0, entradas: 0, salidas: 0, stockFinal: 0
             });
         }
 
@@ -165,12 +162,10 @@ export default function InventoryPage() {
     });
 
     return reporte.sort((a,b) => a.product.localeCompare(b.product) || a.caliber.localeCompare(b.caliber));
-
   }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, date, dateRange, month, filterMode]);
   
-
-  // 4. FILTRADO VISUAL Y TOTALES
-  const { datosFiltrados, totalEntradas, totalSalidas, stockFinalTotal } = useMemo(() => {
+  // 4. FILTRADO VISUAL Y AGRUPACIONES
+  const { datosFiltrados, resumenPorProducto, totalEntradas, totalSalidas, stockFinalTotal } = useMemo(() => {
     let data = kardexData;
 
     if (filtroBodega !== "All") data = data.filter(i => i.warehouse === filtroBodega);
@@ -186,8 +181,20 @@ export default function InventoryPage() {
         stock: acc.stock + item.stockFinal
     }), { entradas: 0, salidas: 0, stock: 0 });
 
+    const resumenProducto = data.reduce((acc, item) => {
+        const prodName = item.product;
+        if (!acc[prodName]) {
+            acc[prodName] = { name: prodName, stockFinal: 0, entradas: 0, salidas: 0 };
+        }
+        acc[prodName].stockFinal += item.stockFinal;
+        acc[prodName].entradas += item.entradas;
+        acc[prodName].salidas += item.salidas;
+        return acc;
+    }, {} as Record<string, ProductSummaryItem>);
+
     return { 
         datosFiltrados: data, 
+        resumenPorProducto: Object.values(resumenProducto),
         totalEntradas: totales.entradas, 
         totalSalidas: totales.salidas, 
         stockFinalTotal: totales.stock 
@@ -196,13 +203,9 @@ export default function InventoryPage() {
 
   const handleExport = () => {
     const dataToExport = datosFiltrados.map(item => ({
-        'Producto': item.product,
-        'Calibre': item.caliber,
-        'Bodega': item.warehouse,
-        'Stock Inicial': item.stockInicial,
-        'Entradas (+)': item.entradas,
-        'Salidas (-)': item.salidas,
-        'Stock Final': item.stockFinal,
+        'Producto': item.product, 'Calibre': item.caliber, 'Bodega': item.warehouse,
+        'Stock Inicial': item.stockInicial, 'Entradas (+)': item.entradas,
+        'Salidas (-)': item.salidas, 'Stock Final': item.stockFinal,
     }));
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
@@ -229,36 +232,34 @@ export default function InventoryPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h2 className="text-3xl font-bold tracking-tight text-white">Auditoría de Stock (Kardex)</h2>
-            <p className="text-slate-400 mt-1">Cálculo en tiempo real basado en Órdenes de Compra y Venta.</p>
+            <p className="text-slate-400 mt-1">Análisis de movimientos de inventario por periodo.</p>
         </div>
-        <div className="flex gap-2">
-            <Button onClick={handleExport} variant="outline" className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800">
-                <Download className="mr-2 h-4 w-4" /> Exportar Excel
-            </Button>
-        </div>
+        <Button onClick={handleExport} variant="outline" className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800">
+            <Download className="mr-2 h-4 w-4" /> Exportar a Excel
+        </Button>
       </div>
-
+      
       <div className="grid gap-4 md:grid-cols-3">
           <Card className="bg-slate-900 border-slate-800">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-emerald-400">Entradas (Periodo)</CardTitle>
-                  <ArrowUp className="text-emerald-500 h-4 w-4"/>
+                  <CardTitle className="text-sm font-medium text-slate-400">Entradas (Periodo)</CardTitle>
+                  <TrendingUp className="text-emerald-500 h-5 w-5"/>
               </CardHeader>
-              <CardContent><div className="text-2xl font-bold">{formatKilos(totalEntradas)}</div></CardContent>
+              <CardContent><div className="text-3xl font-bold text-emerald-400">{formatKilos(totalEntradas)}</div></CardContent>
           </Card>
           <Card className="bg-slate-900 border-slate-800">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-red-400">Salidas (Periodo)</CardTitle>
-                  <ArrowDown className="text-red-500 h-4 w-4"/>
+                  <CardTitle className="text-sm font-medium text-slate-400">Salidas (Periodo)</CardTitle>
+                  <TrendingDown className="text-red-500 h-5 w-5"/>
               </CardHeader>
-              <CardContent><div className="text-2xl font-bold">{formatKilos(totalSalidas)}</div></CardContent>
+              <CardContent><div className="text-3xl font-bold text-red-400">{formatKilos(totalSalidas)}</div></CardContent>
           </Card>
           <Card className="bg-slate-900 border-slate-800">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-blue-400">Stock Final Calculado</CardTitle>
-                  <Package className="text-blue-500 h-4 w-4"/>
+                  <CardTitle className="text-sm font-medium text-slate-400">Stock Final Calculado</CardTitle>
+                  <Boxes className="text-blue-500 h-5 w-5"/>
               </CardHeader>
-              <CardContent><div className="text-2xl font-bold">{formatKilos(stockFinalTotal)}</div></CardContent>
+              <CardContent><div className="text-3xl font-bold text-blue-400">{formatKilos(stockFinalTotal)}</div></CardContent>
           </Card>
       </div>
       
@@ -283,81 +284,57 @@ export default function InventoryPage() {
                                 <TabsTrigger value="range">Rango</TabsTrigger>
                                 <TabsTrigger value="month">Mes</TabsTrigger>
                             </TabsList>
-                            <TabsContent value="day">
-                                <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
-                            </TabsContent>
-                            <TabsContent value="range">
-                                <Calendar mode="range" selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
-                            </TabsContent>
-                            <TabsContent value="month">
-                                <Calendar mode="single" onSelect={setMonth} selected={month} fromDate={startOfMonth(new Date(2020, 0))} toDate={endOfMonth(new Date(2030, 11))} captionLayout="dropdown-buttons" />
-                            </TabsContent>
+                            <TabsContent value="day"><Calendar mode="single" selected={date} onSelect={setDate} initialFocus /></TabsContent>
+                            <TabsContent value="range"><Calendar mode="range" selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></TabsContent>
+                            <TabsContent value="month"><Calendar mode="single" onSelect={setMonth} selected={month} fromDate={startOfMonth(new Date(2020, 0))} toDate={endOfMonth(new Date(2030, 11))} captionLayout="dropdown-buttons" /></TabsContent>
                         </Tabs>
                     </PopoverContent>
                 </Popover>
                 
-                <Select value={filtroBodega} onValueChange={setFiltroBodega}>
-                    <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-100"><SelectValue placeholder="Bodega" /></SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                        <SelectItem value="All">Todas las Bodegas</SelectItem>
-                        {warehouses.map(w => (<SelectItem key={w} value={w}>{w}</SelectItem>))}
-                    </SelectContent>
-                </Select>
-
-                <Select value={filtroProducto} onValueChange={setFiltroProducto}>
-                    <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-100"><SelectValue placeholder="Producto" /></SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                        <SelectItem value="All">Todos los Productos</SelectItem>
-                        {products.map(p => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
-                    </SelectContent>
-                </Select>
+                <Select value={filtroBodega} onValueChange={setFiltroBodega}><SelectTrigger className="bg-slate-950 border-slate-800 text-slate-100"><SelectValue placeholder="Bodega" /></SelectTrigger><SelectContent className="bg-slate-900 border-slate-800 text-slate-100"><SelectItem value="All">Todas las Bodegas</SelectItem>{warehouses.map(w => (<SelectItem key={w} value={w}>{w}</SelectItem>))}</SelectContent></Select>
+                <Select value={filtroProducto} onValueChange={setFiltroProducto}><SelectTrigger className="bg-slate-950 border-slate-800 text-slate-100"><SelectValue placeholder="Producto" /></SelectTrigger><SelectContent className="bg-slate-900 border-slate-800 text-slate-100"><SelectItem value="All">Todos los Productos</SelectItem>{products.map(p => (<SelectItem key={p} value={p}>{p}</SelectItem>))}</SelectContent></Select>
             </div>
         </CardContent>
       </Card>
+      
+      <div className="space-y-4">
+        <h3 className="text-xl font-bold text-slate-200">Resumen por Producto</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {resumenPorProducto.map(prod => (
+            <Card key={prod.name} className="bg-slate-900 border-slate-800 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg text-white flex items-center justify-between">
+                  {prod.name}
+                  <Badge variant="secondary" className="bg-slate-800 text-slate-300">{formatKilos(prod.stockFinal)}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between text-sm text-emerald-400"><span>Entradas Periodo:</span><span>{formatKilos(prod.entradas)}</span></div>
+                <div className="flex justify-between text-sm text-red-400"><span>Salidas Periodo:</span><span>{formatKilos(prod.salidas)}</span></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
 
       <Card className="bg-slate-900 border-slate-800 overflow-hidden shadow-lg">
+        <CardHeader><CardTitle className="text-lg text-slate-200">Detalle Completo (Kardex)</CardTitle></CardHeader>
         <div className="overflow-x-auto relative">
             <Table>
-                <TableHeader className="bg-slate-950/50 sticky top-0 z-10">
-                    <TableRow className="border-slate-800 hover:bg-slate-900">
-                        <TableHead className="text-slate-400 font-bold w-[250px]">Producto / Calibre</TableHead>
-                        <TableHead className="text-slate-400 font-bold">Bodega</TableHead>
-                        <TableHead className="text-right text-slate-500 font-bold">Stock Inicial</TableHead>
-                        <TableHead className="text-right text-emerald-400 font-bold">Entradas</TableHead>
-                        <TableHead className="text-right text-red-400 font-bold">Salidas</TableHead>
-                        <TableHead className="text-right text-blue-400 font-bold text-lg">Stock Final</TableHead>
-                        <TableHead className="text-center">Detalle</TableHead>
-                    </TableRow>
-                </TableHeader>
+                <TableHeader className="bg-slate-950/50 sticky top-0 z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead className="text-slate-400 font-bold w-[250px]">Producto / Calibre</TableHead><TableHead className="text-slate-400 font-bold">Bodega</TableHead><TableHead className="text-right text-slate-500 font-bold">Stock Inicial</TableHead><TableHead className="text-right text-emerald-400 font-bold">Entradas</TableHead><TableHead className="text-right text-red-400 font-bold">Salidas</TableHead><TableHead className="text-right text-blue-400 font-bold text-lg">Stock Final</TableHead><TableHead className="text-center">Detalle</TableHead></TableRow></TableHeader>
                 <TableBody>
                     {datosFiltrados.length === 0 ? (
                         <TableRow><TableCell colSpan={7} className="text-center h-32 text-slate-500">No hay movimientos registrados.</TableCell></TableRow>
                     ) : (
                         datosFiltrados.map((item) => (
                             <TableRow key={item.id} className="border-slate-800 hover:bg-slate-800/50 transition-colors">
-                                <TableCell className="font-medium text-white">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-1.5 bg-blue-500/10 rounded text-blue-500"><Package className="h-4 w-4"/></div>
-                                        <div>
-                                          {item.product}
-                                          <span className="ml-2 text-xs text-slate-500 bg-slate-800/50 px-1.5 py-0.5 rounded border border-slate-700">{item.caliber}</span>
-                                        </div>
-                                    </div>
-                                </TableCell>
+                                <TableCell className="font-medium text-white"><div className="flex items-center gap-2"><div className="p-1.5 bg-blue-500/10 rounded text-blue-500"><Package className="h-4 w-4"/></div><div>{item.product}<span className="ml-2 text-xs text-slate-500 bg-slate-800/50 px-1.5 py-0.5 rounded border border-slate-700">{item.caliber}</span></div></div></TableCell>
                                 <TableCell className="text-slate-400 text-sm">{item.warehouse}</TableCell>
                                 <TableCell className="text-right font-mono text-slate-500">{formatKilos(item.stockInicial)}</TableCell>
-                                <TableCell className="text-right font-mono text-emerald-400">
-                                    {item.entradas > 0 ? `+ ${formatKilos(item.entradas)}` : '-'}
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-red-400">
-                                    {item.salidas > 0 ? `- ${formatKilos(item.salidas)}` : '-'}
-                                </TableCell>
+                                <TableCell className="text-right font-mono text-emerald-400">{item.entradas > 0 ? `+ ${formatKilos(item.entradas)}` : '-'}</TableCell>
+                                <TableCell className="text-right font-mono text-red-400">{item.salidas > 0 ? `- ${formatKilos(item.salidas)}` : '-'}</TableCell>
                                 <TableCell className="text-right font-mono text-lg text-blue-400 font-bold">{formatKilos(item.stockFinal)}</TableCell>
-                                <TableCell className="text-center">
-                                    <Button variant="ghost" size="icon" onClick={() => setItemSeleccionado(item as any)} title="Ver Historial">
-                                        <History className="h-4 w-4 text-slate-500 hover:text-slate-200" />
-                                    </Button>
-                                </TableCell>
+                                <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setItemSeleccionado(item)} title="Ver Historial"><History className="h-4 w-4 text-slate-500 hover:text-slate-200" /></Button></TableCell>
                             </TableRow>
                         ))
                     )}
@@ -381,5 +358,3 @@ export default function InventoryPage() {
     </>
   );
 }
-
-    
