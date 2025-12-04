@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRange } from 'react-day-picker';
-import { addDays, format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
+import { addDays, format, startOfMonth, endOfMonth, isWithinInterval, parseISO, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   Search, Package, Filter, Download, History,
@@ -79,79 +79,80 @@ export default function InventoryPage() {
   const inventoryReport = useMemo(() => {
     if (isLoading || !purchaseOrders || !salesOrders || !inventoryAdjustments) return [];
     
-    const interval = dateRange?.from && dateRange.to ? { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) } : null;
+    const startDate = dateRange?.from ? startOfDay(dateRange.from) : new Date(0);
+    const endDate = dateRange?.to ? endOfDay(dateRange.to) : new Date();
+
+    const normalize = (name?: string) => (name || '').trim().toUpperCase();
     
     const reportMap = new Map<string, InventoryReportItem>();
-    const normalize = (name: string) => (name || '').trim().toUpperCase();
 
-    const allItems = [
-      ...purchaseOrders.flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse || 'Bodega Central', date: o.date, status: o.status, type: 'purchase'}))),
-      ...salesOrders.flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse || 'Bodega Central', date: o.date, status: o.status, type: 'sale'}))),
-      ...inventoryAdjustments.map(a => ({...a, type: 'adjustment'})),
+    const allItemsTx = [
+      ...purchaseOrders.filter(o => o.status === 'completed' || o.status === 'received').flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse, date: o.date, type: 'purchase' }))),
+      ...salesOrders.filter(o => o.status === 'completed' || o.status === 'dispatched' || o.status === 'invoiced').flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse, date: o.date, type: 'sale' }))),
+      ...inventoryAdjustments.map(a => ({...a, type: a.type === 'increase' ? 'adj_in' : 'adj_out'})),
     ];
-    
-    // Primero, poblamos el mapa con todos los productos que han tenido algún movimiento.
-    allItems.forEach(item => {
-      const productName = item.product || item.name;
-      if (!productName || !item.caliber || !item.warehouse) return;
 
-      const key = `${normalize(productName)}::${item.caliber}::${item.warehouse}`;
-      if (!reportMap.has(key)) {
-        reportMap.set(key, {
-            id: key, product: productName, caliber: item.caliber, warehouse: item.warehouse,
-            initialStock: 0, purchases: 0, sales: 0, adjustments: 0, finalStock: 0
-        });
-      }
+    // Populate map with all possible items from transactions
+    allItemsTx.forEach(tx => {
+        const productName = tx.product;
+        if (!productName || !tx.caliber || !tx.warehouse) return;
+        const key = `${normalize(productName)}::${tx.caliber}::${tx.warehouse}`;
+        if (!reportMap.has(key)) {
+            reportMap.set(key, {
+                id: key, product: productName, caliber: tx.caliber, warehouse: tx.warehouse,
+                initialStock: 0, purchases: 0, sales: 0, adjustments: 0, finalStock: 0
+            });
+        }
     });
 
-    // Ahora, procesamos los movimientos dentro del rango de fechas
-    reportMap.forEach(reportItem => {
-        // Entradas (Compras)
-        const purchaseTx = purchaseOrders
-            .filter(o => o.status === 'completed' || o.status === 'received')
-            .flatMap(o => o.items.map(i => ({...i, date: o.date, warehouse: o.warehouse || 'Bodega Central'})))
-            .filter(i => 
-                normalize(i.product) === normalize(reportItem.product) && 
-                i.caliber === reportItem.caliber && 
-                i.warehouse === reportItem.warehouse &&
-                interval && isWithinInterval(parseISO(i.date), interval)
-            );
-        reportItem.purchases = purchaseTx.reduce((sum, item) => sum + item.quantity, 0);
-
-        // Salidas (Ventas)
-        const salesTx = salesOrders
-            .filter(o => o.status === 'completed' || o.status === 'dispatched' || o.status === 'invoiced')
-            .flatMap(o => o.items.map(i => ({...i, date: o.date, warehouse: o.warehouse || 'Bodega Central'})))
-            .filter(i => 
-                normalize(i.product) === normalize(reportItem.product) && 
-                i.caliber === reportItem.caliber && 
-                i.warehouse === reportItem.warehouse &&
-                interval && isWithinInterval(parseISO(i.date), interval)
-            );
-        reportItem.sales = salesTx.reduce((sum, item) => sum + item.quantity, 0);
-        
-        // Ajustes
-        const adjustmentTx = inventoryAdjustments.filter(a => 
-            normalize(a.product) === normalize(reportItem.product) &&
-            a.caliber === reportItem.caliber &&
-            a.warehouse === reportItem.warehouse &&
-            interval && isWithinInterval(parseISO(a.date), interval)
-        );
-        reportItem.adjustments = adjustmentTx.reduce((sum, item) => sum + (item.type === 'increase' ? item.quantity : -item.quantity), 0);
-    });
-
+    // Calculate Initial Stock
     reportMap.forEach(item => {
-        const inventoryItem = inventory?.find(i => 
-            normalize(i.name) === normalize(item.product) && 
-            i.caliber === item.caliber && 
-            i.warehouse === item.warehouse
-        );
-        item.finalStock = inventoryItem?.stock || 0; // Usar stock en vivo
-        item.initialStock = item.finalStock - item.purchases + item.sales - item.adjustments;
+        const key = item.id;
+        let initial = 0;
+
+        const txsBeforePeriod = allItemsTx.filter(tx => {
+            const txKey = `${normalize(tx.product)}::${tx.caliber}::${tx.warehouse}`;
+            return txKey === key && isBefore(parseISO(tx.date), startDate);
+        });
+
+        txsBeforePeriod.forEach(tx => {
+            if (tx.type === 'purchase' || tx.type === 'adj_in') {
+                initial += tx.quantity;
+            } else if (tx.type === 'sale' || tx.type === 'adj_out') {
+                initial -= tx.quantity;
+            }
+        });
+        item.initialStock = initial;
+    });
+
+    // Calculate movements within the period
+    reportMap.forEach(item => {
+        const key = item.id;
+        const txsInPeriod = allItemsTx.filter(tx => {
+            const txKey = `${normalize(tx.product)}::${tx.caliber}::${tx.warehouse}`;
+            return txKey === key && isWithinInterval(parseISO(tx.date), { start: startDate, end: endDate });
+        });
+
+        txsInPeriod.forEach(tx => {
+            if (tx.type === 'purchase') {
+                item.purchases += tx.quantity;
+            } else if (tx.type === 'sale') {
+                item.sales += tx.quantity;
+            } else if (tx.type === 'adj_in') {
+                item.adjustments += tx.quantity;
+            } else if (tx.type === 'adj_out') {
+                item.adjustments -= tx.quantity;
+            }
+        });
+    });
+
+    // Calculate Final Stock
+    reportMap.forEach(item => {
+        item.finalStock = item.initialStock + item.purchases + item.sales + item.adjustments;
     });
 
     return Array.from(reportMap.values());
-  }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, dateRange, inventory]);
+  }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, dateRange]);
   
 
   // 4. Filtering for Display
