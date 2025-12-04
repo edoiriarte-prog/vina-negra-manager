@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, ShoppingCart, Truck, AlertCircle, Info, PackageCheck, DollarSign, CreditCard } from "lucide-react";
+import { Trash2, Plus, Users, Truck, Info, PackageCheck, DollarSign, CreditCard, CalendarIcon, Warehouse } from "lucide-react";
 import { 
   SalesOrder, 
   Contact, 
@@ -43,7 +43,6 @@ interface NewSalesOrderSheetProps {
   contacts?: Contact[];
 }
 
-// Clonado de purchases
 type SalesOrderFormData = Partial<Omit<SalesOrder, 'id' | 'items'>> & {
   items: OrderItem[];
 };
@@ -54,7 +53,7 @@ const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder
         return {
             ...order,
             date: order.date ? format(new Date(order.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-            items: order.items || [],
+            items: order.items.map(item => ({...item, total: (item.quantity || 0) * (item.price || 0)})) || [],
         };
     }
     
@@ -98,22 +97,25 @@ export function NewSalesOrderSheet({
   const isDispatch = sheetType === 'dispatch';
 
   const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order, salesOrders));
+  const [items, setItems] = useState<OrderItem[]>(order?.items || []);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-        setFormData(getInitialFormData(order, salesOrders));
+      const initialData = getInitialFormData(order, salesOrders);
+      setFormData(initialData);
+      setItems(initialData.items);
     }
   }, [order, isOpen, salesOrders]);
 
 
   const handleItemChange = (index: number, field: keyof OrderItem, value: any) => {
-    const newItems = [...formData.items];
+    const newItems = [...items];
     const item = { ...newItems[index] };
     (item as any)[field] = value;
     item.total = (item.quantity || 0) * (item.price || 0);
     newItems[index] = item;
-    setFormData(prev => ({ ...prev, items: newItems }));
+    setItems(newItems);
   };
 
   const handleMatrixSave = (matrixItems: Omit<OrderItem, 'id'>[]) => {
@@ -122,7 +124,7 @@ export function NewSalesOrderSheet({
         id: `temp-${Date.now()}-${Math.random()}`,
         total: (item.quantity || 0) * (item.price || 0)
     }));
-    setFormData(prev => ({...prev, items: [...(prev.items || []), ...newItems]}));
+    setItems(prev => [...prev, ...newItems]);
     setIsMatrixOpen(false);
   }
   
@@ -137,7 +139,7 @@ export function NewSalesOrderSheet({
 
 
   const removeItem = (index: number) => {
-    setFormData(prev => ({...prev, items: (prev.items || []).filter((_, i) => i !== index)}));
+    setItems(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -146,27 +148,28 @@ export function NewSalesOrderSheet({
         toast({ variant: "destructive", title: "Falta Cliente", description: "Selecciona un cliente." });
         return;
     }
-    if ((formData.items || []).length === 0) {
+    if (items.length === 0) {
         toast({ variant: "destructive", title: "Orden Vacía", description: "Agrega al menos un producto." });
         return;
     }
     
-    // Cálculos finales basados en los items del estado
-    const netAmount = (formData.items || []).reduce((sum, item) => sum + item.total, 0);
-    const totalKilos = (formData.items || []).reduce((acc, item) => acc + item.quantity, 0);
-    const totalPackages = (formData.items || []).reduce((acc, item) => acc + (item.packagingQuantity || 0), 0);
+    const netAmount = items.reduce((sum, item) => sum + (item.total || 0), 0);
+    const totalKilos = items.reduce((acc, item) => acc + (item.quantity || 0), 0);
+    const totalPackages = items.reduce((acc, item) => acc + (item.packagingQuantity || 0), 0);
+
+    const safeNumber = formData.number || `OV-${Date.now()}`;
 
     const finalOrder: any = {
         ...formData,
-        id: order?.id || formData.number,
-        number: formData.number,
+        id: order?.id || safeNumber,
+        number: safeNumber,
+        items: items,
         totalAmount: netAmount, 
         totalKilos,
         totalPackages,
         status: formData.status || 'pending',
     };
 
-    // Limpiar campos undefined
     Object.keys(finalOrder).forEach(key => {
         if (finalOrder[key] === undefined) {
             delete finalOrder[key];
@@ -177,8 +180,8 @@ export function NewSalesOrderSheet({
   };
 
   const netTotal = useMemo(() => {
-    return (formData.items || []).reduce((sum, item) => sum + (item.total || 0), 0);
-  }, [formData.items]);
+    return items.reduce((sum, item) => sum + (item.total || 0), 0);
+  }, [items]);
   
   const { vatAmount, finalTotalWithVat } = useMemo(() => {
       const vat = formData.includeVat ? netTotal * 0.19 : 0;
@@ -271,7 +274,7 @@ export function NewSalesOrderSheet({
                     </Button>
                 </div>
                  <div className="p-0">
-                    {(formData.items || []).length === 0 ? (
+                    {items.length === 0 ? (
                         <div className="py-16 text-center text-slate-500 bg-slate-950/50 flex flex-col items-center">
                             <PackageCheck className="h-12 w-12 mb-3 opacity-20" />
                             <p className="text-lg font-medium">No hay productos agregados</p>
@@ -291,7 +294,7 @@ export function NewSalesOrderSheet({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800 bg-slate-900/30">
-                                    {(formData.items || []).map((item, index) => (
+                                    {items.map((item, index) => (
                                         <tr key={index} className="hover:bg-slate-800/50 transition-colors">
                                             <td className="px-4 py-2 font-medium text-slate-200">{item.product}</td>
                                             <td className="px-4 py-2 text-slate-400">{item.caliber}</td>
@@ -369,7 +372,7 @@ export function NewSalesOrderSheet({
 
             <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
               <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={(formData.items || []).length === 0}>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={items.length === 0}>
                   {order ? 'Guardar Cambios' : `Crear ${isDispatch ? 'Despacho' : 'Venta'}`}
               </Button>
             </SheetFooter>
@@ -387,3 +390,5 @@ export function NewSalesOrderSheet({
     </>
   );
 }
+
+    
