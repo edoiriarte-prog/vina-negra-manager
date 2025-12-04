@@ -4,13 +4,13 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useOperations } from '@/hooks/use-operations';
 import { useMasterData } from '@/hooks/use-master-data';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRange } from 'react-day-picker';
-import { format, startOfMonth, endOfMonth, isBefore, isAfter, startOfDay, endOfDay, isEqual, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isBefore, isAfter, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   Search, Package, Filter, Download, History,
@@ -19,13 +19,15 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
-import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
+
 
 // --- DEFINICIÓN DE TIPOS LIMPIA ---
 type InventoryReportItem = {
@@ -46,15 +48,17 @@ type ProductSummaryItem = {
 };
 type FilterMode = "day" | "range" | "month";
 
-// --- AYUDAS VISUALES ---
-const formatKilos = (val: number) => new Intl.NumberFormat('es-CL').format(Math.round(val)) + ' kg';
-const normalize = (str?: string) => (str || '').trim().toUpperCase();
+
 const parseDateAsLocal = (dateString: string) => {
     if (!dateString) return new Date(0);
     // Agrega T12:00:00 para forzar la interpretación en la zona horaria local
     // y evitar que se mueva al día anterior.
     return new Date(`${dateString}T12:00:00`);
 };
+
+// --- AYUDAS VISUALES ---
+const formatKilos = (val: number) => new Intl.NumberFormat('es-CL').format(Math.round(val)) + ' kg';
+const normalize = (str?: string) => (str || '').trim().toUpperCase();
 
 export default function InventoryPage() {
   const { toast } = useToast();
@@ -83,12 +87,12 @@ export default function InventoryPage() {
     let fechaInicio: Date, fechaFin: Date;
     switch (filterMode) {
         case 'day':
-            fechaInicio = startOfDay(date || new Date());
-            fechaFin = endOfDay(date || new Date());
+            fechaInicio = parseDateAsLocal(format(date || new Date(), 'yyyy-MM-dd'));
+            fechaFin = fechaInicio;
             break;
         case 'range':
-            fechaInicio = startOfDay(dateRange?.from || new Date(0));
-            fechaFin = endOfDay(dateRange?.to || new Date());
+            fechaInicio = parseDateAsLocal(format(dateRange?.from || new Date(0), 'yyyy-MM-dd'));
+            fechaFin = parseDateAsLocal(format(dateRange?.to || new Date(), 'yyyy-MM-dd'));
             break;
         case 'month':
             fechaInicio = startOfMonth(month || new Date());
@@ -98,71 +102,76 @@ export default function InventoryPage() {
             fechaInicio = new Date(0);
             fechaFin = new Date();
     }
+    
+    const reportMap = new Map<string, InventoryReportItem>();
 
-    const mapaKardex = new Map<string, InventoryReportItem>();
-
-    const procesarMovimiento = (
-        fechaStr: string, 
-        producto: string,
-        calibre: string, 
-        bodega: string, 
-        cantidad: number, 
-        tipo: 'ENTRADA' | 'SALIDA'
-    ) => {
-        if (!producto || !calibre || !bodega || !fechaStr) return;
-        
-        const clave = `${normalize(producto)}|${normalize(calibre)}|${normalize(bodega)}`;
-
-        if (!mapaKardex.has(clave)) {
-            mapaKardex.set(clave, {
-                id: clave, product: producto, caliber: calibre, warehouse: bodega,
-                stockInicial: 0, entradas: 0, salidas: 0, stockFinal: 0
-            });
-        }
-
-        const item = mapaKardex.get(clave)!;
-        const fechaMov = parseDateAsLocal(fechaStr);
-
-        if (isBefore(fechaMov, fechaInicio)) {
-            if (tipo === 'ENTRADA') item.stockInicial += cantidad;
-            else item.stockInicial -= cantidad;
-        } else if (!isAfter(fechaMov, fechaFin)) {
-            if (tipo === 'ENTRADA') item.entradas += cantidad;
-            else item.salidas += cantidad;
-        }
-    };
+    const allMovements: { date: Date, product: string, caliber: string, warehouse: string, quantity: number, type: 'ENTRADA' | 'SALIDA' }[] = [];
 
     purchaseOrders.forEach(oc => {
         if (oc.status === 'received' || oc.status === 'completed') {
-            oc.items.forEach(linea => procesarMovimiento(oc.date, linea.product, linea.caliber, oc.warehouse, Number(linea.quantity), 'ENTRADA'));
+            oc.items.forEach(linea => {
+                allMovements.push({
+                    date: parseDateAsLocal(oc.date),
+                    product: linea.product, caliber: linea.caliber, warehouse: oc.warehouse,
+                    quantity: Number(linea.quantity), type: 'ENTRADA'
+                });
+            });
         }
     });
+
     salesOrders.forEach(ov => {
         if (ov.status === 'dispatched' || ov.status === 'completed' || ov.status === 'invoiced') {
             if (ov.saleType === 'Traslado Bodega Interna') {
                  ov.items.forEach(linea => {
-                    procesarMovimiento(ov.date, linea.product, linea.caliber, ov.warehouse!, Number(linea.quantity), 'SALIDA');
-                    procesarMovimiento(ov.date, linea.product, linea.caliber, ov.destinationWarehouse!, Number(linea.quantity), 'ENTRADA');
+                    allMovements.push({ date: parseDateAsLocal(ov.date), product: linea.product, caliber: linea.caliber, warehouse: ov.warehouse!, quantity: Number(linea.quantity), type: 'SALIDA' });
+                    allMovements.push({ date: parseDateAsLocal(ov.date), product: linea.product, caliber: linea.caliber, warehouse: ov.destinationWarehouse!, quantity: Number(linea.quantity), type: 'ENTRADA' });
                  });
             } else {
-                ov.items.forEach(linea => procesarMovimiento(ov.date, linea.product, linea.caliber, ov.warehouse!, Number(linea.quantity), 'SALIDA'));
+                ov.items.forEach(linea => {
+                    allMovements.push({ date: parseDateAsLocal(ov.date), product: linea.product, caliber: linea.caliber, warehouse: ov.warehouse!, quantity: Number(linea.quantity), type: 'SALIDA' });
+                });
             }
         }
     });
+
     inventoryAdjustments.forEach(adj => {
-        const tipo = adj.type === 'increase' ? 'ENTRADA' : 'SALIDA';
-        procesarMovimiento(adj.date, adj.product, adj.caliber, adj.warehouse, Number(adj.quantity), tipo);
+        allMovements.push({
+            date: parseDateAsLocal(adj.date), product: adj.product, caliber: adj.caliber, warehouse: adj.warehouse,
+            quantity: Number(adj.quantity), type: adj.type === 'increase' ? 'ENTRADA' : 'SALIDA'
+        });
+    });
+
+    allMovements.forEach(mov => {
+        if (!mov.product || !mov.caliber || !mov.warehouse) return;
+        
+        const clave = `${normalize(mov.product)}|${normalize(mov.caliber)}|${normalize(mov.warehouse)}`;
+        if (!reportMap.has(clave)) {
+            reportMap.set(clave, {
+                id: clave, product: mov.product, caliber: mov.caliber, warehouse: mov.warehouse,
+                stockInicial: 0, entradas: 0, salidas: 0, stockFinal: 0
+            });
+        }
+        
+        const item = reportMap.get(clave)!;
+        const movDate = mov.date;
+        
+        if (isBefore(movDate, fechaInicio)) {
+            item.stockInicial += (mov.type === 'ENTRADA' ? mov.quantity : -mov.quantity);
+        } else if (movDate >= fechaInicio && movDate <= fechaFin) {
+            if (mov.type === 'ENTRADA') item.entradas += mov.quantity;
+            else item.salidas += mov.quantity;
+        }
     });
 
     const reporte: InventoryReportItem[] = [];
-    mapaKardex.forEach(item => {
+    reportMap.forEach(item => {
         item.stockFinal = item.stockInicial + item.entradas - item.salidas;
         if (item.stockInicial !== 0 || item.entradas !== 0 || item.salidas !== 0 || item.stockFinal !== 0) {
             reporte.push(item);
         }
     });
 
-    return reporte.sort((a,b) => a.product.localeCompare(b.product) || a.caliber.localeCompare(b.caliber));
+    return reporte.sort((a, b) => a.product.localeCompare(b.product) || a.caliber.localeCompare(b.caliber));
   }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, date, dateRange, month, filterMode]);
   
   // 4. FILTRADO VISUAL Y AGRUPACIONES
@@ -217,7 +226,7 @@ export default function InventoryPage() {
   
   const displayDate = useMemo(() => {
     switch (filterMode) {
-      case 'day': return date ? format(date, "dd 'de' MMM, yyyy", { locale: es }) : "Seleccione día";
+      case 'day': return date ? format(date, "dd 'de' MMMM, yyyy", { locale: es }) : "Seleccione día";
       case 'range': return dateRange?.from ? (dateRange.to ? `${format(dateRange.from, "dd MMM")} - ${format(dateRange.to, "dd MMM, yyyy")}` : format(dateRange.from, "dd MMM, yyyy")) : "Seleccione rango";
       case 'month': return month ? format(month, "MMMM yyyy", { locale: es }) : "Seleccione mes";
       default: return "Seleccione fecha";
@@ -359,4 +368,3 @@ export default function InventoryPage() {
     </>
   );
 }
-
