@@ -130,9 +130,20 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
   const getAvailableStock = (caliber: string) => {
     if (!inventory || orderType !== 'sale' || !selectedProduct) return null;
     
+    // DEBUG: Console log para verificar datos de entrada.
+    console.log('Comparando:', selectedProduct, 'con inventario:', inventory);
+
+    const normalizedSelectedProduct = selectedProduct.trim().toUpperCase();
+
     const stock = inventory
-        .filter(item => item.name === selectedProduct && item.caliber === caliber)
-        .reduce((sum, item) => sum + item.stock, 0);
+        .filter(item => 
+            item &&
+            item.name &&
+            item.caliber &&
+            item.name.trim().toUpperCase() === normalizedSelectedProduct && 
+            item.caliber === caliber
+        )
+        .reduce((sum, item) => sum + (item.stock || 0), 0);
         
     return stock;
   }
@@ -280,3 +291,5 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
     </Dialog>
   );
 }
+
+    
