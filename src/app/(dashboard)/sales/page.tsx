@@ -2,13 +2,14 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { SalesOrder, Contact, OrderItem } from "@/lib/types"; 
+import { useRouter } from "next/navigation";
+import { SalesOrder, Contact } from "@/lib/types"; 
 import { getColumns } from "./components/columns"; 
 import { DataTable } from "./components/data-table"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { useOperations } from "@/hooks/use-operations";
 import { Button } from "@/components/ui/button";
-import { Plus, TrendingUp, Clock, Truck, Search } from "lucide-react";
+import { Plus, TrendingUp, Search, DollarSign } from "lucide-react";
 import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
 import { SalesOrderPreview } from "./components/sales-order-preview"; 
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,98 +24,69 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-// Importaciones de Firebase directo (Reemplaza a useSalesOrdersCRUD)
-import { useFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { useFirebase, deleteDocumentNonBlocking } from "@/firebase";
+import { doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
 import * as XLSX from 'xlsx';
 import { format, parseISO } from "date-fns";
 
 export default function SalesPage() {
   const { firestore } = useFirebase();
+  const router = useRouter();
   const { toast } = useToast();
 
-  // 1. CARGAR DATOS (Solo de la nube)
   const { salesOrders, purchaseOrders, inventoryAdjustments, isLoading: loadingOps } = useOperations();
   const { contacts, inventory, isLoading: loadingMaster } = useMasterData();
+  const { createSalesOrder, updateSalesOrder } = useSalesOrdersCRUD();
   
   const isLoading = loadingOps || loadingMaster;
 
-  // 2. FILTROS
   const clients = useMemo(() => contacts?.filter(c => Array.isArray(c.type) ? c.type.includes('client') : c.type === 'client') || [], [contacts]);
-  // Solo mostramos ventas reales (no despachos internos)
   const salesList = useMemo(() => salesOrders.filter(o => o.orderType !== 'dispatch' && o.status !== 'cancelled'), [salesOrders]);
 
-  // 3. ESTADOS
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [previewOrder, setPreviewOrder] = useState<SalesOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 4. KPIS
-  const totalAmount = salesList.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
-  const pendingCount = salesList.filter(o => o.status === 'pending').length;
-  const completedCount = salesList.filter(o => o.status === 'dispatched' || o.status === 'completed').length;
+  const { totalNetAmount, totalGrossAmount } = useMemo(() => {
+    if (!salesList) return { totalNetAmount: 0, totalGrossAmount: 0 };
+    return salesList.reduce((acc, order) => {
+        const netAmount = order.totalAmount || 0;
+        acc.totalNetAmount += netAmount;
+        if (order.includeVat !== false) {
+            acc.totalGrossAmount += netAmount * 1.19;
+        } else {
+            acc.totalGrossAmount += netAmount;
+        }
+        return acc;
+    }, { totalNetAmount: 0, totalGrossAmount: 0 });
+  }, [salesList]);
 
   const filteredOrders = salesList.filter((o) => {
       const clientName = clients.find(c => c.id === o.clientId)?.name || 'Cliente Desconocido';
-      return o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             (o.number && o.number.toLowerCase().includes(searchTerm.toLowerCase()));
+      const searchTermLower = searchTerm.toLowerCase();
+      return (o.id || '').toLowerCase().includes(searchTermLower) ||
+             clientName.toLowerCase().includes(searchTermLower) ||
+             (o.number && o.number.toLowerCase().includes(searchTermLower));
   });
 
-  // 5. HANDLERS (Lógica CRUD)
-
-  const handleSave = (orderData: SalesOrder | Omit<SalesOrder, "id">) => {
-    if (!firestore) return;
-
-    // Validación de Stock (Usando inventory real de la nube)
-    if (orderData.items) {
-        for (const item of orderData.items) {
-            const inventoryItem = inventory.find(i => 
-                i.name === item.product && 
-                i.caliber === item.caliber && 
-                i.warehouse === (orderData.warehouse || 'Principal')
-            );
-            
-            const currentStock = inventoryItem ? inventoryItem.stock : 0;
-            
-            // Si editamos, sumamos lo que ya teníamos reservado
-            let quantityInOrder = 0;
-            if('id' in orderData && editingOrder) {
-                const oldItem = editingOrder.items.find(old => old.product === item.product && old.caliber === item.caliber);
-                quantityInOrder = oldItem ? oldItem.quantity : 0;
-            }
-
-            if (item.quantity > (currentStock + quantityInOrder)) {
-                toast({
-                    variant: "destructive",
-                    title: "Stock Insuficiente",
-                    description: `No hay suficiente ${item.product} ${item.caliber}. Disponible: ${currentStock} kg.`,
-                });
-                return;
-            }
+  const handleSave = async (orderData: SalesOrder | Omit<SalesOrder, "id">) => {
+    try {
+        if ('id' in orderData) {
+            await updateSalesOrder(orderData.id, orderData as SalesOrder);
+        } else {
+            await createSalesOrder(orderData as SalesOrder);
         }
+        router.refresh();
+    } catch (error) {
+      console.error("Error al guardar:", error);
+    } finally {
+      setIsSheetOpen(false);
+      setEditingOrder(null);
     }
-
-    const finalOrderData: any = {
-        ...orderData,
-        orderType: 'sale',
-        // Asegurar números
-        totalKilos: orderData.items.reduce((acc, item) => acc + item.quantity, 0),
-        totalPackages: orderData.items.reduce((acc, item) => acc + (item.packagingQuantity || 0), 0),
-    };
-
-    if ('id' in orderData) {
-      updateDocumentNonBlocking(doc(firestore, 'salesOrders', orderData.id), finalOrderData);
-      toast({ title: "Venta Actualizada", description: "Los cambios se han guardado correctamente." });
-    } else {
-      addDocumentNonBlocking(collection(firestore, 'salesOrders'), finalOrderData);
-      toast({ title: "Venta Creada", description: "La venta se ha registrado exitosamente." });
-    }
-    setIsSheetOpen(false);
-    setEditingOrder(null);
   };
   
   const handleEdit = (order: SalesOrder) => {
@@ -136,6 +108,7 @@ export default function SalesPage() {
           await deleteDocumentNonBlocking(doc(firestore, 'salesOrders', deletingOrder.id));
           toast({ variant: "destructive", title: "Venta Eliminada", description: "La orden ha sido eliminada." });
           setDeletingOrder(null);
+          router.refresh();
       }
   }
 
@@ -158,7 +131,6 @@ export default function SalesPage() {
     XLSX.writeFile(workbook, `Venta_${orderToExport.number || orderToExport.id}.xlsx`);
   };
 
-  // Columnas para la tabla
   const columns = useMemo(() => getColumns({
       onEdit: handleEdit,
       onDelete: handleDeleteRequest,
@@ -166,7 +138,6 @@ export default function SalesPage() {
       clients: clients 
   }), [clients]);
 
-  // Estilos
   const cardClass = "bg-slate-900 border-slate-800 shadow-sm hover:border-slate-700 transition-all";
 
   return (
@@ -182,41 +153,31 @@ export default function SalesPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-        <Card className={cardClass}>
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-              <TrendingUp className="h-8 w-8 text-emerald-500" />
+            <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+              <TrendingUp className="h-8 w-8 text-blue-500" />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Ventas</p>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Neto Ventas</p>
               <h3 className="text-2xl font-bold text-white">
-                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalAmount)}
+                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalNetAmount)}
               </h3>
             </div>
           </CardContent>
         </Card>
-
+        
         <Card className={cardClass}>
           <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
-              <Clock className="h-8 w-8 text-yellow-500" />
+            <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+              <DollarSign className="h-8 w-8 text-emerald-500" />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Pendientes</p>
-              <h3 className="text-2xl font-bold text-white">{pendingCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={cardClass}>
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-              <Truck className="h-8 w-8 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Despachadas</p>
-              <h3 className="text-2xl font-bold text-white">{completedCount} <span className="text-sm font-normal text-slate-500">órdenes</span></h3>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total c/IVA Ventas</p>
+              <h3 className="text-2xl font-bold text-white">
+                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(totalGrossAmount)}
+              </h3>
             </div>
           </CardContent>
         </Card>
@@ -247,7 +208,7 @@ export default function SalesPage() {
         onSave={handleSave}
         order={editingOrder}
         clients={clients}
-        inventory={inventory} // INVENTARIO DE LA NUBE
+        inventory={inventory}
         sheetType="sale"
         purchaseOrders={purchaseOrders}
         salesOrders={salesOrders}
@@ -259,7 +220,6 @@ export default function SalesPage() {
           <SalesOrderPreview
             order={previewOrder}
             isOpen={!!previewOrder}
-            // CIERRE CORRECTO
             onOpenChange={(open) => !open && setPreviewOrder(null)}
             onExportRequest={() => handleExport(previewOrder)}
           />
