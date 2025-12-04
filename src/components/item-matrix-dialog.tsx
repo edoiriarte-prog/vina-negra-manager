@@ -21,7 +21,7 @@ import {
 import { useMasterData } from '@/hooks/use-master-data';
 import { OrderItem, InventoryItem } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Package, Calculator, X, Warehouse } from 'lucide-react';
+import { Package, Calculator, X } from 'lucide-react';
 
 const SmartInput = ({ value, onChange, className, placeholder }: { value: number; onChange: (val: number) => void; className?: string; placeholder?: string; }) => {
     const [inputValue, setInputValue] = useState<string>(value === 0 ? '' : value.toString());
@@ -130,9 +130,20 @@ export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType, inve
   const getAvailableStock = (caliber: string) => {
     if (!inventory || orderType !== 'sale' || !selectedProduct) return null;
     
+    // DEBUG: Console log para verificar datos de entrada.
+    console.log('Buscando stock para:', selectedProduct, 'Calibre:', caliber);
+
+    const normalizedSelectedProduct = selectedProduct.trim().toUpperCase();
+
     const stock = inventory
-        .filter(item => item.name === selectedProduct && item.caliber === caliber)
-        .reduce((sum, item) => sum + item.stock, 0);
+        .filter(item => 
+            item &&
+            item.name &&
+            item.caliber &&
+            item.name.trim().toUpperCase() === normalizedSelectedProduct && 
+            item.caliber === caliber
+        )
+        .reduce((sum, item) => sum + (item.stock || 0), 0);
         
     return stock;
   }
