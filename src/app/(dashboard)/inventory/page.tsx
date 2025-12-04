@@ -168,10 +168,17 @@ export default function InventoryPage() {
     const normalizationPromises: Promise<void>[] = [];
 
     inventory.forEach(item => {
+      // **FIX:** Add a guard clause to ensure item and item.name exist
+      if (!item || !item.name) {
+        return; // Skip this item if it's invalid
+      }
+      
       let newName = item.name;
-      if (item.name.toUpperCase().trim() === 'PALTAS') {
+      const normalizedName = item.name.toUpperCase().trim();
+
+      if (normalizedName === 'PALTAS') {
         newName = 'PALTA HASS';
-      } else if (item.name.toUpperCase().trim() === 'MANDARINA') {
+      } else if (normalizedName === 'MANDARINA') {
         newName = 'MANDARINAS';
       }
 
