@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useOperations } from '@/hooks/use-operations';
 import { useMasterData } from '@/hooks/use-master-data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
@@ -38,20 +40,12 @@ type InventoryReportItem = {
     salidas: number;
     stockFinal: number;
 };
+type FilterMode = "day" | "range" | "month";
 
 // --- AYUDAS VISUALES ---
 const formatKilos = (val: number) => new Intl.NumberFormat('es-CL').format(Math.round(val)) + ' kg';
 const normalize = (str?: string) => (str || '').trim().toUpperCase();
-
-// --- **SOLUCIÓN AL BUG DE FECHAS** ---
-// Esta función parsea el string 'YYYY-MM-DD' como una fecha local al mediodía,
-// evitando que el desfase de zona horaria la mueva al día anterior.
-const parseDateAsLocal = (dateString: string) => {
-    if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-        return new Date(0); // Devuelve una fecha inválida o muy antigua si el formato es incorrecto
-    }
-    return new Date(`${dateString}T12:00:00`);
-};
+const parseDateAsLocal = (dateString: string) => new Date(`${dateString}T12:00:00`);
 
 
 export default function InventoryPage() {
@@ -64,10 +58,11 @@ export default function InventoryPage() {
   const isLoading = loadingOps || loadingMaster;
   
   // 2. FILTROS
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
+  const [filterMode, setFilterMode] = useState<FilterMode>("day");
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) });
+  const [month, setMonth] = useState<Date | undefined>(new Date());
+
   const [filtroBodega, setFiltroBodega] = useState<string>("All");
   const [filtroProducto, setFiltroProducto] = useState<string>("All");
   const [busqueda, setBusqueda] = useState("");
@@ -77,8 +72,25 @@ export default function InventoryPage() {
   const kardexData = useMemo(() => {
     if (isLoading || !purchaseOrders || !salesOrders || !inventoryAdjustments) return [];
     
-    const fechaInicio = dateRange?.from ? startOfDay(dateRange.from) : new Date(0);
-    const fechaFin = dateRange?.to ? endOfDay(dateRange.to) : new Date();
+    let fechaInicio: Date, fechaFin: Date;
+    
+    switch (filterMode) {
+        case 'day':
+            fechaInicio = startOfDay(date || new Date());
+            fechaFin = endOfDay(date || new Date());
+            break;
+        case 'range':
+            fechaInicio = startOfDay(dateRange?.from || new Date(0));
+            fechaFin = endOfDay(dateRange?.to || new Date());
+            break;
+        case 'month':
+            fechaInicio = startOfMonth(month || new Date());
+            fechaFin = endOfMonth(month || new Date());
+            break;
+        default:
+            fechaInicio = new Date(0);
+            fechaFin = new Date();
+    }
 
     const mapaKardex = new Map<string, InventoryReportItem>();
 
@@ -90,6 +102,7 @@ export default function InventoryPage() {
         cantidad: number, 
         tipo: 'ENTRADA' | 'SALIDA'
     ) => {
+        if (!producto || !calibre || !bodega || !fechaStr) return;
         const prodNorm = normalize(producto);
         const calNorm = normalize(calibre);
         const bodNorm = normalize(bodega);
@@ -121,46 +134,28 @@ export default function InventoryPage() {
         }
     };
 
-    // A. PROCESAR COMPRAS (ENTRADAS)
     purchaseOrders.forEach(oc => {
         if (oc.status === 'received' || oc.status === 'completed') {
-            oc.items.forEach(linea => {
-                if (linea.product && linea.caliber && oc.warehouse) {
-                    procesarMovimiento(oc.date, linea.product, linea.caliber, oc.warehouse, Number(linea.quantity), 'ENTRADA');
-                }
-            });
+            oc.items.forEach(linea => procesarMovimiento(oc.date, linea.product, linea.caliber, oc.warehouse, Number(linea.quantity), 'ENTRADA'));
         }
     });
-
-    // B. PROCESAR VENTAS (SALIDAS)
     salesOrders.forEach(ov => {
         if (ov.status === 'dispatched' || ov.status === 'completed' || ov.status === 'invoiced') {
             if (ov.saleType === 'Traslado Bodega Interna') {
                  ov.items.forEach(linea => {
-                    if (linea.product && linea.caliber && ov.warehouse && ov.destinationWarehouse) {
-                        procesarMovimiento(ov.date, linea.product, linea.caliber, ov.warehouse, Number(linea.quantity), 'SALIDA');
-                        procesarMovimiento(ov.date, linea.product, linea.caliber, ov.destinationWarehouse, Number(linea.quantity), 'ENTRADA');
-                    }
+                    procesarMovimiento(ov.date, linea.product, linea.caliber, ov.warehouse!, Number(linea.quantity), 'SALIDA');
+                    procesarMovimiento(ov.date, linea.product, linea.caliber, ov.destinationWarehouse!, Number(linea.quantity), 'ENTRADA');
                  });
             } else {
-                ov.items.forEach(linea => {
-                    if (linea.product && linea.caliber && ov.warehouse) {
-                        procesarMovimiento(ov.date, linea.product, linea.caliber, ov.warehouse, Number(linea.quantity), 'SALIDA');
-                    }
-                });
+                ov.items.forEach(linea => procesarMovimiento(ov.date, linea.product, linea.caliber, ov.warehouse!, Number(linea.quantity), 'SALIDA'));
             }
         }
     });
-
-    // C. PROCESAR AJUSTES
     inventoryAdjustments.forEach(adj => {
-        if (adj.product && adj.caliber && adj.warehouse) {
-            const tipo = adj.type === 'increase' ? 'ENTRADA' : 'SALIDA';
-            procesarMovimiento(adj.date, adj.product, adj.caliber, adj.warehouse, Number(adj.quantity), tipo);
-        }
+        const tipo = adj.type === 'increase' ? 'ENTRADA' : 'SALIDA';
+        procesarMovimiento(adj.date, adj.product, adj.caliber, adj.warehouse, Number(adj.quantity), tipo);
     });
 
-    // D. ARRAY FINAL
     const reporte: InventoryReportItem[] = [];
     mapaKardex.forEach(item => {
         item.stockFinal = item.stockInicial + item.entradas - item.salidas;
@@ -171,7 +166,7 @@ export default function InventoryPage() {
 
     return reporte.sort((a,b) => a.product.localeCompare(b.product) || a.caliber.localeCompare(b.caliber));
 
-  }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, dateRange]);
+  }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, date, dateRange, month, filterMode]);
   
 
   // 4. FILTRADO VISUAL Y TOTALES
@@ -199,7 +194,6 @@ export default function InventoryPage() {
     };
   }, [kardexData, filtroBodega, filtroProducto, busqueda]);
 
-  // 5. EXPORTAR Y NORMALIZAR
   const handleExport = () => {
     const dataToExport = datosFiltrados.map(item => ({
         'Producto': item.product,
@@ -216,6 +210,15 @@ export default function InventoryPage() {
     XLSX.writeFile(wb, `Kardex_AVN_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
     toast({ title: "Exportado", description: "Reporte generado correctamente." });
   };
+  
+  const displayDate = useMemo(() => {
+    switch (filterMode) {
+      case 'day': return date ? format(date, "dd 'de' MMM, yyyy", { locale: es }) : "Seleccione día";
+      case 'range': return dateRange?.from ? (dateRange.to ? `${format(dateRange.from, "dd MMM")} - ${format(dateRange.to, "dd MMM, yyyy")}` : format(dateRange.from, "dd MMM, yyyy")) : "Seleccione rango";
+      case 'month': return month ? format(month, "MMMM yyyy", { locale: es }) : "Seleccione mes";
+      default: return "Seleccione fecha";
+    }
+  }, [filterMode, date, dateRange, month]);
   
   if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
 
@@ -268,13 +271,28 @@ export default function InventoryPage() {
                 </div>
                 <Popover>
                     <PopoverTrigger asChild>
-                        <Button id="date" variant={"outline"} className={cn("justify-start text-left font-normal bg-slate-950 border-slate-800 text-slate-200 hover:bg-slate-800", !dateRange && "text-muted-foreground" )}>
+                        <Button id="date" variant={"outline"} className={cn("justify-start text-left font-normal bg-slate-950 border-slate-800 text-slate-200 hover:bg-slate-800", !date && !dateRange && !month && "text-muted-foreground" )}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {dateRange?.from ? (dateRange.to ? (<>{format(dateRange.from, "dd/MM/yy")} - {format(dateRange.to, "dd/MM/yy")}</>) : (format(dateRange.from, "dd/MM/yy"))) : (<span>Seleccione fecha</span>)}
+                            {displayDate}
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-700" align="start">
-                        <Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2}/>
+                        <Tabs value={filterMode} onValueChange={(v) => setFilterMode(v as FilterMode)} className="w-full">
+                            <TabsList className="grid w-full grid-cols-3 bg-slate-950 border-b border-slate-800 rounded-b-none">
+                                <TabsTrigger value="day">Día</TabsTrigger>
+                                <TabsTrigger value="range">Rango</TabsTrigger>
+                                <TabsTrigger value="month">Mes</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="day">
+                                <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+                            </TabsContent>
+                            <TabsContent value="range">
+                                <Calendar mode="range" selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
+                            </TabsContent>
+                            <TabsContent value="month">
+                                <Calendar mode="single" onSelect={setMonth} selected={month} fromDate={startOfMonth(new Date(2020, 0))} toDate={endOfMonth(new Date(2030, 11))} captionLayout="dropdown-buttons" />
+                            </TabsContent>
+                        </Tabs>
                     </PopoverContent>
                 </Popover>
                 
@@ -363,3 +381,5 @@ export default function InventoryPage() {
     </>
   );
 }
+
+    
