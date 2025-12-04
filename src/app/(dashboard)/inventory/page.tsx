@@ -14,7 +14,7 @@ import { addDays, format, startOfMonth, endOfMonth, isWithinInterval, parseISO }
 import { es } from 'date-fns/locale';
 import { 
   Search, Package, Filter, Download, History,
-  ArrowUp, ArrowDown, TrendingUp, Calendar as CalendarIcon 
+  ArrowUp, ArrowDown, TrendingUp, Calendar as CalendarIcon, Wand2
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -23,6 +23,9 @@ import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
+import { useFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { doc } from 'firebase/firestore';
+
 
 // --- TYPES ---
 type InventoryReportItem = {
@@ -43,9 +46,10 @@ const formatKilos = (val: number) => new Intl.NumberFormat('es-CL').format(Math.
 // --- COMPONENT ---
 export default function InventoryPage() {
   const { toast } = useToast();
+  const { firestore } = useFirebase();
   // 1. DATA LOADING
   const { purchaseOrders, salesOrders, inventoryAdjustments, isLoading: loadingOps } = useOperations();
-  const { warehouses, products, calibers, contacts, isLoading: loadingMaster } = useMasterData();
+  const { warehouses, products, calibers, contacts, inventory, isLoading: loadingMaster } = useMasterData();
   const isLoading = loadingOps || loadingMaster;
   
   // 2. FILTERS STATE
@@ -60,64 +64,30 @@ export default function InventoryPage() {
 
   // 3. CORE LOGIC: INVENTORY CALCULATION ENGINE
   const inventoryReport = useMemo(() => {
-    if (isLoading) return [];
+    if (isLoading || !inventory) return [];
     
     const interval = dateRange?.from && dateRange.to ? { start: dateRange.from, end: dateRange.to } : null;
     
-    // Create a map to hold all product/caliber/warehouse combinations
     const reportMap = new Map<string, InventoryReportItem>();
-
-    const allItems = new Set<string>();
-    
     const normalize = (name: string) => (name || '').trim().toUpperCase();
 
-    // Populate all unique items from all sources
-    [...(purchaseOrders || []), ...(salesOrders || []), ...(inventoryAdjustments || [])].forEach(op => {
-        (op.items || [op]).forEach((item: any) => {
-            if (!item.product) return;
-            const warehouse = (op as PurchaseOrder | SalesOrder).warehouse || (op as InventoryAdjustment).warehouse || 'Principal';
-            const key = `${normalize(item.product)}::${item.caliber}::${warehouse}`;
-            if (!allItems.has(key)) {
-                allItems.add(key);
-                reportMap.set(key, {
-                    id: key, product: item.product, caliber: item.caliber, warehouse,
-                    initialStock: 0, purchases: 0, sales: 0, adjustments: 0, finalStock: 0
-                });
-            }
-        });
-    });
-
-    // Calculate Final Stock (based on ALL history)
-    purchaseOrders.forEach(po => {
-        if(po.status === 'completed' || po.status === 'received') {
-            po.items.forEach(item => {
-                const key = `${normalize(item.product)}::${item.caliber}::${po.warehouse || 'Principal'}`;
-                if (reportMap.has(key)) reportMap.get(key)!.finalStock += item.quantity;
+    // 1. Initialize map with all unique product/caliber/warehouse combinations from inventory
+    inventory.forEach(item => {
+        const key = `${normalize(item.name)}::${item.caliber}::${item.warehouse}`;
+        if (!reportMap.has(key)) {
+            reportMap.set(key, {
+                id: key, product: item.name, caliber: item.caliber, warehouse: item.warehouse || 'Principal',
+                initialStock: 0, purchases: 0, sales: 0, adjustments: 0, finalStock: item.stock || 0
             });
         }
     });
-    salesOrders.forEach(so => {
-       if (so.status === 'completed' || so.status === 'dispatched' || so.status === 'invoiced') {
-            so.items.forEach(item => {
-                const key = `${normalize(item.product)}::${item.caliber}::${so.warehouse || 'Principal'}`;
-                if (reportMap.has(key)) reportMap.get(key)!.finalStock -= item.quantity;
-            });
-        }
-    });
-    inventoryAdjustments.forEach(adj => {
-        const key = `${normalize(adj.product)}::${adj.caliber}::${adj.warehouse}`;
-        if (reportMap.has(key)) {
-            const multiplier = adj.type === 'increase' ? 1 : -1;
-            reportMap.get(key)!.finalStock += adj.quantity * multiplier;
-        }
-    });
-
-    // Calculate movements WITHIN the date range
+    
+    // 2. Calculate movements WITHIN the date range
     if (interval) {
         purchaseOrders.forEach(po => {
             if((po.status === 'completed' || po.status === 'received') && isWithinInterval(parseISO(po.date), interval)) {
                 po.items.forEach(item => {
-                    const key = `${normalize(item.product)}::${item.caliber}::${po.warehouse || 'Principal'}`;
+                    const key = `${normalize(item.product)}::${item.caliber}::${po.warehouse || 'Bodega Central'}`;
                     if(reportMap.has(key)) reportMap.get(key)!.purchases += item.quantity;
                 });
             }
@@ -125,7 +95,7 @@ export default function InventoryPage() {
         salesOrders.forEach(so => {
             if((so.status === 'completed' || so.status === 'dispatched' || so.status === 'invoiced') && isWithinInterval(parseISO(so.date), interval)) {
                 so.items.forEach(item => {
-                    const key = `${normalize(item.product)}::${item.caliber}::${so.warehouse || 'Principal'}`;
+                    const key = `${normalize(item.product)}::${item.caliber}::${so.warehouse || 'Bodega Central'}`;
                     if(reportMap.has(key)) reportMap.get(key)!.sales += item.quantity;
                 });
             }
@@ -141,13 +111,13 @@ export default function InventoryPage() {
         });
     }
 
-    // Calculate Initial Stock retroactively
+    // 3. Calculate Initial Stock retroactively
     reportMap.forEach(item => {
         item.initialStock = item.finalStock - (item.purchases + item.adjustments) + item.sales;
     });
 
     return Array.from(reportMap.values());
-  }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, dateRange]);
+  }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, dateRange, inventory]);
 
   // 4. Filtering for Display
   const { filteredData, totalIn, totalOut, netRotation } = useMemo(() => {
@@ -187,6 +157,49 @@ export default function InventoryPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Reporte de Inventario');
     XLSX.writeFile(workbook, `Reporte_Inventario_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
+
+  const handleNormalization = () => {
+    if (!firestore || !inventory) {
+      toast({ variant: "destructive", title: "Error", description: "Los datos de inventario no están listos." });
+      return;
+    }
+    
+    let updatedCount = 0;
+    const normalizationPromises: Promise<void>[] = [];
+
+    inventory.forEach(item => {
+      let newName = item.name;
+      if (item.name.toUpperCase().trim() === 'PALTAS') {
+        newName = 'PALTA HASS';
+      } else if (item.name.toUpperCase().trim() === 'MANDARINA') {
+        newName = 'MANDARINAS';
+      }
+
+      if (newName !== item.name) {
+        updatedCount++;
+        const itemRef = doc(firestore, 'inventory', item.id);
+        normalizationPromises.push(updateDocumentNonBlocking(itemRef, { name: newName }));
+      }
+    });
+
+    if (updatedCount === 0) {
+      toast({ title: "Sin cambios", description: "Los nombres de productos ya están normalizados." });
+      return;
+    }
+
+    toast({ title: "Normalizando...", description: `Actualizando ${updatedCount} registros...` });
+
+    Promise.all(normalizationPromises)
+      .then(() => {
+        toast({ title: "Normalización Completa", description: `${updatedCount} productos fueron actualizados.` });
+        // Consider a router.refresh() or similar if data isn't live updating fast enough
+      })
+      .catch(error => {
+        console.error("Error durante la normalización:", error);
+        toast({ variant: "destructive", title: "Error de Normalización", description: "Algunos productos no pudieron ser actualizados." });
+      });
+  };
+
 
   const renderContent = () => {
     if (isLoading) return <Skeleton className="h-96 w-full" />;
@@ -253,9 +266,14 @@ export default function InventoryPage() {
             <h2 className="text-3xl font-bold tracking-tight text-white">Control de Stock (Kardex)</h2>
             <p className="text-slate-400 mt-1">Análisis de movimientos y estado del inventario por período.</p>
         </div>
-        <Button onClick={handleExport} variant="outline" className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800">
-            <Download className="mr-2 h-4 w-4" /> Exportar a Excel
-        </Button>
+        <div className="flex gap-2">
+            <Button onClick={handleNormalization} variant="outline" className="border-purple-500/30 bg-purple-950/20 text-purple-300 hover:bg-purple-950/60 hover:text-purple-200">
+                <Wand2 className="mr-2 h-4 w-4" /> Normalizar Productos
+            </Button>
+            <Button onClick={handleExport} variant="outline" className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800">
+                <Download className="mr-2 h-4 w-4" /> Exportar a Excel
+            </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
