@@ -64,67 +64,76 @@ export default function InventoryPage() {
 
   // 3. CORE LOGIC: INVENTORY CALCULATION ENGINE
   const inventoryReport = useMemo(() => {
-    if (isLoading || !inventory || !purchaseOrders || !salesOrders || !inventoryAdjustments) return [];
+    if (isLoading || !purchaseOrders || !salesOrders || !inventoryAdjustments) return [];
     
-    const interval = dateRange?.from && dateRange.to ? { start: dateRange.from, end: dateRange.to } : null;
+    const interval = dateRange?.from && dateRange.to ? { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) } : null;
     
     const reportMap = new Map<string, InventoryReportItem>();
     const normalize = (name: string) => (name || '').trim().toUpperCase();
 
-    // 1. Initialize map with all unique product/caliber/warehouse combinations from inventory
-    inventory.forEach(item => {
-        if (!item.name || !item.caliber || !item.warehouse) return;
-        const key = `${normalize(item.name)}::${item.caliber}::${item.warehouse}`;
-        if (!reportMap.has(key)) {
-            reportMap.set(key, {
-                id: key, product: item.name, caliber: item.caliber, warehouse: item.warehouse,
-                initialStock: 0, purchases: 0, sales: 0, adjustments: 0, finalStock: item.stock || 0
-            });
-        }
-    });
+    const allItems = [
+      ...purchaseOrders.flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse || 'Bodega Central'}))),
+      ...salesOrders.flatMap(o => o.items.map(i => ({...i, warehouse: o.warehouse || 'Bodega Central'}))),
+      ...inventoryAdjustments.map(a => ({...a})),
+      ...(inventory || []).map(i => ({...i})),
+    ];
     
-    // 2. Calculate movements WITHIN the date range
-    if (interval) {
-        purchaseOrders.forEach(po => {
-            if((po.status === 'completed' || po.status === 'received') && isWithinInterval(parseISO(po.date), interval)) {
-                po.items.forEach(item => {
-                    const key = `${normalize(item.product)}::${item.caliber}::${po.warehouse || 'Bodega Central'}`;
-                    if(reportMap.has(key)) {
-                        reportMap.get(key)!.purchases += item.quantity;
-                    }
-                });
-            }
-        });
+    allItems.forEach(item => {
+      if (!item.name && !item.product) return;
+      const productName = item.name || item.product;
+      if (!productName || !item.caliber || !item.warehouse) return;
 
-        salesOrders.forEach(so => {
-            if((so.status === 'completed' || so.status === 'dispatched' || so.status === 'invoiced') && isWithinInterval(parseISO(so.date), interval)) {
-                so.items.forEach(item => {
-                    const key = `${normalize(item.product)}::${item.caliber}::${so.warehouse || 'Bodega Central'}`;
-                    if(reportMap.has(key)) {
-                         reportMap.get(key)!.sales += item.quantity;
-                    }
-                });
-            }
+      const key = `${normalize(productName)}::${item.caliber}::${item.warehouse}`;
+      if (!reportMap.has(key)) {
+        reportMap.set(key, {
+            id: key, product: productName, caliber: item.caliber, warehouse: item.warehouse,
+            initialStock: 0, purchases: 0, sales: 0, adjustments: 0, finalStock: 0
         });
-        
-        inventoryAdjustments.forEach(adj => {
-            if (isWithinInterval(parseISO(adj.date), interval)) {
-                const key = `${normalize(adj.product)}::${adj.caliber}::${adj.warehouse}`;
-                 if(reportMap.has(key)) {
-                    const multiplier = adj.type === 'increase' ? 1 : -1;
-                    reportMap.get(key)!.adjustments += adj.quantity * multiplier;
+      }
+    });
+
+    const calculateMovements = (orders: (PurchaseOrder[] | SalesOrder[] | InventoryAdjustment[]), type: 'purchase' | 'sale' | 'adjustment') => {
+        orders.forEach((order: any) => {
+            if (!interval || !isWithinInterval(parseISO(order.date), interval)) return;
+            
+            const items = order.items || [order]; // Adjustments aren't in an 'items' array
+            
+            items.forEach((item: any) => {
+                if (!item.product || !item.caliber || !order.warehouse) return;
+
+                const key = `${normalize(item.product)}::${item.caliber}::${order.warehouse}`;
+                if(reportMap.has(key)) {
+                    const reportItem = reportMap.get(key)!;
+                    if (type === 'purchase' && (order.status === 'completed' || order.status === 'received')) {
+                        reportItem.purchases += item.quantity;
+                    } else if (type === 'sale' && (order.status === 'completed' || order.status === 'dispatched' || order.status === 'invoiced')) {
+                        reportItem.sales += item.quantity;
+                    } else if (type === 'adjustment') {
+                        const multiplier = order.type === 'increase' ? 1 : -1;
+                        reportItem.adjustments += item.quantity * multiplier;
+                    }
                 }
-            }
+            });
         });
-    }
+    };
 
-    // 3. Calculate Initial Stock retroactively
+    calculateMovements(purchaseOrders, 'purchase');
+    calculateMovements(salesOrders, 'sale');
+    calculateMovements(inventoryAdjustments, 'adjustment');
+
     reportMap.forEach(item => {
-        item.initialStock = item.finalStock - (item.purchases + item.adjustments) + item.sales;
+        const inventoryItem = inventory?.find(i => 
+            normalize(i.name) === normalize(item.product) && 
+            i.caliber === item.caliber && 
+            i.warehouse === item.warehouse
+        );
+        item.finalStock = inventoryItem?.stock || 0; // Use live stock as final stock
+        item.initialStock = item.finalStock - item.purchases + item.sales - item.adjustments;
     });
 
     return Array.from(reportMap.values());
   }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, dateRange, inventory]);
+  
 
   // 4. Filtering for Display
   const { filteredData, totalIn, totalOut, netRotation } = useMemo(() => {
@@ -134,7 +143,7 @@ export default function InventoryPage() {
         const matchSearch = searchTerm === "" || 
                             item.product.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             item.caliber?.toLowerCase().includes(searchTerm.toLowerCase());
-        const hasMovement = item.initialStock !== 0 || item.purchases !== 0 || item.sales !== 0 || item.finalStock !== 0;
+        const hasMovement = item.initialStock !== 0 || item.purchases !== 0 || item.sales !== 0 || item.finalStock !== 0 || item.adjustments !== 0;
         return matchWarehouse && matchProduct && matchSearch && hasMovement;
     }).sort((a,b) => a.product.localeCompare(b.product) || a.caliber.localeCompare(b.caliber));
 
@@ -211,6 +220,18 @@ export default function InventoryPage() {
         toast({ variant: "destructive", title: "Error de Normalización", description: "Algunos productos no pudieron ser actualizados." });
       });
   };
+
+  // --- Helper functions from date-fns to avoid being undefined ---
+  const startOfDay = (date: Date) => {
+    const newDate = new Date(date);
+    newDate.setHours(0, 0, 0, 0);
+    return newDate;
+  }
+  const endOfDay = (date: Date) => {
+      const newDate = new Date(date);
+      newDate.setHours(23, 59, 59, 999);
+      return newDate;
+  }
 
 
   const renderContent = () => {
