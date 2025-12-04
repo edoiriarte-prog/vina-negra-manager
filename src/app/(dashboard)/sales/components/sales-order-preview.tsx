@@ -206,12 +206,12 @@ export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest
             {/* Signatures */}
             <div className="mt-24 grid grid-cols-3 gap-12 text-center text-[10px]">
                 <div className="border-t border-black pt-2">
-                    <p className="font-bold">AUTORIZADO POR</p>
-                    <p className="text-gray-500">Viña Negra SpA</p>
+                    <p className="font-bold">JEFE DE OPERACIONES</p>
+                    <p className="text-gray-500">JOAQUIN BOU CORTES</p>
                 </div>
                  <div className="border-t border-black pt-2">
-                    <p className="font-bold">TRANSPORTISTA</p>
-                    <p className="text-gray-500">Nombre, RUT y Firma</p>
+                    <p className="font-bold">GERENCIA DE VENTAS</p>
+                    <p className="text-gray-500">JOSE ROJAS CARMONA</p>
                 </div>
                 <div className="border-t border-black pt-2">
                     <p className="font-bold">RECIBÍ CONFORME</p>
