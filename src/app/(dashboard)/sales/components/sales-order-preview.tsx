@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,14 +10,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { SalesOrder, Contact } from "@/lib/types";
+import { SalesOrder, Contact, BankAccount } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Separator } from "@/components/ui/separator";
-import { Printer, MapPin, Calendar, CreditCard, Building2, Package, FileText, Download } from "lucide-react";
+import { Printer, Download } from "lucide-react";
 import { useMasterData } from "@/hooks/use-master-data";
-import { Badge } from "@/components/ui/badge";
-import { PDFDownloadButton } from "@/components/pdf/pdf-download-button";
+import { useReactToPrint } from 'react-to-print';
 
 interface SalesOrderPreviewProps {
   order: SalesOrder | null;
@@ -25,34 +24,34 @@ interface SalesOrderPreviewProps {
   onExportRequest?: () => void;
 }
 
+const formatCurrency = (val: number) => 
+    new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
+
+const formatKilos = (val: number) => 
+    new Intl.NumberFormat('es-CL').format(val) + ' kg';
+
+const formatDate = (dateString?: string) => {
+    if (!dateString) return '-';
+    try {
+        return format(parseISO(dateString), "dd 'de' MMMM, yyyy", { locale: es });
+    } catch {
+        return dateString;
+    }
+}
+
 export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest }: SalesOrderPreviewProps) {
-  const { contacts } = useMasterData();
+  const { contacts, bankAccounts } = useMasterData();
+  const printRef = useRef<HTMLDivElement>(null);
   
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+  });
+
   if (!order) return null;
 
   const client = contacts.find(c => c.id === order.clientId);
-
-  const formatCurrency = (val: number) => 
-    new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
-
-  const formatKilos = (val: number) => 
-    new Intl.NumberFormat('es-CL').format(val) + ' kg';
-
-  const calculateItemTotal = (item: any) => {
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.price) || 0;
-      return qty * price;
-  };
-
-  const getStatusBadge = (status: string) => {
-      switch(status) {
-          case 'dispatched': return <Badge className="bg-emerald-500 hover:bg-emerald-600">DESPACHADA</Badge>;
-          case 'invoiced': return <Badge className="bg-blue-500 hover:bg-blue-600">FACTURADA</Badge>;
-          case 'pending': return <Badge className="bg-yellow-500 hover:bg-yellow-600">PENDIENTE</Badge>;
-          case 'cancelled': return <Badge variant="destructive">ANULADA</Badge>;
-          default: return <Badge variant="outline">{status}</Badge>;
-      }
-  };
+  // @ts-ignore
+  const bankAccount = bankAccounts.find(b => b.id === order.bankAccountId) as BankAccount | undefined;
 
   const netAmount = order.totalAmount || 0;
   const vatAmount = order.includeVat !== false ? netAmount * 0.19 : 0;
@@ -60,161 +59,152 @@ export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] bg-slate-950 border border-slate-800 text-slate-100 p-0 overflow-hidden flex flex-col max-h-[90vh]">
+      <DialogContent className="max-w-[890px] w-full p-0 flex flex-col h-[95vh] bg-slate-200">
         
-        <div className="bg-slate-900 p-6 border-b border-slate-800 flex justify-between items-start">
-            <div className="flex items-center gap-4">
-                <div className="h-12 w-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
-                    <span className="font-bold text-white text-xl">AVN</span>
-                </div>
+        <DialogHeader className="p-4 bg-white border-b no-print">
+          <DialogTitle>Orden de Venta: #{order.number || order.id}</DialogTitle>
+          <DialogDescription>Vista previa del documento para impresión o descarga.</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto bg-slate-200 p-6" id="printable-content-wrapper">
+          <div ref={printRef} className="p-10 bg-white text-black font-sans shadow-lg max-w-[210mm] mx-auto print:shadow-none print:p-8">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-8 border-b-2 border-gray-800 pb-4">
                 <div>
-                    <DialogTitle className="text-xl font-bold text-white tracking-tight">ORDEN DE VENTA</DialogTitle>
-                    <DialogDescription className="text-slate-400 font-mono">
-                        #{order.number || order.id}
-                    </DialogDescription>
+                    <h1 className="text-3xl font-extrabold text-gray-900 uppercase tracking-tighter">Viña Negra SpA</h1>
+                    <p className="text-xs text-gray-500">RUT: 76.123.456-7</p>
+                    <p className="text-xs text-gray-500">Fundo Viña Negra, Tulahuén, Monte Patria</p>
+                    <p className="text-xs text-gray-500">contacto@vinanegra.cl</p>
                 </div>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-                {getStatusBadge(order.status)}
-                <span className="text-xs text-slate-500">
-                    Emitida el {format(parseISO(order.date), "dd 'de' MMMM, yyyy", { locale: es })}
-                </span>
-            </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-8">
-            <div className="grid grid-cols-2 gap-12 mb-8">
-                
-                <div className="space-y-3">
-                    <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                        <Building2 className="h-3 w-3" /> Datos del Cliente
-                    </h4>
-                    <div className="space-y-1">
-                        <p className="text-lg font-bold text-white">{client?.name || 'Cliente Desconocido'}</p>
-                        <p className="text-sm text-slate-400">RUT: {client?.rut || 'S/I'}</p>
-                        <p className="text-sm text-slate-400">{client?.address || 'Dirección no registrada'}</p>
-                        <p className="text-sm text-slate-400">{client?.email}</p>
+                <div className="text-right">
+                    <h2 className="text-2xl font-bold text-gray-800">ORDEN DE VENTA</h2>
+                    <div className="mt-1 inline-block bg-gray-100 border border-gray-300 px-4 py-1 rounded-md">
+                        <p className="text-lg font-mono font-bold text-gray-800 tracking-wider">{order.number || order.id}</p>
                     </div>
-                </div>
-
-                <div className="space-y-3">
-                    <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                        <FileText className="h-3 w-3" /> Detalles de la Operación
-                    </h4>
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
-                        <div className="flex flex-col">
-                            <span className="text-slate-500 text-xs flex items-center gap-1"><MapPin className="h-3 w-3"/> Bodega Origen</span>
-                            <span className="text-slate-200 font-medium">{order.warehouse || 'Principal'}</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-slate-500 text-xs flex items-center gap-1"><CreditCard className="h-3 w-3"/> Forma de Pago</span>
-                            <span className="text-slate-200 font-medium">{order.paymentMethod || 'Contado'}</span>
-                        </div>
-                        {order.creditDays && order.creditDays > 0 && (
-                            <div className="flex flex-col">
-                                <span className="text-slate-500 text-xs flex items-center gap-1"><Calendar className="h-3 w-3"/> Crédito</span>
-                                <span className="text-slate-200 font-medium">{order.creditDays} días</span>
-                            </div>
-                        )}
-                         <div className="flex flex-col">
-                            <span className="text-slate-500 text-xs flex items-center gap-1"><CreditCard className="h-3 w-3"/> Tipo Venta</span>
-                            <span className="text-slate-200 font-medium">{order.saleType || 'Venta en Firme'}</span>
-                        </div>
-                    </div>
+                    <p className="text-sm mt-1">
+                        <span className="font-semibold">Fecha Emisión:</span> {formatDate(order.date)}
+                    </p>
                 </div>
             </div>
 
-            <Separator className="bg-slate-800 my-6" />
+            {/* Info Blocks */}
+            <div className="grid grid-cols-3 gap-4 mb-6 text-xs">
+                <div className="border rounded-md p-3 space-y-1 bg-gray-50/50">
+                    <h4 className="font-bold text-gray-500 uppercase border-b pb-1 mb-2">Cliente</h4>
+                    <p className="font-bold text-sm text-gray-800">{client?.name || 'N/A'}</p>
+                    <p><span className="font-semibold">RUT:</span> {client?.rut || 'N/A'}</p>
+                    <p><span className="font-semibold">Dirección:</span> {client?.address || 'N/A'}</p>
+                    <p><span className="font-semibold">Giro:</span> {client?.businessLine || 'N/A'}</p>
+                    <p><span className="font-semibold">Contacto:</span> {client?.contactPerson || 'N/A'}</p>
+                </div>
+                <div className="border rounded-md p-3 space-y-1 bg-gray-50/50">
+                    <h4 className="font-bold text-gray-500 uppercase border-b pb-1 mb-2">Despacho</h4>
+                    <p><span className="font-semibold">Bodega Origen:</span> {order.warehouse || 'N/A'}</p>
+                    <p><span className="font-semibold">Dirección Retiro:</span> Fundo Viña Negra</p>
+                    {/* @ts-ignore */}
+                    <p><span className="font-semibold">Chofer:</span> {order.driverName || '--'}</p>
+                     {/* @ts-ignore */}
+                    <p><span className="font-semibold">Patente:</span> {order.licensePlate || '--'}</p>
+                </div>
+                <div className="border rounded-md p-3 space-y-1 bg-gray-50/50">
+                    <h4 className="font-bold text-gray-500 uppercase border-b pb-1 mb-2">Condiciones Comerciales</h4>
+                    <p><span className="font-semibold">Operación:</span> {order.saleType || 'Venta en Firme'}</p>
+                    <p><span className="font-semibold">Pago:</span> {order.paymentMethod} {order.creditDays ? `(${order.creditDays} días)`: ''}</p>
+                    {/* @ts-ignore */}
+                    <p><span className="font-semibold">Vencimiento:</span> {formatDate(order.paymentDueDate)}</p>
+                    <p className="font-semibold pt-1 mt-1 border-t">Datos de Transferencia:</p>
+                    <p><span className="font-semibold">Banco:</span> {bankAccount?.bankName || '-'}</p>
+                    <p><span className="font-semibold">Cuenta:</span> {bankAccount?.accountNumber ? `${bankAccount.accountType} N° ${bankAccount.accountNumber}`: '-'}</p>
+                </div>
+            </div>
 
-            <div className="rounded-lg border border-slate-800 overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-slate-900/50 text-slate-400 text-xs uppercase font-bold">
-                        <tr>
-                            <th className="px-4 py-3 text-left">Producto</th>
-                            <th className="px-4 py-3 text-left">Calibre</th>
-                            <th className="px-4 py-3 text-right">Cantidad</th>
-                            <th className="px-4 py-3 text-right">Precio Unit.</th>
-                            <th className="px-4 py-3 text-right">Total</th>
+            {/* Items Table */}
+            <table className="w-full text-xs">
+                <thead className="bg-gray-100">
+                    <tr>
+                        <th className="p-2 text-left font-semibold">Cód.</th>
+                        <th className="p-2 text-left font-semibold">Producto</th>
+                        <th className="p-2 text-left font-semibold">Calibre</th>
+                        <th className="p-2 text-left font-semibold">Envase</th>
+                        <th className="p-2 text-center font-semibold">Cant.</th>
+                        <th className="p-2 text-right font-semibold">Kilos</th>
+                        <th className="p-2 text-right font-semibold">Precio Unit.</th>
+                        <th className="p-2 text-right font-semibold">Total Neto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {order.items.map((item, index) => (
+                        <tr key={index} className="border-b border-gray-100">
+                            <td className="p-2">{(index + 1) * 10}</td>
+                            <td className="p-2 font-bold">{item.product}</td>
+                            <td className="p-2">{item.caliber}</td>
+                            <td className="p-2">{item.packagingType || 'N/A'}</td>
+                            <td className="p-2 text-center">{item.packagingQuantity || 0}</td>
+                            <td className="p-2 text-right font-medium">{formatKilos(item.quantity)}</td>
+                            <td className="p-2 text-right font-mono">{formatCurrency(item.price)}</td>
+                            <td className="p-2 text-right font-bold font-mono">{formatCurrency(item.total || 0)}</td>
                         </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                        {order.items.map((item, index) => {
-                            const totalRow = calculateItemTotal(item);
-                            return (
-                                <tr key={index} className="group hover:bg-slate-900/30">
-                                    <td className="px-4 py-3 font-medium text-slate-200">{item.product}</td>
-                                    <td className="px-4 py-3 text-slate-400">{item.caliber}</td>
-                                    <td className="px-4 py-3 text-right text-emerald-400 font-mono">
-                                        {formatKilos(item.quantity)}
-                                        {item.packagingQuantity ? <span className="block text-xs text-slate-500">({item.packagingQuantity} envases)</span> : null}
-                                    </td>
-                                    <td className="px-4 py-3 text-right text-slate-400 font-mono">{formatCurrency(item.price)}</td>
-                                    <td className="px-4 py-3 text-right text-slate-200 font-bold font-mono">
-                                        {formatCurrency(totalRow)}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+                    ))}
+                </tbody>
+            </table>
 
-            <div className="mt-6 flex justify-between items-end">
-                <div className="text-sm">
-                    <p><span className="font-bold text-slate-400">Total Kilos:</span> {formatKilos(order.totalKilos || 0)}</p>
-                    <p><span className="font-bold text-slate-400">Total Envases:</span> {order.totalPackages || 0}</p>
+            {/* Totals */}
+            <div className="flex justify-between items-start mt-6">
+                <div className="w-1/2">
+                    <h5 className="font-bold text-gray-500 text-xs uppercase mb-1">Observaciones</h5>
+                    <p className="text-xs italic text-gray-600 border p-2 rounded-md bg-gray-50 min-h-[50px]">
+                        {order.notes || 'Sin observaciones.'}
+                    </p>
                 </div>
-                <div className="w-64 space-y-2">
-                    <div className="flex justify-between text-sm text-slate-400">
-                        <span>Subtotal Neto</span>
-                        <span className="font-mono text-slate-200">{formatCurrency(netAmount)}</span>
+                <div className="w-2/5 space-y-1">
+                    <div className="flex justify-between text-xs">
+                        <span className="text-gray-600">Subtotal Neto:</span>
+                        <span className="font-medium font-mono">{formatCurrency(netAmount)}</span>
                     </div>
-                    {order.includeVat !== false && (
-                        <div className="flex justify-between text-sm text-slate-400">
-                            <span>IVA (19%)</span>
-                            <span className="font-mono text-slate-200">{formatCurrency(vatAmount)}</span>
-                        </div>
-                    )}
-                    <div className="flex justify-between items-center pt-3 border-t border-slate-800">
-                        <span className="text-base font-bold text-white uppercase">Total a Pagar</span>
-                        <span className="text-xl font-bold text-blue-400 font-mono">{formatCurrency(grossAmount)}</span>
+                    <div className="flex justify-between text-xs">
+                        <span className="text-gray-600">IVA (19%):</span>
+                        <span className="font-medium font-mono">{formatCurrency(vatAmount)}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-bold border-t-2 border-black mt-2 pt-2">
+                        <span>TOTAL A PAGAR:</span>
+                        <span className="font-mono">{formatCurrency(grossAmount)}</span>
                     </div>
                 </div>
             </div>
 
-            {order.notes && (
-                <div className="mt-8 bg-slate-900/50 border border-slate-800 p-4 rounded-lg">
-                    <h5 className="text-xs font-bold text-slate-500 uppercase mb-1">Observaciones / Notas</h5>
-                    <p className="text-sm text-slate-300 italic">{order.notes}</p>
+            {/* Signatures */}
+            <div className="mt-24 grid grid-cols-3 gap-12 text-center text-[10px]">
+                <div className="border-t border-black pt-2">
+                    <p className="font-bold">AUTORIZADO POR</p>
+                    <p className="text-gray-500">Viña Negra SpA</p>
                 </div>
-            )}
+                 <div className="border-t border-black pt-2">
+                    <p className="font-bold">TRANSPORTISTA</p>
+                    <p className="text-gray-500">Nombre, RUT y Firma</p>
+                </div>
+                <div className="border-t border-black pt-2">
+                    <p className="font-bold">RECIBÍ CONFORME</p>
+                    <p className="text-gray-500">Cliente</p>
+                </div>
+            </div>
+            
+            <p className="text-center text-[9px] text-gray-400 mt-10">
+                Documento interno de control y despacho. No válido como factura tributaria.
+            </p>
+
+          </div>
         </div>
 
-        <DialogFooter className="bg-slate-900 border-t border-slate-800 p-4 sm:justify-between items-center">
-          <div className="text-xs text-slate-500 hidden sm:block">
-             Documento generado por Sistema AVN Manager
-          </div>
-          <div className="flex gap-2">
-             <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-slate-400 hover:text-white">Cerrar</Button>
-             
-             <PDFDownloadButton 
-                order={order}
-                clientName={client?.name || 'Cliente'}
-                clientRut={client?.rut}
-                type="VENTA"
-                fileName={`Venta_${order.number || order.id}.pdf`}
-            />
-
+        <DialogFooter className="p-4 bg-white border-t sm:justify-end no-print">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>Cerrar</Button>
             {onExportRequest && (
-                <Button onClick={onExportRequest} variant="outline" className="gap-2 border-slate-700 text-slate-300 hover:bg-slate-800">
+                <Button onClick={onExportRequest} variant="outline" className="gap-2">
                     <Download className="h-4 w-4" /> Excel
                 </Button>
             )}
-            
-            <Button onClick={() => window.print()} variant="outline" className="gap-2 border-slate-700 text-slate-300 hover:bg-slate-800">
-              <Printer className="h-4 w-4" /> Imprimir
+            <Button onClick={handlePrint} variant="default" className="gap-2">
+              <Printer className="h-4 w-4" /> Imprimir / Guardar PDF
             </Button>
-          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
