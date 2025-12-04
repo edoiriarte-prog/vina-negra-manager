@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -28,7 +29,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 
-// --- COMPONENTE DE CELDA DE ESTADO (VENTAS) ---
+const formatCurrency = (value: number) => 
+  new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
+
 const StatusCell = ({ order }: { order: SalesOrder }) => {
   const { firestore } = useFirebase();
   const [status, setStatus] = useState(order.status);
@@ -60,17 +63,13 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
     setIsLoading(true);
 
     try {
-      // 1. Referencia a la orden en Firebase
       const orderRef = doc(firestore, "salesOrders", order.id);
       const updateData: any = { status: newStatus };
 
-      // Si se marca como despachada, guardamos la fecha
       if (newStatus === "dispatched" && oldStatus !== "dispatched") {
         updateData.dispatchedAt = new Date().toISOString();
       }
 
-      // 2. Actualizamos solo el estado. 
-      // El inventario se recalculará automáticamente en el Dashboard gracias a los hooks.
       await updateDoc(orderRef, updateData);
 
       toast({
@@ -119,7 +118,6 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
         </SelectContent>
       </Select>
 
-      {/* TOOLTIP DE DESPACHO */}
       {(status === 'dispatched' || status === 'invoiced') && (order as any).dispatchedAt && (
         <TooltipProvider>
           <Tooltip>
@@ -138,8 +136,6 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
     </div>
   );
 };
-
-// --- DEFINICIÓN DE COLUMNAS ---
 
 interface ColumnsProps {
   onEdit: (order: SalesOrder) => void;
@@ -181,14 +177,21 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: ColumnsProp
     cell: ({ row }) => <StatusCell order={row.original} />,
   },
   {
-    accessorKey: "totalAmount",
-    header: ({ column }) => (
-        <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total</div>
-    ),
+    id: 'netAmount',
+    header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL NETO</div>,
     cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("totalAmount"));
-      const formatted = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(amount);
-      return <div className="text-right font-bold text-emerald-400">{formatted}</div>;
+      const netAmount = row.original.totalAmount || 0;
+      return <div className="text-right font-mono text-slate-300">{formatCurrency(netAmount)}</div>
+    },
+  },
+  {
+    id: "totalAmountWithVat",
+    header: () => <div className="text-right text-xs font-bold text-slate-500 uppercase tracking-wider">TOTAL C/IVA</div>,
+    cell: ({ row }) => {
+      const order = row.original;
+      const netAmount = order.totalAmount || 0;
+      const grossAmount = order.includeVat !== false ? Math.round(netAmount * 1.19) : netAmount;
+      return <div className="text-right font-bold font-mono text-emerald-400">{formatCurrency(grossAmount)}</div>
     },
   },
   {

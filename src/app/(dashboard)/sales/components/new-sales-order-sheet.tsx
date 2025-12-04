@@ -10,7 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Plus, ShoppingCart, Truck, AlertCircle } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, Plus, ShoppingCart, Truck, AlertCircle, Info, PackageCheck, DollarSign, CreditCard } from "lucide-react";
 import { 
   SalesOrder, 
   Contact, 
@@ -21,7 +24,8 @@ import {
 } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useMasterData } from "@/hooks/use-master-data";
-import { ItemMatrixDialog } from "./item-matrix-dialog"; // Corregido
+import { ItemMatrixDialog } from "./item-matrix-dialog";
+import { format, addDays, parseISO } from 'date-fns';
 
 interface NewSalesOrderSheetProps {
   isOpen: boolean;
@@ -39,6 +43,45 @@ interface NewSalesOrderSheetProps {
   contacts?: Contact[];
 }
 
+// Clonado de purchases
+type SalesOrderFormData = Partial<Omit<SalesOrder, 'id' | 'items'>> & {
+  items: OrderItem[];
+};
+
+
+const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder[]): SalesOrderFormData => {
+    if (order) {
+        return {
+            ...order,
+            date: order.date ? format(new Date(order.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+            items: order.items || [],
+        };
+    }
+    
+    const existingIds = (allSalesOrders || [])
+        .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
+        .filter(n => !isNaN(n) && n > 0);
+    
+    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 2100;
+    const nextNum = maxId < 2100 ? 2101 : maxId + 1;
+    const newId = `OV-${nextNum}`;
+
+    return {
+        number: newId,
+        clientId: "",
+        date: format(new Date(), 'yyyy-MM-dd'),
+        items: [],
+        status: 'pending',
+        includeVat: true,
+        warehouse: 'Bodega Central',
+        paymentMethod: 'Contado',
+        creditDays: 0,
+        notes: '',
+        saleType: 'Venta Firme',
+    };
+};
+
+
 export function NewSalesOrderSheet({
   isOpen,
   onOpenChange,
@@ -47,58 +90,30 @@ export function NewSalesOrderSheet({
   clients,
   inventory,
   sheetType = 'sale',
-  salesOrders
+  salesOrders = []
 }: NewSalesOrderSheetProps) {
   
   const { toast } = useToast();
-  const { products: masterProducts, warehouses } = useMasterData(); 
+  const { products: masterProducts, calibers, packagingTypes, warehouses } = useMasterData(); 
   const isDispatch = sheetType === 'dispatch';
 
-  const [formData, setFormData] = useState<Partial<SalesOrder>>({});
-  const [items, setItems] = useState<OrderItem[]>([]);
+  const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order, salesOrders));
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-        if (order) {
-            setFormData({ ...order, date: order.date.split('T')[0] });
-            // CORRECCIÓN: Calcular el total para cada ítem al cargar
-            const itemsWithTotal = order.items.map(item => ({
-              ...item,
-              total: (item.quantity || 0) * (item.price || 0)
-            }));
-            setItems(itemsWithTotal);
-        } else {
-            const existingIds = (salesOrders || [])
-                .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
-                .filter(n => !isNaN(n) && n > 0);
-            
-            const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 2100;
-            const nextNum = maxId < 2100 ? 2101 : maxId + 1;
-            const newId = `OV-${nextNum}`;
-
-            setFormData({
-                number: newId,
-                clientId: "",
-                warehouse: warehouses[0] || "Principal",
-                date: new Date().toISOString().split('T')[0],
-                status: isDispatch ? "dispatched" : "pending",
-                includeVat: true,
-                items: [],
-                destinationWarehouse: "",
-            });
-            setItems([]);
-        }
+        setFormData(getInitialFormData(order, salesOrders));
     }
-  }, [order, isOpen, isDispatch, warehouses, salesOrders]);
+  }, [order, isOpen, salesOrders]);
+
 
   const handleItemChange = (index: number, field: keyof OrderItem, value: any) => {
-    const newItems = [...items];
+    const newItems = [...formData.items];
     const item = { ...newItems[index] };
     (item as any)[field] = value;
     item.total = (item.quantity || 0) * (item.price || 0);
     newItems[index] = item;
-    setItems(newItems);
+    setFormData(prev => ({ ...prev, items: newItems }));
   };
 
   const handleMatrixSave = (matrixItems: Omit<OrderItem, 'id'>[]) => {
@@ -107,37 +122,48 @@ export function NewSalesOrderSheet({
         id: `temp-${Date.now()}-${Math.random()}`,
         total: (item.quantity || 0) * (item.price || 0)
     }));
-    setItems(prev => ([...prev, ...newItems]));
+    setFormData(prev => ({...prev, items: [...(prev.items || []), ...newItems]}));
     setIsMatrixOpen(false);
   }
-
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+  
+  const handleSelectChange = (name: string, value: any) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = () => {
+
+  const removeItem = (index: number) => {
+    setFormData(prev => ({...prev, items: (prev.items || []).filter((_, i) => i !== index)}));
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!formData.clientId && !isDispatch) {
         toast({ variant: "destructive", title: "Falta Cliente", description: "Selecciona un cliente." });
         return;
     }
-    if (items.length === 0) {
+    if ((formData.items || []).length === 0) {
         toast({ variant: "destructive", title: "Orden Vacía", description: "Agrega al menos un producto." });
         return;
     }
-
-    const netAmount = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
     
-    // Objeto final sanitizado
+    // Cálculos finales basados en los items del estado
+    const netAmount = (formData.items || []).reduce((sum, item) => sum + item.total, 0);
+    const totalKilos = (formData.items || []).reduce((acc, item) => acc + item.quantity, 0);
+    const totalPackages = (formData.items || []).reduce((acc, item) => acc + (item.packagingQuantity || 0), 0);
+
     const finalOrder: any = {
         ...formData,
-        id: order?.id || formData.number, // Usar ID existente o el nuevo número
+        id: order?.id || formData.number,
         number: formData.number,
-        items: items,
-        totalAmount: netAmount, // Guardar siempre el neto
-        totalKilos: items.reduce((acc, item) => acc + item.quantity, 0),
-        totalPackages: items.reduce((acc, item) => acc + (item.packagingQuantity || 0), 0),
-        clientId: formData.clientId || (isDispatch ? 'internal_transfer' : ''),
-        status: formData.status || (isDispatch ? 'dispatched' : 'pending'),
+        totalAmount: netAmount, 
+        totalKilos,
+        totalPackages,
+        status: formData.status || 'pending',
     };
 
     // Limpiar campos undefined
@@ -151,8 +177,8 @@ export function NewSalesOrderSheet({
   };
 
   const netTotal = useMemo(() => {
-    return items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-  }, [items]);
+    return (formData.items || []).reduce((sum, item) => sum + (item.total || 0), 0);
+  }, [formData.items]);
   
   const { vatAmount, finalTotalWithVat } = useMemo(() => {
       const vat = formData.includeVat ? netTotal * 0.19 : 0;
@@ -160,105 +186,204 @@ export function NewSalesOrderSheet({
       return { vatAmount: vat, finalTotalWithVat: total };
   }, [netTotal, formData.includeVat]);
 
+  const title = order ? `Editar OV ${order.number}` : `Nueva Orden de Venta`;
+  const darkInputClass = "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 placeholder:text-slate-600";
+  const darkCardClass = "bg-slate-900 border-slate-800 shadow-sm";
+  const labelClass = "text-xs font-medium text-slate-400 uppercase tracking-wide";
+  
+  if (!formData) return null;
 
   return (
+    <>
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-4xl bg-slate-950 border-l-slate-800 text-slate-100">
-        <SheetHeader>
-          <div className="flex items-center gap-2">
-             {isDispatch ? <Truck className="text-blue-500"/> : <ShoppingCart className="text-emerald-500"/>}
-             <SheetTitle className="text-white">{order ? 'Editar' : 'Nueva'} {isDispatch ? 'Orden de Despacho' : 'Venta'}</SheetTitle>
-          </div>
-          <SheetDescription className="text-slate-400">
-            {isDispatch ? 'Registra una salida de stock o traspaso de bodega.' : 'Genera una nueva venta comercial.'}
-          </SheetDescription>
+      <SheetContent className="sm:max-w-7xl w-[95vw] overflow-y-auto p-0 flex flex-col gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
+        <SheetHeader className="bg-slate-900 border-b border-slate-800 px-6 py-4 sticky top-0 z-10">
+             <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                    <div className="bg-emerald-600/20 p-2.5 rounded-xl border border-emerald-600/30">
+                        <Truck className="h-6 w-6 text-emerald-400" />
+                    </div>
+                    <div>
+                        <SheetTitle className="text-xl font-bold text-slate-100 tracking-tight">{title}</SheetTitle>
+                        <SheetDescription className="text-xs text-slate-400 font-mono mt-0.5">
+                            {formData.number ? `ID: ${formData.number}` : 'Calculando ID...'}
+                        </SheetDescription>
+                    </div>
+                </div>
+            </div>
         </SheetHeader>
 
-        <div className="grid gap-6 py-6">
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label className="text-slate-300">Cliente / Destino</Label>
-                    <Select value={formData.clientId} onValueChange={(v) => setFormData(prev => ({...prev, clientId: v}))}>
-                        <SelectTrigger className="bg-slate-900 border-slate-800 text-slate-100"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                            {clients.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                    <Label className="text-slate-300">Fecha</Label>
-                    <Input type="date" value={formData.date} onChange={(e) => setFormData(prev => ({...prev, date: e.target.value}))} className="bg-slate-900 border-slate-800 text-slate-100"/>
-                </div>
-            </div>
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-8">
+            
+            <div className="grid md:grid-cols-3 gap-5">
+                <Card className={darkCardClass}>
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <Users className="h-4 w-4 text-blue-500" /> Cliente
+                        </div>
+                        <Select required onValueChange={(value) => handleSelectChange('clientId', value)} value={formData.clientId}>
+                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                {clients?.map((c) => (
+                                    <SelectItem key={c.id} value={c.id} className="focus:bg-slate-800 focus:text-slate-100">
+                                        {c.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </CardContent>
+                </Card>
 
-            <div className="grid grid-cols-2 gap-4 items-end">
-                 <div className="space-y-2">
-                    <Label className="text-slate-300">Bodega Origen</Label>
-                    <Select value={formData.warehouse} onValueChange={(v) => setFormData(prev => ({...prev, warehouse: v}))}>
-                        <SelectTrigger className="bg-slate-900 border-slate-800 text-slate-100"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                            {warehouses.map((w) => (<SelectItem key={w} value={w}>{w}</SelectItem>))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="flex items-center space-x-2 pb-2">
-                    <Switch id="vat" checked={formData.includeVat} onCheckedChange={(c) => setFormData(prev => ({...prev, includeVat: c}))} />
-                    <Label htmlFor="vat" className="text-slate-300">Calcular con IVA (19%)</Label>
-                </div>
-            </div>
+                <Card className={darkCardClass}>
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <CalendarIcon className="h-4 w-4 text-orange-500" /> Fecha Emisión
+                        </div>
+                        <Input type="date" name="date" value={formData.date} onChange={handleInputChange} className={`${darkInputClass} [color-scheme:dark]`} required />
+                    </CardContent>
+                </Card>
 
-            <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                    <h4 className="font-medium text-slate-200">Productos</h4>
-                    <Button onClick={() => setIsMatrixOpen(true)} variant="link" className="text-blue-500">
-                        <Plus className="h-4 w-4 mr-1"/> Carga Rápida (Matriz)
+                <Card className={darkCardClass}>
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <Warehouse className="h-4 w-4 text-emerald-500" /> Bodega Origen
+                        </div>
+                        <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
+                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                {warehouses.map((w, index) => (
+                                    <SelectItem key={index} value={w} className="focus:bg-slate-800 focus:text-slate-100">{w}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </CardContent>
+                </Card>
+            </div>
+            
+            <div className={`rounded-xl border border-slate-800 overflow-hidden ${darkCardClass}`}>
+                <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                    <h3 className="font-semibold text-slate-200 flex items-center gap-2">
+                        <Info className="h-4 w-4 text-blue-400" /> Detalle de Productos
+                    </h3>
+                    <Button type="button" onClick={() => setIsMatrixOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md shadow-blue-900/20 transition-all">
+                        <Plus className="mr-2 h-4 w-4" /> Carga Masiva (Matriz)
                     </Button>
                 </div>
-                <div className="p-4 border rounded-md border-slate-800 bg-slate-900/50 space-y-3">
-                    {items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-sm">
-                            <div>
-                                <span className="text-white font-medium">{item.product} {item.caliber}</span>
-                                <div className="text-slate-500 text-xs">
-                                    {item.quantity} kg @ ${item.price}/kg
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <span className="text-emerald-400 font-mono">${(item.total || 0).toLocaleString('es-CL')}</span>
-                                <button onClick={() => removeItem(idx)} className="text-slate-500 hover:text-red-400">
-                                    <Trash2 className="h-4 w-4"/>
-                                </button>
-                            </div>
+                 <div className="p-0">
+                    {(formData.items || []).length === 0 ? (
+                        <div className="py-16 text-center text-slate-500 bg-slate-950/50 flex flex-col items-center">
+                            <PackageCheck className="h-12 w-12 mb-3 opacity-20" />
+                            <p className="text-lg font-medium">No hay productos agregados</p>
+                            <p className="text-sm opacity-70">Use el botón de "Carga Masiva" para comenzar.</p>
                         </div>
-                    ))}
-                    {items.length === 0 && <p className="text-center text-slate-500 text-sm py-4">No hay productos agregados.</p>}
+                    ) : (
+                         <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-slate-400 uppercase bg-slate-950 border-b border-slate-800">
+                                    <tr>
+                                        <th className="px-4 py-3 font-semibold">Producto</th>
+                                        <th className="px-4 py-3 font-semibold">Calibre</th>
+                                        <th className="px-4 py-3 text-center font-semibold">Kilos</th>
+                                        <th className="px-4 py-3 text-right font-semibold">Precio Unit.</th>
+                                        <th className="px-4 py-3 text-right font-semibold">Total</th>
+                                        <th className="px-4 py-3"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800 bg-slate-900/30">
+                                    {(formData.items || []).map((item, index) => (
+                                        <tr key={index} className="hover:bg-slate-800/50 transition-colors">
+                                            <td className="px-4 py-2 font-medium text-slate-200">{item.product}</td>
+                                            <td className="px-4 py-2 text-slate-400">{item.caliber}</td>
+                                            <td className="px-4 py-2">
+                                                <Input type="number" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))} className="h-7 text-center font-bold bg-slate-950 border-slate-700 focus:border-blue-500 text-slate-100" />
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <Input type="number" value={item.price || ''} onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-slate-700 focus:border-blue-500" />
+                                            </td>
+                                            <td className="px-4 py-2 text-right font-medium text-slate-300 font-mono">
+                                                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(item.total)}
+                                            </td>
+                                            <td className="px-4 py-2 text-center">
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-7 w-7 text-slate-500 hover:text-red-400 hover:bg-red-950/30">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             </div>
             
-            {items.length > 0 && (
-                 <div className="space-y-2 mt-4 ml-auto w-1/2">
-                    <div className="flex justify-between text-slate-400"><p>Subtotal Neto:</p> <p className="font-mono">${netTotal.toLocaleString('es-CL')}</p></div>
-                    {formData.includeVat && <div className="flex justify-between text-slate-400"><p>IVA (19%):</p> <p className="font-mono">${vatAmount.toLocaleString('es-CL')}</p></div>}
-                    <div className="flex justify-between text-white font-bold text-lg pt-2 border-t border-slate-700"><p>TOTAL:</p> <p className="font-mono">${finalTotalWithVat.toLocaleString('es-CL')}</p></div>
-                </div>
-            )}
-        </div>
+             <div className="grid md:grid-cols-12 gap-6 items-start">
+                 <div className="md:col-span-7 space-y-4">
+                    <Card className={darkCardClass}>
+                        <CardContent className="p-5 space-y-4">
+                             <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                                <CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones Comerciales
+                            </h4>
+                            <div className="space-y-2">
+                                <Label className={labelClass}>Notas / Observaciones</Label>
+                                <Textarea name="notes" value={formData.notes || ''} onChange={handleInputChange} className="min-h-[80px] resize-none bg-slate-950 border-slate-800 text-slate-300 focus:border-slate-600" placeholder="Instrucciones especiales para el despacho..." />
+                            </div>
+                        </CardContent>
+                    </Card>
+                 </div>
+                 <div className="md:col-span-5">
+                      <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 shadow-xl">
+                          <CardContent className="p-6 space-y-4">
+                              <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+                                  <h4 className="font-semibold text-slate-100 flex items-center gap-2">
+                                      <DollarSign className="h-4 w-4 text-emerald-500" /> Totales
+                                  </h4>
+                                  <div className="flex items-center gap-2 bg-slate-950/50 px-3 py-1 rounded-full border border-slate-800">
+                                      <Switch id="includeVat" checked={formData.includeVat} onCheckedChange={(checked) => setFormData(prev => ({...prev, includeVat: checked}))} className="data-[state=checked]:bg-emerald-500" />
+                                      <Label htmlFor="includeVat" className="text-[10px] cursor-pointer text-slate-400 uppercase font-bold">Ver con IVA</Label>
+                                  </div>
+                              </div>
+                              <div className="space-y-3">
+                                  <div className="flex justify-between text-slate-400 text-sm">
+                                      <span>Subtotal Neto</span>
+                                      <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(netTotal)}</span>
+                                  </div>
+                                  {formData.includeVat && (
+                                      <div className="flex justify-between text-slate-400 text-sm">
+                                          <span>IVA (19%)</span>
+                                          <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(vatAmount)}</span>
+                                      </div>
+                                  )}
+                                  <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 flex justify-between items-end mt-2">
+                                      <span className="text-sm text-slate-400 font-medium uppercase tracking-wider mb-1">Total a Pagar</span>
+                                      <span className="text-2xl font-bold text-white tracking-tight">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(finalTotalWithVat)}</span>
+                                  </div>
+                              </div>
+                          </CardContent>
+                      </Card>
+                 </div>
+            </div>
 
-        <SheetFooter>
-          <SheetClose asChild><Button variant="outline" className="border-slate-700 text-slate-300 bg-transparent hover:bg-slate-800">Cancelar</Button></SheetClose>
-          <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-500 text-white">
-            {order ? 'Guardar Cambios' : `Crear ${isDispatch ? 'Despacho' : 'Venta'}`}
-          </Button>
-        </SheetFooter>
+            </div>
+
+            <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
+              <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={(formData.items || []).length === 0}>
+                  {order ? 'Guardar Cambios' : `Crear ${isDispatch ? 'Despacho' : 'Venta'}`}
+              </Button>
+            </SheetFooter>
+        </form>
       </SheetContent>
-
-      <ItemMatrixDialog
+    </Sheet>
+    
+    <ItemMatrixDialog
         isOpen={isMatrixOpen}
         onOpenChange={setIsMatrixOpen}
         onSave={handleMatrixSave}
         orderType="sale"
         inventory={inventory}
       />
-    </Sheet>
+    </>
   );
 }
