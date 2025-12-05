@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -21,9 +22,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact } from '@/lib/types';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfYear } from 'date-fns';
 import { suggestTransactionDescription } from '@/ai/flows/suggest-transaction-descriptions';
-import { Loader2, Sparkles, CalendarIcon, Trash2, PlusCircle, ArrowRight, ArrowDownLeft, ArrowUpRight, GitCompareArrows, Banknote } from 'lucide-react';
+import { Loader2, Sparkles, CalendarIcon, Trash2, ArrowRight, ArrowDownLeft, ArrowUpRight, GitCompareArrows, Banknote, User, Building, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useMasterData } from '@/hooks/use-master-data';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -31,338 +32,223 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
-import { Switch } from '@/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type NewFinancialMovementSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (movement: FinancialMovement | Omit<FinancialMovement, 'id'> | Omit<FinancialMovement, 'id'>[]) => void;
+  onSave: (movement: FinancialMovement | Omit<FinancialMovement, 'id'>) => void;
   movement: FinancialMovement | null;
   onDelete?: (movement: FinancialMovement) => void;
   allMovements: FinancialMovement[];
   purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
-  serviceOrders: ServiceOrder[];
   contacts: Contact[];
 };
 
-type BatchMovement = Omit<FinancialMovement, 'id' | 'contactId' | 'type'> & { batchId: number };
-type PaymentType = 'total' | 'abono';
+type PaymentMode = 'total' | 'balance' | 'partial';
 
+const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
 
-const getInitialFormData = (): Omit<FinancialMovement, 'id'> => ({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    type: 'expense',
-    description: '',
-    amount: 0,
-    paymentMethod: 'Transferencia',
-    destinationAccountId: undefined,
-    sourceAccountId: undefined,
-    contactId: undefined,
-    relatedDocument: undefined,
-    internalConcept: undefined,
-    productId: undefined,
-    reference: '',
-});
-
+const getInitialFormData = (movement: FinancialMovement | null): Omit<FinancialMovement, 'id'> => {
+    if (movement) {
+        return {
+            ...movement,
+            date: format(new Date(movement.date), 'yyyy-MM-dd'),
+        };
+    }
+    return {
+        date: format(new Date(), 'yyyy-MM-dd'),
+        type: 'expense',
+        description: '',
+        amount: 0,
+        paymentMethod: 'Transferencia',
+        contactId: undefined,
+        relatedDocument: undefined,
+        sourceAccountId: undefined,
+        destinationAccountId: undefined,
+        reference: ''
+    };
+};
 
 export function NewFinancialMovementSheet({ 
     isOpen, onOpenChange, onSave, movement, onDelete, allMovements, 
-    purchaseOrders, salesOrders, serviceOrders, contacts 
+    purchaseOrders, salesOrders, contacts 
 }: NewFinancialMovementSheetProps) {
-  const [formData, setFormData] = useState<Omit<FinancialMovement, 'id'>>(getInitialFormData());
-  const [associationType, setAssociationType] = useState<'document' | 'anticipo' | 'concept'>('document');
-  const [relatedOrderType, setRelatedOrderType] = useState<'OV' | 'OC' | 'OS' | ''>('');
-  const [isSuggesting, setIsSuggesting] = useState(false);
-  const [isBatchMode, setIsBatchMode] = useState(false);
-  const [paymentType, setPaymentType] = useState<PaymentType>('abono');
-  const [batchMovements, setBatchMovements] = useState<BatchMovement[]>([]);
+    
+  const [formData, setFormData] = useState<Omit<FinancialMovement, 'id'>>(getInitialFormData(movement));
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string>('');
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('partial');
+  
   const { toast } = useToast();
-  const { bankAccounts, internalConcepts, costCenters } = useMasterData();
-  const [pendingBalance, setPendingBalance] = useState<number | null>(null);
+  const { bankAccounts, costCenters } = useMasterData();
 
-  const calculatePendingBalance = (docType: 'OV' | 'OC' | 'OS', docId: string) => {
-    let orderAmount = 0;
-    let paymentsMade = 0;
-
-    const otherPayments = allMovements
-        .filter(m => m.relatedDocument?.id === docId && m.id !== movement?.id); // Exclude current movement if editing
-
-    paymentsMade = otherPayments.reduce((sum, m) => sum + m.amount, 0);
-
-    if (docType === 'OC') {
-        const order = purchaseOrders.find(o => o.id === docId);
-        if (order) orderAmount = order.totalAmount;
-    } else if (docType === 'OV') {
-        const order = salesOrders.find(o => o.id === docId);
-        if (order) orderAmount = order.totalAmount;
-    } else if (docType === 'OS') {
-        const order = serviceOrders.find(o => o.id === docId);
-        if (order) orderAmount = order.cost;
+  // --- DERIVED STATE & MEMOS ---
+  const filteredContacts = useMemo(() => {
+    if (formData.type === 'income') {
+      return contacts.filter(c => c.type.includes('client') || c.type.includes('other_income'));
     }
+    if (formData.type === 'expense') {
+      return contacts.filter(c => c.type.includes('supplier') || c.type.includes('other_expense'));
+    }
+    return [];
+  }, [formData.type, contacts]);
 
-    setPendingBalance(orderAmount - paymentsMade);
-  };
+  const pendingDocuments = useMemo(() => {
+    if (!formData.contactId) return [];
+    if (formData.type === 'income') {
+        return salesOrders.filter(o => o.clientId === formData.contactId && o.status !== 'cancelled');
+    }
+    if (formData.type === 'expense') {
+        return purchaseOrders.filter(o => o.supplierId === formData.contactId && o.status !== 'cancelled');
+    }
+    return [];
+  }, [formData.contactId, formData.type, salesOrders, purchaseOrders]);
+
+  const selectedDocument = useMemo(() => {
+    return [...salesOrders, ...purchaseOrders].find(d => d.id === selectedDocumentId);
+  }, [selectedDocumentId, salesOrders, purchaseOrders]);
+
+  const documentBalance = useMemo(() => {
+    if (!selectedDocument) return { total: 0, paid: 0, pending: 0 };
+    const total = selectedDocument.totalAmount;
+    const payments = allMovements
+        .filter(m => m.relatedDocument?.id === selectedDocument.id && m.id !== movement?.id)
+        .reduce((sum, m) => sum + m.amount, 0);
+    const pending = total - payments;
+    return { total, paid: payments, pending };
+  }, [selectedDocument, allMovements, movement]);
+
+  // --- EFFECT HOOKS ---
 
   useEffect(() => {
-    if (movement) { // Editing mode
-        setIsBatchMode(false);
-        setFormData({
-            ...movement,
-            date: format(new Date(movement.date), 'yyyy-MM-dd'),
-        });
-        if (movement.relatedDocument) {
-            setAssociationType('document');
-            setRelatedOrderType(movement.relatedDocument.type);
-            calculatePendingBalance(movement.relatedDocument.type, movement.relatedDocument.id);
-        } else if (movement.contactId) {
-            setAssociationType('anticipo');
-        } else {
-            setAssociationType('concept');
-        }
-    } else { // Creating mode
-      setFormData(getInitialFormData());
-      setRelatedOrderType('');
-      setAssociationType('document');
-      setIsBatchMode(false);
-      setBatchMovements([]);
-      setPendingBalance(null);
-      setPaymentType('abono');
+    setFormData(getInitialFormData(movement));
+    if (movement?.relatedDocument) {
+        setSelectedDocumentId(movement.relatedDocument.id);
+        setPaymentMode('partial');
+    } else {
+        setSelectedDocumentId('');
+        setPaymentMode('partial');
     }
   }, [movement, isOpen]);
-  
-  useEffect(() => {
-      if (isBatchMode) {
-          setAssociationType('anticipo');
-      } else if (formData.type !== 'traspaso') {
-          setAssociationType('document');
-      } else {
-          setAssociationType('concept');
-      }
-      setPendingBalance(null);
-  }, [isBatchMode, formData.type]);
-  
-  useEffect(() => {
-    if (paymentType === 'total' && pendingBalance !== null) {
-      const balanceForTotal = movement ? (pendingBalance || 0) + movement.amount : (pendingBalance || 0);
-      setFormData(prev => ({...prev, amount: balanceForTotal}));
-    }
-  }, [paymentType, pendingBalance, movement]);
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  useEffect(() => {
+    if (!selectedDocumentId) {
+        setFormData(p => ({ ...p, relatedDocument: undefined }));
+        return;
+    }
+    const docType = salesOrders.some(s => s.id === selectedDocumentId) ? 'OV' : 'OC';
+    setFormData(p => ({ ...p, relatedDocument: { id: selectedDocumentId, type: docType }}));
+    setPaymentMode('balance');
+  }, [selectedDocumentId, salesOrders]);
+
+  useEffect(() => {
+    if (!selectedDocument) return;
+    switch(paymentMode) {
+        case 'total':
+            setFormData(p => ({ ...p, amount: documentBalance.total }));
+            break;
+        case 'balance':
+            setFormData(p => ({ ...p, amount: documentBalance.pending }));
+            break;
+        case 'partial':
+            // Allows manual input
+            break;
+    }
+  }, [paymentMode, selectedDocument, documentBalance]);
+  
+  useEffect(() => {
+      // Reset dependent fields when type changes
+      setFormData(prev => ({ 
+          ...getInitialFormData(null), 
+          type: prev.type, 
+          date: prev.date,
+          amount: prev.amount, // Keep amount for quick re-entry
+      }));
+      setSelectedDocumentId('');
+  }, [formData.type]);
+
+
+  // --- HANDLERS ---
+
+  const handleTypeChange = (type: 'income' | 'expense' | 'traspaso') => {
+    setFormData(prev => ({...prev, type}));
+  }
   
   const handleAmountChange = (value: string) => {
     const numericValue = parseInt(value.replace(/\D/g, ''), 10) || 0;
     setFormData(prev => ({...prev, amount: numericValue}));
-    setPaymentType('abono');
-  }
-  
-  const handleBatchAmountChange = (batchId: number, value: string) => {
-    const numericValue = parseInt(value.replace(/\D/g, ''), 10) || 0;
-    handleBatchChange(batchId, 'amount', numericValue);
-  }
-
-  const handleSelectChange = (name: keyof typeof formData, value: any) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-
-    if (name === 'contactId' && associationType === 'document') {
-        setRelatedOrderType('');
-        setFormData(p => ({...p, relatedDocument: undefined}));
-        setPendingBalance(null);
-    }
-  };
-
-  const handleRelatedOrderSelect = (orderId: string) => {
-    if (!relatedOrderType) return;
-    
-    calculatePendingBalance(relatedOrderType, orderId);
-    setPaymentType('abono');
-    setFormData(prev => ({ 
-        ...prev, 
-        relatedDocument: { type: relatedOrderType, id: orderId },
-        amount: 0, 
-        internalConcept: undefined,
-        productId: undefined,
-    }));
-  }
-
-  const handleSuggestDescription = async () => {
-      if (!formData.relatedDocument) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Debe asociar un documento primero.' });
-        return;
-      }
-      setIsSuggesting(true);
-      try {
-          const result = await suggestTransactionDescription({
-              transactionType: formData.type,
-              transactionDetails: `Documento: ${formData.relatedDocument.type}-${formData.relatedDocument.id}, Monto: ${formData.amount}, Saldo Pendiente: ${pendingBalance}`
-          });
-          if (result.suggestedDescription) {
-              setFormData(prev => ({...prev, description: result.suggestedDescription}));
-          }
-      } catch(e) {
-          console.error(e);
-          toast({ variant: 'destructive', title: 'Error de IA', description: 'No se pudo generar la sugerencia.' });
-      } finally {
-          setIsSuggesting(false);
-      }
-  };
-
-  const addBatchMovement = () => {
-    setBatchMovements(prev => [...prev, { 
-        batchId: Date.now(), 
-        date: format(new Date(), 'yyyy-MM-dd'),
-        description: '',
-        amount: 0,
-        paymentMethod: 'Transferencia',
-        sourceAccountId: formData.type === 'expense' ? formData.sourceAccountId : '',
-        destinationAccountId: formData.type === 'income' ? formData.destinationAccountId : '',
-    }]);
-  }
-
-  const removeBatchMovement = (batchId: number) => {
-    setBatchMovements(prev => prev.filter(m => m.batchId !== batchId));
-  }
-
-  const handleBatchChange = (batchId: number, field: keyof BatchMovement, value: any) => {
-    setBatchMovements(prev => prev.map(m => m.batchId === batchId ? { ...m, [field]: value } : m));
+    setPaymentMode('partial');
   }
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (isBatchMode) {
-        if (!formData.contactId) {
-            toast({ variant: "destructive", title: "Error", description: "Debe seleccionar un contacto para el registro múltiple." });
-            return;
-        }
-        if (batchMovements.length === 0 || batchMovements.some(m => m.amount <= 0 || !m.description || (!m.sourceAccountId && !m.destinationAccountId))) {
-            toast({ variant: "destructive", title: "Error", description: "Todos los movimientos deben tener descripción, monto positivo y cuenta." });
-            return;
-        }
-        const movementsToSave = batchMovements.map(bm => ({
-            ...bm,
-            type: formData.type,
-            contactId: formData.contactId,
-        }));
-        onSave(movementsToSave);
-    } else {
-        if (!formData.date) {
-            toast({ variant: "destructive", title: "Error", description: "Debe seleccionar una fecha." });
-            return;
-        }
-        if (movement) {
-            onSave({ ...formData, id: movement.id });
-        } else {
-            onSave(formData);
-        }
+    if (formData.amount <= 0) {
+        toast({ variant: "destructive", title: "Error", description: "El monto debe ser mayor a cero." });
+        return;
     }
+    if(selectedDocument && formData.amount > documentBalance.pending + 0.01) { // +0.01 for float issues
+        toast({ variant: "destructive", title: "Monto excede saldo", description: `El pago ${formatCurrency(formData.amount)} supera el saldo pendiente de ${formatCurrency(documentBalance.pending)}.` });
+        return;
+    }
+    onSave(movement ? { ...formData, id: movement.id } : formData);
   };
   
-  const getOrderOptions = () => {
-    if (!formData.contactId || !relatedOrderType) return [];
-    
-    switch (relatedOrderType) {
-        case 'OC': return purchaseOrders.filter(o => o.supplierId === formData.contactId).map(o => ({ value: o.id, label: `${o.number || o.id}` }));
-        case 'OV': return salesOrders.filter(o => o.clientId === formData.contactId).map(o => ({ value: o.id, label: `${o.number || o.id}` }));
-        case 'OS': 
-          const contact = contacts.find(c => c.id === formData.contactId);
-          if (!contact) return [];
-          return serviceOrders.filter(o => o.provider === contact.name).map(o => ({ value: o.id, label: `${o.id} - ${o.description}`}));
-        default: return [];
-    }
-  }
-
-  const title = movement ? 'Editar Movimiento' : 'Registrar Movimiento';
-  const description = movement ? 'Actualice los detalles del registro.' : 'Registra un nuevo ingreso, egreso o traspaso.';
-
-  const filteredContacts = formData.type === 'income' 
-    ? contacts.filter(c => c.type.includes('client') || c.type.includes('other_income')) 
-    : contacts.filter(c => c.type.includes('supplier') || c.type.includes('other_expense'));
-
-  const onAssociationChange = (value: 'document' | 'anticipo' | 'concept') => {
-      setAssociationType(value);
-      setFormData(prev => ({
-          ...prev,
-          relatedDocument: undefined,
-          contactId: undefined,
-          internalConcept: undefined,
-          productId: undefined,
-          description: '',
-      }));
-      if (value === 'concept' && costCenters.length > 0) {
-        setFormData(prev => ({
-            ...prev,
-            description: costCenters[0].name
-        }));
-      }
-      setPendingBalance(null);
-  }
-
-  const onTypeChange = (value: 'income' | 'expense' | 'traspaso') => {
-      setFormData(prev => ({
-          ...getInitialFormData(),
-          date: prev.date,
-          type: value,
-      }));
-  }
-  
   const handleDeleteClick = () => {
-    if (movement && onDelete) {
-        onDelete(movement);
-    }
+    if (movement && onDelete) onDelete(movement);
   }
   
+  // --- UI CONSTANTS & STYLES ---
+  const title = movement ? `Editar Movimiento #${movement.id.slice(0, 6)}` : 'Registrar Movimiento';
   const darkInputClass = "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-blue-500";
   const darkCardClass = "bg-slate-900 border-slate-800 shadow-sm";
   const labelClass = "text-xs font-medium text-slate-400 uppercase tracking-wide";
-
+  const getTabClass = (tabType: string) => cn(
+    "flex-1 h-12 text-base font-bold transition-all disabled:opacity-50",
+    formData.type === tabType
+      ? (tabType === 'income' ? 'bg-emerald-600 shadow-lg shadow-emerald-900/20 text-white' : 
+         tabType === 'expense' ? 'bg-rose-600 shadow-lg shadow-rose-900/20 text-white' :
+         'bg-blue-600 shadow-lg shadow-blue-900/20 text-white')
+      : 'bg-transparent text-slate-400 hover:bg-slate-800'
+  );
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-2xl w-full flex flex-col p-0 gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
         <SheetHeader className="px-6 py-4 bg-slate-900/50 border-b border-slate-800">
           <SheetTitle className="text-xl font-bold">{title}</SheetTitle>
-          <SheetDescription className="text-slate-400">{description}</SheetDescription>
+          <SheetDescription className="text-slate-400">Registra un nuevo ingreso, egreso o traspaso.</SheetDescription>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
           <div className="overflow-y-auto p-6 space-y-6">
             
-            {/* TYPE SELECTOR */}
-            <div className='grid grid-cols-3 gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800'>
-                <Button type="button" onClick={() => onTypeChange('income')} className={`h-11 text-base font-bold transition-all ${formData.type === 'income' ? 'bg-emerald-600 shadow-lg shadow-emerald-900/20 text-white' : 'bg-transparent text-slate-400 hover:bg-slate-800'}`}>
-                    <ArrowDownLeft className="mr-2"/> Ingreso
-                </Button>
-                <Button type="button" onClick={() => onTypeChange('expense')} className={`h-11 text-base font-bold transition-all ${formData.type === 'expense' ? 'bg-rose-600 shadow-lg shadow-rose-900/20 text-white' : 'bg-transparent text-slate-400 hover:bg-slate-800'}`}>
-                    <ArrowUpRight className="mr-2"/> Egreso
-                </Button>
-                <Button type="button" onClick={() => onTypeChange('traspaso')} className={`h-11 text-base font-bold transition-all ${formData.type === 'traspaso' ? 'bg-blue-600 shadow-lg shadow-blue-900/20 text-white' : 'bg-transparent text-slate-400 hover:bg-slate-800'}`}>
-                    <GitCompareArrows className="mr-2"/> Traspaso
-                </Button>
-            </div>
-
-            {/* MAIN DATA: DATE & AMOUNT */}
+            <Tabs value={formData.type} onValueChange={(v) => handleTypeChange(v as any)} className='w-full'>
+                <TabsList className='grid w-full grid-cols-3 gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800 h-auto'>
+                    <TabsTrigger value='income' className={getTabClass('income')}><ArrowDownLeft className="mr-2"/> Ingreso</TabsTrigger>
+                    <TabsTrigger value='expense' className={getTabClass('expense')}><ArrowUpRight className="mr-2"/> Egreso</TabsTrigger>
+                    <TabsTrigger value='traspaso' className={getTabClass('traspaso')}><GitCompareArrows className="mr-2"/> Traspaso</TabsTrigger>
+                </TabsList>
+            </Tabs>
+            
             <Card className={darkCardClass}>
                 <CardContent className="p-4 grid grid-cols-2 gap-4">
-                     <div className="space-y-2">
+                    <div className="space-y-2">
                         <Label className={labelClass}>Fecha del Movimiento</Label>
-                         <Popover>
+                        <Popover>
                             <PopoverTrigger asChild>
                                 <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-12", darkInputClass, !formData.date && "text-muted-foreground")}>
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {formData.date ? format(parseISO(formData.date), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100">
-                                <Calendar mode="single" selected={formData.date ? parseISO(formData.date) : undefined} onSelect={(d) => d && handleSelectChange('date', format(d, 'yyyy-MM-dd'))} initialFocus />
+                            <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100" align="start">
+                                <Calendar mode="single" selected={formData.date ? parseISO(formData.date) : undefined} onSelect={(d) => d && setFormData(p => ({...p, date: format(d, 'yyyy-MM-dd')}))} captionLayout="dropdown-buttons" fromYear={2023} toYear={2030} />
                             </PopoverContent>
                         </Popover>
-                     </div>
-                     <div className="space-y-2">
+                    </div>
+                    <div className="space-y-2">
                         <Label className={labelClass}>Monto</Label>
                         <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-3xl font-bold text-slate-500">$</span>
@@ -372,100 +258,130 @@ export function NewFinancialMovementSheet({
                                 onChange={(e) => handleAmountChange(e.target.value)}
                                 className="h-12 text-3xl font-bold text-center tracking-tighter bg-slate-950 border-slate-800 placeholder:text-slate-700"
                                 required placeholder="0"
-                                disabled={paymentType === 'total'}
                             />
                         </div>
-                     </div>
+                    </div>
                 </CardContent>
             </Card>
 
-            {/* ORIGIN / DESTINATION */}
-             <Card className={darkCardClass}>
+            <Card className={darkCardClass}>
                 <CardContent className="p-4 space-y-4">
-                     {formData.type === 'traspaso' ? (
+                    {formData.type === 'traspaso' ? (
                          <div className="flex items-center gap-2">
                             <div className="flex-1 space-y-1">
                                 <Label className={labelClass}>Desde Cuenta</Label>
-                                <Select required onValueChange={(v) => handleSelectChange('sourceAccountId', v)} value={formData.sourceAccountId}><SelectTrigger className={darkInputClass}><SelectValue placeholder="Origen"/></SelectTrigger><SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa').map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent></Select>
+                                <Select required onValueChange={(v) => setFormData(p => ({...p, sourceAccountId: v}))} value={formData.sourceAccountId}><SelectTrigger className={darkInputClass}><SelectValue placeholder="Origen"/></SelectTrigger><SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa').map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent></Select>
                             </div>
                             <ArrowRight className="mt-5 text-slate-600"/>
                             <div className="flex-1 space-y-1">
                                 <Label className={labelClass}>Hacia Cuenta</Label>
-                                <Select required onValueChange={(v) => handleSelectChange('destinationAccountId', v)} value={formData.destinationAccountId}><SelectTrigger className={darkInputClass}><SelectValue placeholder="Destino"/></SelectTrigger><SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa' && a.id !== formData.sourceAccountId).map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent></Select>
+                                <Select required onValueChange={(v) => setFormData(p => ({...p, destinationAccountId: v}))} value={formData.destinationAccountId}><SelectTrigger className={darkInputClass}><SelectValue placeholder="Destino"/></SelectTrigger><SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa' && a.id !== formData.sourceAccountId).map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent></Select>
                             </div>
                         </div>
-                     ) : (
-                         <div className="grid grid-cols-2 gap-4">
-                             <div className="space-y-1">
+                    ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
                                 <Label className={labelClass}>{formData.type === 'income' ? 'Cuenta Destino' : 'Cuenta Origen'}</Label>
-                                <Select required onValueChange={(v) => handleSelectChange(formData.type === 'income' ? 'destinationAccountId' : 'sourceAccountId', v)} value={formData.type === 'income' ? formData.destinationAccountId : formData.sourceAccountId}>
-                                    <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione una cuenta"/></SelectTrigger>
+                                <Select required onValueChange={(v) => setFormData(p => ({...p, [formData.type === 'income' ? 'destinationAccountId' : 'sourceAccountId']: v}))} value={formData.type === 'income' ? formData.destinationAccountId : formData.sourceAccountId}>
+                                    <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione cuenta..."/></SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa').map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent>
                                 </Select>
-                             </div>
-                             <div className="space-y-1">
+                            </div>
+                            <div className="space-y-1">
                                 <Label className={labelClass}>Forma de Pago</Label>
-                                <Select required onValueChange={(v) => handleSelectChange('paymentMethod', v)} value={formData.paymentMethod}>
+                                <Select required onValueChange={(v) => setFormData(p => ({...p, paymentMethod: v}))} value={formData.paymentMethod}>
                                     <SelectTrigger className={darkInputClass}><SelectValue /></SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                         <SelectItem value="Transferencia">Transferencia</SelectItem>
                                         <SelectItem value="Efectivo">Efectivo</SelectItem>
-                                        <SelectItem value="Depósito Bancario">Depósito Bancario</SelectItem>
+                                        <SelectItem value="Depósito">Depósito</SelectItem>
                                         <SelectItem value="Cheque">Cheque</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
-                         </div>
-                     )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
-            {/* CLASSIFICATION */}
-             <Card className={darkCardClass}>
+            {formData.type !== 'traspaso' && (
+            <Card className={darkCardClass}>
+                <CardContent className="p-4 space-y-4">
+                     <div className="flex items-center gap-2">
+                        {formData.type === 'income' ? <User className="h-4 w-4 text-slate-400"/> : <Building className="h-4 w-4 text-slate-400"/>}
+                        <Label className="font-medium text-slate-300">Asociación del Movimiento</Label>
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                        <div className='space-y-1'>
+                            <Label className={labelClass}>{formData.type === 'income' ? 'Cliente' : 'Proveedor'}</Label>
+                            <Select onValueChange={(v) => { setFormData(p => ({...p, contactId: v})); setSelectedDocumentId(''); }} value={formData.contactId}>
+                                <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..."/></SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                    {filteredContacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                         <div className='space-y-1'>
+                            <Label className={labelClass}>Documento Asociado (OV/OC)</Label>
+                            <Select onValueChange={setSelectedDocumentId} value={selectedDocumentId} disabled={!formData.contactId || pendingDocuments.length === 0}>
+                                <SelectTrigger className={darkInputClass}><SelectValue placeholder={pendingDocuments.length > 0 ? "Seleccione documento..." : "Sin docs pendientes"}/></SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                    {pendingDocuments.map(d => <SelectItem key={d.id} value={d.id}>{d.number || d.id} - {formatCurrency(d.totalAmount)}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    {selectedDocument && (
+                        <div className="space-y-3 pt-3">
+                            <Alert className="bg-slate-950 border-slate-800">
+                                <FileText className="h-4 w-4 !text-slate-400" />
+                                <AlertDescription className="text-slate-300">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span>Total Documento:</span>
+                                        <span className="font-mono font-bold">{formatCurrency(documentBalance.total)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span>Pagos Anteriores:</span>
+                                        <span className="font-mono text-emerald-400">{formatCurrency(documentBalance.paid)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-lg mt-1 pt-1 border-t border-slate-700">
+                                        <span className="font-bold">Saldo Pendiente:</span>
+                                        <span className="font-mono font-bold text-amber-400">{formatCurrency(documentBalance.pending)}</span>
+                                    </div>
+                                </AlertDescription>
+                            </Alert>
+                             <RadioGroup value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)} className="flex gap-2">
+                                <Label className={cn("flex-1 p-2 border rounded-md cursor-pointer text-center text-xs transition-all", paymentMode === 'balance' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800')}>
+                                    <RadioGroupItem value="balance" id="r-balance" className="sr-only"/> Pagar Saldo
+                                </Label>
+                                <Label className={cn("flex-1 p-2 border rounded-md cursor-pointer text-center text-xs transition-all", paymentMode === 'total' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800')}>
+                                    <RadioGroupItem value="total" id="r-total" className="sr-only"/> Pagar Total Doc.
+                                </Label>
+                                <Label className={cn("flex-1 p-2 border rounded-md cursor-pointer text-center text-xs transition-all", paymentMode === 'partial' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800')}>
+                                    <RadioGroupItem value="partial" id="r-partial" className="sr-only"/> Abono Parcial
+                                </Label>
+                             </RadioGroup>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+            )}
+
+            <Card className={darkCardClass}>
                 <CardContent className="p-4 grid grid-cols-2 gap-4">
                      <div className="space-y-1">
-                        <Label className={labelClass}>Centro de Costo</Label>
-                        <Select onValueChange={(v) => handleSelectChange('description', v)} value={formData.description} required>
+                        <Label className={labelClass}>Descripción / Centro de Costo</Label>
+                        <Select onValueChange={(v) => setFormData(p => ({...p, description: v}))} value={formData.description} required>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{costCenters.map(c => (<SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>))}</SelectContent>
                         </Select>
                      </div>
                      <div className="space-y-1">
                         <Label className={labelClass}>Referencia</Label>
-                         <Input name="reference" value={formData.reference || ''} onChange={handleInputChange} className={darkInputClass} placeholder='Ej: Nro. Factura, Nro. Cheque'/>
+                         <Input name="reference" value={formData.reference || ''} onChange={(e) => setFormData(p => ({...p, reference: e.target.value}))} className={darkInputClass} placeholder='Ej: Nro. Factura, Nro. Cheque'/>
                      </div>
                 </CardContent>
             </Card>
-
-            {/* ASSOCIATION */}
-            {formData.type !== 'traspaso' && (
-            <Card className={darkCardClass}>
-                <CardContent className="p-4 space-y-4">
-                     <Label className="font-medium text-slate-300">Asociación del Movimiento</Label>
-                      <RadioGroup value={associationType} onValueChange={onAssociationChange} className="flex gap-4">
-                          <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="document" id="r-doc" />
-                              <Label htmlFor="r-doc">A Documento</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="anticipo" id="r-anticipo" />
-                              <Label htmlFor="r-anticipo">Anticipo a Contacto</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="concept" id="r-concept" />
-                              <Label htmlFor="r-concept">Concepto Interno</Label>
-                          </div>
-                      </RadioGroup>
-                      
-                       <div className='pt-2 space-y-2'>
-                        {associationType === 'document' && ( <div></div> )}
-                        {associationType === 'anticipo' && ( <div></div> )}
-                        {associationType === 'concept' && ( <div></div> )}
-                      </div>
-                      {pendingBalance !== null && ( <div></div> )}
-                </CardContent>
-            </Card>
-            )}
 
           </div>
           <SheetFooter className="p-4 bg-slate-900 border-t border-slate-800 mt-auto flex justify-between">
@@ -486,3 +402,4 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
+
