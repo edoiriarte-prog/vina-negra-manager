@@ -192,8 +192,26 @@ export function NewFinancialMovementSheet({
   }
 
   const handleSuggestDescription = async () => {
-    // ... (logic is correct, not changing it)
-  }
+      if (!formData.relatedDocument) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Debe asociar un documento primero.' });
+        return;
+      }
+      setIsSuggesting(true);
+      try {
+          const result = await suggestTransactionDescription({
+              transactionType: formData.type,
+              transactionDetails: `Documento: ${formData.relatedDocument.type}-${formData.relatedDocument.id}, Monto: ${formData.amount}, Saldo Pendiente: ${pendingBalance}`
+          });
+          if (result.suggestedDescription) {
+              setFormData(prev => ({...prev, description: result.suggestedDescription}));
+          }
+      } catch(e) {
+          console.error(e);
+          toast({ variant: 'destructive', title: 'Error de IA', description: 'No se pudo generar la sugerencia.' });
+      } finally {
+          setIsSuggesting(false);
+      }
+  };
 
   const addBatchMovement = () => {
     setBatchMovements(prev => [...prev, { 
@@ -440,11 +458,11 @@ export function NewFinancialMovementSheet({
                       </RadioGroup>
                       
                        <div className='pt-2 space-y-2'>
-                        {associationType === 'document' && ( /* ... */ )}
-                        {associationType === 'anticipo' && ( /* ... */ )}
-                        {associationType === 'concept' && ( /* ... */ )}
+                        {associationType === 'document' && ( <div></div> )}
+                        {associationType === 'anticipo' && ( <div></div> )}
+                        {associationType === 'concept' && ( <div></div> )}
                       </div>
-                      {pendingBalance !== null && ( /* ... */ )}
+                      {pendingBalance !== null && ( <div></div> )}
                 </CardContent>
             </Card>
             )}
