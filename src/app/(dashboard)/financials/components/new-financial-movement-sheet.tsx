@@ -21,8 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact } from '@/lib/types';
-import { format, parseISO, startOfYear } from 'date-fns';
+import { FinancialMovement, PurchaseOrder, SalesOrder, Contact } from '@/lib/types';
+import { format, parseISO } from 'date-fns';
 import { suggestTransactionDescription } from '@/ai/flows/suggest-transaction-descriptions';
 import { Loader2, Sparkles, CalendarIcon, Trash2, ArrowRight, ArrowDownLeft, ArrowUpRight, GitCompareArrows, Banknote, User, Building, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -88,10 +88,10 @@ export function NewFinancialMovementSheet({
   // --- DERIVED STATE & MEMOS ---
   const filteredContacts = useMemo(() => {
     if (formData.type === 'income') {
-      return contacts.filter(c => c.type.includes('client') || c.type.includes('other_income'));
+      return contacts.filter(c => Array.isArray(c.type) && (c.type.includes('client') || c.type.includes('other_income')));
     }
     if (formData.type === 'expense') {
-      return contacts.filter(c => c.type.includes('supplier') || c.type.includes('other_expense'));
+      return contacts.filter(c => Array.isArray(c.type) && (c.type.includes('supplier') || c.type.includes('other_expense')));
     }
     return [];
   }, [formData.type, contacts]);
@@ -240,11 +240,11 @@ export function NewFinancialMovementSheet({
                             <PopoverTrigger asChild>
                                 <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-12", darkInputClass, !formData.date && "text-muted-foreground")}>
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {formData.date ? format(parseISO(formData.date), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                                    {formData.date ? format(new Date(formData.date.replace(/-/g, '/')), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100" align="start">
-                                <Calendar mode="single" selected={formData.date ? parseISO(formData.date) : undefined} onSelect={(d) => d && setFormData(p => ({...p, date: format(d, 'yyyy-MM-dd')}))} captionLayout="dropdown-buttons" fromYear={2023} toYear={2030} />
+                                <Calendar mode="single" selected={new Date(formData.date.replace(/-/g, '/'))} onSelect={(d) => d && setFormData(p => ({...p, date: format(d, 'yyyy-MM-dd')}))} captionLayout="dropdown-buttons" fromYear={2023} toYear={2030} />
                             </PopoverContent>
                         </Popover>
                     </div>
@@ -270,12 +270,18 @@ export function NewFinancialMovementSheet({
                          <div className="flex items-center gap-2">
                             <div className="flex-1 space-y-1">
                                 <Label className={labelClass}>Desde Cuenta</Label>
-                                <Select required onValueChange={(v) => setFormData(p => ({...p, sourceAccountId: v}))} value={formData.sourceAccountId}><SelectTrigger className={darkInputClass}><SelectValue placeholder="Origen"/></SelectTrigger><SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa').map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent></Select>
+                                <Select required onValueChange={(v) => setFormData(p => ({...p, sourceAccountId: v}))} value={formData.sourceAccountId}>
+                                    <SelectTrigger className={darkInputClass}><SelectValue placeholder="Origen"/></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa').map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent>
+                                </Select>
                             </div>
                             <ArrowRight className="mt-5 text-slate-600"/>
                             <div className="flex-1 space-y-1">
                                 <Label className={labelClass}>Hacia Cuenta</Label>
-                                <Select required onValueChange={(v) => setFormData(p => ({...p, destinationAccountId: v}))} value={formData.destinationAccountId}><SelectTrigger className={darkInputClass}><SelectValue placeholder="Destino"/></SelectTrigger><SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa' && a.id !== formData.sourceAccountId).map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent></Select>
+                                <Select required onValueChange={(v) => setFormData(p => ({...p, destinationAccountId: v}))} value={formData.destinationAccountId}>
+                                    <SelectTrigger className={darkInputClass}><SelectValue placeholder="Destino"/></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa' && a.id !== formData.sourceAccountId).map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent>
+                                </Select>
                             </div>
                         </div>
                     ) : (
@@ -402,4 +408,3 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
-
