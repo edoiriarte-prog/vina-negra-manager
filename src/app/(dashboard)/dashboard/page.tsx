@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -22,7 +23,7 @@ import {
     PieChart,
     Activity
 } from "lucide-react";
-import { InventoryItem } from '@/lib/types';
+import { InventoryItem, PurchaseOrder, SalesOrder } from '@/lib/types';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
@@ -34,20 +35,26 @@ export default function DashboardPage() {
   const { purchaseOrders, salesOrders, financialMovements, inventoryAdjustments, isLoading: loadingOps } = useOperations();
   const isLoading = loadingMaster || loadingOps;
 
+  // --- FILTROS DE DATOS PRIMARIOS ---
+  const completedPurchases: PurchaseOrder[] = useMemo(() => {
+    return purchaseOrders.filter(o => o.status === 'completed' || o.status === 'received');
+  }, [purchaseOrders]);
+  
+  const completedSales: SalesOrder[] = useMemo(() => {
+    return salesOrders.filter(o => o.status === 'dispatched' || o.status === 'invoiced');
+  }, [salesOrders]);
+
   // Cálculo de Stock en tiempo real
   const availableStock = useMemo(() => {
       let stock = 0;
-      purchaseOrders.forEach(o => { if(o.status === 'completed' || o.status === 'received') o.items.forEach(i => stock += i.quantity) });
-      salesOrders.forEach(o => { if(o.status === 'completed' || o.status === 'dispatched' || o.status === 'invoiced') o.items.forEach(i => stock -= i.quantity) });
+      completedPurchases.forEach(o => o.items.forEach(i => stock += i.quantity));
+      completedSales.forEach(o => o.items.forEach(i => stock -= i.quantity));
       inventoryAdjustments.forEach(a => { stock += (a.type === 'increase' ? a.quantity : -a.quantity) });
       return stock;
-  }, [purchaseOrders, salesOrders, inventoryAdjustments]);
+  }, [completedPurchases, completedSales, inventoryAdjustments]);
 
   const { kpis, financialDataString } = useMemo(() => {
     if (isLoading) return { kpis: null, financialDataString: '' };
-
-    const completedPurchases = purchaseOrders.filter(o => o.status === 'completed' || o.status === 'received');
-    const completedSales = salesOrders.filter(o => o.status === 'completed' || o.status === 'dispatched' || o.status === 'invoiced');
 
     const totalPurchaseAmount = completedPurchases.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     const totalSalesAmount = completedSales.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
@@ -69,7 +76,7 @@ export default function DashboardPage() {
     const financialString = `Ventas: ${formatCurrency(totalSalesAmount)}. Compras: ${formatCurrency(totalPurchaseAmount)}. Flujo Neto: ${formatCurrency(netCashflow)}. Stock: ${formatKilos(availableStock)}kg.`;
     
     return { kpis: kpiData, financialDataString: financialString };
-  }, [purchaseOrders, salesOrders, financialMovements, availableStock, isLoading]);
+  }, [completedPurchases, completedSales, financialMovements, availableStock, isLoading]);
 
 
   if (isLoading || !kpis) {
@@ -90,7 +97,7 @@ export default function DashboardPage() {
 
       {/* 1. KPIs Principales */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KpiCard title="Ventas Totales" value={formatCurrency(kpis.totalSalesAmount)} description={`${kpis.completedSalesCount} OP completadas`} icon={<TrendingUp className="text-blue-500" />} isLoading={isLoading} />
+        <KpiCard title="Ventas Totales" value={formatCurrency(kpis.totalSalesAmount)} description={`${kpis.completedSalesCount} OP despachadas`} icon={<TrendingUp className="text-blue-500" />} isLoading={isLoading} />
         <KpiCard title="Compras Totales" value={formatCurrency(kpis.totalPurchaseAmount)} description={`${kpis.completedPurchasesCount} OC recepcionadas`} icon={<ShoppingCart className="text-amber-500" />} isLoading={isLoading} />
         <KpiCard title="Flujo de Caja Neto" value={formatCurrency(kpis.netCashflow)} description="Ingresos reales - Egresos" icon={<DollarSign className={kpis.netCashflow >= 0 ? "text-emerald-500" : "text-red-500"} />} isLoading={isLoading} />
         <KpiCard title="Stock Disponible" value={`${formatKilos(kpis.availableStock)} kg`} description="Inventario actual global" icon={<Warehouse className="text-purple-500" />} isLoading={isLoading} />
@@ -106,7 +113,7 @@ export default function DashboardPage() {
                     <CardDescription className="text-slate-400">Comparativa semanal de Ventas (Línea) vs. Compras (Barras).</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ComparativeFinancialChart sales={salesOrders} purchases={purchaseOrders} />
+                    <ComparativeFinancialChart sales={completedSales} purchases={completedPurchases} />
                   </CardContent>
               </Card>
           </div>
@@ -126,7 +133,7 @@ export default function DashboardPage() {
                     <CardTitle className="text-white flex items-center gap-2"><PieChart className="h-5 w-5 text-amber-500"/> Top Proveedores (Kg)</CardTitle>
                   </CardHeader>
                   <CardContent>
-                      <TopSuppliersChart data={purchaseOrders} suppliers={contacts}/>
+                      <TopSuppliersChart data={completedPurchases} suppliers={contacts}/>
                   </CardContent>
               </Card>
           </div>
@@ -140,7 +147,7 @@ export default function DashboardPage() {
                 <CardDescription className="text-slate-400">Productos más comprados vs. vendidos.</CardDescription>
             </CardHeader>
             <CardContent>
-                <ProductFlowChart sales={salesOrders} purchases={purchaseOrders} />
+                <ProductFlowChart sales={completedSales} purchases={completedPurchases} />
             </CardContent>
         </Card>
 
