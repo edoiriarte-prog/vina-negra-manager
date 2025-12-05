@@ -193,7 +193,17 @@ export function NewFinancialMovementSheet({
         toast({ variant: "destructive", title: "Monto excede saldo", description: `El pago ${formatCurrency(formData.amount)} supera el saldo pendiente de ${formatCurrency(documentBalance.pending)}.` });
         return;
     }
-    onSave(movement ? { ...formData, id: movement.id } : formData);
+
+    const dataToSave = { ...formData };
+    
+    // Sanitize data: Firestore doesn't accept 'undefined'
+    (Object.keys(dataToSave) as Array<keyof typeof dataToSave>).forEach(key => {
+        if (dataToSave[key] === undefined) {
+           (dataToSave as any)[key] = null;
+        }
+    });
+
+    onSave(movement ? { ...dataToSave, id: movement.id } : dataToSave);
   };
   
   const handleDeleteClick = () => {
@@ -408,3 +418,4 @@ export function NewFinancialMovementSheet({
     </Sheet>
   );
 }
+
