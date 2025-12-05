@@ -1,133 +1,74 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
 import { useOperations } from '@/hooks/use-operations';
 import { useMasterData } from '@/hooks/use-master-data';
-import { FinancialMovement, BankAccount } from '@/lib/types';
+import { useFinancialsCRUD } from '@/hooks/use-financials-crud'; // Importamos el nuevo hook
+import { FinancialMovement } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "./components/data-table";
 import { getColumns } from "./components/columns";
 import { NewFinancialMovementSheet } from './components/new-financial-movement-sheet';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { 
-  Wallet, 
-  Landmark, 
-  History,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Plus
-} from "lucide-react";
+import { Wallet, Landmark, History, ArrowUpRight, ArrowDownLeft, Plus, Banknote } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
-import { useToast } from "@/hooks/use-toast";
 
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
 
 export default function FinancialsPage() {
-  const { firestore } = useFirebase();
-  const { toast } = useToast();
-
+  // HOOKS DE DATOS
   const { bankAccounts, contacts, isLoading: l1 } = useMasterData();
   const { financialMovements, purchaseOrders, salesOrders, serviceOrders, isLoading: l2 } = useOperations();
+  const { createFinancialMovement, updateFinancialMovement, deleteFinancialMovement } = useFinancialsCRUD();
 
   const isLoading = l1 || l2;
 
+  // ESTADOS UI
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingMovement, setEditingMovement] = useState<FinancialMovement | null>(null);
   const [deletingMovement, setDeletingMovement] = useState<FinancialMovement | null>(null);
 
-  // --- CORRECCIÓN DE TYPESCRIPT AQUÍ ---
-  // 1. Calculamos los datos en un objeto "summary"
-  const summary = useMemo(() => {
-    // Valores iniciales seguros
-    const initialData = { 
-        accountBalances: {} as Record<string, number>, 
-        totalBalance: 0, 
-        totalIncome: 0, 
-        totalExpense: 0 
-    };
-
-    if (!bankAccounts || !financialMovements) return initialData;
+  // CÁLCULO DE TOTALES (KPIs)
+  const { totalBalance, totalIncome, totalExpense } = useMemo(() => {
+    if (!bankAccounts || !financialMovements) return { totalBalance: 0, totalIncome: 0, totalExpense: 0 };
     
-    const balances: Record<string, number> = {};
     let income = 0;
     let expense = 0;
     
-    bankAccounts.forEach(acc => balances[acc.id] = acc.initialBalance || 0);
-
     financialMovements.forEach(m => {
         const amt = Number(m.amount) || 0;
-        if (m.type === 'income') {
-            income += amt;
-             // Lógica simple: si hay destino, sumamos. 
-             // En un sistema real, deberíamos validar destinationAccountId
-        } else if (m.type === 'expense') {
-            expense += amt;
-        }
+        if (m.type === 'income') income += amt;
+        else if (m.type === 'expense') expense += amt;
     });
 
-    // Cálculo global simple para KPIs
-    const globalTotal = (income - expense) + (bankAccounts.reduce((acc, b) => acc + (b.initialBalance || 0), 0));
+    const bankInitial = bankAccounts.reduce((acc, b) => acc + (Number(b.initialBalance) || 0), 0);
+    const globalTotal = bankInitial + income - expense;
 
-    return { 
-        accountBalances: balances, 
-        totalBalance: globalTotal, 
-        totalIncome: income, 
-        totalExpense: expense 
-    };
+    return { totalBalance: globalTotal, totalIncome: income, totalExpense: expense };
   }, [bankAccounts, financialMovements]);
 
-  // 2. Desestructuramos DESPUÉS de que TypeScript ya sabe qué es "summary"
-  const { accountBalances, totalBalance, totalIncome, totalExpense } = summary;
-
-  // --- CRUD HANDLERS ---
-
-  const handleSaveMovement = (movementData: any) => {
-    if (!firestore) return;
-
-    const saveSingle = (data: any) => {
-        // Aseguramos que amount sea número
-        const cleanData = { ...data, amount: Number(data.amount) };
-        
-        if ('id' in cleanData && cleanData.id) {
-            updateDocumentNonBlocking(doc(firestore, 'financialMovements', cleanData.id), cleanData);
-            toast({ title: "Movimiento Actualizado" });
-        } else {
-            addDocumentNonBlocking(collection(firestore, 'financialMovements'), cleanData);
-            toast({ title: "Movimiento Registrado" });
-        }
-    };
-
+  // HANDLERS (Ahora usan el Hook limpio)
+  const handleSaveMovement = async (movementData: any) => {
     if (Array.isArray(movementData)) {
-        movementData.forEach(m => saveSingle(m));
+        await createFinancialMovement(movementData);
     } else {
-        saveSingle(movementData);
+        if ('id' in movementData && movementData.id) {
+            await updateFinancialMovement(movementData.id, movementData);
+        } else {
+            await createFinancialMovement(movementData);
+        }
     }
-    
     setIsSheetOpen(false);
     setEditingMovement(null);
   };
   
-  const handleDeleteRequest = (movement: FinancialMovement) => {
-      setDeletingMovement(movement);
-  }
-
   const confirmDelete = async () => {
-      if (deletingMovement && firestore) {
-          await deleteDocumentNonBlocking(doc(firestore, 'financialMovements', deletingMovement.id));
-          toast({ variant: "destructive", title: "Movimiento Eliminado" });
+      if (deletingMovement) {
+          await deleteFinancialMovement(deletingMovement.id);
           setDeletingMovement(null);
       }
   }
@@ -143,17 +84,18 @@ export default function FinancialsPage() {
   }
 
   const movementsWithContactNames = useMemo(() => {
+    if (!contacts || !financialMovements) return [];
     return (financialMovements || []).map(mov => ({
       ...mov,
-      contactName: contacts.find(c => c.id === mov.contactId)?.name || 'Sin Contacto',
+      contactName: contacts.find(c => c.id === mov.contactId)?.name || '-',
     }));
   }, [financialMovements, contacts]);
 
   const columns = useMemo(() => getColumns({ 
       onEdit: handleEdit, 
-      onDelete: handleDeleteRequest, 
+      onDelete: setDeletingMovement, 
       bankAccounts: bankAccounts || [] 
-  }), [bankAccounts]);
+  }), [bankAccounts, handleEdit]);
 
 
   if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-32 w-full"/><Skeleton className="h-64 w-full"/></div>;
@@ -161,10 +103,11 @@ export default function FinancialsPage() {
   return (
     <div className="flex-1 space-y-6 p-8 pt-6 bg-slate-950 min-h-screen text-slate-100">
       
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h2 className="text-3xl font-bold tracking-tight text-white">Tesorería</h2>
-            <p className="text-slate-400 mt-1">Gestión de Flujo de Caja.</p>
+            <p className="text-slate-400 mt-1">Gestión de Flujo de Caja y conciliación.</p>
         </div>
         <div className="flex gap-3">
             <Button 
@@ -176,62 +119,66 @@ export default function FinancialsPage() {
         </div>
       </div>
 
+      {/* KPIS */}
       <div className="grid gap-4 md:grid-cols-3">
-          <Card className="bg-slate-900 border-slate-800">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-400">Ingresos Totales</CardTitle></CardHeader>
-              <CardContent>
-                  <div className="text-2xl font-bold text-emerald-400 flex items-center gap-2">
-                      <ArrowDownLeft className="h-5 w-5" /> {formatCurrency(totalIncome)}
-                  </div>
-              </CardContent>
+          <Card className="bg-slate-900 border-slate-800 shadow-lg hover:border-emerald-500/30 transition-all">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between"><CardTitle className="text-sm text-slate-400">Ingresos Totales</CardTitle><ArrowDownLeft className="h-5 w-5 text-emerald-400"/></CardHeader>
+              <CardContent><div className="text-3xl font-bold text-emerald-400 flex items-center gap-2">{formatCurrency(totalIncome)}</div></CardContent>
           </Card>
-          <Card className="bg-slate-900 border-slate-800">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-400">Egresos Totales</CardTitle></CardHeader>
-              <CardContent>
-                  <div className="text-2xl font-bold text-red-400 flex items-center gap-2">
-                      <ArrowUpRight className="h-5 w-5" /> {formatCurrency(totalExpense)}
-                  </div>
-              </CardContent>
+          <Card className="bg-slate-900 border-slate-800 shadow-lg hover:border-rose-500/30 transition-all">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between"><CardTitle className="text-sm text-slate-400">Egresos Totales</CardTitle><ArrowUpRight className="h-5 w-5 text-rose-400"/></CardHeader>
+              <CardContent><div className="text-3xl font-bold text-rose-400 flex items-center gap-2">{formatCurrency(totalExpense)}</div></CardContent>
           </Card>
-          <Card className="bg-slate-900 border-slate-800">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-400">Balance Global</CardTitle></CardHeader>
-              <CardContent>
-                  <div className={`text-2xl font-bold flex items-center gap-2 ${totalBalance >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
-                      <Wallet className="h-5 w-5" /> {formatCurrency(totalBalance)}
-                  </div>
-              </CardContent>
+          <Card className="bg-slate-900 border-slate-800 shadow-lg hover:border-blue-500/30 transition-all">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between"><CardTitle className="text-sm text-slate-400">Balance Global</CardTitle><Wallet className="h-5 w-5 text-blue-400"/></CardHeader>
+              <CardContent><div className={`text-3xl font-bold flex items-center gap-2 ${totalBalance >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{formatCurrency(totalBalance)}</div></CardContent>
           </Card>
       </div>
 
+      {/* CUENTAS */}
       <div>
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-200">
               <Landmark className="h-5 w-5 text-slate-500" /> Mis Cuentas
           </h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {bankAccounts?.map(acc => (
-                  <Card key={acc.id} className="bg-gradient-to-br from-slate-900 to-slate-950 border-slate-800 hover:border-slate-700 transition-all">
-                      <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium text-slate-400 uppercase tracking-wider">
-                              {acc.name}
-                          </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                          {/* Aquí mostramos saldo inicial por ahora para simplificar */}
-                          <div className="text-xl font-bold text-white">{formatCurrency(acc.initialBalance)}</div>
-                          <p className="text-xs text-slate-500 mt-1">{acc.bank} • {acc.accountNumber}</p>
-                      </CardContent>
-                  </Card>
-              ))}
+              {bankAccounts?.map(acc => {
+                  const accIncome = financialMovements?.filter(m => m.destinationAccountId === acc.id && m.type !== 'expense').reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+                  const accExpense = financialMovements?.filter(m => m.sourceAccountId === acc.id && m.type !== 'income').reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+                  const currentBalance = (acc.initialBalance || 0) + accIncome - accExpense;
+
+                  return (
+                    <Card key={acc.id} className="bg-gradient-to-br from-slate-900 to-slate-800 border-slate-800 hover:border-slate-700 transition-all shadow-md group">
+                        <CardContent className="p-5 flex flex-col justify-between h-full">
+                           <div>
+                             <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">{acc.bankName}</span>
+                                <Banknote className="h-6 w-6 text-slate-600 group-hover:text-slate-500 transition-colors" />
+                             </div>
+                             <p className="text-xs text-slate-500">{acc.type}</p>
+                           </div>
+                           <div className="text-center my-4">
+                                <p className="text-xs text-slate-400">Saldo Disponible</p>
+                                <p className={`text-3xl font-bold font-mono tracking-tighter ${currentBalance >= 0 ? 'text-white' : 'text-red-400'}`}>{formatCurrency(currentBalance)}</p>
+                           </div>
+                           <div className="text-right">
+                               <p className="text-lg font-medium text-slate-300">{acc.name}</p>
+                               <p className="text-xs font-mono text-slate-500">{acc.accountNumber}</p>
+                           </div>
+                        </CardContent>
+                    </Card>
+                  );
+              })}
           </div>
       </div>
 
-      <Card className="bg-slate-900 border-slate-800">
+      {/* HISTORIAL */}
+      <Card className="bg-slate-900 border-slate-800 shadow-lg">
           <CardHeader className="border-b border-slate-800 pb-4">
               <CardTitle className="text-lg text-slate-200 flex items-center gap-2">
                   <History className="h-5 w-5 text-purple-500" /> Historial de Movimientos
               </CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-4">
               <DataTable columns={columns} data={movementsWithContactNames}/>
           </CardContent>
       </Card>
@@ -241,7 +188,7 @@ export default function FinancialsPage() {
         onOpenChange={setIsSheetOpen}
         onSave={handleSaveMovement}
         movement={editingMovement}
-        onDelete={handleDeleteRequest}
+        onDelete={(m) => setDeletingMovement(m)}
         allMovements={financialMovements}
         purchaseOrders={purchaseOrders}
         salesOrders={salesOrders}
