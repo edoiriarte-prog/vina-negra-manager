@@ -10,26 +10,34 @@ interface PDFDownloadButtonProps {
     order: any;
     clientName: string;
     clientRut?: string;
+    clientAddress?: string; // Agregamos la dirección del cliente como opcional
     type: 'VENTA' | 'COMPRA';
     fileName: string;
 }
 
-export function PDFDownloadButton({ order, clientName, clientRut, type, fileName }: PDFDownloadButtonProps) {
+export function PDFDownloadButton({ order, clientName, clientRut, clientAddress, type, fileName }: PDFDownloadButtonProps) {
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
     }, []);
 
-    if (!isClient) return <Button disabled variant="outline"><Loader2 className="h-4 w-4 animate-spin"/></Button>;
+    if (!isClient) {
+        return (
+            <Button disabled variant="outline" className="gap-2">
+                <Loader2 className="h-4 w-4 animate-spin"/>
+                Cargando...
+            </Button>
+        );
+    }
 
     return (
         <PDFDownloadLink
-            document={<OrderDocument order={order} clientName={clientName} clientRut={clientRut} type={type} />}
+            document={<OrderDocument order={order} clientName={clientName} clientRut={clientRut} clientAddress={clientAddress} type={type} />}
             fileName={fileName}
         >
             {({ loading }) => (
-                <Button variant="outline" disabled={loading} className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50">
+                <Button variant="default" disabled={loading} className="bg-blue-600 hover:bg-blue-500 text-white gap-2">
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                     {loading ? 'Generando...' : 'Descargar PDF'}
                 </Button>

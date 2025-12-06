@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -40,6 +39,15 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             return dateString;
         }
     }
+    
+    const formatDateShort = (dateString?: string) => {
+        if (!dateString) return '-';
+        try {
+            return format(parseISO(dateString), "dd 'de' MMMM, yyyy", { locale: es });
+        } catch {
+            return dateString;
+        }
+    }
 
     return (
         <div ref={ref} className="p-10 bg-white text-black font-sans shadow-lg max-w-[210mm] mx-auto print:shadow-none print:p-8 text-xs">
@@ -58,7 +66,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         <p className="text-lg font-mono font-bold text-gray-800 tracking-wider">{order.number || order.id}</p>
                     </div>
                     <p className="text-sm mt-1">
-                        <span className="font-semibold">Fecha Emisión:</span> {formatDate(order.date)}
+                        <span className="font-semibold">Fecha Emisión:</span> {formatDateShort(order.date)}
                     </p>
                 </div>
             </div>
@@ -107,10 +115,12 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                 </thead>
                 <tbody>
                     {order.items.map((item, index) => {
-                        const netPrice = item.price || 0;
-                        const grossPrice = netPrice * 1.19;
-                        const subTotalNet = netPrice * (item.quantity || 0);
-                        const totalLineGross = subTotalNet * 1.19;
+                        const price = item.price || 0;
+                        const qty = item.quantity || 0;
+                        const lineNetoUnit = order.includeVat === false ? price : (price / 1.19);
+                        const lineBrutoUnit = order.includeVat === false ? (price * 1.19) : price;
+                        const lineSubtotalNeto = lineNetoUnit * qty;
+                        const lineTotalBruto = lineBrutoUnit * qty;
 
                         return (
                         <tr key={index} className="border-b border-gray-100">
@@ -124,10 +134,10 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                                 <p className="text-gray-500 text-[10px]">({item.packagingQuantity} uds)</p>
                             </td>
                             <td className="p-1.5 align-top text-right font-medium">{numberFormat(item.quantity)}</td>
-                            <td className="p-1.5 align-top text-right font-mono">{currency(netPrice)}</td>
-                            <td className="p-1.5 align-top text-right font-mono">{currency(grossPrice)}</td>
-                            <td className="p-1.5 align-top text-right font-mono font-semibold text-gray-800">{currency(subTotalNet)}</td>
-                            <td className="p-1.5 align-top text-right font-mono font-bold text-black bg-gray-50">{currency(totalLineGross)}</td>
+                            <td className="p-1.5 align-top text-right font-mono">{currency(lineNetoUnit)}</td>
+                            <td className="p-1.5 align-top text-right font-mono">{currency(lineBrutoUnit)}</td>
+                            <td className="p-1.5 align-top text-right font-mono font-semibold text-gray-800">{currency(lineSubtotalNeto)}</td>
+                            <td className="p-1.5 align-top text-right font-mono font-bold text-black bg-gray-50">{currency(lineTotalBruto)}</td>
                         </tr>
                     )})}
                 </tbody>
