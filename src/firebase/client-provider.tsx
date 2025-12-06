@@ -2,13 +2,11 @@
 
 import React from 'react';
 import { FirebaseProvider } from './provider';
-import { firebaseApp, auth, firestore } from './index'; // Import the initialized instances
+// Importamos las instancias que acabamos de exportar en index.ts
+import { firebaseApp, auth, firestore } from './index'; 
 
 export function FirebaseClientProvider({ children }: { children: React.ReactNode }) {
-
-  // This component ensures that the Firebase services are only passed to the provider on the client side.
-  // It takes the singleton instances from index.ts and provides them to the context.
-  
+  // Este componente conecta las instancias singleton con el contexto de React
   return (
     <FirebaseProvider
       firebaseApp={firebaseApp}
