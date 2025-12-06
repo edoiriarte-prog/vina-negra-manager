@@ -1,5 +1,4 @@
 import React from 'react';
-// 1. IMPORTAMOS IMAGE
 import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -8,15 +7,13 @@ import { es } from 'date-fns/locale';
 const styles = StyleSheet.create({
   page: { padding: 30, fontSize: 9, fontFamily: 'Helvetica', color: '#111' },
   
-  // 2. ESTILO DEL LOGO
   logo: {
-      width: 80, // Tamaño ajustado para tu logo horizontal
+      width: 80,
       height: 50,
       objectFit: 'contain',
       marginRight: 10
   },
 
-  // Cabecera
   headerContainer: { 
       flexDirection: 'row', 
       justifyContent: 'space-between', 
@@ -26,12 +23,7 @@ const styles = StyleSheet.create({
       alignItems: 'center' 
   },
   
-  // Agrupador Logo + Texto
-  companyWrapper: {
-      flexDirection: 'row',
-      alignItems: 'center'
-  },
-
+  companyWrapper: { flexDirection: 'row', alignItems: 'center' },
   companyInfo: { flexDirection: 'column' },
   companyName: { fontSize: 20, fontWeight: 'bold', textTransform: 'uppercase' },
   companySub: { fontSize: 8, color: '#444', marginBottom: 1 },
@@ -42,20 +34,20 @@ const styles = StyleSheet.create({
   docNumber: { fontSize: 12, fontWeight: 'bold' },
   docDate: { fontSize: 9 },
 
-  // Cajas Info
   boxesContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, gap: 5 },
   infoBox: { width: '32%', border: '1px solid #ddd', borderRadius: 2, backgroundColor: '#fcfcfc' },
   boxHeader: { borderBottom: '1px solid #ddd', padding: '4 6', marginBottom: 4, backgroundColor: '#f3f4f6' },
   boxTitle: { fontSize: 7, fontWeight: 'bold', textTransform: 'uppercase', color: '#333' },
   boxContent: { padding: '2 6 6 6' },
   boxRow: { marginBottom: 3, flexDirection: 'row' },
+  
+  // OJO: width 45 es para etiquetas cortas. Para títulos largos usamos override.
   boxLabel: { fontWeight: 'bold', fontSize: 7, color: '#444', width: 45 },
   boxValue: { fontSize: 7, color: '#000', flex: 1 },
 
-  // Tabla (CON ESPACIADO AUMENTADO)
   table: { width: '100%', marginBottom: 10 },
   tableHeader: { flexDirection: 'row', backgroundColor: '#eee', borderBottom: '1px solid #999', padding: '8 0' },
-  tableRow: { flexDirection: 'row', borderBottom: '1px solid #eee', padding: '10 0' }, // Padding 10 para más aire
+  tableRow: { flexDirection: 'row', borderBottom: '1px solid #eee', padding: '10 0' },
   
   colCode: { width: '8%', paddingLeft: 4, fontSize: 7 },
   colDesc: { width: '27%', fontSize: 7 },
@@ -66,16 +58,14 @@ const styles = StyleSheet.create({
   colSub: { width: '11%', textAlign: 'right', fontSize: 7 },
   colTotal: { width: '12%', textAlign: 'right', paddingRight: 4, fontSize: 7, fontWeight: 'bold' },
 
-  // Totales (CON ESPACIADO AUMENTADO)
   totalsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '1px solid #ddd' },
   totalsLeft: { width: '50%', backgroundColor: '#f9fafb', padding: 8, borderRadius: 4 },
   totalsRight: { width: '40%' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }, // Separación aumentada
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   totalLabel: { fontSize: 8, color: '#444' },
   totalValue: { fontSize: 8, fontWeight: 'bold' },
   totalFinalBox: { backgroundColor: '#111', padding: 8, borderRadius: 2, flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   
-  // Observaciones y Firmas
   obsContainer: { marginTop: 15 },
   obsBox: { border: '1px solid #ddd', padding: 8, borderRadius: 4, backgroundColor: '#fafafa', minHeight: 30 },
   
@@ -98,34 +88,28 @@ const formatDate = (dateString?: string) => {
 
 export const OrderDocument = ({ order, clientName, clientRut, clientAddress, clientContact, bankAccount, type }: any) => {
     
-    // Totales
     const totalNeto = order.totalAmount || 0;
     const totalIVA = order.includeVat !== false ? Math.round(totalNeto * 0.19) : 0;
     const totalBruto = totalNeto + totalIVA;
-    
     const totalPackages = order.items?.reduce((s:any, i:any)=> s + (Number(i.packagingQuantity)||0),0) || 0;
     const totalKilos = order.items?.reduce((s:any, i:any)=> s + (Number(i.quantity)||0),0) || 0;
 
-    // RUTA DEL LOGO (Debe estar en carpeta 'public')
-    const logoUrl = '/logo.jpg';
+    const logoUrl = '/logo.jpg'; 
 
     return (
         <Document>
             <Page size="A4" style={styles.page}>
             
-                {/* 1. HEADER CON LOGO */}
+                {/* 1. HEADER */}
                 <View style={styles.headerContainer}>
                     <View style={styles.companyWrapper}>
-                        {/* IMAGEN DEL LOGO */}
                         <Image src={logoUrl} style={styles.logo} />
-                        
                         <View style={styles.companyInfo}>
                             <Text style={styles.companyName}>VIÑA NEGRA SPA</Text>
                             <Text style={[styles.companySub, {fontWeight:'bold'}]}>RUT: 78.261.683-8</Text>
                             <Text style={styles.companySub}>ventas@agrocomercialavn.com</Text>
                         </View>
                     </View>
-
                     <View style={styles.docInfo}>
                         <Text style={styles.docTitle}>ORDEN DE {type}</Text>
                         <View style={styles.docNumberBox}>
@@ -165,12 +149,21 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                             <View style={styles.boxRow}><Text style={styles.boxLabel}>Op:</Text><Text style={styles.boxValue}>{order.saleType || 'Venta Firme'}</Text></View>
                             <View style={styles.boxRow}><Text style={styles.boxLabel}>Pago:</Text><Text style={styles.boxValue}>{order.paymentMethod || 'Contado'}</Text></View>
                             <View style={styles.boxRow}><Text style={styles.boxLabel}>Venc:</Text><Text style={styles.boxValue}>{formatDate(order.paymentDueDate)}</Text></View>
+                            
+                            {/* SECCION DATOS BANCARIOS (CORREGIDA) */}
                             <View style={{marginTop: 6, paddingTop: 6, borderTop: '1px solid #ddd'}}>
-                                <Text style={[styles.boxLabel, {marginBottom:3}]}>TRANSFERENCIA:</Text>
+                                {/* width: '100%' para evitar que se corte el texto */}
+                                <Text style={[styles.boxLabel, {marginBottom:3, width: '100%'}]}>DATOS TRANSFERENCIA:</Text>
+                                
                                 {bankAccount ? (
                                     <>
                                         <Text style={{fontSize: 7}}>{bankAccount.bank || bankAccount.bankName}</Text>
-                                        <Text style={{fontSize: 7}}>{bankAccount.type || 'Cta'} N° {bankAccount.accountNumber}</Text>
+                                        <Text style={{fontSize: 7, marginBottom: 4}}>{bankAccount.type || 'Cta'} N° {bankAccount.accountNumber}</Text>
+                                        
+                                        {/* NUEVOS DATOS AGREGADOS */}
+                                        <Text style={{fontSize: 7, fontWeight: 'bold'}}>Agrocomercial Viña Negra SpA</Text>
+                                        <Text style={{fontSize: 7}}>RUT: 78.261.683-8</Text>
+                                        <Text style={{fontSize: 7}}>ventas@agrocomercialavn.com</Text>
                                     </>
                                 ) : (
                                     <Text style={{fontSize: 6, fontStyle: 'italic', color:'#666'}}>No asignados</Text>
@@ -192,7 +185,6 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                         <Text style={styles.colSub}>SUBT.</Text>
                         <Text style={styles.colTotal}>TOTAL</Text>
                     </View>
-                    
                     {order.items?.map((item: any, i: number) => {
                          const price = Number(item.price) || 0;
                          const qty = Number(item.quantity) || 0;
@@ -200,7 +192,6 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                          const lineBrutoUnit = price * 1.19;
                          const lineSubtotalNeto = lineNetoUnit * qty;
                          const lineTotalBruto = lineSubtotalNeto * 1.19;
-
                         return (
                             <View key={i} style={styles.tableRow}>
                                 <Text style={styles.colCode}>{item.code || (i + 1) * 10}</Text>
@@ -248,29 +239,27 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                     </View>
                 </View>
 
-                {/* 5. OBSERVACIONES */}
+                {/* 5. OBSERVACIONES (CORREGIDA) */}
                 <View style={styles.obsContainer}>
-                    <Text style={[styles.boxLabel, {marginBottom: 4}]}>OBSERVACIONES</Text>
+                    {/* width: '100%' para evitar que se corte el título */}
+                    <Text style={[styles.boxLabel, {marginBottom: 4, width: '100%'}]}>OBSERVACIONES</Text>
                     <View style={styles.obsBox}>
                         <Text style={{fontSize: 7, fontStyle: 'italic'}}>{order.notes || 'Sin observaciones.'}</Text>
                     </View>
                 </View>
 
-                {/* 6. FIRMAS (ACTUALIZADAS) */}
+                {/* 6. FIRMAS */}
                 <View style={styles.signatures}>
-                    {/* VENTAS */}
                     <View style={styles.signatureBox}>
                         <View style={styles.signatureLine} />
                         <Text style={styles.signatureText}>GERENCIA VENTAS</Text>
                         <Text style={styles.signatureSub}>JOSE ROJAS CARMONA</Text>
                     </View>
-                    {/* OPERACIONES */}
                     <View style={styles.signatureBox}>
                         <View style={styles.signatureLine} />
                         <Text style={styles.signatureText}>OPERACIONES</Text>
                         <Text style={styles.signatureSub}>JOAQUIN BOU CORTES</Text>
                     </View>
-                    {/* CLIENTE */}
                     <View style={styles.signatureBox}>
                         <View style={styles.signatureLine} />
                         <Text style={styles.signatureText}>CLIENTE</Text>

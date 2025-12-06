@@ -14,7 +14,7 @@ import {
   Briefcase,
   ClipboardList,
   Calendar,
-  Leaf // Icono opcional para cuando la barra se encoge
+  Leaf
 } from "lucide-react"
 
 import {
@@ -66,17 +66,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props} className="border-r border-slate-800 bg-slate-950">
       
-      {/* --- ENCABEZADO MEJORADO (LOGO PROTAGONISTA) --- */}
-      <SidebarHeader className="border-b border-slate-800 bg-slate-950 h-24 flex justify-center py-4">
+      {/* --- ENCABEZADO GIGANTE (LOGO AL DOBLE DE TAMAÑO) --- */}
+      <SidebarHeader className="border-b border-slate-800 bg-slate-950 h-48 flex justify-center py-6 transition-all duration-300">
         
-        {/* Versión Expandida: Logo Completo Grande */}
-        <div className="group-data-[collapsible=icon]:hidden w-full h-full flex items-center justify-center px-4 transition-all duration-300">
+        {/* Versión Expandida: Logo Gigante */}
+        <div className="group-data-[collapsible=icon]:hidden w-full h-full flex items-center justify-center px-2 transition-all duration-300">
             <div className="relative w-full h-full">
                <Image 
                  src="/logo-avn.png" 
                  alt="AVN Agro Manager" 
                  fill 
-                 className="object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.15)]" // Efecto de brillo sutil
+                 // Aumentamos el brillo para el tamaño más grande
+                 className="object-contain drop-shadow-[0_0_20px_rgba(34,211,238,0.2)]" 
+                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                  priority
                />
             </div>
@@ -84,8 +86,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
         {/* Versión Colapsada (Icono Pequeño) */}
         <div className="hidden group-data-[collapsible=icon]:flex w-full h-full items-center justify-center">
-            <div className="bg-gradient-to-br from-emerald-500 to-blue-600 p-2 rounded-lg shadow-lg shadow-emerald-500/20">
-                <Leaf className="text-white h-5 w-5" />
+            <div className="bg-gradient-to-br from-emerald-500 to-blue-600 p-3 rounded-xl shadow-lg shadow-emerald-500/20">
+                <Leaf className="text-white h-6 w-6" />
             </div>
         </div>
 
