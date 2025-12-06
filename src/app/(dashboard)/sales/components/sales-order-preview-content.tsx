@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -21,14 +22,9 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
     
     const bankAccount = bankAccounts.find(b => b.id === (order as any).bankAccountId) as BankAccount | undefined;
 
-    const currency = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
-    const numberFormat = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+    const currency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
+    const numberFormat = (val: number) => new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(val || 0);
     
-    const formatNumber = (val: number | undefined) => {
-      if (val === undefined || val === null) return '0';
-      return new Intl.NumberFormat('es-CL').format(val);
-    }
-
     const netAmount = order.totalAmount || 0;
     const vatAmount = order.includeVat !== false ? netAmount * 0.19 : 0;
     const grossAmount = netAmount + vatAmount;
@@ -52,7 +48,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             <div className="flex justify-between items-start mb-8 border-b-2 border-gray-800 pb-4">
                 <div>
                     <h1 className="text-3xl font-extrabold text-gray-900 uppercase tracking-tighter">Viña Negra SpA</h1>
-                    <p className="text-xs text-gray-500">RUT: 76.123.456-7</p>
+                    <p className="text-xs text-gray-500">RUT: 78.261.683-8</p>
                     <p className="text-xs text-gray-500">Fundo Viña Negra, Tulahuén, Monte Patria</p>
                     <p className="text-xs text-gray-500">contacto@vinanegra.cl</p>
                 </div>
@@ -127,11 +123,11 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                                 <p>{item.packagingType || 'S/E'}</p>
                                 <p className="text-gray-500 text-[10px]">({item.packagingQuantity} uds)</p>
                             </td>
-                            <td className="p-1.5 align-top text-right font-medium">{numberFormat.format(item.quantity)}</td>
-                            <td className="p-1.5 align-top text-right font-mono">{currency.format(netPrice)}</td>
-                            <td className="p-1.5 align-top text-right font-mono">{currency.format(grossPrice)}</td>
-                            <td className="p-1.5 align-top text-right font-mono font-semibold text-gray-800">{currency.format(subTotalNet)}</td>
-                            <td className="p-1.5 align-top text-right font-mono font-bold text-black bg-gray-50">{currency.format(totalLineGross)}</td>
+                            <td className="p-1.5 align-top text-right font-medium">{numberFormat(item.quantity)}</td>
+                            <td className="p-1.5 align-top text-right font-mono">{currency(netPrice)}</td>
+                            <td className="p-1.5 align-top text-right font-mono">{currency(grossPrice)}</td>
+                            <td className="p-1.5 align-top text-right font-mono font-semibold text-gray-800">{currency(subTotalNet)}</td>
+                            <td className="p-1.5 align-top text-right font-mono font-bold text-black bg-gray-50">{currency(totalLineGross)}</td>
                         </tr>
                     )})}
                 </tbody>
@@ -142,22 +138,22 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                 <div className="w-1/2">
                     <h5 className="font-bold text-gray-500 text-xs uppercase mb-1">Resumen Carga</h5>
                     <div className="text-xs text-gray-700">
-                        <p>Total Envases: {formatNumber(totalPackages)}</p>
-                        <p>Total Kilos: {formatNumber(totalKilos)}</p>
+                        <p>Total Envases: {numberFormat(totalPackages)}</p>
+                        <p>Total Kilos: {numberFormat(totalKilos)}</p>
                     </div>
                 </div>
                 <div className="w-2/5 space-y-1">
                     <div className="flex justify-between text-xs">
                         <span className="text-gray-600">Subtotal Neto:</span>
-                        <span className="font-medium font-mono">{currency.format(netAmount)}</span>
+                        <span className="font-medium font-mono">{currency(netAmount)}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                         <span className="text-gray-600">IVA (19%):</span>
-                        <span className="font-medium font-mono">{currency.format(vatAmount)}</span>
+                        <span className="font-medium font-mono">{currency(vatAmount)}</span>
                     </div>
                     <div className="flex justify-between text-base font-bold border-t-2 border-black mt-2 pt-2">
                         <span>TOTAL A PAGAR:</span>
-                        <span className="font-mono">{currency.format(grossAmount)}</span>
+                        <span className="font-mono">{currency(grossAmount)}</span>
                     </div>
                 </div>
             </div>
