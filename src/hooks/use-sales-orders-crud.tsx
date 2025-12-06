@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useFirebase, addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
+import { useFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { SalesOrder } from "@/lib/types";
@@ -13,7 +12,7 @@ export function useSalesOrdersCRUD() {
   const createSalesOrder = async (order: Omit<SalesOrder, 'id'>) => {
     if (!firestore) return;
     try {
-      const docRef = await addDocumentNonBlocking(collection(firestore, 'salesOrders'), order);
+      const docRef = await addDocumentNonBlocking('salesOrders', order);
       return docRef;
     } catch (e) {
       console.error(e);
@@ -21,14 +20,25 @@ export function useSalesOrdersCRUD() {
     }
   };
 
-  const updateSalesOrder = (id: string, data: Partial<SalesOrder>) => {
+  const updateSalesOrder = async (id: string, data: Partial<SalesOrder>) => {
     if (!firestore) return;
-    setDocumentNonBlocking(doc(firestore, 'salesOrders', id), data, { merge: true });
+    try {
+      await updateDocumentNonBlocking('salesOrders', id, data);
+      toast({ title: "Orden Actualizada", description: "Los cambios se han guardado." });
+    } catch(e) {
+      console.error(e);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la orden de venta.' });
+    }
   };
 
-  const deleteSalesOrder = (id: string) => {
+  const deleteSalesOrder = async (id: string) => {
     if (!firestore) return;
-    deleteDocumentNonBlocking(doc(firestore, 'salesOrders', id));
+    try {
+      await deleteDocumentNonBlocking('salesOrders', id);
+    } catch(e) {
+      console.error(e);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar la orden de venta.' });
+    }
   };
 
   return {

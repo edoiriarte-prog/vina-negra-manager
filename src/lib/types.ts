@@ -100,6 +100,7 @@ export interface PurchaseOrder {
   orderType?: string;
 }
 
+// --- ACTUALIZACIÓN PRINCIPAL AQUÍ ---
 export interface SalesOrder {
   id: string;
   date: string;
@@ -113,10 +114,30 @@ export interface SalesOrder {
   totalPackages?: number; 
   notes?: string;
   number?: string;
-  saleType?: string; 
+  
+  // Configuración de Venta
+  saleType?: string;       // Ej: 'Venta en Firme', 'Consignación'
   includeVat?: boolean; 
   paymentStatus?: string; 
   orderType?: 'sale' | 'dispatch'; 
+
+  // Nuevos Campos Financieros (Soluciona errores del formulario)
+  paymentMethod?: string;  // Ej: 'Contado', 'Crédito'
+  creditDays?: number;     // Días de crédito
+  paymentDueDate?: string; // Fecha de vencimiento calculada
+  advanceAmount?: number;  // Monto anticipo
+  bankAccountId?: string;  // ID de la cuenta bancaria seleccionada
+
+  // Nuevos Campos Logísticos (Soluciona errores de Chofer/Patente)
+  transport?: string;      // Empresa de transporte
+  driver?: string;         // Nombre del chofer
+  plate?: string;          // Patente
+  driverName?: string;     // Alias para compatibilidad
+  licensePlate?: string;   // Alias para compatibilidad
+
+  // Campos opcionales para visualización en PDF/Vistas (Expandidos)
+  customer?: Contact;
+  bankAccount?: BankAccount;
 }
 
 // --- 4. FINANZAS Y SERVICIOS ---
@@ -126,11 +147,10 @@ export interface ServiceOrder {
     supplierId: string;
     date: string;
     cost: number;
-    description?: string; // Agregado para evitar errores
-    provider?: string;    // Agregado para evitar errores
+    description?: string; 
+    provider?: string;    
 }
 
-// Ampliamos MovementType para incluir 'traspaso'
 export type MovementType = 'income' | 'expense' | 'traspaso';
 
 export interface FinancialMovement {
@@ -139,7 +159,7 @@ export interface FinancialMovement {
   description: string;
   amount: number;
   type: MovementType;
-  category?: string; // Ahora opcional
+  category?: string;
   
   // Relaciones
   relatedOrderId?: string;
@@ -151,11 +171,11 @@ export interface FinancialMovement {
 
   status?: 'paid' | 'pending';
 
-  // Nuevos campos requeridos por Tesorería Avanzada
+  // Tesorería Avanzada
   paymentMethod?: string;
-  sourceAccountId?: string;      // Cuenta origen (egresos/traspasos)
-  destinationAccountId?: string; // Cuenta destino (ingresos/traspasos)
-  reference?: string;            // Nro. cheque, operación, etc.
+  sourceAccountId?: string;      
+  destinationAccountId?: string; 
+  reference?: string;            
   internalConcept?: string;
   productId?: string;
 }
@@ -170,7 +190,8 @@ export interface BankAccount {
     currency: 'CLP' | 'USD';
     initialBalance: number;
     status?: 'Activa' | 'Inactiva';
-    bankName?: string; // Alias para bank
+    bankName?: string; 
+    accountType?: string; // Alias agregado para compatibilidad con PDF
 }
 
 // --- 6. PLANIFICACIÓN COMERCIAL ---
@@ -178,13 +199,13 @@ export type PlanningStatus = 'borrador' | 'confirmado' | 'entregado' | 'cancelad
 
 export interface PlannedOrder {
   id: string;
-  date: string;           // Fecha de registro
-  deliveryDate: string;   // Fecha prometida de entrega
+  date: string;           
+  deliveryDate: string;   
   clientId: string;
   status: PlanningStatus;
-  items: OrderItem[];     // Reusamos OrderItem (producto, calibre, precio, cantidad)
+  items: OrderItem[];     
   totalAmount: number;
   totalKilos: number;
   notes?: string;
-  createdBy?: string;     // Nombre del vendedor
+  createdBy?: string;     
 }

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -52,14 +51,19 @@ const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder
             ...order,
             date: order.date ? format(new Date(order.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
             items: (order.items || []).map(item => ({...item, total: (item.quantity || 0) * (item.price || 0)})),
-            // Aseguramos valores por defecto si no existen
             saleType: order.saleType || 'Venta en Firme',
             paymentMethod: order.paymentMethod || 'Contado',
             // @ts-ignore
             paymentDueDate: order.paymentDueDate ? format(new Date(order.paymentDueDate), 'yyyy-MM-dd') : undefined,
+            // Aseguramos que existan los campos de chofer si venimos de editar
+            // @ts-ignore
+            driver: order.driver || '',
+            // @ts-ignore
+            plate: order.plate || '',
         };
     }
     
+    // Lógica de generación de ID (Previene OV-OV duplicado limpiando el string primero)
     const existingIds = (allSalesOrders || [])
         .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
         .filter(n => !isNaN(n) && n > 0);
@@ -84,6 +88,10 @@ const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder
         advanceAmount: 0,
         // @ts-ignore
         bankAccountId: '',
+        // @ts-ignore
+        driver: '',
+        // @ts-ignore
+        plate: ''
     };
 };
 
@@ -100,7 +108,6 @@ export function NewSalesOrderSheet({
 }: NewSalesOrderSheetProps) {
   
   const { toast } = useToast();
-  // --- CARGA DE DATOS MAESTROS ---
   const { warehouses, bankAccounts } = useMasterData(); 
   const isDispatch = sheetType === 'dispatch';
 
@@ -116,7 +123,6 @@ export function NewSalesOrderSheet({
     }
   }, [order, isOpen, salesOrders]);
 
-  // --- LÓGICA DE CÁLCULO DE VENCIMIENTO ---
   useEffect(() => {
       if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {
           const dueDate = addDays(parseISO(formData.date), formData.creditDays);
@@ -174,6 +180,7 @@ export function NewSalesOrderSheet({
     const totalKilos = items.reduce((acc, item) => acc + (item.quantity || 0), 0);
     const totalPackages = items.reduce((acc, item) => acc + (item.packagingQuantity || 0), 0);
 
+    // Seguridad extra para ID
     const safeNumber = formData.number || `OV-${Date.now()}`;
 
     const finalOrder: any = {
@@ -206,6 +213,9 @@ export function NewSalesOrderSheet({
       return { vatAmount: vat, finalTotalWithVat: total };
   }, [netTotal, formData.includeVat]);
 
+  // Formateador de moneda auxiliar
+  const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val || 0);
+
   const title = order ? `Editar OV ${order.number}` : `Nueva Orden de Venta`;
   const darkInputClass = "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 placeholder:text-slate-600";
   const darkCardClass = "bg-slate-900 border-slate-800 shadow-sm";
@@ -237,6 +247,7 @@ export function NewSalesOrderSheet({
             <div className="p-6 space-y-8">
             
             <div className="grid md:grid-cols-3 gap-5">
+                {/* TARJETA CLIENTE */}
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
@@ -255,6 +266,7 @@ export function NewSalesOrderSheet({
                     </CardContent>
                 </Card>
 
+                {/* TARJETA FECHA */}
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
@@ -264,23 +276,56 @@ export function NewSalesOrderSheet({
                     </CardContent>
                 </Card>
 
+                {/* TARJETA DESPACHO / BODEGA (ACTUALIZADA CON CHOFER Y PATENTE) */}
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Warehouse className="h-4 w-4 text-emerald-500" /> Bodega Origen
+                            <Warehouse className="h-4 w-4 text-emerald-500" /> Despacho y Logística
                         </div>
-                        <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
-                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {warehouses.map((w, index) => (
-                                    <SelectItem key={index} value={w} className="focus:bg-slate-800 focus:text-slate-100">{w}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        
+                        <div className="space-y-1">
+                            <Label className="text-[10px] text-slate-500 uppercase">Bodega Origen</Label>
+                            <Select required onValueChange={(v) => handleSelectChange('warehouse', v)} value={formData.warehouse}>
+                                <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                    {warehouses.map((w, index) => (
+                                        <SelectItem key={index} value={w} className="focus:bg-slate-800 focus:text-slate-100">{w}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* NUEVOS CAMPOS: CHOFER Y PATENTE */}
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                            <div className="space-y-1">
+                                <Label className="text-[10px] text-slate-500 uppercase">Chofer</Label>
+                                <Input 
+                                    name="driver" 
+                                    placeholder="Nombre Chofer" 
+                                    // @ts-ignore
+                                    value={formData.driver || ''} 
+                                    onChange={handleInputChange} 
+                                    className={darkInputClass} 
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] text-slate-500 uppercase">Patente</Label>
+                                <Input 
+                                    name="plate" 
+                                    placeholder="AB-CD-12" 
+                                    // @ts-ignore
+                                    value={formData.plate || ''} 
+                                    onChange={handleInputChange} 
+                                    className={`${darkInputClass} uppercase`} 
+                                />
+                            </div>
+                        </div>
+
                     </CardContent>
                 </Card>
             </div>
             
+            {/* TABLA DE PRODUCTOS */}
             <div className={`rounded-xl border border-slate-800 overflow-hidden ${darkCardClass}`}>
                 <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                     <h3 className="font-semibold text-slate-200 flex items-center gap-2">
@@ -319,12 +364,25 @@ export function NewSalesOrderSheet({
                                                 <Input type="number" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))} className="h-7 text-center font-bold bg-slate-950 border-slate-700 focus:border-blue-500 text-slate-100" />
                                             </td>
                                             <td className="px-4 py-2">
-                                                <Input type="number" value={item.price || ''} onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-slate-700 focus:border-blue-500" />
+                                                <div className="flex flex-col items-end">
+                                                    {/* INPUT PRECIO NETO */}
+                                                    <Input 
+                                                        type="number" 
+                                                        value={item.price || ''} 
+                                                        onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} 
+                                                        className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-slate-700 focus:border-blue-500 w-32" 
+                                                        placeholder="Neto"
+                                                    />
+                                                    {/* VISUALIZACIÓN PRECIO CON IVA */}
+                                                    <span className="text-[10px] text-blue-500/70 font-mono mt-1 pr-1">
+                                                        c/IVA: {formatCurrency((item.price || 0) * 1.19)}
+                                                    </span>
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-2 text-right font-medium text-slate-300 font-mono">
-                                                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(item.total || 0)}
+                                            <td className="px-4 py-2 text-right font-medium text-slate-300 font-mono align-top pt-3">
+                                                {formatCurrency(item.total || 0)}
                                             </td>
-                                            <td className="px-4 py-2 text-center">
+                                            <td className="px-4 py-2 text-center align-top pt-2">
                                                 <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-7 w-7 text-slate-500 hover:text-red-400 hover:bg-red-950/30">
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -426,17 +484,17 @@ export function NewSalesOrderSheet({
                               <div className="space-y-3">
                                   <div className="flex justify-between text-slate-400 text-sm">
                                       <span>Subtotal Neto</span>
-                                      <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(netTotal)}</span>
+                                      <span className="font-mono text-slate-200">{formatCurrency(netTotal)}</span>
                                   </div>
                                   {formData.includeVat && (
                                       <div className="flex justify-between text-slate-400 text-sm">
                                           <span>IVA (19%)</span>
-                                          <span className="font-mono text-slate-200">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(vatAmount)}</span>
+                                          <span className="font-mono text-slate-200">{formatCurrency(vatAmount)}</span>
                                       </div>
                                   )}
                                   <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 flex justify-between items-end mt-2">
                                       <span className="text-sm text-slate-400 font-medium uppercase tracking-wider mb-1">Total a Pagar</span>
-                                      <span className="text-2xl font-bold text-white tracking-tight">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(finalTotalWithVat)}</span>
+                                      <span className="text-2xl font-bold text-white tracking-tight">{formatCurrency(finalTotalWithVat)}</span>
                                   </div>
                               </div>
                           </CardContent>

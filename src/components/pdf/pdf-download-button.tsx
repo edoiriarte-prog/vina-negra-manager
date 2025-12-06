@@ -3,19 +3,32 @@
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { Button } from '@/components/ui/button';
 import { Download, Loader2 } from 'lucide-react';
-import { OrderDocument } from './order-document';
+import { OrderDocument } from './order-document'; // Asegúrate de que la ruta sea correcta
 import { useEffect, useState } from 'react';
+import { BankAccount } from '@/lib/types';
 
 interface PDFDownloadButtonProps {
     order: any;
     clientName: string;
     clientRut?: string;
-    clientAddress?: string; // Agregamos la dirección del cliente como opcional
+    clientAddress?: string;
+    clientContact?: string;       // <--- NUEVO CAMPO AGREGADO
+    bankAccount?: BankAccount | any; // <--- NUEVO CAMPO AGREGADO
     type: 'VENTA' | 'COMPRA';
     fileName: string;
 }
 
-export function PDFDownloadButton({ order, clientName, clientRut, clientAddress, type, fileName }: PDFDownloadButtonProps) {
+export function PDFDownloadButton({ 
+    order, 
+    clientName, 
+    clientRut, 
+    clientAddress, 
+    clientContact, 
+    bankAccount, 
+    type, 
+    fileName 
+}: PDFDownloadButtonProps) {
+    
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
@@ -33,7 +46,17 @@ export function PDFDownloadButton({ order, clientName, clientRut, clientAddress,
 
     return (
         <PDFDownloadLink
-            document={<OrderDocument order={order} clientName={clientName} clientRut={clientRut} clientAddress={clientAddress} type={type} />}
+            document={
+                <OrderDocument 
+                    order={order} 
+                    clientName={clientName} 
+                    clientRut={clientRut} 
+                    clientAddress={clientAddress} 
+                    clientContact={clientContact} // Pasamos el contacto
+                    bankAccount={bankAccount}     // Pasamos el banco
+                    type={type} 
+                />
+            }
             fileName={fileName}
         >
             {({ loading }) => (
