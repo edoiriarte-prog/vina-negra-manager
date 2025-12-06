@@ -1,186 +1,192 @@
 "use client";
 
 import React from 'react';
-import { SalesOrder, Contact } from '@/lib/types';
+import { SalesOrder, Contact, BankAccount } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import { useMasterData } from '@/hooks/use-master-data';
-import { Separator } from '@/components/ui/separator';
 
-// --- CORRECCIÓN AQUÍ: Definimos 'client' (singular) ---
 interface PreviewContentProps {
     order: SalesOrder;
     client: Contact | null; 
 }
 
 export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, PreviewContentProps>(({ order, client }, ref) => {
-    const { calibers } = useMasterData();
+    const { calibers, bankAccounts } = useMasterData();
 
     const getCaliberCode = (caliberName: string) => {
         const caliber = calibers.find(c => c.name === caliberName);
         return caliber ? caliber.code : 'N/A';
     }
+    
+    const bankAccount = bankAccounts.find(b => b.id === (order as any).bankAccountId) as BankAccount | undefined;
 
     const currency = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
     const numberFormat = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 
-    // Cálculos
-    const calculatedNetTotal = order.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.price || 0)), 0);
-    const calculatedVat = calculatedNetTotal * 0.19;
-    const calculatedGrossTotal = calculatedNetTotal + calculatedVat;
+    const netAmount = order.totalAmount || 0;
+    const vatAmount = order.includeVat !== false ? netAmount * 0.19 : 0;
+    const grossAmount = netAmount + vatAmount;
 
     const totalPackages = order.items.reduce((sum, item) => sum + (item.packagingQuantity || 0), 0);
     const totalKilos = order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-
-    const displayDueDate = order.balanceDueDate || order.advanceDueDate;
+    
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return '-';
+        try {
+            return format(parseISO(dateString), "dd 'de' MMMM, yyyy", { locale: es });
+        } catch {
+            return dateString;
+        }
+    }
 
     return (
-        <div ref={ref} className="p-8 bg-white text-black font-sans max-w-[210mm] mx-auto min-h-[297mm] relative text-xs">
+        <div ref={ref} className="p-10 bg-white text-black font-sans shadow-lg max-w-[210mm] mx-auto print:shadow-none print:p-8 text-xs">
             
-            {/* HEADER */}
-            <div className="flex justify-between items-start mb-6 border-b-2 border-gray-800 pb-4">
-                <div className="w-1/2">
-                    <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 uppercase">Viña Negra SpA</h1>
-                    <p className="text-xs text-gray-600 font-semibold tracking-widest uppercase">Agrocomercial</p>
+            {/* Header */}
+            <div className="flex justify-between items-start mb-8 border-b-2 border-gray-800 pb-4">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-gray-900 uppercase tracking-tighter">Viña Negra SpA</h1>
+                    <p className="text-xs text-gray-500">RUT: 76.123.456-7</p>
+                    <p className="text-xs text-gray-500">Fundo Viña Negra, Tulahuén, Monte Patria</p>
+                    <p className="text-xs text-gray-500">contacto@vinanegra.cl</p>
                 </div>
-                <div className='text-right w-1/2'>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-1">ORDEN DE VENTA</h2>
-                    <div className="inline-block bg-gray-100 border border-gray-300 px-3 py-1 rounded-md mb-1">
-                        <p className="text-lg font-mono font-bold text-gray-800">{order.id}</p>
+                <div className="text-right">
+                    <h2 className="text-2xl font-bold text-gray-800">ORDEN DE VENTA</h2>
+                    <div className="mt-1 inline-block bg-gray-100 border border-gray-300 px-4 py-1 rounded-md">
+                        <p className="text-lg font-mono font-bold text-gray-800 tracking-wider">{order.number || order.id}</p>
                     </div>
-                    <p className="text-sm font-bold text-black">
-                        Fecha: {order.date ? format(parseISO(order.date), "dd 'de' MMMM, yyyy", { locale: es }) : 'N/A'}
+                    <p className="text-sm mt-1">
+                        <span className="font-semibold">Fecha Emisión:</span> {formatDate(order.date)}
                     </p>
                 </div>
             </div>
 
-            {/* INFO EMPRESAS + DESPACHO */}
-            <div className="grid grid-cols-2 gap-6 mb-6">
-                {/* CLIENTE */}
-                <div className="border rounded-lg p-4">
-                    <h3 className="text-xs font-bold text-gray-500 uppercase border-b pb-1 mb-2">Datos del Cliente</h3>
-                    <p className="font-bold text-sm text-gray-800">{client?.name || 'Cliente General'}</p>
-                    <div className="mt-1 space-y-0.5 text-gray-700">
-                        <p><span className="font-semibold">RUT:</span> {client?.rut || 'N/A'}</p>
-                        <p><span className="font-semibold">Dirección:</span> {client?.address || ''}</p>
-                        <p><span className="font-semibold">Giro:</span> {client?.businessLine || 'N/A'}</p>
-                    </div>
+            {/* Info Blocks */}
+            <div className="grid grid-cols-3 gap-4 mb-6 text-xs">
+                <div className="border rounded-md p-3 space-y-1 bg-gray-50/50">
+                    <h4 className="font-bold text-gray-500 uppercase border-b pb-1 mb-2">Cliente</h4>
+                    <p className="font-bold text-sm text-gray-800">{client?.name || 'N/A'}</p>
+                    <p><span className="font-semibold">RUT:</span> {client?.rut || 'N/A'}</p>
+                    <p><span className="font-semibold">Dirección:</span> {client?.address || 'N/A'}</p>
+                    <p><span className="font-semibold">Giro:</span> {client?.businessLine || 'N/A'}</p>
+                    <p><span className="font-semibold">Contacto:</span> {client?.contactPerson || 'N/A'}</p>
                 </div>
-
-                {/* DESPACHO */}
-                <div className="border rounded-lg p-4 bg-gray-50/50">
-                    <h3 className="text-xs font-bold text-gray-500 uppercase border-b pb-1 mb-2">Información de Despacho</h3>
-                    <div className="space-y-1 text-gray-700">
-                        <p><span className="font-semibold">Bodega Origen:</span> {order.warehouse}</p>
-                        <p><span className="font-semibold">Transportista:</span> {order.carrierId === 'none' ? 'Propio/Cliente' : order.carrierId || 'N/A'}</p>
-                        {order.driverName && <p><span className="font-semibold">Chofer:</span> {order.driverName}</p>}
-                        {order.licensePlate && <p><span className="font-semibold">Patente:</span> {order.licensePlate}</p>}
-                    </div>
+                <div className="border rounded-md p-3 space-y-1 bg-gray-50/50">
+                    <h4 className="font-bold text-gray-500 uppercase border-b pb-1 mb-2">Despacho</h4>
+                    <p><span className="font-semibold">Bodega Origen:</span> <span className="font-medium text-gray-800">{order.warehouse || 'N/A'}</span></p>
+                    <p><span className="font-semibold">Dirección Retiro:</span> Fundo Viña Negra</p>
+                    <p><span className="font-semibold">Chofer:</span> {(order as any).driverName || '--'}</p>
+                    <p><span className="font-semibold">Patente:</span> {(order as any).licensePlate || '--'}</p>
+                </div>
+                <div className="border rounded-md p-3 space-y-1 bg-gray-50/50">
+                    <h4 className="font-bold text-gray-500 uppercase border-b pb-1 mb-2">Condiciones Comerciales</h4>
+                    <p><span className="font-semibold">Operación:</span> {order.saleType || 'Venta en Firme'}</p>
+                    <p><span className="font-semibold">Pago:</span> {(order as any).paymentMethod} {(order as any).creditDays ? `(${(order as any).creditDays} días)`: ''}</p>
+                    <p><span className="font-semibold">Vencimiento:</span> {formatDate((order as any).paymentDueDate)}</p>
+                    <p className="font-semibold pt-1 mt-1 border-t">Datos de Transferencia:</p>
+                    <p><span className="font-semibold">Banco:</span> {bankAccount?.bankName || '-'}</p>
+                    <p><span className="font-semibold">Cuenta:</span> {bankAccount?.accountNumber ? `${bankAccount.accountType} N° ${bankAccount.accountNumber}`: '-'}</p>
                 </div>
             </div>
 
-            {/* TABLA ITEMS */}
-            <div className="mb-6">
-                <Table className="text-xs border border-gray-200 table-fixed w-full">
-                    <TableHeader className="bg-gray-100">
-                        <TableRow className="border-b border-gray-300">
-                            <TableHead className="text-gray-900 font-bold h-8 w-[6%]">CÓD.</TableHead>
-                            <TableHead className="text-gray-900 font-bold h-8 w-[28%]">PRODUCTO</TableHead>
-                            <TableHead className="text-center text-gray-900 font-bold h-8 w-[6%]">ENV.</TableHead>
-                            <TableHead className="text-right text-gray-900 font-bold h-8 w-[8%]">KGS</TableHead>
-                            <TableHead className="text-right text-gray-900 font-bold h-8 w-[10%]">P. NETO</TableHead>
-                            <TableHead className="text-right text-gray-900 font-bold h-8 w-[10%]">P. C/IVA</TableHead>
-                            <TableHead className="text-right text-gray-900 font-bold h-8 w-[12%]">SUBT. NETO</TableHead>
-                            <TableHead className="text-right text-gray-900 font-bold h-8 w-[14%]">TOTAL C/IVA</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {order.items.map((item, idx) => {
-                            const netPrice = item.price || 0;
-                            const grossPrice = netPrice * 1.19;
-                            const subTotalNet = netPrice * (item.quantity || 0);
-                            const totalLineGross = subTotalNet * 1.19;
+            {/* Items Table */}
+            <table className="w-full text-xs">
+                 <thead className="bg-gray-100">
+                    <tr className="border-b border-gray-300">
+                        <th className="p-1.5 text-left font-bold w-[5%]">CÓD.</th>
+                        <th className="p-1.5 text-left font-bold w-[25%]">DESCRIPCIÓN</th>
+                        <th className="p-1.5 text-left font-bold w-[15%]">ENVASE</th>
+                        <th className="p-1.5 text-right font-bold w-[10%]">KGS</th>
+                        <th className="p-1.5 text-right font-bold w-[10%]">P. NETO</th>
+                        <th className="p-1.5 text-right font-bold w-[10%]">P. C/IVA</th>
+                        <th className="p-1.5 text-right font-bold w-[12%]">SUBT. NETO</th>
+                        <th className="p-1.5 text-right font-bold w-[13%]">TOTAL C/IVA</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {order.items.map((item, index) => {
+                        const netPrice = item.price || 0;
+                        const grossPrice = netPrice * 1.19;
+                        const subTotalNet = netPrice * (item.quantity || 0);
+                        const totalLineGross = subTotalNet * 1.19;
 
-                            return (
-                                <TableRow key={item.id || idx} className="border-b border-gray-100 hover:bg-transparent">
-                                    <TableCell className="font-medium text-gray-600 py-1.5">{getCaliberCode(item.caliber)}</TableCell>
-                                    <TableCell className="text-gray-800 py-1.5">
-                                        <span className="font-bold block">{item.product}</span>
-                                        <span className="text-gray-500 block text-[10px]">Calibre: {item.caliber}</span>
-                                    </TableCell>
-                                    <TableCell className="text-center py-1.5">{item.packagingQuantity || 0}</TableCell>
-                                    <TableCell className="text-right font-medium py-1.5">{numberFormat.format(item.quantity)}</TableCell>
-                                    <TableCell className="text-right text-gray-700 py-1.5 font-mono">{currency.format(netPrice)}</TableCell>
-                                    <TableCell className="text-right text-gray-700 py-1.5 font-mono">{currency.format(grossPrice)}</TableCell>
-                                    <TableCell className="text-right font-semibold text-gray-800 py-1.5 font-mono">{currency.format(subTotalNet)}</TableCell>
-                                    <TableCell className="text-right font-bold text-gray-900 py-1.5 font-mono bg-gray-50">{currency.format(totalLineGross)}</TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                    <tfoot className="bg-gray-50 font-bold text-gray-700">
-                        <tr>
-                            <TableCell colSpan={2} className="text-right py-1.5 uppercase text-[10px]">Totales:</TableCell>
-                            <TableCell className="text-center py-1.5">{numberFormat.format(totalPackages)}</TableCell>
-                            <TableCell className="text-right py-1.5">{numberFormat.format(totalKilos)}</TableCell>
-                            <TableCell colSpan={4}></TableCell>
+                        return (
+                        <tr key={index} className="border-b border-gray-100">
+                            <td className="p-1.5 align-top">{getCaliberCode(item.caliber)}</td>
+                            <td className="p-1.5 align-top">
+                                <p className="font-bold text-gray-800">{item.product}</p>
+                                <p className="text-gray-500 text-[10px]">Calibre: {item.caliber}</p>
+                            </td>
+                            <td className="p-1.5 align-top">
+                                <p>{item.packagingType || 'S/E'}</p>
+                                <p className="text-gray-500 text-[10px]">({item.packagingQuantity} uds)</p>
+                            </td>
+                            <td className="p-1.5 align-top text-right font-medium">{numberFormat.format(item.quantity)}</td>
+                            <td className="p-1.5 align-top text-right font-mono">{currency.format(netPrice)}</td>
+                            <td className="p-1.5 align-top text-right font-mono">{currency.format(grossPrice)}</td>
+                            <td className="p-1.5 align-top text-right font-mono font-semibold text-gray-800">{currency.format(subTotalNet)}</td>
+                            <td className="p-1.5 align-top text-right font-mono font-bold text-black bg-gray-50">{currency.format(totalLineGross)}</td>
                         </tr>
-                    </tfoot>
-                </Table>
-            </div>
+                    )})}
+                </tbody>
+            </table>
 
-            {/* TOTALES Y CONDICIONES */}
-            <div className="flex justify-between items-start mt-2">
-                <div className="w-3/5 pr-6">
-                    <div className="border rounded-md p-3 bg-white">
-                        <h4 className="font-bold text-xs text-gray-800 mb-2 border-b pb-1 uppercase">Condiciones Comerciales</h4>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-700">
-                            <div><span className="font-semibold">Tipo Venta:</span> {order.saleType}</div>
-                            <div><span className="font-semibold">Forma de Pago:</span> {order.paymentMethod}</div>
-                            <div><span className="font-semibold">Estado:</span> <span className="capitalize">{order.status === 'completed' ? 'Despachada' : 'Pendiente'}</span></div>
-                            {displayDueDate && <div><span className="font-semibold">Vencimiento:</span> {format(parseISO(displayDueDate), "dd/MM/yyyy")}</div>}
-                        </div>
-                        {order.notes && (
-                            <div className="mt-3 pt-2 border-t">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Observaciones:</span>
-                                <p className="text-xs text-gray-600 italic leading-tight bg-gray-50 p-1 rounded">{order.notes}</p>
-                            </div>
-                        )}
+            {/* Totals */}
+            <div className="flex justify-between items-start mt-6">
+                <div className="w-1/2">
+                    <h5 className="font-bold text-gray-500 text-xs uppercase mb-1">Resumen Carga</h5>
+                    <div className="text-xs text-gray-700">
+                        <p>Total Envases: {formatNumber(totalPackages)}</p>
+                        <p>Total Kilos: {formatNumber(totalKilos)}</p>
                     </div>
                 </div>
-
-                <div className="w-2/5">
-                    <div className="bg-gray-50 rounded-lg p-3 border">
-                        <div className="flex justify-between py-1 text-xs text-gray-600">
-                            <span>Subtotal Neto:</span>
-                            <span className="font-medium font-mono">{currency.format(calculatedNetTotal)}</span>
-                        </div>
-                        <div className="flex justify-between py-1 text-xs text-gray-600 mb-2">
-                            <span>IVA (19%):</span>
-                            <span className="font-medium font-mono">{currency.format(calculatedVat)}</span>
-                        </div>
-                        <Separator className="bg-gray-300" />
-                        <div className="flex justify-between py-2 text-base font-bold text-gray-900">
-                            <span>TOTAL A PAGAR:</span>
-                            <span className="font-mono">{currency.format(calculatedGrossTotal)}</span>
-                        </div>
+                <div className="w-2/5 space-y-1">
+                    <div className="flex justify-between text-xs">
+                        <span className="text-gray-600">Subtotal Neto:</span>
+                        <span className="font-medium font-mono">{currency.format(netAmount)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                        <span className="text-gray-600">IVA (19%):</span>
+                        <span className="font-medium font-mono">{currency.format(vatAmount)}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-bold border-t-2 border-black mt-2 pt-2">
+                        <span>TOTAL A PAGAR:</span>
+                        <span className="font-mono">{currency.format(grossAmount)}</span>
                     </div>
                 </div>
             </div>
 
-            {/* FOOTER */}
-            <div className="absolute bottom-4 left-0 right-0 text-center border-t pt-1">
-                <p className="text-[9px] text-gray-400">Documento generado electrónicamente por Viña Negra Manager. No válido como factura.</p>
+            {/* Observaciones */}
+            <div className="mt-8">
+                 <h5 className="font-bold text-gray-500 text-xs uppercase mb-1">Observaciones</h5>
+                <p className="text-xs italic text-gray-600 border p-2 rounded-md bg-gray-50 min-h-[50px]">
+                    {order.notes || 'Sin observaciones.'}
+                </p>
             </div>
-        </div>
+
+
+            {/* Signatures */}
+            <div className="mt-24 grid grid-cols-3 gap-12 text-center text-[10px]">
+                <div className="border-t border-black pt-2">
+                    <p className="font-bold">JEFE DE OPERACIONES</p>
+                    <p className="text-gray-500">JOAQUIN BOU CORTES</p>
+                </div>
+                 <div className="border-t border-black pt-2">
+                    <p className="font-bold">GERENCIA DE VENTAS</p>
+                    <p className="text-gray-500">JOSE ROJAS CARMONA</p>
+                </div>
+                <div className="border-t border-black pt-2">
+                    <p className="font-bold">RECIBÍ CONFORME</p>
+                    <p className="text-gray-500">Cliente</p>
+                </div>
+            </div>
+            
+            <p className="text-center text-[9px] text-gray-400 mt-10">
+                Documento interno de control y despacho. No válido como factura tributaria.
+            </p>
+
+          </div>
     );
 });
 

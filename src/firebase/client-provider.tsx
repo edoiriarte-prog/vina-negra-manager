@@ -2,11 +2,10 @@
 
 import React from 'react';
 import { FirebaseProvider } from './provider';
-// Importamos las instancias que acabamos de exportar en index.ts
-import { firebaseApp, auth, firestore } from './index'; 
+// CAMBIO CLAVE: Importamos desde './init' (el archivo limpio) en vez de './index'
+import { firebaseApp, auth, firestore } from './init'; 
 
 export function FirebaseClientProvider({ children }: { children: React.ReactNode }) {
-  // Este componente conecta las instancias singleton con el contexto de React
   return (
     <FirebaseProvider
       firebaseApp={firebaseApp}

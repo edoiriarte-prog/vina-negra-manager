@@ -1,11 +1,17 @@
 "use client";
 
-import React, { createContext, useContext, ReactNode } from 'react';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { PurchaseOrder, SalesOrder, FinancialMovement, ServiceOrder, InventoryAdjustment } from '@/lib/types';
-import { collection, query, orderBy } from 'firebase/firestore';
+import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { db } from '@/firebase/init'; // Usamos la conexión limpia
+import { 
+  PurchaseOrder, 
+  SalesOrder, 
+  FinancialMovement, 
+  ServiceOrder, 
+  InventoryAdjustment 
+} from '@/lib/types';
 
-// --- 1. TIPOS ---
+// --- DEFINICIÓN DEL CONTEXTO ---
 export type OperationsContextType = {
   purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
@@ -15,69 +21,81 @@ export type OperationsContextType = {
   isLoading: boolean;
 };
 
-// --- 2. CONTEXTO ---
 // Lo creamos aquí mismo para exportarlo
 export const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
 
-// --- 3. PROVIDER (El componente que enviaste) ---
+// --- PROVIDER ---
 export function OperationsProvider({ children }: { children: ReactNode }) {
-  const { firestore } = useFirebase();
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
+  const [financialMovements, setFinancialMovements] = useState<FinancialMovement[]>([]);
+  const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
+  const [inventoryAdjustments, setInventoryAdjustments] = useState<InventoryAdjustment[]>([]);
+  
+  const [loading, setLoading] = useState(true);
 
-  // 1. Órdenes de Compra
-  const purchasesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'purchaseOrders'), orderBy('date', 'desc'));
-  }, [firestore]);
-  const { data: purchaseOrders, isLoading: l1 } = useCollection<PurchaseOrder>(purchasesQuery);
+  useEffect(() => {
+    if (!db) return;
+    setLoading(true);
 
-  // 2. Órdenes de Venta
-  const salesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'salesOrders'), orderBy('date', 'desc'));
-  }, [firestore]);
-  const { data: salesOrders, isLoading: l2 } = useCollection<SalesOrder>(salesQuery);
+    // Función auxiliar para suscribirse y mapear datos
+    const subscribe = (coll: string, setter: Function, orderField: string = 'date') => {
+      const q = query(collection(db, coll), orderBy(orderField, 'desc'));
+      return onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data() 
+        }));
+        setter(data);
+      }, (error) => {
+        console.error(`Error loading ${coll}:`, error);
+      });
+    };
 
-  // 3. Movimientos Financieros
-  const financeQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'financialMovements'), orderBy('date', 'desc'));
-  }, [firestore]);
-  const { data: financialMovements, isLoading: l3 } = useCollection<FinancialMovement>(financeQuery);
+    // 1. Órdenes de Compra
+    const unsubPurchases = subscribe('purchaseOrders', setPurchaseOrders);
 
-  // 4. Órdenes de Servicio
-  const servicesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'serviceOrders'), orderBy('date', 'desc'));
-  }, [firestore]);
-  const { data: serviceOrders, isLoading: l4 } = useCollection<ServiceOrder>(servicesQuery);
+    // 2. Órdenes de Venta
+    const unsubSales = subscribe('salesOrders', setSalesOrders);
 
-  // 5. Ajustes de Inventario
-  const adjustmentsQuery = useMemoFirebase(() => {
-      if (!firestore) return null;
-      return query(collection(firestore, 'inventoryAdjustments'), orderBy('date', 'desc'));
-  }, [firestore]);
-  const { data: inventoryAdjustments, isLoading: l5 } = useCollection<InventoryAdjustment>(adjustmentsQuery);
+    // 3. Movimientos Financieros (Tesorería)
+    const unsubFinancials = subscribe('financialMovements', setFinancialMovements);
 
-  const isLoading = l1 || l2 || l3 || l4 || l5;
+    // 4. Órdenes de Servicio
+    const unsubServices = subscribe('serviceOrders', setServiceOrders);
 
-  const value: OperationsContextType = {
-    purchaseOrders: purchaseOrders || [],
-    salesOrders: salesOrders || [],
-    financialMovements: financialMovements || [],
-    serviceOrders: serviceOrders || [],
-    inventoryAdjustments: inventoryAdjustments || [],
-    isLoading
+    // 5. Ajustes de Inventario
+    const unsubAdjustments = subscribe('inventoryAdjustments', setInventoryAdjustments);
+
+    setLoading(false);
+
+    // Cleanup al desmontar
+    return () => {
+      unsubPurchases();
+      unsubSales();
+      unsubFinancials();
+      unsubServices();
+      unsubAdjustments();
+    };
+  }, []);
+
+  const value = {
+    purchaseOrders,
+    salesOrders,
+    financialMovements,
+    serviceOrders,
+    inventoryAdjustments,
+    isLoading: loading
   };
 
   return <OperationsContext.Provider value={value}>{children}</OperationsContext.Provider>;
 }
 
-// --- 4. HOOK PERSONALIZADO ---
-// Esto es lo que usas en tus páginas: const { salesOrders } = useOperations();
+// --- HOOK EXPORTADO ---
 export function useOperations() {
   const context = useContext(OperationsContext);
   if (context === undefined) {
-    throw new Error('useOperations must be used within an OperationsProvider. Check DashboardLayout.');
+    throw new Error('useOperations must be used within an OperationsProvider');
   }
   return context;
 }

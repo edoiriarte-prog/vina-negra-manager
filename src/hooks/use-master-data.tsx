@@ -1,24 +1,25 @@
-
 "use client";
 
-import React, { createContext, useContext, ReactNode } from 'react';
-import {
-  useCollection,
-  useDoc,
-  useFirebase,
-  useMemoFirebase,
-  setDocumentNonBlocking,
-  addDocumentNonBlocking,
-  deleteDocumentNonBlocking,
-  updateDocumentNonBlocking
-} from '@/firebase';
+import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import { 
+  collection, 
+  doc, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  setDoc,
+  query, 
+  orderBy 
+} from 'firebase/firestore';
+import { db } from '@/firebase/init'; // Usamos la conexión limpia directa
 import { BankAccount, Contact, InventoryItem } from '@/lib/types';
-import { doc, collection } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 // --- TIPOS ---
 export type ProductCaliberAssociation = {
-  id: string; // ID del producto (nombre)
-  calibers: string[]; // IDs de calibres (nombres)
+  id: string; // Nombre del producto
+  calibers: string[]; // Nombres de calibres
 };
 
 type MasterSettings = {
@@ -41,9 +42,10 @@ type MasterDataContextType = {
   inventory: InventoryItem[];
   contacts: Contact[];
   bankAccounts: BankAccount[];
+  
   isLoading: boolean;
   
-  // Funciones CRUD
+  // Funciones CRUD Configuración
   addProduct: (p: string) => void;
   removeProduct: (p: string) => void;
   addCaliber: (c: { name: string; code: string }) => void;
@@ -54,82 +56,108 @@ type MasterDataContextType = {
   removeUnit: (u: string) => void;
   addPackagingType: (p: string) => void;
   removePackagingType: (p: string) => void;
-  
-  // --- ESTA LÍNEA FALTABA EN TU CÓDIGO ---
   updateProductCalibers: (productId: string, caliberIds: string[]) => void;
   
-  addBankAccount: (account: Omit<BankAccount, 'id'>) => void;
-  updateBankAccount: (account: BankAccount) => void;
-  removeBankAccount: (id: string) => void;
+  // Funciones CRUD Cuentas
+  addBankAccount: (account: Omit<BankAccount, 'id'>) => Promise<void>;
+  updateBankAccount: (account: BankAccount) => Promise<void>;
+  removeBankAccount: (id: string) => Promise<void>;
   
   // Estáticos
   internalConcepts: { name: string }[];
   costCenters: { name: string }[];
 };
 
-// --- CONTEXTO ---
 const MasterDataContext = createContext<MasterDataContextType | undefined>(undefined);
 
-// --- PROVIDER ---
 export function MasterDataProvider({ children }: { children: ReactNode }) {
-  const { firestore } = useFirebase();
+  const { toast } = useToast();
 
-  // 1. Configuración General (Listas)
-  const settingsDocRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'general') : null, [firestore]);
-  const { data: settingsData, isLoading: l1 } = useDoc<MasterSettings>(settingsDocRef);
+  // --- ESTADOS LOCALES ---
+  const [settings, setSettings] = useState<MasterSettings>({
+    products: [],
+    calibers: [],
+    warehouses: [],
+    units: ['Kilos', 'Cajas'],
+    packagingTypes: [],
+    productCaliberAssociations: []
+  });
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // 2. Colecciones Maestras
-  const accountsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'bankAccounts') : null, [firestore]);
-  const { data: bankAccountsData, isLoading: l2 } = useCollection<BankAccount>(accountsCollection);
+  // --- SUSCRIPCIONES A FIREBASE (REALTIME) ---
+  useEffect(() => {
+    if (!db) return;
+    setLoading(true);
 
-  const contactsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'contacts') : null, [firestore]);
-  const { data: contactsData, isLoading: l3 } = useCollection<Contact>(contactsCollection);
+    // 1. Configuración General (Settings)
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as Partial<MasterSettings>;
+        setSettings(prev => ({ ...prev, ...data }));
+      }
+    });
 
-  const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
-  const { data: inventoryData, isLoading: l4 } = useCollection<InventoryItem>(inventoryCollection);
+    // 2. Cuentas Bancarias
+    const unsubBanks = onSnapshot(collection(db, 'bankAccounts'), (snapshot) => {
+      setBankAccounts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BankAccount)));
+    });
 
-  // Valores por defecto seguros
-  const products = settingsData?.products || [];
-  const calibers = settingsData?.calibers || [];
-  const warehouses = settingsData?.warehouses || [];
-  const units = settingsData?.units || ['Kilos', 'Cajas'];
-  const packagingTypes = settingsData?.packagingTypes || [];
-  const productCaliberAssociations = settingsData?.productCaliberAssociations || [];
-  
-  const bankAccounts = bankAccountsData || [];
-  const contacts = contactsData || [];
-  const inventory = inventoryData || [];
+    // 3. Contactos
+    const unsubContacts = onSnapshot(collection(db, 'contacts'), (snapshot) => {
+      setContacts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contact)));
+    });
 
-  const isLoading = l1 || l2 || l3 || l4;
+    // 4. Inventario
+    const unsubInventory = onSnapshot(collection(db, 'inventory'), (snapshot) => {
+      setInventory(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
+    });
 
-  // --- FUNCIONES DE ESCRITURA (FIREBASE) ---
-  const updateSettingList = (field: keyof MasterSettings, newList: any[]) => {
-    if (!firestore || !settingsDocRef) return;
-    setDocumentNonBlocking(settingsDocRef, { [field]: newList }, { merge: true });
+    setLoading(false);
+
+    // Cleanup al desmontar
+    return () => {
+      unsubSettings();
+      unsubBanks();
+      unsubContacts();
+      unsubInventory();
+    };
+  }, []);
+
+  // --- HELPERS DE ESCRITURA ---
+  const updateSettingList = async (field: keyof MasterSettings, newList: any[]) => {
+    if (!db) return;
+    try {
+        await setDoc(doc(db, 'settings', 'general'), { [field]: newList }, { merge: true });
+    } catch (e) {
+        console.error("Error updating settings:", e);
+        toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar la configuración." });
+    }
   };
 
-  const addProduct = (p: string) => { if (!products.includes(p)) updateSettingList('products', [...products, p]); };
-  const removeProduct = (p: string) => updateSettingList('products', products.filter(item => item !== p));
+  // --- FUNCIONES CRUD CONFIG ---
+  const addProduct = (p: string) => { if (!settings.products.includes(p)) updateSettingList('products', [...settings.products, p]); };
+  const removeProduct = (p: string) => updateSettingList('products', settings.products.filter(item => item !== p));
 
   const addCaliber = (c: { name: string; code: string }) => { 
-      if (!calibers.find(cal => cal.name === c.name)) updateSettingList('calibers', [...calibers, c]); 
+      if (!settings.calibers.find(cal => cal.name === c.name)) updateSettingList('calibers', [...settings.calibers, c]); 
   };
-  const removeCaliber = (name: string) => updateSettingList('calibers', calibers.filter(item => item.name !== name));
+  const removeCaliber = (name: string) => updateSettingList('calibers', settings.calibers.filter(item => item.name !== name));
 
-  const addWarehouse = (w: string) => { if (!warehouses.includes(w)) updateSettingList('warehouses', [...warehouses, w]); };
-  const removeWarehouse = (w: string) => updateSettingList('warehouses', warehouses.filter(item => item !== w));
+  const addWarehouse = (w: string) => { if (!settings.warehouses.includes(w)) updateSettingList('warehouses', [...settings.warehouses, w]); };
+  const removeWarehouse = (w: string) => updateSettingList('warehouses', settings.warehouses.filter(item => item !== w));
 
-  const addUnit = (u: string) => { if (!units.includes(u)) updateSettingList('units', [...units, u]); };
-  const removeUnit = (u: string) => updateSettingList('units', units.filter(item => item !== u));
+  const addUnit = (u: string) => { if (!settings.units.includes(u)) updateSettingList('units', [...settings.units, u]); };
+  const removeUnit = (u: string) => updateSettingList('units', settings.units.filter(item => item !== u));
 
-  const addPackagingType = (p: string) => { if (!packagingTypes.includes(p)) updateSettingList('packagingTypes', [...packagingTypes, p]); };
-  const removePackagingType = (p: string) => updateSettingList('packagingTypes', packagingTypes.filter(item => item !== p));
+  const addPackagingType = (p: string) => { if (!settings.packagingTypes.includes(p)) updateSettingList('packagingTypes', [...settings.packagingTypes, p]); };
+  const removePackagingType = (p: string) => updateSettingList('packagingTypes', settings.packagingTypes.filter(item => item !== p));
 
-  // ASOCIACIONES
   const updateProductCalibers = (productName: string, caliberNames: string[]) => {
-    const index = productCaliberAssociations.findIndex(a => a.id === productName);
-    let newAssociations = [...productCaliberAssociations];
-    
+    const index = settings.productCaliberAssociations.findIndex(a => a.id === productName);
+    let newAssociations = [...settings.productCaliberAssociations];
     if (index >= 0) {
       newAssociations[index] = { id: productName, calibers: caliberNames };
     } else {
@@ -138,20 +166,21 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     updateSettingList('productCaliberAssociations', newAssociations);
   };
 
-  // Gestión de Cuentas Bancarias
-  const addBankAccount = (account: Omit<BankAccount, 'id'>) => {
-    if (!firestore) return;
-    addDocumentNonBlocking(collection(firestore, 'bankAccounts'), account);
+  // --- FUNCIONES CRUD CUENTAS ---
+  const addBankAccount = async (account: Omit<BankAccount, 'id'>) => {
+    await addDoc(collection(db, 'bankAccounts'), account);
+    toast({ title: "Cuenta Agregada" });
   };
   
-  const updateBankAccount = (account: BankAccount) => {
-     if (!firestore) return;
-     updateDocumentNonBlocking(doc(firestore, 'bankAccounts', account.id), account);
+  const updateBankAccount = async (account: BankAccount) => {
+     const { id, ...data } = account;
+     await updateDoc(doc(db, 'bankAccounts', id), data);
+     toast({ title: "Cuenta Actualizada" });
   };
 
-  const removeBankAccount = (id: string) => {
-     if (!firestore) return;
-     deleteDocumentNonBlocking(doc(firestore, 'bankAccounts', id));
+  const removeBankAccount = async (id: string) => {
+     await deleteDoc(doc(db, 'bankAccounts', id));
+     toast({ title: "Cuenta Eliminada" });
   };
 
   // Datos estáticos
@@ -166,24 +195,25 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
   ];
 
   const value: MasterDataContextType = {
-    products, addProduct, removeProduct,
-    calibers, addCaliber, removeCaliber,
-    warehouses, addWarehouse, removeWarehouse,
-    units, addUnit, removeUnit,
-    packagingTypes, addPackagingType, removePackagingType,
-    productCaliberAssociations,
-    updateProductCalibers, // <--- FUNCIÓN AGREGADA
+    ...settings,
     inventory,
     contacts,
-    bankAccounts, addBankAccount, updateBankAccount, removeBankAccount,
+    bankAccounts,
+    addProduct, removeProduct,
+    addCaliber, removeCaliber,
+    addWarehouse, removeWarehouse,
+    addUnit, removeUnit,
+    addPackagingType, removePackagingType,
+    updateProductCalibers,
+    addBankAccount, updateBankAccount, removeBankAccount,
     internalConcepts, costCenters,
-    isLoading
+    isLoading: loading
   };
 
   return <MasterDataContext.Provider value={value}>{children}</MasterDataContext.Provider>;
 }
 
-// --- HOOK ---
+// --- HOOK EXPORTADO ---
 export function useMasterData() {
   const context = useContext(MasterDataContext);
   if (context === undefined) {
