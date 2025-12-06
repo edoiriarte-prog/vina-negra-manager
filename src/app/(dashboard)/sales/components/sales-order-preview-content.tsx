@@ -23,6 +23,11 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
 
     const currency = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
     const numberFormat = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+    
+    const formatNumber = (val: number | undefined) => {
+      if (val === undefined || val === null) return '0';
+      return new Intl.NumberFormat('es-CL').format(val);
+    }
 
     const netAmount = order.totalAmount || 0;
     const vatAmount = order.includeVat !== false ? netAmount * 0.19 : 0;
