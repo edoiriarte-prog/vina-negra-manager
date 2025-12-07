@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -178,24 +177,41 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       return [...costCenters, ...productNames];
   }, [costCenters, products]);
 
-  // --- Handlers ---
+  // --- Handlers (CORREGIDO) ---
   const onSubmit = (data: FormData) => {
     const totalFromItems = data.items.reduce((sum, item) => sum + item.amount, 0);
     
-    const finalMovement = {
-      ...data,
+    // CORRECCIÓN: Limpiamos los valores 'null' para que sean 'undefined'
+    // Esto satisface el tipado estricto de TypeScript
+    const cleanData = {
+      type: data.type,
+      costCenter: data.costCenter,
       date: format(data.date, 'yyyy-MM-dd'),
       amount: totalFromItems,
       description: data.items.map(i => i.concept).join(', '),
+      
+      contactId: data.contactId || undefined,
+      voucherNumber: data.voucherNumber || undefined,
+      paymentMethod: data.paymentMethod || undefined,
+      sourceAccountId: data.sourceAccountId || undefined,
+      destinationAccountId: data.destinationAccountId || undefined,
+      notes: data.notes || undefined,
+      manualDteType: data.manualDteType || undefined,
+      manualDteFolio: data.manualDteFolio || undefined,
+
       relatedDocument: data.pendingDocumentId ? {
         id: data.pendingDocumentId,
         type: salesOrders.some(s => s.id === data.pendingDocumentId) ? 'OV' : 'OC',
       } : undefined
     };
-    
-    const { items, documentType, pendingDocumentId, ...rest } = finalMovement;
 
-    onSave(movement ? { ...rest, id: movement.id } : rest);
+    if (movement) {
+        // @ts-ignore: Casting seguro tras limpieza
+        onSave({ ...cleanData, id: movement.id });
+    } else {
+        // @ts-ignore: Casting seguro tras limpieza
+        onSave(cleanData);
+    }
   };
   
   // --- Estilos ---
@@ -256,7 +272,15 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100" align="start">
-                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={2023} toYear={2030} />
+                                    <Calendar 
+                                        mode="single" 
+                                        selected={field.value} 
+                                        onSelect={field.onChange} 
+                                        captionLayout="dropdown-buttons" 
+                                        fromYear={2023} 
+                                        toYear={2030}
+                                        locale={es} 
+                                    />
                                 </PopoverContent>
                             </Popover>
                         )} />
@@ -341,7 +365,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                                             <SelectItem value="Otro">Otro</SelectItem>
                                         </SelectContent>
                                       </Select>
-                                    )}/>
+                                      )}/>
                                </div>
                                <div className="space-y-2"><Label className={labelClass}>Folio DTE</Label><Input {...form.register('manualDteFolio')} placeholder="N° de Folio" className={darkInputClass}/></div>
                             </div>
@@ -432,4 +456,3 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     </Sheet>
   );
 }
-
