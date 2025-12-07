@@ -3,17 +3,16 @@
 
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { SalesOrder, Contact } from "@/lib/types"; 
+import { SalesOrder } from "@/lib/types"; 
 import { getColumns } from "./components/columns"; 
 import { DataTable } from "./components/data-table"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { useOperations } from "@/hooks/use-operations";
 import { Button } from "@/components/ui/button";
-import { Plus, TrendingUp, Search, DollarSign, FileText } from "lucide-react";
+import { Plus, DollarSign, FileText, FileSpreadsheet } from "lucide-react";
 import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
 import { SalesOrderPreview } from "./components/sales-order-preview"; 
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useFirebase, deleteDocumentNonBlocking } from "@/firebase";
+import { useFirebase } from "@/firebase";
 import { doc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
@@ -33,7 +32,7 @@ import { format, parseISO } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SalesPage() {
-  const { firestore } = useFirebase();
+  const { db } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -76,18 +75,21 @@ export default function SalesPage() {
 
   const handleSave = async (orderData: SalesOrder | Omit<SalesOrder, "id">) => {
     try {
-        if ('id' in orderData) {
+        if ('id' in orderData && orderData.id) {
             await updateSalesOrder(orderData.id, orderData as SalesOrder);
+            toast({ title: "Actualizado", description: "La orden se actualizó correctamente." });
         } else {
-            await createSalesOrder(orderData as SalesOrder);
+            const newOrder = await createSalesOrder(orderData as SalesOrder);
+            toast({ title: "Creado", description: "Nueva orden de venta registrada." });
         }
+        
         router.refresh();
+        setIsSheetOpen(false);
+        setEditingOrder(null);
+        
     } catch (error) {
       console.error("Error al guardar:", error);
-      toast({ variant: "destructive", title: "Error", description: "No se pudo guardar la orden." });
-    } finally {
-      setIsSheetOpen(false);
-      setEditingOrder(null);
+      toast({ variant: "destructive", title: "Error", description: "No se pudo guardar la orden. Intente nuevamente." });
     }
   };
   
@@ -102,22 +104,62 @@ export default function SalesPage() {
   };
 
   const handleDeleteRequest = async (order: SalesOrder) => {
-      if (!firestore) return;
+      if (!db) return;
       if (!order.id) {
           alert("ERROR: No se puede eliminar una orden sin ID.");
           return;
       }
       if (window.confirm(`¿Seguro que quieres eliminar la orden de venta ${order.number || order.id}? Esta acción es permanente.`)) {
           try {
-              await deleteDoc(doc(firestore, "salesOrders", order.id));
+              await deleteDoc(doc(db, "salesOrders", order.id));
               toast({ title: "Orden Eliminada", description: `La orden ${order.number} ha sido eliminada.`});
-              window.location.reload(); // Forzar refresco para limpiar estado
+              window.location.reload(); 
           } catch(e) {
               console.error("Error al eliminar:", e);
               toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar la orden.' });
           }
       }
   }
+
+  const handleExportPackingList = () => {
+    if (salesList.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No hay datos",
+        description: "No hay órdenes de venta para exportar."
+      });
+      return;
+    }
+
+    const dataToExport = salesList.flatMap(order => {
+      const client = clients.find(c => c.id === order.clientId);
+      return order.items.map(item => ({
+        'N° Orden': order.number || order.id,
+        'Fecha': format(parseISO(order.date), 'dd/MM/yyyy'),
+        'Cliente': client?.name || 'Desconocido',
+        'Estado': order.status,
+        'Bodega': order.warehouse,
+        'Chofer': order.driver,
+        'Patente': order.plate,
+        'Producto': item.product,
+        'Calibre': item.caliber,
+        'Cantidad (Kg)': item.quantity,
+        'Cantidad (Envases)': item.packagingQuantity,
+        'Precio Unitario': item.price,
+        'Total Línea': item.total,
+      }));
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Packing List Ventas');
+    XLSX.writeFile(workbook, `PackingList_Ventas_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+
+    toast({
+      title: "Exportación Exitosa",
+      description: "El packing list de ventas ha sido generado."
+    });
+  };
 
   const handleExport = (orderToExport: SalesOrder) => {
     const client = clients.find(c => c.id === orderToExport.clientId);
@@ -164,9 +206,14 @@ export default function SalesPage() {
           <h2 className="text-3xl font-bold tracking-tight text-white">Gestión de Ventas</h2>
           <p className="text-slate-400 mt-1">Control de despachos y facturación comercial.</p>
         </div>
-        <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 font-semibold">
-          <Plus className="mr-2 h-4 w-4" /> Nueva Venta
-        </Button>
+        <div className="flex gap-2">
+            <Button onClick={handleExportPackingList} variant="outline" className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800">
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Packing List
+            </Button>
+            <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 font-semibold">
+              <Plus className="mr-2 h-4 w-4" /> Nueva Venta
+            </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
@@ -251,3 +298,5 @@ export default function SalesPage() {
     </div>
   );
 }
+
+    

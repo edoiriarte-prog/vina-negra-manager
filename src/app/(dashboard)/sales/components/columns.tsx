@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -33,7 +32,8 @@ const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
 
 const StatusCell = ({ order }: { order: SalesOrder }) => {
-  const { firestore } = useFirebase();
+  // CORRECCIÓN: Usamos 'db' en lugar de 'firestore'
+  const { db } = useFirebase();
   const [status, setStatus] = useState(order.status);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -56,14 +56,16 @@ const StatusCell = ({ order }: { order: SalesOrder }) => {
   };
 
   const handleStatusChange = async (newStatus: string) => {
-    if (!firestore) return;
+    // CORRECCIÓN: Validamos contra 'db'
+    if (!db) return;
     const oldStatus = status;
     // @ts-ignore
     setStatus(newStatus);
     setIsLoading(true);
 
     try {
-      const orderRef = doc(firestore, "salesOrders", order.id);
+      // CORRECCIÓN: Usamos 'db' para la referencia
+      const orderRef = doc(db, "salesOrders", order.id);
       const updateData: any = { status: newStatus };
 
       if (newStatus === "dispatched" && oldStatus !== "dispatched") {

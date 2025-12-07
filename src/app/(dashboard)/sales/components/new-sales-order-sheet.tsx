@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Plus, Users, Truck, Info, PackageCheck, DollarSign, CreditCard, CalendarIcon, Warehouse, Landmark } from "lucide-react";
+import { Trash2, Plus, Users, Truck, Info, PackageCheck, DollarSign, CreditCard, CalendarIcon, Warehouse, Landmark, Loader2 } from "lucide-react";
 import { 
   SalesOrder, 
   Contact, 
@@ -28,7 +28,7 @@ import { format, addDays, parseISO } from 'date-fns';
 interface NewSalesOrderSheetProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (orderData: SalesOrder | Omit<SalesOrder, "id">) => void;
+  onSave: (orderData: SalesOrder | Omit<SalesOrder, "id">) => Promise<void>;
   order: SalesOrder | null;
   clients: Contact[];
   inventory: InventoryItem[]; 
@@ -55,7 +55,6 @@ const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder
             paymentMethod: order.paymentMethod || 'Contado',
             // @ts-ignore
             paymentDueDate: order.paymentDueDate ? format(new Date(order.paymentDueDate), 'yyyy-MM-dd') : undefined,
-            // Aseguramos que existan los campos de chofer si venimos de editar
             // @ts-ignore
             driver: order.driver || '',
             // @ts-ignore
@@ -63,7 +62,6 @@ const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder
         };
     }
     
-    // Lógica de generación de ID (Previene OV-OV duplicado limpiando el string primero)
     const existingIds = (allSalesOrders || [])
         .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
         .filter(n => !isNaN(n) && n > 0);
@@ -114,12 +112,14 @@ export function NewSalesOrderSheet({
   const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order, salesOrders));
   const [items, setItems] = useState<OrderItem[]>(order?.items || []);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       const initialData = getInitialFormData(order, salesOrders);
       setFormData(initialData);
       setItems(initialData.items || []);
+      setIsSubmitting(false);
     }
   }, [order, isOpen, salesOrders]);
 
@@ -165,8 +165,9 @@ export function NewSalesOrderSheet({
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    
     if (!formData.clientId && !isDispatch) {
         toast({ variant: "destructive", title: "Falta Cliente", description: "Selecciona un cliente." });
         return;
@@ -180,7 +181,6 @@ export function NewSalesOrderSheet({
     const totalKilos = items.reduce((acc, item) => acc + (item.quantity || 0), 0);
     const totalPackages = items.reduce((acc, item) => acc + (item.packagingQuantity || 0), 0);
 
-    // Seguridad extra para ID
     const safeNumber = formData.number || `OV-${Date.now()}`;
 
     const finalOrder: any = {
@@ -200,7 +200,14 @@ export function NewSalesOrderSheet({
         }
     });
 
-    onSave(finalOrder);
+    try {
+        setIsSubmitting(true);
+        await onSave(finalOrder);
+    } catch (error) {
+        console.error("Error al guardar desde el sheet:", error);
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const netTotal = useMemo(() => {
@@ -213,7 +220,6 @@ export function NewSalesOrderSheet({
       return { vatAmount: vat, finalTotalWithVat: total };
   }, [netTotal, formData.includeVat]);
 
-  // Formateador de moneda auxiliar
   const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val || 0);
 
   const title = order ? `Editar OV ${order.number}` : `Nueva Orden de Venta`;
@@ -228,7 +234,7 @@ export function NewSalesOrderSheet({
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-7xl w-[95vw] overflow-y-auto p-0 flex flex-col gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
         <SheetHeader className="bg-slate-900 border-b border-slate-800 px-6 py-4 sticky top-0 z-10">
-             <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
                     <div className="bg-emerald-600/20 p-2.5 rounded-xl border border-emerald-600/30">
                         <Truck className="h-6 w-6 text-emerald-400" />
@@ -276,7 +282,7 @@ export function NewSalesOrderSheet({
                     </CardContent>
                 </Card>
 
-                {/* TARJETA DESPACHO / BODEGA (ACTUALIZADA CON CHOFER Y PATENTE) */}
+                {/* TARJETA DESPACHO / BODEGA */}
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
@@ -295,7 +301,6 @@ export function NewSalesOrderSheet({
                             </Select>
                         </div>
 
-                        {/* NUEVOS CAMPOS: CHOFER Y PATENTE */}
                         <div className="grid grid-cols-2 gap-2 pt-1">
                             <div className="space-y-1">
                                 <Label className="text-[10px] text-slate-500 uppercase">Chofer</Label>
@@ -365,7 +370,6 @@ export function NewSalesOrderSheet({
                                             </td>
                                             <td className="px-4 py-2">
                                                 <div className="flex flex-col items-end">
-                                                    {/* INPUT PRECIO NETO */}
                                                     <Input 
                                                         type="number" 
                                                         value={item.price || ''} 
@@ -373,7 +377,6 @@ export function NewSalesOrderSheet({
                                                         className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-slate-700 focus:border-blue-500 w-32" 
                                                         placeholder="Neto"
                                                     />
-                                                    {/* VISUALIZACIÓN PRECIO CON IVA */}
                                                     <span className="text-[10px] text-blue-500/70 font-mono mt-1 pr-1">
                                                         c/IVA: {formatCurrency((item.price || 0) * 1.19)}
                                                     </span>
@@ -506,8 +509,18 @@ export function NewSalesOrderSheet({
 
             <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
               <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={items.length === 0}>
-                  {order ? 'Guardar Cambios' : `Crear ${isDispatch ? 'Despacho' : 'Venta'}`}
+              <Button 
+                type="submit" 
+                className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold disabled:opacity-50 disabled:cursor-not-allowed" 
+                disabled={items.length === 0 || isSubmitting}
+              >
+                  {isSubmitting ? (
+                    <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...
+                    </>
+                  ) : (
+                    order ? 'Guardar Cambios' : `Crear ${isDispatch ? 'Despacho' : 'Venta'}`
+                  )}
               </Button>
             </SheetFooter>
         </form>
