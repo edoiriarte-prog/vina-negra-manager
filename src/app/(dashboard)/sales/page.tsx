@@ -133,21 +133,30 @@ export default function SalesPage() {
 
     const dataToExport = salesList.flatMap(order => {
       const client = clients.find(c => c.id === order.clientId);
-      return order.items.map(item => ({
-        'N° Orden': order.number || order.id,
-        'Fecha': format(parseISO(order.date), 'dd/MM/yyyy'),
-        'Cliente': client?.name || 'Desconocido',
-        'Estado': order.status,
-        'Bodega': order.warehouse,
-        'Chofer': order.driver,
-        'Patente': order.plate,
-        'Producto': item.product,
-        'Calibre': item.caliber,
-        'Cantidad (Kg)': item.quantity,
-        'Cantidad (Envases)': item.packagingQuantity,
-        'Precio Unitario': item.price,
-        'Total Línea': item.total,
-      }));
+      return order.items.map(item => {
+        const netPrice = item.price || 0;
+        const netTotal = item.total || 0;
+        const grossPrice = order.includeVat !== false ? Math.round(netPrice * 1.19) : netPrice;
+        const grossTotal = order.includeVat !== false ? Math.round(netTotal * 1.19) : netTotal;
+
+        return {
+          'N° Orden': order.number || order.id,
+          'Fecha': format(parseISO(order.date), 'dd/MM/yyyy'),
+          'Cliente': client?.name || 'Desconocido',
+          'Estado': order.status,
+          'Bodega': order.warehouse,
+          'Chofer': order.driver,
+          'Patente': order.plate,
+          'Producto': item.product,
+          'Calibre': item.caliber,
+          'Cantidad (Kg)': item.quantity,
+          'Cantidad (Envases)': item.packagingQuantity,
+          'Precio Unitario Neto': netPrice,
+          'Precio Unitario c/IVA': grossPrice,
+          'Total Línea Neto': netTotal,
+          'Total Línea c/IVA': grossTotal
+        };
+      });
     });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -298,5 +307,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    
