@@ -86,7 +86,7 @@ type NewFinancialMovementSheetProps = {
 // --- Componente Principal ---
 export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements }: NewFinancialMovementSheetProps) {
   const { toast } = useToast();
-  const { bankAccounts, costCenters, contacts } = useMasterData();
+  const { bankAccounts, costCenters, contacts, products } = useMasterData();
   const { purchaseOrders, salesOrders } = useOperations();
 
   const form = useForm<FormData>({
@@ -172,6 +172,11 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     const pending = total - payments;
     return { total, paid: payments, pending };
   }, [pendingDocId, salesOrders, purchaseOrders, allMovements, movement]);
+  
+  const combinedCostCenters = useMemo(() => {
+      const productNames = products.map(p => ({ name: p }));
+      return [...costCenters, ...productNames];
+  }, [costCenters, products]);
 
   // --- Handlers ---
   const onSubmit = (data: FormData) => {
@@ -188,8 +193,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       } : undefined
     };
     
-    // Limpieza de campos que no van en el objeto final
-    const { items, documentType, pendingDocumentId, manualDteType, manualDteFolio, ...rest } = finalMovement;
+    const { items, documentType, pendingDocumentId, ...rest } = finalMovement;
 
     onSave(movement ? { ...rest, id: movement.id } : rest);
   };
@@ -262,7 +266,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                         <Controller control={form.control} name="costCenter" render={({ field }) => (
                             <Select onValueChange={field.onChange} value={field.value}>
                                 <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..."/></SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{costCenters.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
+                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{combinedCostCenters.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
                             </Select>
                         )} />
                     </div>
@@ -324,7 +328,21 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 gap-4">
-                               <div className="space-y-2"><Label className={labelClass}>Tipo DTE</Label><Input {...form.register('manualDteType')} placeholder="Factura, Boleta..." className={darkInputClass}/></div>
+                               <div className="space-y-2">
+                                    <Label className={labelClass}>Tipo DTE</Label>
+                                    <Controller control={form.control} name="manualDteType" render={({ field }) => (
+                                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione tipo..."/></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                            <SelectItem value="Factura">Factura</SelectItem>
+                                            <SelectItem value="Boleta">Boleta</SelectItem>
+                                            <SelectItem value="Boleta Honorarios">Boleta Honorarios</SelectItem>
+                                            <SelectItem value="Recibo">Recibo</SelectItem>
+                                            <SelectItem value="Otro">Otro</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    )}/>
+                               </div>
                                <div className="space-y-2"><Label className={labelClass}>Folio DTE</Label><Input {...form.register('manualDteFolio')} placeholder="N° de Folio" className={darkInputClass}/></div>
                             </div>
                         )}
@@ -415,4 +433,3 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
   );
 }
 
-    
