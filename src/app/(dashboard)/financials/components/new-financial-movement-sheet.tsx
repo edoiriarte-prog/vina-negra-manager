@@ -2,222 +2,207 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-  SheetClose,
-} from '@/components/ui/sheet';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { FinancialMovement, PurchaseOrder, SalesOrder, Contact } from '@/lib/types';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { format, parseISO } from 'date-fns';
-import { suggestTransactionDescription } from '@/ai/flows/suggest-transaction-descriptions';
-import { Loader2, Sparkles, CalendarIcon, Trash2, ArrowRight, ArrowDownLeft, ArrowUpRight, GitCompareArrows, Banknote, User, Building, FileText } from 'lucide-react';
+import { es } from 'date-fns/locale';
+
 import { useToast } from '@/hooks/use-toast';
 import { useMasterData } from '@/hooks/use-master-data';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useOperations } from '@/hooks/use-operations';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
-import { es } from 'date-fns/locale';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+import { FinancialMovement, PurchaseOrder, SalesOrder, Contact } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { 
+    CalendarIcon, Trash2, ArrowRight, ArrowDownLeft, ArrowUpRight, GitCompareArrows, Banknote, User, 
+    Building, FileText, Plus, DollarSign, Loader2, Info, FilePlus
+} from 'lucide-react';
+
+// --- Esquema de Validación con Zod ---
+const movementItemSchema = z.object({
+  concept: z.string().min(1, "El concepto es requerido."),
+  amount: z.number().min(1, "El monto debe ser mayor a 0."),
+});
+
+const formSchema = z.object({
+  voucherNumber: z.string().optional(),
+  date: z.date({ required_error: "La fecha es requerida." }),
+  type: z.enum(['income', 'expense', 'traspaso']),
+  contactId: z.string().optional().nullable(),
+  costCenter: z.string().min(1, "Debe seleccionar un centro de costos."),
+  
+  documentType: z.enum(['pending', 'manual']).optional(),
+  pendingDocumentId: z.string().optional().nullable(),
+  manualDteType: z.string().optional().nullable(),
+  manualDteFolio: z.string().optional().nullable(),
+  
+  items: z.array(movementItemSchema).min(1, "Debe agregar al menos un ítem."),
+  
+  paymentMethod: z.string().optional(),
+  sourceAccountId: z.string().optional().nullable(),
+  destinationAccountId: z.string().optional().nullable(),
+  notes: z.string().optional(),
+}).refine(data => {
+    if (data.type === 'traspaso') {
+        return !!data.sourceAccountId && !!data.destinationAccountId;
+    }
+    if (data.type === 'income') {
+        return !!data.destinationAccountId;
+    }
+    if (data.type === 'expense') {
+        return !!data.sourceAccountId;
+    }
+    return true;
+}, {
+    message: "Debe seleccionar las cuentas de origen/destino.",
+    path: ['sourceAccountId'] 
+});
+
+type FormData = z.infer<typeof formSchema>;
+
+// --- Props del Componente ---
 type NewFinancialMovementSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSave: (movement: FinancialMovement | Omit<FinancialMovement, 'id'>) => void;
   movement: FinancialMovement | null;
-  onDelete?: (movement: FinancialMovement) => void;
   allMovements: FinancialMovement[];
-  purchaseOrders: PurchaseOrder[];
-  salesOrders: SalesOrder[];
-  contacts: Contact[];
 };
 
-type PaymentMode = 'total' | 'balance' | 'partial';
-
-const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
-
-const getInitialFormData = (movement: FinancialMovement | null): Omit<FinancialMovement, 'id'> => {
-    if (movement) {
-        return {
-            ...movement,
-            date: format(new Date(movement.date), 'yyyy-MM-dd'),
-        };
-    }
-    return {
-        date: format(new Date(), 'yyyy-MM-dd'),
-        type: 'expense',
-        description: '',
-        amount: 0,
-        paymentMethod: 'Transferencia',
-        contactId: undefined,
-        relatedDocument: undefined,
-        sourceAccountId: undefined,
-        destinationAccountId: undefined,
-        reference: ''
-    };
-};
-
-export function NewFinancialMovementSheet({ 
-    isOpen, onOpenChange, onSave, movement, onDelete, allMovements, 
-    purchaseOrders, salesOrders, contacts 
-}: NewFinancialMovementSheetProps) {
-    
-  const [formData, setFormData] = useState<Omit<FinancialMovement, 'id'>>(getInitialFormData(movement));
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string>('');
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('partial');
-  
+// --- Componente Principal ---
+export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements }: NewFinancialMovementSheetProps) {
   const { toast } = useToast();
-  const { bankAccounts, costCenters } = useMasterData();
+  const { bankAccounts, costCenters, contacts } = useMasterData();
+  const { purchaseOrders, salesOrders } = useOperations();
 
-  // --- DERIVED STATE & MEMOS ---
-  const filteredContacts = useMemo(() => {
-    if (formData.type === 'income') {
-      return contacts.filter(c => Array.isArray(c.type) && (c.type.includes('client') || c.type.includes('other_income')));
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      type: 'expense',
+      items: [{ concept: '', amount: 0 }],
+      documentType: 'pending'
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "items",
+  });
+  
+  const movementType = form.watch('type');
+  const contactId = form.watch('contactId');
+  const pendingDocId = form.watch('pendingDocumentId');
+
+  // --- Efectos y Memos ---
+  useEffect(() => {
+    if (isOpen) {
+      if (movement) {
+        form.reset({
+          voucherNumber: (movement as any).voucherNumber || '',
+          date: parseISO(movement.date),
+          type: movement.type,
+          contactId: movement.contactId,
+          costCenter: (movement as any).costCenter || '',
+          pendingDocumentId: movement.relatedDocument?.id,
+          documentType: movement.relatedDocument ? 'pending' : 'manual',
+          items: (movement as any).items || [{ concept: movement.description, amount: movement.amount }],
+          paymentMethod: movement.paymentMethod,
+          sourceAccountId: movement.sourceAccountId,
+          destinationAccountId: movement.destinationAccountId,
+          notes: (movement as any).notes || ''
+        });
+      } else {
+        form.reset({
+          date: new Date(),
+          type: 'expense',
+          items: [{ concept: '', amount: 0 }],
+          documentType: 'pending'
+        });
+      }
     }
-    if (formData.type === 'expense') {
-      return contacts.filter(c => Array.isArray(c.type) && (c.type.includes('supplier') || c.type.includes('other_expense')));
+  }, [isOpen, movement, form]);
+
+  useEffect(() => {
+      form.setValue('contactId', null);
+      form.setValue('pendingDocumentId', null);
+  }, [movementType, form]);
+
+  const totalAmount = useMemo(() => {
+    return form.watch('items').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  }, [form.watch('items')]);
+
+  const filteredContacts = useMemo(() => {
+    if (movementType === 'income') {
+      return contacts.filter(c => c.type?.includes('client') || c.type?.includes('other_income'));
+    }
+    if (movementType === 'expense') {
+      return contacts.filter(c => c.type?.includes('supplier') || c.type?.includes('other_expense'));
     }
     return [];
-  }, [formData.type, contacts]);
+  }, [movementType, contacts]);
 
   const pendingDocuments = useMemo(() => {
-    if (!formData.contactId) return [];
-    if (formData.type === 'income') {
-        return salesOrders.filter(o => o.clientId === formData.contactId && o.status !== 'cancelled');
-    }
-    if (formData.type === 'expense') {
-        return purchaseOrders.filter(o => o.supplierId === formData.contactId && o.status !== 'cancelled');
-    }
+    if (!contactId) return [];
+    if (movementType === 'income') return salesOrders.filter(o => o.clientId === contactId && (o.status === 'dispatched' || o.status === 'invoiced'));
+    if (movementType === 'expense') return purchaseOrders.filter(o => o.supplierId === contactId && (o.status === 'completed' || o.status === 'received'));
     return [];
-  }, [formData.contactId, formData.type, salesOrders, purchaseOrders]);
-
-  const selectedDocument = useMemo(() => {
-    return [...salesOrders, ...purchaseOrders].find(d => d.id === selectedDocumentId);
-  }, [selectedDocumentId, salesOrders, purchaseOrders]);
+  }, [contactId, movementType, salesOrders, purchaseOrders]);
 
   const documentBalance = useMemo(() => {
-    if (!selectedDocument) return { total: 0, paid: 0, pending: 0 };
-    const total = selectedDocument.totalAmount;
+    const doc = [...salesOrders, ...purchaseOrders].find(d => d.id === pendingDocId);
+    if (!doc) return { total: 0, paid: 0, pending: 0 };
+    const total = doc.totalAmount;
     const payments = allMovements
-        .filter(m => m.relatedDocument?.id === selectedDocument.id && m.id !== movement?.id)
+        .filter(m => m.relatedDocument?.id === doc.id && m.id !== movement?.id)
         .reduce((sum, m) => sum + m.amount, 0);
     const pending = total - payments;
     return { total, paid: payments, pending };
-  }, [selectedDocument, allMovements, movement]);
+  }, [pendingDocId, salesOrders, purchaseOrders, allMovements, movement]);
 
-  // --- EFFECT HOOKS ---
-
-  useEffect(() => {
-    setFormData(getInitialFormData(movement));
-    if (movement?.relatedDocument) {
-        setSelectedDocumentId(movement.relatedDocument.id);
-        setPaymentMode('partial');
-    } else {
-        setSelectedDocumentId('');
-        setPaymentMode('partial');
-    }
-  }, [movement, isOpen]);
-
-  useEffect(() => {
-    if (!selectedDocumentId) {
-        setFormData(p => ({ ...p, relatedDocument: undefined }));
-        return;
-    }
-    const docType = salesOrders.some(s => s.id === selectedDocumentId) ? 'OV' : 'OC';
-    setFormData(p => ({ ...p, relatedDocument: { id: selectedDocumentId, type: docType }}));
-    setPaymentMode('balance');
-  }, [selectedDocumentId, salesOrders]);
-
-  useEffect(() => {
-    if (!selectedDocument) return;
-    switch(paymentMode) {
-        case 'total':
-            setFormData(p => ({ ...p, amount: documentBalance.total }));
-            break;
-        case 'balance':
-            setFormData(p => ({ ...p, amount: documentBalance.pending }));
-            break;
-        case 'partial':
-            // Allows manual input
-            break;
-    }
-  }, [paymentMode, selectedDocument, documentBalance]);
-  
-  useEffect(() => {
-      // Reset dependent fields when type changes
-      setFormData(prev => ({ 
-          ...getInitialFormData(null), 
-          type: prev.type, 
-          date: prev.date,
-          amount: prev.amount, // Keep amount for quick re-entry
-      }));
-      setSelectedDocumentId('');
-  }, [formData.type]);
-
-
-  // --- HANDLERS ---
-
-  const handleTypeChange = (type: 'income' | 'expense' | 'traspaso') => {
-    setFormData(prev => ({...prev, type}));
-  }
-  
-  const handleAmountChange = (value: string) => {
-    const numericValue = parseInt(value.replace(/\D/g, ''), 10) || 0;
-    setFormData(prev => ({...prev, amount: numericValue}));
-    setPaymentMode('partial');
-  }
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (formData.amount <= 0) {
-        toast({ variant: "destructive", title: "Error", description: "El monto debe ser mayor a cero." });
-        return;
-    }
-    if(selectedDocument && formData.amount > documentBalance.pending + 0.01) { // +0.01 for float issues
-        toast({ variant: "destructive", title: "Monto excede saldo", description: `El pago ${formatCurrency(formData.amount)} supera el saldo pendiente de ${formatCurrency(documentBalance.pending)}.` });
-        return;
-    }
-
-    const dataToSave = { ...formData };
+  // --- Handlers ---
+  const onSubmit = (data: FormData) => {
+    const totalFromItems = data.items.reduce((sum, item) => sum + item.amount, 0);
     
-    // Sanitize data: Firestore doesn't accept 'undefined'
-    (Object.keys(dataToSave) as Array<keyof typeof dataToSave>).forEach(key => {
-        if (dataToSave[key] === undefined) {
-           (dataToSave as any)[key] = null;
-        }
-    });
+    const finalMovement = {
+      ...data,
+      date: format(data.date, 'yyyy-MM-dd'),
+      amount: totalFromItems,
+      description: data.items.map(i => i.concept).join(', '),
+      relatedDocument: data.pendingDocumentId ? {
+        id: data.pendingDocumentId,
+        type: salesOrders.some(s => s.id === data.pendingDocumentId) ? 'OV' : 'OC',
+      } : undefined
+    };
+    
+    // Limpieza de campos que no van en el objeto final
+    const { items, documentType, pendingDocumentId, manualDteType, manualDteFolio, ...rest } = finalMovement;
 
-    onSave(movement ? { ...dataToSave, id: movement.id } : dataToSave);
+    onSave(movement ? { ...rest, id: movement.id } : rest);
   };
   
-  const handleDeleteClick = () => {
-    if (movement && onDelete) onDelete(movement);
-  }
-  
-  // --- UI CONSTANTS & STYLES ---
-  const title = movement ? `Editar Movimiento #${movement.id.slice(0, 6)}` : 'Registrar Movimiento';
+  // --- Estilos ---
+  const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
+  const title = movement ? `Editar Movimiento` : 'Registrar Movimiento';
   const darkInputClass = "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-blue-500";
   const darkCardClass = "bg-slate-900 border-slate-800 shadow-sm";
   const labelClass = "text-xs font-medium text-slate-400 uppercase tracking-wide";
   const getTabClass = (tabType: string) => cn(
     "flex-1 h-12 text-base font-bold transition-all disabled:opacity-50",
-    formData.type === tabType
+    movementType === tabType
       ? (tabType === 'income' ? 'bg-emerald-600 shadow-lg shadow-emerald-900/20 text-white' : 
          tabType === 'expense' ? 'bg-rose-600 shadow-lg shadow-rose-900/20 text-white' :
          'bg-blue-600 shadow-lg shadow-blue-900/20 text-white')
@@ -226,191 +211,202 @@ export function NewFinancialMovementSheet({
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-2xl w-full flex flex-col p-0 gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
+      <SheetContent className="sm:max-w-4xl w-full flex flex-col p-0 gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
         <SheetHeader className="px-6 py-4 bg-slate-900/50 border-b border-slate-800">
           <SheetTitle className="text-xl font-bold">{title}</SheetTitle>
-          <SheetDescription className="text-slate-400">Registra un nuevo ingreso, egreso o traspaso.</SheetDescription>
+          <SheetDescription className="text-slate-400">Registra un nuevo ingreso, egreso o traspaso de tesorería.</SheetDescription>
         </SheetHeader>
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
-          <div className="overflow-y-auto p-6 space-y-6">
-            
-            <Tabs value={formData.type} onValueChange={(v) => handleTypeChange(v as any)} className='w-full'>
-                <TabsList className='grid w-full grid-cols-3 gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800 h-auto'>
-                    <TabsTrigger value='income' className={getTabClass('income')}><ArrowDownLeft className="mr-2"/> Ingreso</TabsTrigger>
-                    <TabsTrigger value='expense' className={getTabClass('expense')}><ArrowUpRight className="mr-2"/> Egreso</TabsTrigger>
-                    <TabsTrigger value='traspaso' className={getTabClass('traspaso')}><GitCompareArrows className="mr-2"/> Traspaso</TabsTrigger>
-                </TabsList>
-            </Tabs>
-            
-            <Card className={darkCardClass}>
-                <CardContent className="p-4 grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label className={labelClass}>Fecha del Movimiento</Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-12", darkInputClass, !formData.date && "text-muted-foreground")}>
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {formData.date ? format(new Date(formData.date.replace(/-/g, '/')), "PPP", { locale: es }) : <span>Seleccione fecha</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100" align="start">
-                                <Calendar mode="single" selected={new Date(formData.date.replace(/-/g, '/'))} onSelect={(d) => d && setFormData(p => ({...p, date: format(d, 'yyyy-MM-dd')}))} captionLayout="dropdown-buttons" fromYear={2023} toYear={2030} />
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                    <div className="space-y-2">
-                        <Label className={labelClass}>Monto</Label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-3xl font-bold text-slate-500">$</span>
-                            <Input 
-                                id="amount" name="amount" type="text"
-                                value={new Intl.NumberFormat('es-CL').format(formData.amount)}
-                                onChange={(e) => handleAmountChange(e.target.value)}
-                                className="h-12 text-3xl font-bold text-center tracking-tighter bg-slate-950 border-slate-800 placeholder:text-slate-700"
-                                required placeholder="0"
-                            />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+        
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
+            <Controller control={form.control} name="type" render={({ field }) => (
+                <RadioGroup value={field.value} onValueChange={field.onChange} className='grid grid-cols-3 gap-2'>
+                    <Label className={getTabClass('income')}>
+                        <RadioGroupItem value='income' className='sr-only' /> <ArrowDownLeft className="mr-2"/> Ingreso
+                    </Label>
+                    <Label className={getTabClass('expense')}>
+                        <RadioGroupItem value='expense' className='sr-only' /> <ArrowUpRight className="mr-2"/> Egreso
+                    </Label>
+                    <Label className={getTabClass('traspaso')}>
+                        <RadioGroupItem value='traspaso' className='sr-only' /> <GitCompareArrows className="mr-2"/> Traspaso
+                    </Label>
+                </RadioGroup>
+            )} />
+            
             <Card className={darkCardClass}>
-                <CardContent className="p-4 space-y-4">
-                    {formData.type === 'traspaso' ? (
-                         <div className="flex items-center gap-2">
-                            <div className="flex-1 space-y-1">
-                                <Label className={labelClass}>Desde Cuenta</Label>
-                                <Select required onValueChange={(v) => setFormData(p => ({...p, sourceAccountId: v}))} value={formData.sourceAccountId}>
-                                    <SelectTrigger className={darkInputClass}><SelectValue placeholder="Origen"/></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa').map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent>
-                                </Select>
-                            </div>
-                            <ArrowRight className="mt-5 text-slate-600"/>
-                            <div className="flex-1 space-y-1">
-                                <Label className={labelClass}>Hacia Cuenta</Label>
-                                <Select required onValueChange={(v) => setFormData(p => ({...p, destinationAccountId: v}))} value={formData.destinationAccountId}>
-                                    <SelectTrigger className={darkInputClass}><SelectValue placeholder="Destino"/></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa' && a.id !== formData.sourceAccountId).map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <Label className={labelClass}>{formData.type === 'income' ? 'Cuenta Destino' : 'Cuenta Origen'}</Label>
-                                <Select required onValueChange={(v) => setFormData(p => ({...p, [formData.type === 'income' ? 'destinationAccountId' : 'sourceAccountId']: v}))} value={formData.type === 'income' ? formData.destinationAccountId : formData.sourceAccountId}>
-                                    <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione cuenta..."/></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa').map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1">
-                                <Label className={labelClass}>Forma de Pago</Label>
-                                <Select required onValueChange={(v) => setFormData(p => ({...p, paymentMethod: v}))} value={formData.paymentMethod}>
-                                    <SelectTrigger className={darkInputClass}><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                        <SelectItem value="Transferencia">Transferencia</SelectItem>
-                                        <SelectItem value="Efectivo">Efectivo</SelectItem>
-                                        <SelectItem value="Depósito">Depósito</SelectItem>
-                                        <SelectItem value="Cheque">Cheque</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            {formData.type !== 'traspaso' && (
-            <Card className={darkCardClass}>
-                <CardContent className="p-4 space-y-4">
-                     <div className="flex items-center gap-2">
-                        {formData.type === 'income' ? <User className="h-4 w-4 text-slate-400"/> : <Building className="h-4 w-4 text-slate-400"/>}
-                        <Label className="font-medium text-slate-300">Asociación del Movimiento</Label>
+                <CardHeader><CardTitle className="text-lg text-slate-200">Información General</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                        <Label className={labelClass}>N° Voucher</Label>
+                        <Input {...form.register('voucherNumber')} className={darkInputClass} placeholder='(Autogenerado)' />
                     </div>
-                    <div className='grid grid-cols-2 gap-4'>
-                        <div className='space-y-1'>
-                            <Label className={labelClass}>{formData.type === 'income' ? 'Cliente' : 'Proveedor'}</Label>
-                            <Select onValueChange={(v) => { setFormData(p => ({...p, contactId: v})); setSelectedDocumentId(''); }} value={formData.contactId}>
+                     <div className="space-y-2">
+                        <Label className={labelClass}>Fecha</Label>
+                        <Controller control={form.control} name="date" render={({ field }) => (
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", darkInputClass, !field.value && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione fecha</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100" align="start">
+                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={2023} toYear={2030} />
+                                </PopoverContent>
+                            </Popover>
+                        )} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className={labelClass}>Centro de Costo</Label>
+                        <Controller control={form.control} name="costCenter" render={({ field }) => (
+                            <Select onValueChange={field.onChange} value={field.value}>
                                 <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..."/></SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                    {filteredContacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                </SelectContent>
+                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{costCenters.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
                             </Select>
-                        </div>
-                         <div className='space-y-1'>
-                            <Label className={labelClass}>Documento Asociado (OV/OC)</Label>
-                            <Select onValueChange={setSelectedDocumentId} value={selectedDocumentId} disabled={!formData.contactId || pendingDocuments.length === 0}>
-                                <SelectTrigger className={darkInputClass}><SelectValue placeholder={pendingDocuments.length > 0 ? "Seleccione documento..." : "Sin docs pendientes"}/></SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                    {pendingDocuments.map(d => <SelectItem key={d.id} value={d.id}>{d.number || d.id} - {formatCurrency(d.totalAmount)}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        )} />
                     </div>
-                    {selectedDocument && (
-                        <div className="space-y-3 pt-3">
-                            <Alert className="bg-slate-950 border-slate-800">
-                                <FileText className="h-4 w-4 !text-slate-400" />
-                                <AlertDescription className="text-slate-300">
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span>Total Documento:</span>
-                                        <span className="font-mono font-bold">{formatCurrency(documentBalance.total)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span>Pagos Anteriores:</span>
-                                        <span className="font-mono text-emerald-400">{formatCurrency(documentBalance.paid)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-lg mt-1 pt-1 border-t border-slate-700">
-                                        <span className="font-bold">Saldo Pendiente:</span>
-                                        <span className="font-mono font-bold text-amber-400">{formatCurrency(documentBalance.pending)}</span>
-                                    </div>
-                                </AlertDescription>
-                            </Alert>
-                             <RadioGroup value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)} className="flex gap-2">
-                                <Label className={cn("flex-1 p-2 border rounded-md cursor-pointer text-center text-xs transition-all", paymentMode === 'balance' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800')}>
-                                    <RadioGroupItem value="balance" id="r-balance" className="sr-only"/> Pagar Saldo
-                                </Label>
-                                <Label className={cn("flex-1 p-2 border rounded-md cursor-pointer text-center text-xs transition-all", paymentMode === 'total' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800')}>
-                                    <RadioGroupItem value="total" id="r-total" className="sr-only"/> Pagar Total Doc.
-                                </Label>
-                                <Label className={cn("flex-1 p-2 border rounded-md cursor-pointer text-center text-xs transition-all", paymentMode === 'partial' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800')}>
-                                    <RadioGroupItem value="partial" id="r-partial" className="sr-only"/> Abono Parcial
-                                </Label>
-                             </RadioGroup>
+                </CardContent>
+            </Card>
+
+            <Card className={darkCardClass}>
+                <CardHeader><CardTitle className="text-lg text-slate-200">Asociación y Detalle</CardTitle></CardHeader>
+                <CardContent className="space-y-6">
+                    {movementType !== 'traspaso' ? (
+                        <>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className={labelClass}>{movementType === 'income' ? 'Cliente' : 'Proveedor'}</Label>
+                                <Controller control={form.control} name="contactId" render={({ field }) => (
+                                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..."/></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                            {filteredContacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                )}/>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className={labelClass}>Asociar a</Label>
+                                <Controller control={form.control} name="documentType" render={({ field }) => (
+                                    <RadioGroup value={field.value} onValueChange={field.onChange} className="flex gap-2 items-center h-10">
+                                        <RadioGroupItem value="pending" id="doc-pending" className="sr-only"/>
+                                        <Label htmlFor="doc-pending" className={cn("flex-1 text-center py-2 border rounded-md cursor-pointer", field.value === 'pending' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-transparent border-slate-700 text-slate-400')}>Doc. Pendiente</Label>
+                                        <RadioGroupItem value="manual" id="doc-manual" className="sr-only"/>
+                                        <Label htmlFor="doc-manual" className={cn("flex-1 text-center py-2 border rounded-md cursor-pointer", field.value === 'manual' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-transparent border-slate-700 text-slate-400')}>Otro (Manual)</Label>
+                                    </RadioGroup>
+                                )}/>
+                            </div>
+                        </div>
+
+                        {form.watch('documentType') === 'pending' ? (
+                            <div className='space-y-2'>
+                                <Label className={labelClass}>Documento Pendiente (OV/OC)</Label>
+                                <Controller control={form.control} name="pendingDocumentId" render={({ field }) => (
+                                     <Select onValueChange={field.onChange} value={field.value || ''} disabled={!contactId || pendingDocuments.length === 0}>
+                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder={!contactId ? "Seleccione un contacto primero" : "Seleccione documento..."}/></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                            {pendingDocuments.map(d => <SelectItem key={d.id} value={d.id}>{d.number || d.id} - {formatCurrency(d.totalAmount)}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                )}/>
+                               {pendingDocId && (
+                                   <Alert className="mt-2 bg-slate-950 border-slate-800">
+                                      <FileText className="h-4 w-4 !text-slate-400" />
+                                      <AlertDescription className="text-slate-300 grid grid-cols-3 gap-2 text-xs">
+                                          <p>Total: <strong className="font-mono">{formatCurrency(documentBalance.total)}</strong></p>
+                                          <p>Pagado: <strong className="font-mono text-emerald-400">{formatCurrency(documentBalance.paid)}</strong></p>
+                                          <p>Saldo: <strong className="font-mono text-amber-400">{formatCurrency(documentBalance.pending)}</strong></p>
+                                          <Button type="button" size="sm" className="col-span-3 h-7" onClick={() => form.setValue('items.0.amount', documentBalance.pending)}>Pagar Saldo</Button>
+                                      </AlertDescription>
+                                  </Alert>
+                               )}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-4">
+                               <div className="space-y-2"><Label className={labelClass}>Tipo DTE</Label><Input {...form.register('manualDteType')} placeholder="Factura, Boleta..." className={darkInputClass}/></div>
+                               <div className="space-y-2"><Label className={labelClass}>Folio DTE</Label><Input {...form.register('manualDteFolio')} placeholder="N° de Folio" className={darkInputClass}/></div>
+                            </div>
+                        )}
+                        </>
+                    ) : (
+                         <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className={labelClass}>Desde Cuenta</Label>
+                                <Controller control={form.control} name="sourceAccountId" render={({ field }) => (
+                                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder="Origen"/></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa').map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent>
+                                    </Select>
+                                )}/>
+                            </div>
+                             <div className="space-y-2">
+                                <Label className={labelClass}>Hacia Cuenta</Label>
+                                <Controller control={form.control} name="destinationAccountId" render={({ field }) => (
+                                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder="Destino"/></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa' && a.id !== form.watch('sourceAccountId')).map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent>
+                                    </Select>
+                                )}/>
+                            </div>
                         </div>
                     )}
                 </CardContent>
             </Card>
-            )}
 
             <Card className={darkCardClass}>
-                <CardContent className="p-4 grid grid-cols-2 gap-4">
-                     <div className="space-y-1">
-                        <Label className={labelClass}>Descripción / Centro de Costo</Label>
-                        <Select onValueChange={(v) => setFormData(p => ({...p, description: v}))} value={formData.description} required>
-                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{costCenters.map(c => (<SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>))}</SelectContent>
-                        </Select>
-                     </div>
-                     <div className="space-y-1">
-                        <Label className={labelClass}>Referencia</Label>
-                         <Input name="reference" value={formData.reference || ''} onChange={(e) => setFormData(p => ({...p, reference: e.target.value}))} className={darkInputClass} placeholder='Ej: Nro. Factura, Nro. Cheque'/>
-                     </div>
+                <CardHeader><CardTitle className="text-lg text-slate-200">Ítems del Movimiento</CardTitle></CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="border-slate-800 hover:bg-transparent">
+                                <TableHead className="text-slate-400">Concepto / Producto</TableHead>
+                                <TableHead className="w-[200px] text-right text-slate-400">Monto</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {fields.map((field, index) => (
+                                <TableRow key={field.id} className="border-slate-800 hover:bg-transparent">
+                                    <TableCell>
+                                        <Input {...form.register(`items.${index}.concept`)} placeholder="Ej: Pago Factura 123" className={darkInputClass}/>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Controller control={form.control} name={`items.${index}.amount`} render={({ field: { onChange, value, ...rest} }) => (
+                                             <Input type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} {...rest} className={`${darkInputClass} text-right font-mono`} placeholder="0" />
+                                        )}/>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4 text-red-500"/></Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ concept: '', amount: 0})} className="mt-4 border-slate-700 text-slate-300 hover:bg-slate-800">
+                        <Plus className="mr-2 h-4 w-4"/> Agregar Fila
+                    </Button>
+                </CardContent>
+                <CardContent className="pt-0 flex justify-end">
+                    <div className="w-1/2 bg-slate-950 p-4 rounded-lg border border-slate-800 flex justify-between items-center">
+                        <span className="text-lg font-bold text-white">TOTAL MOVIMIENTO</span>
+                        <span className="text-2xl font-bold text-emerald-400 font-mono">{formatCurrency(totalAmount)}</span>
+                    </div>
                 </CardContent>
             </Card>
 
           </div>
           <SheetFooter className="p-4 bg-slate-900 border-t border-slate-800 mt-auto flex justify-between">
             <div>
-              {movement && onDelete && (
-                 <Button type="button" variant="destructive" onClick={handleDeleteClick}>
+              {movement && (
+                 <Button type="button" variant="destructive" onClick={() => onSave(movement)}>
                     <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                 </Button>
               )}
             </div>
             <div className="flex gap-2">
               <SheetClose asChild><Button type="button" variant="ghost" className="text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-semibold">Guardar Movimiento</Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-semibold" disabled={!form.formState.isValid}>Guardar Movimiento</Button>
             </div>
           </SheetFooter>
         </form>
@@ -419,3 +415,4 @@ export function NewFinancialMovementSheet({
   );
 }
 
+    
