@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useFirebase } from "@/firebase";
@@ -6,8 +7,8 @@ import { FinancialMovement } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 export function useFinancialsCRUD() {
-  // CORRECCIÓN: Usamos 'db' en lugar de 'firestore' para que coincida con tu sistema
-  const { db } = useFirebase();
+  // CORRECCIÓN: Usamos 'firestore' y lo renombramos a 'db' para consistencia interna.
+  const { firestore: db } = useFirebase();
   const { toast } = useToast();
 
   // CREAR MOVIMIENTO (Soporta Uno o Varios en Lote)

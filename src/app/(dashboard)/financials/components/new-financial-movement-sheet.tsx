@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -84,8 +85,8 @@ type NewFinancialMovementSheetProps = {
 
 export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements }: NewFinancialMovementSheetProps) {
   const { toast } = useToast();
-  const { bankAccounts, costCenters, contacts, products } = useMasterData();
-  const { purchaseOrders, salesOrders } = useOperations();
+  const { bankAccounts, contacts, products } = useMasterData();
+  const { purchaseOrders, salesOrders, costCenters } = useOperations();
   
   // Estado para el modal rápido
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
@@ -260,6 +261,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         id: data.pendingDocumentId,
         type: salesOrders.some(s => s.id === data.pendingDocumentId) ? 'OV' : 'OC',
       } : null,
+      items: data.items, // Incluimos los ítems
     };
     
     Object.keys(cleanData).forEach(key => { if ((cleanData as any)[key] === undefined) (cleanData as any)[key] = null; });
@@ -554,7 +556,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                                     <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione Cuenta..."/></SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                         {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
-                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bank}</SelectItem>
+                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bankName}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -570,7 +572,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                                     <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione Cuenta..."/></SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                         {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
-                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bank}</SelectItem>
+                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bankName}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -653,5 +655,3 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     </>
   );
 }
-
-    
