@@ -89,11 +89,10 @@ type NewFinancialMovementSheetProps = {
 
 export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements, purchaseOrders, salesOrders }: NewFinancialMovementSheetProps) {
   const { toast } = useToast();
-  // CORRECCIÓN: 'costCenters' viene de useMasterData
   const { bankAccounts, contacts, products, costCenters } = useMasterData();
   
-  // Estado para el modal rápido
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -215,7 +214,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
   
   const combinedCostCenters = useMemo(() => {
       const productNames = products.map(p => ({ name: p }));
-      // CORRECCIÓN: Aseguramos que costCenters sea un array antes de hacer spread
       return [...(costCenters || []), ...productNames];
   }, [costCenters, products]);
 
@@ -327,7 +325,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                      <div className="space-y-2">
                         <Label className={labelClass}>Fecha</Label>
                         <Controller control={form.control} name="date" render={({ field }) => (
-                            <Popover>
+                            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", darkInputClass, !field.value && "text-muted-foreground")}>
                                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -335,7 +333,18 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100" align="start">
-                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={2023} toYear={2030} locale={es} />
+                                    <Calendar 
+                                        mode="single" 
+                                        selected={field.value} 
+                                        onSelect={(date) => {
+                                            field.onChange(date);
+                                            setIsCalendarOpen(false); // Cierra el calendario al seleccionar
+                                        }} 
+                                        captionLayout="dropdown-buttons" 
+                                        fromYear={2023} 
+                                        toYear={2030} 
+                                        locale={es} 
+                                    />
                                 </PopoverContent>
                             </Popover>
                         )} />
@@ -640,11 +649,10 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         onOpenChange={setIsQuickContactOpen}
         type={movementType === 'income' ? 'client' : 'supplier'}
         onSuccess={(newId) => {
-            form.setValue('contactId', newId);
+            form.setValue('contactId', newId.id);
         }}
     />
     </>
   );
 }
 
-    
