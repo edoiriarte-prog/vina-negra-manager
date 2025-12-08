@@ -23,10 +23,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-// IMPORTAMOS EL COMPONENTE NUEVO DE CONTACTOS
 import { QuickContactDialog } from '@/components/contacts/quick-contact-dialog';
 
-import { FinancialMovement } from '@/lib/types';
+import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { 
     CalendarIcon, Trash2, ArrowDownLeft, ArrowUpRight, GitCompareArrows, 
@@ -81,12 +80,17 @@ type NewFinancialMovementSheetProps = {
   onSave: (movement: FinancialMovement | Omit<FinancialMovement, 'id'>) => void;
   movement: FinancialMovement | null;
   allMovements: FinancialMovement[];
+  onDelete: (movement: FinancialMovement) => void;
+  purchaseOrders: PurchaseOrder[];
+  salesOrders: SalesOrder[];
+  serviceOrders: ServiceOrder[];
+  contacts: any[]; // Consider using a more specific type if possible
 };
 
-export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements }: NewFinancialMovementSheetProps) {
+export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements, purchaseOrders, salesOrders }: NewFinancialMovementSheetProps) {
   const { toast } = useToast();
-  const { bankAccounts, contacts, products } = useMasterData();
-  const { purchaseOrders, salesOrders, costCenters } = useOperations();
+  // CORRECCIÓN: 'costCenters' viene de useMasterData
+  const { bankAccounts, contacts, products, costCenters } = useMasterData();
   
   // Estado para el modal rápido
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
@@ -189,7 +193,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     // Cálculo seguro del IVA
     const netAmount = doc.totalAmount || 0;
     // Si no tiene la flag o es true, asumimos que totalAmount es NETO y sumamos IVA. Si es false, es bruto.
-    // Ajustar según tu lógica de negocio: Generalmente guardas NETO en la BD.
     const grossTotal = doc.includeVat !== false ? Math.round(netAmount * 1.19) : netAmount;
     const vatAmount = grossTotal - netAmount;
 
@@ -205,24 +208,23 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         vat: vatAmount,
         total: grossTotal, 
         paid: payments, 
-        pending: Math.max(0, pending), // No mostrar negativos
+        pending: Math.max(0, pending),
         isComplete: pending <= 0 
     };
   }, [pendingDocId, salesOrders, purchaseOrders, allMovements, movement]);
   
   const combinedCostCenters = useMemo(() => {
       const productNames = products.map(p => ({ name: p }));
-      return [...costCenters, ...productNames];
+      // CORRECCIÓN: Aseguramos que costCenters sea un array antes de hacer spread
+      return [...(costCenters || []), ...productNames];
   }, [costCenters, products]);
 
   // Función para aplicar montos rápidos
   const applyPaymentAmount = (amountToPay: number, concept: string) => {
-      // Actualizamos la primera línea del detalle
       update(0, { 
           concept: concept, 
           amount: amountToPay 
       });
-      // Si hay más líneas, las borramos para evitar confusión
       if (fields.length > 1) {
           form.setValue('items', [{ concept: concept, amount: amountToPay }]);
       }
@@ -231,15 +233,14 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
   const onSubmit = (data: FormData) => {
     const totalFromItems = data.items.reduce((sum, item) => sum + item.amount, 0);
     
-    // Validación Final: No pagar más de lo que se debe
     if (data.pendingDocumentId && documentBalance.total > 0) {
-        if (totalFromItems > documentBalance.pending + 100) { // +100 por margen de error de redondeo
+        if (totalFromItems > documentBalance.pending + 100) { 
             toast({
                 variant: "destructive",
                 title: "Exceso de Pago",
                 description: `El monto (${formatCurrency(totalFromItems)}) supera el saldo pendiente (${formatCurrency(documentBalance.pending)}).`
             });
-            return; // Detiene el guardado
+            return;
         }
     }
 
@@ -261,16 +262,14 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         id: data.pendingDocumentId,
         type: salesOrders.some(s => s.id === data.pendingDocumentId) ? 'OV' : 'OC',
       } : null,
-      items: data.items, // Incluimos los ítems
+      items: data.items,
     };
     
     Object.keys(cleanData).forEach(key => { if ((cleanData as any)[key] === undefined) (cleanData as any)[key] = null; });
 
     if (movement) {
-        // @ts-ignore
         onSave({ ...cleanData, id: movement.id });
     } else {
-        // @ts-ignore
         onSave(cleanData);
     }
   };
@@ -301,7 +300,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-            {/* SELECCIÓN DE TIPO */}
             <Controller control={form.control} name="type" render={({ field }) => (
                 <RadioGroup value={field.value} onValueChange={field.onChange} className='grid grid-cols-3 gap-2'>
                     <Label className={getTabClass('income')}>
@@ -316,7 +314,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 </RadioGroup>
             )} />
             
-            {/* INFORMACIÓN GENERAL */}
             <Card className={darkCardClass}>
                 <CardHeader><CardTitle className="text-lg text-slate-200">Información General</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -355,7 +352,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 </CardContent>
             </Card>
 
-            {/* ASOCIACIÓN (CLIENTE/PROVEEDOR) */}
             <Card className={darkCardClass}>
                 <CardHeader><CardTitle className="text-lg text-slate-200">Asociación y Detalle</CardTitle></CardHeader>
                 <CardContent className="space-y-6">
@@ -440,7 +436,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                                               <span className="text-xl font-bold text-amber-400 font-mono">{formatCurrency(documentBalance.pending)}</span>
                                           </div>
                                           
-                                          {/* BOTONES DE ACCIÓN RÁPIDA DE PAGO */}
                                           <div className="grid grid-cols-3 gap-2">
                                               <Button 
                                                 type="button" 
@@ -528,7 +523,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 </CardContent>
             </Card>
 
-            {/* INFORMACIÓN DE PAGO */}
             <Card className={darkCardClass}>
                 <CardHeader><CardTitle className="text-lg text-slate-200">Información de Pago</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-2 gap-4">
@@ -582,7 +576,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 </CardContent>
             </Card>
 
-            {/* ITEMS DEL MOVIMIENTO */}
             <Card className={darkCardClass}>
                 <CardHeader><CardTitle className="text-lg text-slate-200">Ítems del Movimiento</CardTitle></CardHeader>
                 <CardContent>
@@ -642,16 +635,16 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       </SheetContent>
     </Sheet>
 
-    {/* AQUÍ ESTÁ EL DIÁLOGO CONECTADO */}
     <QuickContactDialog 
         isOpen={isQuickContactOpen}
         onOpenChange={setIsQuickContactOpen}
         type={movementType === 'income' ? 'client' : 'supplier'}
         onSuccess={(newId) => {
-            // MAGIA: Asigna automáticamente el nuevo contacto y cierra el modal
             form.setValue('contactId', newId);
         }}
     />
     </>
   );
 }
+
+    
