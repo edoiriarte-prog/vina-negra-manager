@@ -82,8 +82,7 @@ type MatrixRow = {
 
 
 export function ItemMatrixDialog({ isOpen, onOpenChange, onSave, orderType }: ItemMatrixDialogProps) {
-  const { products, calibers, packagingTypes, productCaliberAssociations } = useMasterData();
-  const { inventory } = useOperations(); // Correct: Get inventory from operations
+  const { products, calibers, packagingTypes, productCaliberAssociations, inventory } = useMasterData();
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [rows, setRows] = useState<MatrixRow[]>([]);
 
