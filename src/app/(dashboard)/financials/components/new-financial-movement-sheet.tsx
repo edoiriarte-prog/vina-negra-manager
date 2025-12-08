@@ -28,7 +28,7 @@ import { FinancialMovement, PurchaseOrder, SalesOrder, Contact } from '@/lib/typ
 import { cn } from '@/lib/utils';
 import { 
     CalendarIcon, Trash2, ArrowRight, ArrowDownLeft, ArrowUpRight, GitCompareArrows, Banknote, User, 
-    Building, FileText, Plus, DollarSign, Loader2, Info, FilePlus
+    Building, FileText, Plus, DollarSign, Loader2, Info, FilePlus, CreditCard
 } from 'lucide-react';
 
 // --- Esquema de Validación con Zod ---
@@ -51,7 +51,7 @@ const formSchema = z.object({
   
   items: z.array(movementItemSchema).min(1, "Debe agregar al menos un ítem."),
   
-  paymentMethod: z.string().optional(),
+  paymentMethod: z.string().min(1, "Seleccione una forma de pago."), // Ahora es requerido
   sourceAccountId: z.string().optional().nullable(),
   destinationAccountId: z.string().optional().nullable(),
   notes: z.string().optional(),
@@ -60,15 +60,15 @@ const formSchema = z.object({
         return !!data.sourceAccountId && !!data.destinationAccountId;
     }
     if (data.type === 'income') {
-        return !!data.destinationAccountId;
+        return !!data.destinationAccountId; // Ingreso requiere destino
     }
     if (data.type === 'expense') {
-        return !!data.sourceAccountId;
+        return !!data.sourceAccountId; // Egreso requiere origen
     }
     return true;
 }, {
-    message: "Debe seleccionar las cuentas de origen/destino.",
-    path: ['sourceAccountId'] 
+    message: "Debe seleccionar la cuenta bancaria correspondiente.",
+    path: ['destinationAccountId'] // El error se mostrará genéricamente, pero la validación protege.
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -91,9 +91,10 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      type: 'expense',
+      type: 'income', // Por defecto Ingreso
       items: [{ concept: '', amount: 0 }],
-      documentType: 'pending'
+      documentType: 'pending',
+      paymentMethod: 'Transferencia'
     },
   });
 
@@ -119,7 +120,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
           pendingDocumentId: movement.relatedDocument?.id,
           documentType: movement.relatedDocument ? 'pending' : 'manual',
           items: (movement as any).items || [{ concept: movement.description, amount: movement.amount }],
-          paymentMethod: movement.paymentMethod,
+          paymentMethod: movement.paymentMethod || 'Transferencia',
           sourceAccountId: movement.sourceAccountId,
           destinationAccountId: movement.destinationAccountId,
           notes: (movement as any).notes || ''
@@ -127,18 +128,24 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       } else {
         form.reset({
           date: new Date(),
-          type: 'expense',
+          type: 'income',
           items: [{ concept: '', amount: 0 }],
-          documentType: 'pending'
+          documentType: 'pending',
+          paymentMethod: 'Transferencia'
         });
       }
     }
   }, [isOpen, movement, form]);
 
   useEffect(() => {
-      form.setValue('contactId', null);
-      form.setValue('pendingDocumentId', null);
-  }, [movementType, form]);
+      // Limpiar campos al cambiar tipo para evitar datos cruzados
+      if (!movement) {
+          form.setValue('contactId', null);
+          form.setValue('pendingDocumentId', null);
+          form.setValue('sourceAccountId', null);
+          form.setValue('destinationAccountId', null);
+      }
+  }, [movementType, form, movement]);
 
   const totalAmount = useMemo(() => {
     return form.watch('items').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
@@ -177,12 +184,11 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       return [...costCenters, ...productNames];
   }, [costCenters, products]);
 
-  // --- Handlers (CORREGIDO) ---
+  // --- Handlers ---
   const onSubmit = (data: FormData) => {
     const totalFromItems = data.items.reduce((sum, item) => sum + item.amount, 0);
     
-    // CORRECCIÓN: Limpiamos los valores 'null' para que sean 'undefined'
-    // Esto satisface el tipado estricto de TypeScript
+    // CORRECCIÓN: Cambiar undefined por null
     const cleanData = {
       type: data.type,
       costCenter: data.costCenter,
@@ -190,26 +196,33 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       amount: totalFromItems,
       description: data.items.map(i => i.concept).join(', '),
       
-      contactId: data.contactId || undefined,
-      voucherNumber: data.voucherNumber || undefined,
-      paymentMethod: data.paymentMethod || undefined,
-      sourceAccountId: data.sourceAccountId || undefined,
-      destinationAccountId: data.destinationAccountId || undefined,
-      notes: data.notes || undefined,
-      manualDteType: data.manualDteType || undefined,
-      manualDteFolio: data.manualDteFolio || undefined,
+      contactId: data.contactId || null,
+      voucherNumber: data.voucherNumber || null,
+      paymentMethod: data.paymentMethod || null,
+      sourceAccountId: data.sourceAccountId || null,
+      destinationAccountId: data.destinationAccountId || null,
+      notes: data.notes || null,
+      manualDteType: data.manualDteType || null,
+      manualDteFolio: data.manualDteFolio || null,
 
       relatedDocument: data.pendingDocumentId ? {
         id: data.pendingDocumentId,
         type: salesOrders.some(s => s.id === data.pendingDocumentId) ? 'OV' : 'OC',
-      } : undefined
+      } : null,
     };
+    
+    // Remueve explícitamente las claves si el valor es null (Firebase lo prefiere sobre undefined)
+    Object.keys(cleanData).forEach(key => {
+        if ((cleanData as any)[key] === undefined) {
+           (cleanData as any)[key] = null;
+        }
+    });
 
     if (movement) {
-        // @ts-ignore: Casting seguro tras limpieza
+        // @ts-ignore
         onSave({ ...cleanData, id: movement.id });
     } else {
-        // @ts-ignore: Casting seguro tras limpieza
+        // @ts-ignore
         onSave(cleanData);
     }
   };
@@ -240,6 +253,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
+            {/* SELECCIÓN DE TIPO */}
             <Controller control={form.control} name="type" render={({ field }) => (
                 <RadioGroup value={field.value} onValueChange={field.onChange} className='grid grid-cols-3 gap-2'>
                     <Label className={getTabClass('income')}>
@@ -254,6 +268,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 </RadioGroup>
             )} />
             
+            {/* INFORMACIÓN GENERAL */}
             <Card className={darkCardClass}>
                 <CardHeader><CardTitle className="text-lg text-slate-200">Información General</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -297,6 +312,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 </CardContent>
             </Card>
 
+            {/* ASOCIACIÓN (CLIENTE/PROVEEDOR) */}
             <Card className={darkCardClass}>
                 <CardHeader><CardTitle className="text-lg text-slate-200">Asociación y Detalle</CardTitle></CardHeader>
                 <CardContent className="space-y-6">
@@ -374,20 +390,20 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                     ) : (
                          <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className={labelClass}>Desde Cuenta</Label>
+                                <Label className={labelClass}>Desde Cuenta (Origen)</Label>
                                 <Controller control={form.control} name="sourceAccountId" render={({ field }) => (
                                     <Select onValueChange={field.onChange} value={field.value || ''}>
-                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder="Origen"/></SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa').map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent>
+                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione Origen..."/></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa').map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bankName}</SelectItem>))}</SelectContent>
                                     </Select>
                                 )}/>
                             </div>
                              <div className="space-y-2">
-                                <Label className={labelClass}>Hacia Cuenta</Label>
+                                <Label className={labelClass}>Hacia Cuenta (Destino)</Label>
                                 <Controller control={form.control} name="destinationAccountId" render={({ field }) => (
                                     <Select onValueChange={field.onChange} value={field.value || ''}>
-                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder="Destino"/></SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa' && a.id !== form.watch('sourceAccountId')).map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>))}</SelectContent>
+                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione Destino..."/></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{bankAccounts.filter(a => a.status === 'Activa' && a.id !== form.watch('sourceAccountId')).map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bankName}</SelectItem>))}</SelectContent>
                                     </Select>
                                 )}/>
                             </div>
@@ -396,6 +412,61 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 </CardContent>
             </Card>
 
+            {/* NUEVA TARJETA: INFORMACIÓN DE PAGO */}
+            <Card className={darkCardClass}>
+                <CardHeader><CardTitle className="text-lg text-slate-200">Información de Pago</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label className={labelClass}>Forma de Pago</Label>
+                         <Controller control={form.control} name="paymentMethod" render={({ field }) => (
+                            <Select onValueChange={field.onChange} value={field.value || ''}>
+                                <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..."/></SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                    <SelectItem value="Transferencia">Transferencia</SelectItem>
+                                    <SelectItem value="Efectivo">Efectivo</SelectItem>
+                                    <SelectItem value="Cheque">Cheque</SelectItem>
+                                    <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+                                    <SelectItem value="Otro">Otro</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )} />
+                    </div>
+
+                    {movementType === 'income' && (
+                        <div className="space-y-2">
+                            <Label className={labelClass}>Cuenta Destino (Donde entra el dinero)</Label>
+                            <Controller control={form.control} name="destinationAccountId" render={({ field }) => (
+                                <Select onValueChange={field.onChange} value={field.value || ''}>
+                                    <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione Cuenta..."/></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                        {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
+                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bankName}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )} />
+                        </div>
+                    )}
+
+                    {movementType === 'expense' && (
+                        <div className="space-y-2">
+                            <Label className={labelClass}>Cuenta Origen (De donde sale el dinero)</Label>
+                            <Controller control={form.control} name="sourceAccountId" render={({ field }) => (
+                                <Select onValueChange={field.onChange} value={field.value || ''}>
+                                    <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione Cuenta..."/></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                        {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
+                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bankName}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )} />
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* ITEMS DEL MOVIMIENTO */}
             <Card className={darkCardClass}>
                 <CardHeader><CardTitle className="text-lg text-slate-200">Ítems del Movimiento</CardTitle></CardHeader>
                 <CardContent>

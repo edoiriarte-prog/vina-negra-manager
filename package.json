@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@genkit-ai/core": "^1.25.0",
+    "@genkit-ai/googleai": "^1.25.0",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
     "@radix-ui/react-dialog": "^1.1.1",
@@ -27,7 +29,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "firebase": "^10.13.0",
-    "genkit": "^1.2.0",
+    "genkit": "^1.25.0",
     "lucide-react": "^0.436.0",
     "next": "15.0.3",
     "react": "18.3.1",
@@ -38,7 +40,7 @@
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "xlsx": "^0.18.5",
-    "zod": "^3.23.8"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^20",
