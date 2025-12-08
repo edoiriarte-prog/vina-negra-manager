@@ -24,7 +24,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-import { FinancialMovement } from '@/lib/types';
+import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { 
     CalendarIcon, Trash2, ArrowDownLeft, ArrowUpRight, GitCompareArrows, 
@@ -81,13 +81,27 @@ type NewFinancialMovementSheetProps = {
   onSave: (movement: FinancialMovement | Omit<FinancialMovement, 'id'>) => void;
   movement: FinancialMovement | null;
   allMovements: FinancialMovement[];
+  onDelete: (movement: FinancialMovement) => void;
+  purchaseOrders: PurchaseOrder[];
+  salesOrders: SalesOrder[];
+  serviceOrders: ServiceOrder[];
+  contacts: Contact[];
 };
 
 // --- Componente Principal ---
-export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements }: NewFinancialMovementSheetProps) {
+export function NewFinancialMovementSheet({ 
+  isOpen, 
+  onOpenChange, 
+  onSave, 
+  movement, 
+  allMovements,
+  onDelete,
+  purchaseOrders,
+  salesOrders,
+  contacts
+}: NewFinancialMovementSheetProps) {
   const { toast } = useToast();
-  const { bankAccounts, costCenters, contacts, products } = useMasterData();
-  const { purchaseOrders, salesOrders } = useOperations();
+  const { bankAccounts, costCenters, products } = useMasterData();
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
 
   const form = useForm<FormData>({
@@ -552,7 +566,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
           <SheetFooter className="p-4 bg-slate-900 border-t border-slate-800 mt-auto flex justify-between">
             <div>
               {movement && (
-                 <Button type="button" variant="destructive" onClick={() => onSave(movement)}>
+                 <Button type="button" variant="destructive" onClick={() => onDelete(movement)}>
                     <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                 </Button>
               )}
@@ -574,3 +588,5 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     </>
   );
 }
+
+    
