@@ -24,29 +24,35 @@ import { QuickContactDialog } from '@/components/contacts/quick-contact-dialog';
 type NewPurchaseOrderSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (order: PurchaseOrder) => void;
+  onSave: (order: PurchaseOrder | Omit<PurchaseOrder, 'id'>) => void;
   order: PurchaseOrder | null;
   suppliers: Contact[];
   purchaseOrders: PurchaseOrder[];
 };
 
-type PurchaseOrderFormData = Omit<PurchaseOrder, 'id' | 'totalPackages' | 'totalKilos' | 'totalAmount' | 'status'> & {
-    status: any; 
+type PurchaseOrderFormData = Partial<Omit<PurchaseOrder, 'id' | 'items'>> & {
+    items: OrderItem[];
 };
 
-const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData => {
+const getInitialFormData = (order: PurchaseOrder | null, allPurchaseOrders: PurchaseOrder[]): PurchaseOrderFormData => {
     if (order) {
         return {
             ...order,
-            date: format(new Date(order.date), 'yyyy-MM-dd'),
-            advanceDueDate: order.advanceDueDate ? format(new Date(order.advanceDueDate), 'yyyy-MM-dd') : undefined,
-            balanceDueDate: order.balanceDueDate ? format(new Date(order.balanceDueDate), 'yyyy-MM-dd') : undefined,
-            status: order.status,
-            notes: order.notes || '',
-            number: order.number || order.id || '',
+            date: order.date ? format(new Date(order.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+            items: order.items || [],
         };
     }
+    
+    const existingIds = (allPurchaseOrders || [])
+        .map(o => o.number ? parseInt(o.number.replace(/OC-|\D/g, ''), 10) : 0)
+        .filter(n => !isNaN(n) && n > 0);
+    
+    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 1101;
+    const nextNum = maxId < 1101 ? 1102 : maxId + 1;
+    const newId = `OC-${nextNum}`;
+
     return {
+        number: newId,
         supplierId: '',
         date: format(new Date(), 'yyyy-MM-dd'),
         items: [],
@@ -54,12 +60,9 @@ const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData 
         paymentMethod: 'Contado',
         creditDays: 0,
         advancePercentage: 0,
-        advanceDueDate: undefined,
-        balanceDueDate: undefined,
         warehouse: 'Bodega Central',
         orderType: 'purchase',
         notes: '',
-        number: '', 
         includeVat: true,
     };
 };
@@ -68,17 +71,25 @@ export function NewPurchaseOrderSheet({
     isOpen, onOpenChange, onSave, order, suppliers, purchaseOrders 
 }: NewPurchaseOrderSheetProps) {
   
-  const [formData, setFormData] = useState<PurchaseOrderFormData>(() => getInitialFormData(order));
+  const [formData, setFormData] = useState<PurchaseOrderFormData>(() => getInitialFormData(order, purchaseOrders));
+  const [items, setItems] = useState<OrderItem[]>(order?.items || []);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
 
   const { products, calibers, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
+  
+  useEffect(() => {
+    if (isOpen) {
+      const initialData = getInitialFormData(order, purchaseOrders);
+      setFormData(initialData);
+      setItems(initialData.items || []);
+    }
+  }, [order, isOpen, purchaseOrders]);
 
   const netTotal = useMemo(() => {
-    return formData.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-  }, [formData.items]);
+    return items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.price || 0)), 0);
+  }, [items]);
   
   const { vatAmount, finalTotalWithVat } = useMemo(() => {
       const vat = formData.includeVat ? netTotal * 0.19 : 0;
@@ -96,45 +107,16 @@ export function NewPurchaseOrderSheet({
      return finalTotalWithVat - advanceAmount;
   }, [finalTotalWithVat, advanceAmount, formData.paymentMethod]);
 
-  useEffect(() => {
-    if (isOpen) {
-        if (!hasInitialized) {
-            if (!order) {
-                const existingIds = (purchaseOrders || [])
-                    .map(o => o.number ? parseInt(o.number.replace(/OC-|\D/g, ''), 10) : 0)
-                    .filter(n => !isNaN(n) && n > 0);
-                
-                const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 1101;
-                const nextNum = maxId < 1101 ? 1102 : maxId + 1;
-                const newId = `OC-${nextNum}`;
-                
-                setFormData({...getInitialFormData(null), number: newId});
-            } else {
-                setFormData(getInitialFormData(order));
-            }
-            setHasInitialized(true);
-        }
-    } else {
-        setHasInitialized(false);
-    }
-  }, [isOpen, order, hasInitialized, purchaseOrders]);
-
   const handleItemChange = (index: number, field: keyof OrderItem, value: string | number) => {
-    const newItems = [...formData.items];
+    const newItems = [...items];
     const item = { ...newItems[index] };
     (item[field] as any) = value; 
     newItems[index] = item;
-    setFormData(prev => ({ ...prev, items: newItems }));
+    setItems(newItems);
   };
 
   const handleSelectChange = (name: string, value: any) => {
-    if (name.startsWith('items.')) {
-        const [_, indexStr, field] = name.split('.');
-        const index = parseInt(indexStr);
-        handleItemChange(index, field as keyof OrderItem, value);
-    } else {
-        setFormData(prev => ({ ...prev, [name]: value }));
-    }
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
   
   const handleQuickContactSuccess = (newContact: {id: string; name: string}) => {
@@ -143,12 +125,7 @@ export function NewPurchaseOrderSheet({
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = event.target;
-
-    if (name.startsWith('items.')) {
-        const [_, indexStr, field] = name.split('.');
-        const index = parseInt(indexStr);
-        handleItemChange(index, field as keyof OrderItem, ['quantity', 'price', 'packagingQuantity'].includes(field) ? Number(value) : value);
-    } else if (name === 'includeVat') {
+    if (name === 'includeVat') {
         setFormData(prev => ({ ...prev, includeVat: (event.target as HTMLInputElement).checked }));
     } else {
         setFormData((prev) => ({ ...prev, [name]: ['advancePercentage', 'creditDays'].includes(name) ? Number(value) : value }));
@@ -163,7 +140,7 @@ export function NewPurchaseOrderSheet({
   }, [formData.creditDays, formData.date, formData.paymentMethod]);
 
   const removeItem = (index: number) => {
-    setFormData(prev => ({...prev, items: prev.items.filter((_, i) => i !== index)}));
+    setItems(prev => prev.filter((_, i) => i !== index));
   }
 
   const handleMatrixSave = (matrixItems: Omit<OrderItem, 'id'>[]) => {
@@ -171,7 +148,7 @@ export function NewPurchaseOrderSheet({
         ...item,
         id: `temp-${Date.now()}-${Math.random()}`,
     }));
-    setFormData(prev => ({...prev, items: [...prev.items, ...newItems]}));
+    setItems(prev => [...prev, ...newItems]);
     setIsMatrixOpen(false);
   }
 
@@ -180,11 +157,11 @@ export function NewPurchaseOrderSheet({
     
     if (!formData.date) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione una fecha.' });
     if (!formData.supplierId) return toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un proveedor.' });
-    if (formData.items.length === 0) return toast({ variant: 'destructive', title: 'Error', description: 'Agregue al menos un ítem.' });
+    if (items.length === 0) return toast({ variant: 'destructive', title: 'Error', description: 'Agregue al menos un ítem.' });
     
-    const safeNumber = formData.number || order?.number || order?.id || `OC-${Date.now().toString().slice(-6)}`;
+    const safeNumber = formData.number || `OC-${Date.now().toString().slice(-6)}`;
 
-    const sanitizedItems = formData.items.map(item => ({
+    const sanitizedItems = items.map(item => ({
         ...item,
         packagingType: item.packagingType || null, 
         packagingQuantity: Number(item.packagingQuantity) || 0,
@@ -199,29 +176,16 @@ export function NewPurchaseOrderSheet({
     const calculatedTotalKilos = sanitizedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
     const finalOrder: any = {
-        id: safeNumber,
+        ...formData,
+        id: order?.id || safeNumber,
         number: safeNumber,      
-        supplierId: formData.supplierId,
-        date: formData.date,
         items: sanitizedItems,
-        
         totalPackages: calculatedTotalPackages,
         totalKilos: calculatedTotalKilos,
-        totalAmount: netTotal,   
-        
-        includeVat: formData.includeVat ?? true,
+        totalAmount: netTotal,
         status: formData.status || 'pending',
-        paymentMethod: formData.paymentMethod || 'Contado',
-        warehouse: formData.warehouse || 'Bodega Central',
-        orderType: formData.orderType || 'purchase',
-        
-        advanceDueDate: formData.advanceDueDate || null,
-        balanceDueDate: formData.balanceDueDate || null,
-        notes: formData.notes || null,
-        creditDays: Number(formData.creditDays || 0),
-        advancePercentage: Number(formData.advancePercentage || 0),
     };
-
+    
     Object.keys(finalOrder).forEach(key => {
         if (finalOrder[key] === undefined) {
             delete finalOrder[key];
@@ -279,8 +243,8 @@ export function NewPurchaseOrderSheet({
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={`capitalize border-slate-700 ${getStatusColor(formData.status)}`}>
-                        {getStatusLabel(formData.status)}
+                    <Badge variant="outline" className={`capitalize border-slate-700 ${getStatusColor(formData.status || 'pending')}`}>
+                        {getStatusLabel(formData.status || 'pending')}
                     </Badge>
                 </div>
             </div>
@@ -303,8 +267,8 @@ export function NewPurchaseOrderSheet({
                         <Select required onValueChange={(value) => handleSelectChange('supplierId', value)} value={formData.supplierId}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                {suppliers?.map((s, idx) => (
-                                    <SelectItem key={s.id || idx} value={s.id || `temp-${idx}`} className="focus:bg-slate-800 focus:text-slate-100">
+                                {suppliers?.map((s) => (
+                                    <SelectItem key={s.id} value={s.id} className="focus:bg-slate-800 focus:text-slate-100">
                                         {s.name}
                                     </SelectItem>
                                 ))}
@@ -350,7 +314,7 @@ export function NewPurchaseOrderSheet({
                 </div>
 
                 <div className="p-0">
-                    {formData.items.length === 0 ? (
+                    {items.length === 0 ? (
                         <div className="py-16 text-center text-slate-500 bg-slate-950/50 flex flex-col items-center">
                             <PackageCheck className="h-12 w-12 mb-3 opacity-20" />
                             <p className="text-lg font-medium">No hay productos agregados</p>
@@ -374,12 +338,12 @@ export function NewPurchaseOrderSheet({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800 bg-slate-900/30">
-                                    {formData.items.map((item, index) => {
+                                    {items.map((item, index) => {
                                         const subtotal = (item.quantity || 0) * (item.price || 0);
                                         return (
                                             <tr key={index} className="hover:bg-slate-800/50 transition-colors group">
                                                 <td className="px-4 py-2">
-                                                    <Select onValueChange={(v) => handleSelectChange(`items.${index}.product`, v)} value={item.product}>
+                                                    <Select onValueChange={(v) => handleItemChange(index, 'product', v)} value={item.product}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 font-medium text-slate-200 focus:ring-0"><SelectValue /></SelectTrigger>
                                                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                                             {products?.map((p) => (
@@ -391,7 +355,7 @@ export function NewPurchaseOrderSheet({
                                                     </Select>
                                                 </td>
                                                 <td className="px-4 py-2">
-                                                    <Select onValueChange={(v) => handleSelectChange(`items.${index}.caliber`, v)} value={item.caliber}>
+                                                    <Select onValueChange={(v) => handleItemChange(index, 'caliber', v)} value={item.caliber}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-slate-400 focus:ring-0"><SelectValue /></SelectTrigger>
                                                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                                             {calibers?.map((c) => (
@@ -412,7 +376,7 @@ export function NewPurchaseOrderSheet({
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-2">
-                                                    <Select onValueChange={(v) => handleSelectChange(`items.${index}.packagingType`, v)} value={item.packagingType || ''}>
+                                                    <Select onValueChange={(v) => handleItemChange(index, 'packagingType', v)} value={item.packagingType || ''}>
                                                         <SelectTrigger className="h-8 border-none shadow-none bg-transparent p-0 text-xs text-slate-400 focus:ring-0"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                                                         <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{packagingTypes?.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                                     </Select>
@@ -572,7 +536,7 @@ export function NewPurchaseOrderSheet({
 
             <SheetFooter className="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 sm:justify-end z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.2)]">
               <SheetClose asChild><Button variant="ghost" className="mr-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={formData.items.length === 0}>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 shadow-lg shadow-blue-900/20 font-semibold" disabled={items.length === 0}>
                   Guardar Orden
               </Button>
             </SheetFooter>
@@ -595,4 +559,3 @@ export function NewPurchaseOrderSheet({
     </>
   );
 }
-
