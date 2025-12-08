@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -18,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { QuickContactDialog } from '@/components/contacts/quick-contact-dialog';
 
 type NewPurchaseOrderSheetProps = {
   isOpen: boolean;
@@ -69,6 +71,7 @@ export function NewPurchaseOrderSheet({
   const [formData, setFormData] = useState<PurchaseOrderFormData>(() => getInitialFormData(order));
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
 
   const { products, calibers, packagingTypes, warehouses } = useMasterData();
   const { toast } = useToast();
@@ -134,6 +137,10 @@ export function NewPurchaseOrderSheet({
     }
   };
   
+  const handleQuickContactSuccess = (newContact: {id: string; name: string}) => {
+    setFormData(prev => ({ ...prev, supplierId: newContact.id }));
+  };
+
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = event.target;
 
@@ -285,8 +292,13 @@ export function NewPurchaseOrderSheet({
               <div className="grid md:grid-cols-3 gap-5">
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Truck className="h-4 w-4 text-blue-500" /> Proveedor
+                        <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                                <Truck className="h-4 w-4 text-blue-500" /> Proveedor
+                            </Label>
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-blue-400 hover:bg-blue-900/50" onClick={() => setIsQuickContactOpen(true)}>
+                                <Plus className="h-4 w-4" />
+                            </Button>
                         </div>
                         <Select required onValueChange={(value) => handleSelectChange('supplierId', value)} value={formData.supplierId}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
@@ -574,6 +586,13 @@ export function NewPurchaseOrderSheet({
         onSave={handleMatrixSave}
         orderType="purchase"
       />
+      <QuickContactDialog
+        isOpen={isQuickContactOpen}
+        onOpenChange={setIsQuickContactOpen}
+        type="supplier"
+        onSuccess={handleQuickContactSuccess}
+       />
     </>
   );
 }
+

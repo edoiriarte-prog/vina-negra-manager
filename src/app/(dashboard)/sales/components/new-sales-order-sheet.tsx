@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -24,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMasterData } from "@/hooks/use-master-data";
 import { ItemMatrixDialog } from "./item-matrix-dialog";
 import { format, addDays, parseISO } from 'date-fns';
+import { QuickContactDialog } from "@/components/contacts/quick-contact-dialog";
 
 interface NewSalesOrderSheetProps {
   isOpen: boolean;
@@ -113,6 +115,7 @@ export function NewSalesOrderSheet({
   const [items, setItems] = useState<OrderItem[]>(order?.items || []);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -163,6 +166,12 @@ export function NewSalesOrderSheet({
 
   const removeItem = (index: number) => {
     setItems(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const handleQuickContactSuccess = (newContact: {id: string; name: string}) => {
+    // La lista de clientes se actualizará globalmente gracias a onSnapshot,
+    // solo necesitamos seleccionar el nuevo valor.
+    setFormData(prev => ({ ...prev, clientId: newContact.id }));
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -256,8 +265,13 @@ export function NewSalesOrderSheet({
                 {/* TARJETA CLIENTE */}
                 <Card className={darkCardClass}>
                     <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-                            <Users className="h-4 w-4 text-blue-500" /> Cliente
+                        <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                                <Users className="h-4 w-4 text-blue-500" /> Cliente
+                            </Label>
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-blue-400 hover:bg-blue-900/50" onClick={() => setIsQuickContactOpen(true)}>
+                                <Plus className="h-4 w-4" />
+                            </Button>
                         </div>
                         <Select required onValueChange={(value) => handleSelectChange('clientId', value)} value={formData.clientId}>
                             <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
@@ -459,7 +473,7 @@ export function NewSalesOrderSheet({
                                     </SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                         {bankAccounts.map(acc => (
-                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} ({acc.bank})</SelectItem>
+                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} ({acc.bankName})</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -533,6 +547,13 @@ export function NewSalesOrderSheet({
         onSave={handleMatrixSave}
         orderType="sale"
       />
+      
+    <QuickContactDialog
+        isOpen={isQuickContactOpen}
+        onOpenChange={setIsQuickContactOpen}
+        type="client"
+        onSuccess={handleQuickContactSuccess}
+    />
     </>
   );
 }

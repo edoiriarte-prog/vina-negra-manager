@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form'; // Agregamos useWatch
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format, parseISO } from 'date-fns';
@@ -14,7 +15,6 @@ import { useOperations } from '@/hooks/use-operations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
@@ -24,12 +24,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-import { FinancialMovement, PurchaseOrder, SalesOrder, Contact } from '@/lib/types';
+import { FinancialMovement } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { 
-    CalendarIcon, Trash2, ArrowRight, ArrowDownLeft, ArrowUpRight, GitCompareArrows, Banknote, User, 
-    Building, FileText, Plus, DollarSign, Loader2, Info, FilePlus, CreditCard
+    CalendarIcon, Trash2, ArrowDownLeft, ArrowUpRight, GitCompareArrows, 
+    FileText, Plus, CreditCard, RefreshCw
 } from 'lucide-react';
+import { QuickContactDialog } from '@/components/contacts/quick-contact-dialog';
 
 // --- Esquema de Validación con Zod ---
 const movementItemSchema = z.object({
@@ -51,7 +52,7 @@ const formSchema = z.object({
   
   items: z.array(movementItemSchema).min(1, "Debe agregar al menos un ítem."),
   
-  paymentMethod: z.string().min(1, "Seleccione una forma de pago."), // Ahora es requerido
+  paymentMethod: z.string().min(1, "Seleccione una forma de pago."),
   sourceAccountId: z.string().optional().nullable(),
   destinationAccountId: z.string().optional().nullable(),
   notes: z.string().optional(),
@@ -60,15 +61,15 @@ const formSchema = z.object({
         return !!data.sourceAccountId && !!data.destinationAccountId;
     }
     if (data.type === 'income') {
-        return !!data.destinationAccountId; // Ingreso requiere destino
+        return !!data.destinationAccountId;
     }
     if (data.type === 'expense') {
-        return !!data.sourceAccountId; // Egreso requiere origen
+        return !!data.sourceAccountId;
     }
     return true;
 }, {
     message: "Debe seleccionar la cuenta bancaria correspondiente.",
-    path: ['destinationAccountId'] // El error se mostrará genéricamente, pero la validación protege.
+    path: ['destinationAccountId']
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -87,11 +88,12 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
   const { toast } = useToast();
   const { bankAccounts, costCenters, contacts, products } = useMasterData();
   const { purchaseOrders, salesOrders } = useOperations();
+  const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      type: 'income', // Por defecto Ingreso
+      type: 'income',
       items: [{ concept: '', amount: 0 }],
       documentType: 'pending',
       paymentMethod: 'Transferencia'
@@ -103,6 +105,13 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     name: "items",
   });
   
+  // --- MEJORA 1: Observación en tiempo real para totales ---
+  // useWatch es más eficiente y reactivo que form.watch dentro de un useMemo para arrays anidados
+  const watchedItems = useWatch({
+    control: form.control,
+    name: "items"
+  });
+
   const movementType = form.watch('type');
   const contactId = form.watch('contactId');
   const pendingDocId = form.watch('pendingDocumentId');
@@ -137,8 +146,25 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     }
   }, [isOpen, movement, form]);
 
+  // --- MEJORA 2: Generador de Voucher Automático ---
   useEffect(() => {
-      // Limpiar campos al cambiar tipo para evitar datos cruzados
+    // Solo generamos si NO estamos editando un movimiento existente
+    if (!movement && isOpen) {
+        const prefix = movementType === 'income' ? 'ING' : movementType === 'expense' ? 'EGR' : 'TR';
+        
+        // Filtramos los movimientos que sean del mismo tipo para calcular el correlativo
+        const countByType = allMovements.filter(m => m.type === movementType).length;
+        const nextNumber = countByType + 1;
+        
+        // Formateamos a 4 dígitos (Ej: ING-0005)
+        const autoVoucher = `${prefix}-${String(nextNumber).padStart(4, '0')}`;
+        
+        form.setValue('voucherNumber', autoVoucher);
+    }
+  }, [movementType, allMovements, isOpen, movement, form]);
+
+  // Limpieza al cambiar tipo
+  useEffect(() => {
       if (!movement) {
           form.setValue('contactId', null);
           form.setValue('pendingDocumentId', null);
@@ -147,9 +173,10 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       }
   }, [movementType, form, movement]);
 
+  // Cálculo de totales usando la variable observada (Reactivo 100%)
   const totalAmount = useMemo(() => {
-    return form.watch('items').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  }, [form.watch('items')]);
+    return (watchedItems || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  }, [watchedItems]);
 
   const filteredContacts = useMemo(() => {
     if (movementType === 'income') {
@@ -185,10 +212,13 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
   }, [costCenters, products]);
 
   // --- Handlers ---
+  const handleQuickContactSuccess = (newContact: {id: string; name: string}) => {
+    form.setValue('contactId', newContact.id);
+  };
+
   const onSubmit = (data: FormData) => {
     const totalFromItems = data.items.reduce((sum, item) => sum + item.amount, 0);
     
-    // CORRECCIÓN: Cambiar undefined por null
     const cleanData = {
       type: data.type,
       costCenter: data.costCenter,
@@ -211,7 +241,6 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       } : null,
     };
     
-    // Remueve explícitamente las claves si el valor es null (Firebase lo prefiere sobre undefined)
     Object.keys(cleanData).forEach(key => {
         if ((cleanData as any)[key] === undefined) {
            (cleanData as any)[key] = null;
@@ -243,6 +272,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
   );
 
   return (
+    <>
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-4xl w-full flex flex-col p-0 gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
         <SheetHeader className="px-6 py-4 bg-slate-900/50 border-b border-slate-800">
@@ -274,7 +304,12 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                         <Label className={labelClass}>N° Voucher</Label>
-                        <Input {...form.register('voucherNumber')} className={darkInputClass} placeholder='(Autogenerado)' />
+                        <div className="relative">
+                            <Input {...form.register('voucherNumber')} className={`${darkInputClass} pr-8`} placeholder='(Autogenerado)' readOnly />
+                            <div className="absolute right-2 top-2.5 text-slate-500">
+                                <RefreshCw className="h-3 w-3 animate-pulse" />
+                            </div>
+                        </div>
                     </div>
                      <div className="space-y-2">
                         <Label className={labelClass}>Fecha</Label>
@@ -286,7 +321,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                                         {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione fecha</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100" align="start">
+                                <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-700 text-slate-100" align="start">
                                     <Calendar 
                                         mode="single" 
                                         selected={field.value} 
@@ -320,7 +355,12 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                         <>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className={labelClass}>{movementType === 'income' ? 'Cliente' : 'Proveedor'}</Label>
+                                <div className="flex justify-between items-center">
+                                  <Label className={labelClass}>{movementType === 'income' ? 'Cliente' : 'Proveedor'}</Label>
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-blue-400 hover:bg-blue-900/50" onClick={() => setIsQuickContactOpen(true)}>
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </div>
                                 <Controller control={form.control} name="contactId" render={({ field }) => (
                                     <Select onValueChange={field.onChange} value={field.value || ''}>
                                         <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..."/></SelectTrigger>
@@ -412,7 +452,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                 </CardContent>
             </Card>
 
-            {/* NUEVA TARJETA: INFORMACIÓN DE PAGO */}
+            {/* INFORMACIÓN DE PAGO */}
             <Card className={darkCardClass}>
                 <CardHeader><CardTitle className="text-lg text-slate-200">Información de Pago</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-2 gap-4">
@@ -525,5 +565,12 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         </form>
       </SheetContent>
     </Sheet>
+    <QuickContactDialog
+        isOpen={isQuickContactOpen}
+        onOpenChange={setIsQuickContactOpen}
+        type={movementType === 'income' ? 'client' : 'supplier'}
+        onSuccess={handleQuickContactSuccess}
+    />
+    </>
   );
 }
