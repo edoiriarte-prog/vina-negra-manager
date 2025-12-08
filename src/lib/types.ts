@@ -1,7 +1,32 @@
 // src/lib/types.ts
 
-// --- 1. CONTACTOS ---
+// --- 0. TIPOS PRIMITIVOS Y GLOBALES ---
+export type ContactType = 'client' | 'supplier' | 'carrier' | 'other_income' | 'other_expense';
 export type InteractionType = 'Llamada' | 'Reunión' | 'Email' | 'Acuerdo' | 'Cotizacion';
+export type OrderStatus = 'pending' | 'completed' | 'cancelled' | 'received' | 'dispatched' | 'invoiced' | 'draft';
+export type MovementType = 'income' | 'expense' | 'traspaso';
+export type Category = 'fruit' | 'supply' | 'service';
+export type Unit = 'Kilos' | 'Cajas' | 'Unidades' | 'Litros' | string;
+export type PlanningStatus = 'borrador' | 'confirmado' | 'entregado' | 'cancelado';
+
+
+// --- 1. DATOS MAESTROS Y CONFIGURACIÓN ---
+export interface BankAccount {
+    id: string;
+    name: string;
+    bankName: string;
+    accountType: string;
+    accountNumber: string;
+    initialBalance: number;
+    owner?: string;
+    ownerRUT?: string;
+    ownerEmail?: string;
+    status: 'Activa' | 'Inactiva';
+    // --- CAMPOS LEGACY / ALIAS ---
+    bank?: string; // Para compatibilidad
+    type?: string; // Para compatibilidad
+    currency?: 'CLP' | 'USD';
+}
 
 export interface Interaction {
   id: string;
@@ -9,8 +34,6 @@ export interface Interaction {
   type: InteractionType;
   notes: string;
 }
-
-export type ContactType = 'client' | 'supplier' | 'carrier' | 'other_income' | 'other_expense';
 
 export interface Contact {
   id: string;
@@ -25,10 +48,6 @@ export interface Contact {
   businessLine?: string; 
   interactions?: Interaction[];
 }
-
-// --- 2. PRODUCTOS E INVENTARIO ---
-export type Category = 'fruit' | 'supply' | 'service';
-export type Unit = 'Kilos' | 'Cajas' | 'Unidades' | 'Litros' | string;
 
 export interface InventoryItem {
   id: string;
@@ -58,9 +77,7 @@ export interface InventoryAdjustment {
     notes?: string;
 }
 
-// --- 3. ÓRDENES (COMPRAS Y VENTAS) ---
-
-export type OrderStatus = 'pending' | 'completed' | 'cancelled' | 'received' | 'dispatched' | 'invoiced' | 'draft';
+// --- 2. ÓRDENES Y TRANSACCIONES ---
 
 export interface OrderItem {
   product: string; 
@@ -68,11 +85,12 @@ export interface OrderItem {
   quantity: number; 
   packagingQuantity?: number; 
   price: number;
-  total: number; 
+  total?: number; // Calculado en cliente, opcional aquí
   unit?: string;
   lotNumber?: string; 
   format?: string; 
-  packagingType?: string; 
+  packagingType?: string;
+  id?: string; // Id temporal para el cliente
 }
 
 export interface PurchaseOrder {
@@ -81,14 +99,15 @@ export interface PurchaseOrder {
   supplierId: string;
   status: OrderStatus;
   warehouse: string; 
-  destinationWarehouse?: string; 
   items: OrderItem[];
   totalAmount: number;
+  // Campos opcionales y calculados
+  number?: string;
   totalKilos?: number; 
   totalPackages?: number;
   notes?: string;
-  number?: string;
-  
+  includeVat?: boolean;
+  orderType?: string;
   // Financiero
   paymentMethod?: string;
   creditDays?: number;
@@ -96,51 +115,7 @@ export interface PurchaseOrder {
   advanceDueDate?: string | null;
   balanceDueDate?: string | null;
   paymentCondition?: string;
-  includeVat?: boolean;
-  orderType?: string;
 }
-
-// --- ACTUALIZACIÓN PRINCIPAL AQUÍ ---
-export interface SalesOrder {
-  id: string;
-  date: string;
-  clientId: string;
-  status: OrderStatus;
-  warehouse?: string; 
-  destinationWarehouse?: string; 
-  items: OrderItem[];
-  totalAmount: number;
-  totalKilos?: number; 
-  totalPackages?: number; 
-  notes?: string;
-  number?: string;
-  
-  // Configuración de Venta
-  saleType?: string;       // Ej: 'Venta en Firme', 'Consignación'
-  includeVat?: boolean; 
-  paymentStatus?: string; 
-  orderType?: 'sale' | 'dispatch'; 
-
-  // Nuevos Campos Financieros (Soluciona errores del formulario)
-  paymentMethod?: string;  // Ej: 'Contado', 'Crédito'
-  creditDays?: number;     // Días de crédito
-  paymentDueDate?: string; // Fecha de vencimiento calculada
-  advanceAmount?: number;  // Monto anticipo
-  bankAccountId?: string;  // ID de la cuenta bancaria seleccionada
-
-  // Nuevos Campos Logísticos (Soluciona errores de Chofer/Patente)
-  transport?: string;      // Empresa de transporte
-  driver?: string;         // Nombre del chofer
-  plate?: string;          // Patente
-  driverName?: string;     // Alias para compatibilidad
-  licensePlate?: string;   // Alias para compatibilidad
-
-  // Campos opcionales para visualización en PDF/Vistas (Expandidos)
-  customer?: Contact;
-  bankAccount?: BankAccount;
-}
-
-// --- 4. FINANZAS Y SERVICIOS ---
 
 export interface ServiceOrder {
     id: string;
@@ -149,9 +124,8 @@ export interface ServiceOrder {
     cost: number;
     description?: string; 
     provider?: string;    
+    relatedPurchaseId?: string;
 }
-
-export type MovementType = 'income' | 'expense' | 'traspaso';
 
 export interface FinancialMovement {
   id: string;
@@ -160,42 +134,26 @@ export interface FinancialMovement {
   amount: number;
   type: MovementType;
   category?: string;
-  
   // Relaciones
-  relatedOrderId?: string;
   contactId?: string;
   relatedDocument?: { 
       id: string; 
       type: 'OV' | 'OC' | 'OS'; 
-  };
-
-  status?: 'paid' | 'pending';
-
+  } | null;
   // Tesorería Avanzada
-  paymentMethod?: string;
-  sourceAccountId?: string;      
-  destinationAccountId?: string; 
+  paymentMethod?: string | null;
+  sourceAccountId?: string | null;      
+  destinationAccountId?: string | null; 
   reference?: string;            
   internalConcept?: string;
-  productId?: string;
+  // Nuevos campos del formulario
+  voucherNumber?: string | null;
+  costCenter?: string;
+  manualDteType?: string | null;
+  manualDteFolio?: string | null;
+  notes?: string | null;
+  items?: { concept: string; amount: number; }[];
 }
-
-// --- 5. CONFIGURACIÓN Y BANCAS ---
-export interface BankAccount {
-    id: string;
-    name: string;
-    bank: string;
-    accountNumber: string;
-    type: 'Corriente' | 'Vista' | 'Ahorro';
-    currency: 'CLP' | 'USD';
-    initialBalance: number;
-    status?: 'Activa' | 'Inactiva';
-    bankName?: string; 
-    accountType?: string; // Alias agregado para compatibilidad con PDF
-}
-
-// --- 6. PLANIFICACIÓN COMERCIAL ---
-export type PlanningStatus = 'borrador' | 'confirmado' | 'entregado' | 'cancelado';
 
 export interface PlannedOrder {
   id: string;
@@ -208,4 +166,45 @@ export interface PlannedOrder {
   totalKilos: number;
   notes?: string;
   createdBy?: string;     
+}
+
+// --- 3. ÓRDENES DE VENTA (Más complejo, depende de otros tipos) ---
+
+export interface SalesOrder {
+  id: string;
+  date: string;
+  clientId: string;
+  status: OrderStatus;
+  items: OrderItem[];
+  totalAmount: number;
+  
+  // Campos opcionales y calculados
+  number?: string;
+  warehouse?: string; 
+  destinationWarehouse?: string; 
+  totalKilos?: number; 
+  totalPackages?: number; 
+  notes?: string;
+  
+  // Configuración de Venta
+  saleType?: string;       // Ej: 'Venta en Firme', 'Consignación'
+  includeVat?: boolean; 
+  paymentStatus?: string; 
+  orderType?: 'sale' | 'dispatch'; 
+
+  // Campos Financieros
+  paymentMethod?: string;  // Ej: 'Contado', 'Crédito'
+  creditDays?: number;     // Días de crédito
+  paymentDueDate?: string; // Fecha de vencimiento calculada
+  advanceAmount?: number;  // Monto anticipo
+  bankAccountId?: string;  // ID de la cuenta bancaria seleccionada
+
+  // Campos Logísticos
+  transport?: string;      // Empresa de transporte
+  driver?: string;         // Nombre del chofer
+  plate?: string;          // Patente
+
+  // Campos opcionales para visualización en PDF/Vistas (Expandidos)
+  customer?: Contact;
+  bankAccount?: BankAccount;
 }
