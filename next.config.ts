@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  reactStrictMode: true,
-  // Desactivamos temporalmente el chequeo estricto de tipos en build para evitar bloqueos
+  reactStrictMode: false,
   typescript: {
     ignoreBuildErrors: true,
   },
