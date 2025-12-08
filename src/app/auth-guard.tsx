@@ -1,10 +1,10 @@
 'use client';
 
-import { useUser } from '@/firebase';
+import { useUser } from '@/firebase/provider'; // CORREGIDO: Importar desde el provider
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { signInAnonymously } from 'firebase/auth';
-import { useAuth } from '@/firebase';
+import { useAuth } from '@/firebase/provider'; // CORREGIDO: Importar desde el provider
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
