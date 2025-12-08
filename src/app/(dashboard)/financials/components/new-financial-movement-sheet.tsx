@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form'; // Agregamos useWatch
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format, parseISO } from 'date-fns';
@@ -21,16 +20,17 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+// IMPORTAMOS EL COMPONENTE NUEVO DE CONTACTOS
+import { QuickContactDialog } from '@/components/contacts/quick-contact-dialog';
 
-import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder, Contact } from '@/lib/types';
+import { FinancialMovement } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { 
     CalendarIcon, Trash2, ArrowDownLeft, ArrowUpRight, GitCompareArrows, 
-    FileText, Plus, CreditCard, RefreshCw
+    FileText, Plus, RefreshCw, UserPlus, Calculator, Wallet, Percent, AlertTriangle
 } from 'lucide-react';
-import { QuickContactDialog } from '@/components/contacts/quick-contact-dialog';
 
 // --- Esquema de Validación con Zod ---
 const movementItemSchema = z.object({
@@ -74,34 +74,20 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-// --- Props del Componente ---
 type NewFinancialMovementSheetProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSave: (movement: FinancialMovement | Omit<FinancialMovement, 'id'>) => void;
   movement: FinancialMovement | null;
   allMovements: FinancialMovement[];
-  onDelete: (movement: FinancialMovement) => void;
-  purchaseOrders: PurchaseOrder[];
-  salesOrders: SalesOrder[];
-  serviceOrders: ServiceOrder[];
-  contacts: Contact[];
 };
 
-// --- Componente Principal ---
-export function NewFinancialMovementSheet({ 
-  isOpen, 
-  onOpenChange, 
-  onSave, 
-  movement, 
-  allMovements,
-  onDelete,
-  purchaseOrders,
-  salesOrders,
-  contacts
-}: NewFinancialMovementSheetProps) {
+export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements }: NewFinancialMovementSheetProps) {
   const { toast } = useToast();
-  const { bankAccounts, costCenters, products } = useMasterData();
+  const { bankAccounts, costCenters, contacts, products } = useMasterData();
+  const { purchaseOrders, salesOrders } = useOperations();
+  
+  // Estado para el modal rápido
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
 
   const form = useForm<FormData>({
@@ -114,23 +100,17 @@ export function NewFinancialMovementSheet({
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: "items",
   });
   
-  // --- MEJORA 1: Observación en tiempo real para totales ---
-  // useWatch es más eficiente y reactivo que form.watch dentro de un useMemo para arrays anidados
-  const watchedItems = useWatch({
-    control: form.control,
-    name: "items"
-  });
-
+  const watchedItems = useWatch({ control: form.control, name: "items" });
   const movementType = form.watch('type');
   const contactId = form.watch('contactId');
   const pendingDocId = form.watch('pendingDocumentId');
 
-  // --- Efectos y Memos ---
+  // --- Efectos y Lógica ---
   useEffect(() => {
     if (isOpen) {
       if (movement) {
@@ -160,24 +140,16 @@ export function NewFinancialMovementSheet({
     }
   }, [isOpen, movement, form]);
 
-  // --- MEJORA 2: Generador de Voucher Automático ---
   useEffect(() => {
-    // Solo generamos si NO estamos editando un movimiento existente
     if (!movement && isOpen) {
         const prefix = movementType === 'income' ? 'ING' : movementType === 'expense' ? 'EGR' : 'TR';
-        
-        // Filtramos los movimientos que sean del mismo tipo para calcular el correlativo
         const countByType = allMovements.filter(m => m.type === movementType).length;
         const nextNumber = countByType + 1;
-        
-        // Formateamos a 4 dígitos (Ej: ING-0005)
         const autoVoucher = `${prefix}-${String(nextNumber).padStart(4, '0')}`;
-        
         form.setValue('voucherNumber', autoVoucher);
     }
   }, [movementType, allMovements, isOpen, movement, form]);
 
-  // Limpieza al cambiar tipo
   useEffect(() => {
       if (!movement) {
           form.setValue('contactId', null);
@@ -187,7 +159,6 @@ export function NewFinancialMovementSheet({
       }
   }, [movementType, form, movement]);
 
-  // Cálculo de totales usando la variable observada (Reactivo 100%)
   const totalAmount = useMemo(() => {
     return (watchedItems || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   }, [watchedItems]);
@@ -209,15 +180,33 @@ export function NewFinancialMovementSheet({
     return [];
   }, [contactId, movementType, salesOrders, purchaseOrders]);
 
+  // --- LÓGICA DE CONTROL DE SALDOS Y IVA ---
   const documentBalance = useMemo(() => {
     const doc = [...salesOrders, ...purchaseOrders].find(d => d.id === pendingDocId);
-    if (!doc) return { total: 0, paid: 0, pending: 0 };
-    const total = doc.totalAmount;
+    if (!doc) return { total: 0, paid: 0, pending: 0, vat: 0, net: 0, isComplete: false };
+    
+    // Cálculo seguro del IVA
+    const netAmount = doc.totalAmount || 0;
+    // Si no tiene la flag o es true, asumimos que totalAmount es NETO y sumamos IVA. Si es false, es bruto.
+    // Ajustar según tu lógica de negocio: Generalmente guardas NETO en la BD.
+    const grossTotal = doc.includeVat !== false ? Math.round(netAmount * 1.19) : netAmount;
+    const vatAmount = grossTotal - netAmount;
+
+    // Pagos previos
     const payments = allMovements
         .filter(m => m.relatedDocument?.id === doc.id && m.id !== movement?.id)
         .reduce((sum, m) => sum + m.amount, 0);
-    const pending = total - payments;
-    return { total, paid: payments, pending };
+    
+    const pending = grossTotal - payments;
+    
+    return { 
+        net: netAmount,
+        vat: vatAmount,
+        total: grossTotal, 
+        paid: payments, 
+        pending: Math.max(0, pending), // No mostrar negativos
+        isComplete: pending <= 0 
+    };
   }, [pendingDocId, salesOrders, purchaseOrders, allMovements, movement]);
   
   const combinedCostCenters = useMemo(() => {
@@ -225,21 +214,40 @@ export function NewFinancialMovementSheet({
       return [...costCenters, ...productNames];
   }, [costCenters, products]);
 
-  // --- Handlers ---
-  const handleQuickContactSuccess = (newContact: {id: string; name: string}) => {
-    form.setValue('contactId', newContact.id);
+  // Función para aplicar montos rápidos
+  const applyPaymentAmount = (amountToPay: number, concept: string) => {
+      // Actualizamos la primera línea del detalle
+      update(0, { 
+          concept: concept, 
+          amount: amountToPay 
+      });
+      // Si hay más líneas, las borramos para evitar confusión
+      if (fields.length > 1) {
+          form.setValue('items', [{ concept: concept, amount: amountToPay }]);
+      }
   };
 
   const onSubmit = (data: FormData) => {
     const totalFromItems = data.items.reduce((sum, item) => sum + item.amount, 0);
     
+    // Validación Final: No pagar más de lo que se debe
+    if (data.pendingDocumentId && documentBalance.total > 0) {
+        if (totalFromItems > documentBalance.pending + 100) { // +100 por margen de error de redondeo
+            toast({
+                variant: "destructive",
+                title: "Exceso de Pago",
+                description: `El monto (${formatCurrency(totalFromItems)}) supera el saldo pendiente (${formatCurrency(documentBalance.pending)}).`
+            });
+            return; // Detiene el guardado
+        }
+    }
+
     const cleanData = {
       type: data.type,
       costCenter: data.costCenter,
       date: format(data.date, 'yyyy-MM-dd'),
       amount: totalFromItems,
       description: data.items.map(i => i.concept).join(', '),
-      
       contactId: data.contactId || null,
       voucherNumber: data.voucherNumber || null,
       paymentMethod: data.paymentMethod || null,
@@ -248,18 +256,13 @@ export function NewFinancialMovementSheet({
       notes: data.notes || null,
       manualDteType: data.manualDteType || null,
       manualDteFolio: data.manualDteFolio || null,
-
       relatedDocument: data.pendingDocumentId ? {
         id: data.pendingDocumentId,
         type: salesOrders.some(s => s.id === data.pendingDocumentId) ? 'OV' : 'OC',
       } : null,
     };
     
-    Object.keys(cleanData).forEach(key => {
-        if ((cleanData as any)[key] === undefined) {
-           (cleanData as any)[key] = null;
-        }
-    });
+    Object.keys(cleanData).forEach(key => { if ((cleanData as any)[key] === undefined) (cleanData as any)[key] = null; });
 
     if (movement) {
         // @ts-ignore
@@ -270,7 +273,6 @@ export function NewFinancialMovementSheet({
     }
   };
   
-  // --- Estilos ---
   const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
   const title = movement ? `Editar Movimiento` : 'Registrar Movimiento';
   const darkInputClass = "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-blue-500";
@@ -320,9 +322,7 @@ export function NewFinancialMovementSheet({
                         <Label className={labelClass}>N° Voucher</Label>
                         <div className="relative">
                             <Input {...form.register('voucherNumber')} className={`${darkInputClass} pr-8`} placeholder='(Autogenerado)' readOnly />
-                            <div className="absolute right-2 top-2.5 text-slate-500">
-                                <RefreshCw className="h-3 w-3 animate-pulse" />
-                            </div>
+                            <div className="absolute right-2 top-2.5 text-slate-500"><RefreshCw className="h-3 w-3 animate-pulse" /></div>
                         </div>
                     </div>
                      <div className="space-y-2">
@@ -335,16 +335,8 @@ export function NewFinancialMovementSheet({
                                         {field.value ? format(field.value, "PPP", { locale: es }) : <span>Seleccione fecha</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-700 text-slate-100" align="start">
-                                    <Calendar 
-                                        mode="single" 
-                                        selected={field.value} 
-                                        onSelect={field.onChange} 
-                                        captionLayout="dropdown-buttons" 
-                                        fromYear={2023} 
-                                        toYear={2030}
-                                        locale={es} 
-                                    />
+                                <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100" align="start">
+                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={2023} toYear={2030} locale={es} />
                                 </PopoverContent>
                             </Popover>
                         )} />
@@ -369,20 +361,20 @@ export function NewFinancialMovementSheet({
                         <>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <Label className={labelClass}>{movementType === 'income' ? 'Cliente' : 'Proveedor'}</Label>
-                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-blue-400 hover:bg-blue-900/50" onClick={() => setIsQuickContactOpen(true)}>
-                                    <Plus className="h-4 w-4" />
-                                  </Button>
+                                <Label className={labelClass}>{movementType === 'income' ? 'Cliente' : 'Proveedor'}</Label>
+                                <div className="flex gap-2">
+                                    <Controller control={form.control} name="contactId" render={({ field }) => (
+                                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                                            <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..."/></SelectTrigger>
+                                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                                {filteredContacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    )}/>
+                                    <Button type="button" variant="outline" className="border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300" onClick={() => setIsQuickContactOpen(true)}>
+                                        <UserPlus className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                                <Controller control={form.control} name="contactId" render={({ field }) => (
-                                    <Select onValueChange={field.onChange} value={field.value || ''}>
-                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione..."/></SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                            {filteredContacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                )}/>
                             </div>
                             <div className="space-y-2">
                                 <Label className={labelClass}>Asociar a</Label>
@@ -398,26 +390,94 @@ export function NewFinancialMovementSheet({
                         </div>
 
                         {form.watch('documentType') === 'pending' ? (
-                            <div className='space-y-2'>
-                                <Label className={labelClass}>Documento Pendiente (OV/OC)</Label>
-                                <Controller control={form.control} name="pendingDocumentId" render={({ field }) => (
-                                     <Select onValueChange={field.onChange} value={field.value || ''} disabled={!contactId || pendingDocuments.length === 0}>
-                                        <SelectTrigger className={darkInputClass}><SelectValue placeholder={!contactId ? "Seleccione un contacto primero" : "Seleccione documento..."}/></SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                            {pendingDocuments.map(d => <SelectItem key={d.id} value={d.id}>{d.number || d.id} - {formatCurrency(d.totalAmount)}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                )}/>
+                            <div className='space-y-4'>
+                                <div className="space-y-2">
+                                    <Label className={labelClass}>Documento Pendiente (OV/OC)</Label>
+                                    <Controller control={form.control} name="pendingDocumentId" render={({ field }) => (
+                                        <Select onValueChange={field.onChange} value={field.value || ''} disabled={!contactId || pendingDocuments.length === 0}>
+                                            <SelectTrigger className={darkInputClass}><SelectValue placeholder={!contactId ? "Seleccione un contacto primero" : "Seleccione documento..."}/></SelectTrigger>
+                                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                                {pendingDocuments.map(d => <SelectItem key={d.id} value={d.id}>{d.number || d.id} - {formatCurrency(d.totalAmount)} (Neto)</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    )}/>
+                                </div>
+                               
                                {pendingDocId && (
-                                   <Alert className="mt-2 bg-slate-950 border-slate-800">
-                                      <FileText className="h-4 w-4 !text-slate-400" />
-                                      <AlertDescription className="text-slate-300 grid grid-cols-3 gap-2 text-xs">
-                                          <p>Total: <strong className="font-mono">{formatCurrency(documentBalance.total)}</strong></p>
-                                          <p>Pagado: <strong className="font-mono text-emerald-400">{formatCurrency(documentBalance.paid)}</strong></p>
-                                          <p>Saldo: <strong className="font-mono text-amber-400">{formatCurrency(documentBalance.pending)}</strong></p>
-                                          <Button type="button" size="sm" className="col-span-3 h-7" onClick={() => form.setValue('items.0.amount', documentBalance.pending)}>Pagar Saldo</Button>
-                                      </AlertDescription>
-                                  </Alert>
+                                   <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4 space-y-4">
+                                      <div className="flex items-start gap-3">
+                                          <div className="p-2 bg-blue-500/10 rounded-md border border-blue-500/20">
+                                              <FileText className="h-5 w-5 text-blue-400" />
+                                          </div>
+                                          <div className="flex-1 space-y-1">
+                                              <h4 className="text-sm font-semibold text-slate-200">Resumen del Documento</h4>
+                                              <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs">
+                                                  <div className="flex justify-between">
+                                                      <span className="text-slate-500">Monto Neto:</span>
+                                                      <span className="font-mono text-slate-300">{formatCurrency(documentBalance.net)}</span>
+                                                  </div>
+                                                  <div className="flex justify-between">
+                                                      <span className="text-slate-500">IVA (19%):</span>
+                                                      <span className="font-mono text-slate-300">{formatCurrency(documentBalance.vat)}</span>
+                                                  </div>
+                                                  <div className="flex justify-between border-t border-slate-700 pt-1 mt-1">
+                                                      <span className="text-slate-400 font-bold">Total Bruto:</span>
+                                                      <span className="font-mono font-bold text-white">{formatCurrency(documentBalance.total)}</span>
+                                                  </div>
+                                                  <div className="flex justify-between border-t border-slate-700 pt-1 mt-1">
+                                                      <span className="text-slate-400 font-bold">Pagado:</span>
+                                                      <span className="font-mono font-bold text-emerald-400">{formatCurrency(documentBalance.paid)}</span>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      </div>
+
+                                      <div className="pt-2 border-t border-slate-800">
+                                          <div className="flex justify-between items-center mb-3">
+                                              <span className="text-xs uppercase font-bold text-amber-500">Saldo Pendiente</span>
+                                              <span className="text-xl font-bold text-amber-400 font-mono">{formatCurrency(documentBalance.pending)}</span>
+                                          </div>
+                                          
+                                          {/* BOTONES DE ACCIÓN RÁPIDA DE PAGO */}
+                                          <div className="grid grid-cols-3 gap-2">
+                                              <Button 
+                                                type="button" 
+                                                variant="outline" 
+                                                className="bg-slate-800 border-slate-700 hover:bg-emerald-900/30 hover:text-emerald-400 hover:border-emerald-800 text-xs"
+                                                onClick={() => applyPaymentAmount(documentBalance.pending, `Pago Total ${movementType === 'income' ? 'OV' : 'OC'}`)}
+                                                disabled={documentBalance.isComplete}
+                                              >
+                                                  <Wallet className="w-3 h-3 mr-2" /> Pagar Total
+                                              </Button>
+                                              
+                                              <Button 
+                                                type="button" 
+                                                variant="outline" 
+                                                className="bg-slate-800 border-slate-700 hover:bg-blue-900/30 hover:text-blue-400 hover:border-blue-800 text-xs"
+                                                onClick={() => applyPaymentAmount(documentBalance.vat, `Pago IVA ${movementType === 'income' ? 'OV' : 'OC'}`)}
+                                                disabled={documentBalance.isComplete || documentBalance.pending < documentBalance.vat}
+                                              >
+                                                  <Percent className="w-3 h-3 mr-2" /> Pagar IVA
+                                              </Button>
+
+                                              <Button 
+                                                type="button" 
+                                                variant="outline" 
+                                                className="bg-slate-800 border-slate-700 hover:bg-slate-700 text-xs"
+                                                onClick={() => applyPaymentAmount(0, `Abono ${movementType === 'income' ? 'OV' : 'OC'}`)}
+                                                disabled={documentBalance.isComplete}
+                                              >
+                                                  <Calculator className="w-3 h-3 mr-2" /> Abonar
+                                              </Button>
+                                          </div>
+                                      </div>
+                                      
+                                      {documentBalance.isComplete && (
+                                          <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-2 rounded flex items-center text-xs font-bold">
+                                              <AlertTriangle className="h-4 w-4 mr-2" /> Este documento ya está pagado en su totalidad.
+                                          </div>
+                                      )}
+                                   </div>
                                )}
                             </div>
                         ) : (
@@ -494,7 +554,7 @@ export function NewFinancialMovementSheet({
                                     <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione Cuenta..."/></SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                         {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
-                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bankName}</SelectItem>
+                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bank}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -510,7 +570,7 @@ export function NewFinancialMovementSheet({
                                     <SelectTrigger className={darkInputClass}><SelectValue placeholder="Seleccione Cuenta..."/></SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                         {bankAccounts.filter(a => a.status === 'Activa').map(acc => (
-                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bankName}</SelectItem>
+                                            <SelectItem key={acc.id} value={acc.id}>{acc.name} - {acc.bank}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -566,24 +626,29 @@ export function NewFinancialMovementSheet({
           <SheetFooter className="p-4 bg-slate-900 border-t border-slate-800 mt-auto flex justify-between">
             <div>
               {movement && (
-                 <Button type="button" variant="destructive" onClick={() => onDelete(movement)}>
+                 <Button type="button" variant="destructive" onClick={() => onSave(movement)}>
                     <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                 </Button>
               )}
             </div>
             <div className="flex gap-2">
               <SheetClose asChild><Button type="button" variant="ghost" className="text-slate-400 hover:text-slate-100 hover:bg-slate-800">Cancelar</Button></SheetClose>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-semibold" disabled={!form.formState.isValid}>Guardar Movimiento</Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-semibold" disabled={!form.formState.isValid || documentBalance.isComplete && form.watch('documentType') === 'pending'}>Guardar Movimiento</Button>
             </div>
           </SheetFooter>
         </form>
       </SheetContent>
     </Sheet>
-    <QuickContactDialog
+
+    {/* AQUÍ ESTÁ EL DIÁLOGO CONECTADO */}
+    <QuickContactDialog 
         isOpen={isQuickContactOpen}
         onOpenChange={setIsQuickContactOpen}
         type={movementType === 'income' ? 'client' : 'supplier'}
-        onSuccess={handleQuickContactSuccess}
+        onSuccess={(newId) => {
+            // MAGIA: Asigna automáticamente el nuevo contacto y cierra el modal
+            form.setValue('contactId', newId);
+        }}
     />
     </>
   );
