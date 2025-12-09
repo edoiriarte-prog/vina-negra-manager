@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useFirebase } from "@/firebase";
+import { db } from "@/firebase/init";
 import { doc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
@@ -42,7 +42,6 @@ const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 
 const formatDate = (dateString: string) => format(parseISO(dateString), "dd-MM-yyyy");
 
 export default function SalesPage() {
-  const { db } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 

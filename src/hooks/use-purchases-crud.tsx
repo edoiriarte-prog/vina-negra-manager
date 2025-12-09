@@ -1,19 +1,18 @@
 
 "use client";
 
-import { useFirebase } from "@/firebase";
-import { collection, doc, setDoc, addDoc } from "firebase/firestore";
+import { collection, doc, setDoc, addDoc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { PurchaseOrder } from "@/lib/types";
+import { db } from "@/firebase/init"; // CORRECCIÓN: Importar 'db' desde init
 
 export function usePurchasesCRUD() {
-  const { firestore } = useFirebase();
   const { toast } = useToast();
 
   const createPurchaseOrder = async (order: Omit<PurchaseOrder, 'id'>) => {
-    if (!firestore) return;
+    if (!db) return;
     try {
-        const docRef = await addDoc(collection(firestore, 'purchaseOrders'), order);
+        const docRef = await addDoc(collection(db, 'purchaseOrders'), order);
         toast({ title: "Compra Creada", description: "La orden se ha registrado exitosamente." });
         return docRef;
     } catch (e) {
@@ -24,9 +23,9 @@ export function usePurchasesCRUD() {
   };
 
   const updatePurchaseOrder = async (id: string, data: Partial<PurchaseOrder>) => {
-    if (!firestore) return;
+    if (!db) return;
     try {
-        await setDoc(doc(firestore, 'purchaseOrders', id), data, { merge: true });
+        await setDoc(doc(db, 'purchaseOrders', id), data, { merge: true });
         toast({ title: "Compra Actualizada", description: "Los cambios se han guardado." });
     } catch (e) {
         console.error(e);
@@ -36,9 +35,9 @@ export function usePurchasesCRUD() {
   };
 
   const deletePurchaseOrder = async (id: string) => {
-    if (!firestore) return;
+    if (!db) return;
      try {
-        await doc(firestore, 'purchaseOrders', id).delete();
+        await deleteDoc(doc(db, 'purchaseOrders', id));
     } catch (e) {
         console.error(e);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar la orden de compra.' });

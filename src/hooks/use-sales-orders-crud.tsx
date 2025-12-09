@@ -1,14 +1,13 @@
 
 "use client";
 
-import { useFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
+import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, setDoc, addDoc } from "firebase/firestore"; // Agregamos setDoc y addDoc
 import { useToast } from "@/hooks/use-toast";
 import { SalesOrder } from "@/lib/types";
+import { db } from "@/firebase/init"; // CORRECCIÓN: Importar 'db' desde init
 
 export function useSalesOrdersCRUD() {
-  // CORRECCIÓN 1: Usamos 'firestore' y lo renombramos a 'db' para que coincida con el resto del hook
-  const { firestore: db } = useFirebase();
   const { toast } = useToast();
 
   const createSalesOrder = async (order: SalesOrder | Omit<SalesOrder, 'id'>) => {
