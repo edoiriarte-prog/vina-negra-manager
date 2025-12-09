@@ -13,13 +13,13 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Search, Wallet, FileText, ChevronRight, User, ArrowUpRight, ArrowDownLeft,
-  Truck, Briefcase, Download, Printer, Package, Scale, Info
+  Truck, Briefcase, Download, Printer, Package, Scale
 } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { format, parseISO, compareDesc } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 // --- FORMATO MONEDA ---
@@ -52,7 +52,7 @@ type DetailedMovement = {
 
 export default function CurrentAccountPage() {
   const { contacts, isLoading: l1 } = useMasterData();
-  const { salesOrders, purchaseOrders, serviceOrders, financialMovements, isLoading: l2 } = useOperations();
+  const { salesOrders, purchaseOrders, financialMovements, isLoading: l2 } = useOperations();
   const isLoading = l1 || l2;
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,7 +60,7 @@ export default function CurrentAccountPage() {
 
   // PROCESAMIENTO DE DATOS INTELIGENTE
   const { clientsData, suppliersData } = useMemo(() => {
-    if (isLoading || !contacts || !salesOrders || !financialMovements) {
+    if (isLoading || !contacts || !salesOrders || !financialMovements || !purchaseOrders) {
         return { clientsData: [], suppliersData: [] };
     }
 
@@ -89,10 +89,12 @@ export default function CurrentAccountPage() {
             supplierPurchases.forEach(order => {
                 const netAmount = order.totalAmount || 0;
                 totalBilled += order.includeVat !== false ? Math.round(netAmount * 1.19) : netAmount;
+                 order.items.forEach(item => {
+                    const currentKilos = productVolumesMap.get(item.product) || 0;
+                    productVolumesMap.set(item.product, currentKilos + (item.quantity || 0));
+                });
             });
             
-            // Aquí se podrían agregar las O/S también si fuera necesario
-
             financialMovements
               .filter(fm => fm.contactId === contact.id && fm.type === 'expense')
               .forEach(p => totalPaid += Number(p.amount) || 0);
@@ -116,7 +118,7 @@ export default function CurrentAccountPage() {
 
     return { clientsData: clients, suppliersData: suppliers };
 
-  }, [contacts, salesOrders, purchaseOrders, serviceOrders, financialMovements, isLoading]);
+  }, [contacts, salesOrders, purchaseOrders, financialMovements, isLoading]);
 
   // Filtrado y totales
   const filterAccounts = (list: AccountSummary[]) => {
@@ -211,7 +213,7 @@ export default function CurrentAccountPage() {
         </TabsContent>
       </Tabs>
 
-      {selectedAccount && <AccountDetailSheet account={selectedAccount} isOpen={!!selectedAccount} onOpenChange={() => setSelectedAccount(null)} salesOrders={salesOrders} financialMovements={financialMovements} />}
+      {selectedAccount && <AccountDetailSheet account={selectedAccount} isOpen={!!selectedAccount} onOpenChange={() => setSelectedAccount(null)} salesOrders={salesOrders} financialMovements={financialMovements} purchaseOrders={purchaseOrders} />}
     </div>
   );
 }
@@ -284,27 +286,32 @@ function AccountCard({ account, type, onClick }: { account: AccountSummary, type
     );
 }
 
-function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financialMovements }: { account: AccountSummary, isOpen: boolean, onOpenChange: () => void, salesOrders: SalesOrder[], financialMovements: FinancialMovement[] }) {
+function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financialMovements, purchaseOrders }: { account: AccountSummary, isOpen: boolean, onOpenChange: () => void, salesOrders: SalesOrder[], financialMovements: FinancialMovement[], purchaseOrders: PurchaseOrder[] }) {
     
     const detailedMovements: DetailedMovement[] = useMemo(() => {
         if (!account) return [];
         const movements: Omit<DetailedMovement, 'balance'>[] = [];
 
-        // Cargos (Ventas)
-        salesOrders.filter(s => s.clientId === account.contact.id && s.status !== 'cancelled' && s.status !== 'draft').forEach(s => {
-            const grossAmount = s.includeVat !== false ? Math.round(s.totalAmount * 1.19) : s.totalAmount;
+        const isClient = account.contact.type.includes('client');
+        const relevantOrders = isClient ? salesOrders : purchaseOrders;
+        const relevantPayments = financialMovements.filter(f => f.contactId === account.contact.id && (isClient ? f.type === 'income' : f.type === 'expense'));
+        
+        // Cargos (Ventas o Compras)
+        relevantOrders.filter(o => (isClient ? o.clientId : o.supplierId) === account.contact.id && o.status !== 'cancelled' && o.status !== 'draft').forEach(o => {
+            const grossAmount = o.includeVat !== false ? Math.round(o.totalAmount * 1.19) : o.totalAmount;
             movements.push({
-                date: s.date,
+                date: o.date,
                 type: 'Cargo',
-                documentType: 'O/V',
-                reference: s.number || s.id,
-                details: s.items,
+                documentType: isClient ? 'O/V' : 'O/C',
+                reference: o.number || o.id,
+                details: o.items,
                 charge: grossAmount,
                 payment: 0
             });
         });
+
         // Abonos (Pagos)
-        financialMovements.filter(f => f.contactId === account.contact.id && f.type === 'income').forEach(f => {
+        relevantPayments.forEach(f => {
             movements.push({
                 date: f.date,
                 type: 'Abono',
@@ -323,7 +330,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
             balance += m.charge - m.payment;
             return { ...m, balance };
         });
-    }, [account, salesOrders, financialMovements]);
+    }, [account, salesOrders, purchaseOrders, financialMovements]);
 
     return (
         <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -355,30 +362,34 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                         <Table>
                             <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargo</TableHead><TableHead className="text-right">Abono</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {detailedMovements.map((mov, i) => (
-                                    <TableRow key={i} className={`border-slate-800/50 ${mov.type === 'Abono' ? 'bg-emerald-950/20' : ''}`}>
-                                        <TableCell className="text-slate-400 text-xs">{format(parseISO(mov.date), 'dd-MM-yy')}</TableCell>
-                                        <TableCell><Badge variant={mov.type === 'Cargo' ? 'outline' : 'default'} className={mov.type === 'Abono' ? 'bg-emerald-500/80 border-emerald-700' : 'border-slate-700'}>{mov.documentType}</Badge></TableCell>
-                                        <TableCell className="font-mono text-xs">{mov.reference}</TableCell>
-                                        <TableCell className="text-xs max-w-xs">
-                                            {typeof mov.details === 'string' ? mov.details : (
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild><span className="cursor-help underline decoration-dotted">{mov.details.length} ítem(s) de producto</span></TooltipTrigger>
-                                                        <TooltipContent className="bg-slate-900 border-slate-800 text-slate-200">
-                                                            <div className="space-y-1">
-                                                                {mov.details.map((item, idx) => <p key={idx}>{item.quantity} kg de {item.product} ({item.caliber})</p>)}
-                                                            </div>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono text-red-400">{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</TableCell>
-                                        <TableCell className="text-right font-mono text-emerald-400">{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</TableCell>
-                                        <TableCell className="text-right font-mono font-semibold">{formatCurrency(mov.balance)}</TableCell>
-                                    </TableRow>
-                                ))}
+                                {detailedMovements.length === 0 ? (
+                                    <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">No hay movimientos para este contacto.</TableCell></TableRow>
+                                ) : (
+                                    detailedMovements.map((mov, i) => (
+                                        <TableRow key={i} className={`border-slate-800/50 ${mov.type === 'Abono' ? 'bg-emerald-950/20' : ''}`}>
+                                            <TableCell className="text-slate-400 text-xs">{format(parseISO(mov.date), 'dd-MM-yy')}</TableCell>
+                                            <TableCell><Badge variant={mov.type === 'Cargo' ? 'outline' : 'default'} className={mov.type === 'Abono' ? 'bg-emerald-500/80 border-emerald-700' : 'border-slate-700'}>{mov.documentType}</Badge></TableCell>
+                                            <TableCell className="font-mono text-xs">{mov.reference}</TableCell>
+                                            <TableCell className="text-xs max-w-xs">
+                                                {typeof mov.details === 'string' ? mov.details : (
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild><span className="cursor-help underline decoration-dotted">{mov.details.length} ítem(s) de producto</span></TooltipTrigger>
+                                                            <TooltipContent className="bg-slate-900 border-slate-800 text-slate-200">
+                                                                <div className="space-y-1">
+                                                                    {mov.details.map((item, idx) => <p key={idx}>{item.quantity} kg de {item.product} ({item.caliber})</p>)}
+                                                                </div>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono text-red-400">{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</TableCell>
+                                            <TableCell className="text-right font-mono text-emerald-400">{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</TableCell>
+                                            <TableCell className="text-right font-mono font-semibold">{formatCurrency(mov.balance)}</TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
                             </TableBody>
                         </Table>
                     </ScrollArea>
@@ -387,3 +398,5 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
         </Sheet>
     )
 }
+
+    
