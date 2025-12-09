@@ -151,7 +151,7 @@ export default function SalesPage() {
     return { filteredOrders: orders, groupedByClient: clientArray, groupedByDate: dateArray, totalGrossAmount: total };
   }, [salesList, clients, searchTerm]);
   
-  const columns = useMemo(() => getColumns({ onEdit, onDelete: handleDeleteRequest, onPreview: setPreviewOrder, clients }), [clients]);
+  const columns = useMemo(() => getColumns({ onEdit: handleEdit, onDelete: handleDeleteRequest, onPreview: setPreviewOrder, clients }), [clients]);
 
   if (isLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-64 w-full" /></div>;
@@ -321,4 +321,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
