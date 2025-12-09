@@ -3,13 +3,14 @@
 import React, { useState, useMemo } from 'react';
 import { useOperations } from '@/hooks/use-operations';
 import { useMasterData } from '@/hooks/use-master-data';
-import { useFinancialsCRUD } from '@/hooks/use-financials-crud'; // Importamos el nuevo hook
-import { FinancialMovement } from '@/lib/types';
+import { useFinancialsCRUD } from '@/hooks/use-financials-crud'; 
+import { FinancialMovement, BankAccount } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "./components/data-table";
 import { getColumns } from "./components/columns";
 import { NewFinancialMovementSheet } from './components/new-financial-movement-sheet';
+import { AccountStatementDialog } from './components/account-statement-dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -20,19 +21,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
 
 export default function FinancialsPage() {
-  // HOOKS DE DATOS
   const { bankAccounts, contacts, isLoading: l1 } = useMasterData();
   const { financialMovements, purchaseOrders, salesOrders, serviceOrders, isLoading: l2 } = useOperations();
   const { createFinancialMovement, updateFinancialMovement, deleteFinancialMovement } = useFinancialsCRUD();
 
   const isLoading = l1 || l2;
 
-  // ESTADOS UI
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingMovement, setEditingMovement] = useState<FinancialMovement | null>(null);
   const [deletingMovement, setDeletingMovement] = useState<FinancialMovement | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
 
-  // CÁLCULO DE TOTALES (KPIs)
   const { totalBalance, totalIncome, totalExpense } = useMemo(() => {
     if (!bankAccounts || !financialMovements) return { totalBalance: 0, totalIncome: 0, totalExpense: 0 };
     
@@ -51,7 +50,6 @@ export default function FinancialsPage() {
     return { totalBalance: globalTotal, totalIncome: income, totalExpense: expense };
   }, [bankAccounts, financialMovements]);
 
-  // HANDLERS (Ahora usan el Hook limpio)
   const handleSaveMovement = async (movementData: any) => {
     if (Array.isArray(movementData)) {
         await createFinancialMovement(movementData);
@@ -101,9 +99,9 @@ export default function FinancialsPage() {
   if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-32 w-full"/><Skeleton className="h-64 w-full"/></div>;
 
   return (
+    <>
     <div className="flex-1 space-y-6 p-8 pt-6 bg-slate-950 min-h-screen text-slate-100">
       
-      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h2 className="text-3xl font-bold tracking-tight text-white">Tesorería</h2>
@@ -119,7 +117,6 @@ export default function FinancialsPage() {
         </div>
       </div>
 
-      {/* KPIS */}
       <div className="grid gap-4 md:grid-cols-3">
           <Card className="bg-slate-900 border-slate-800 shadow-lg hover:border-emerald-500/30 transition-all">
               <CardHeader className="pb-2 flex flex-row items-center justify-between"><CardTitle className="text-sm text-slate-400">Ingresos Totales</CardTitle><ArrowDownLeft className="h-5 w-5 text-emerald-400"/></CardHeader>
@@ -135,34 +132,39 @@ export default function FinancialsPage() {
           </Card>
       </div>
 
-      {/* CUENTAS */}
       <div>
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-200">
               <Landmark className="h-5 w-5 text-slate-500" /> Mis Cuentas
           </h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {bankAccounts?.map(acc => {
-                  const accIncome = financialMovements?.filter(m => m.destinationAccountId === acc.id && m.type !== 'expense').reduce((sum, m) => sum + Number(m.amount), 0) || 0;
-                  const accExpense = financialMovements?.filter(m => m.sourceAccountId === acc.id && m.type !== 'income').reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+                  const accIncome = financialMovements?.filter(m => m.destinationAccountId === acc.id).reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+                  const accExpense = financialMovements?.filter(m => m.sourceAccountId === acc.id).reduce((sum, m) => sum + Number(m.amount), 0) || 0;
                   const currentBalance = (acc.initialBalance || 0) + accIncome - accExpense;
 
                   return (
-                    <Card key={acc.id} className="bg-gradient-to-br from-slate-900 to-slate-800 border-slate-800 hover:border-slate-700 transition-all shadow-md group">
-                        <CardContent className="p-5 flex flex-col justify-between h-full">
+                    <Card key={acc.id} onClick={() => setSelectedAccount(acc)} className="bg-gradient-to-br from-slate-900 to-slate-800 border-slate-800 hover:border-slate-700 transition-all shadow-md group cursor-pointer">
+                        <CardContent className="p-4 flex flex-col justify-between h-full">
                            <div>
                              <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">{acc.bankName}</span>
-                                <Banknote className="h-6 w-6 text-slate-600 group-hover:text-slate-500 transition-colors" />
+                                <p className="font-bold text-slate-200">{acc.name}</p>
+                                <Banknote className="h-5 w-5 text-slate-600 group-hover:text-slate-500 transition-colors" />
                              </div>
-                             <p className="text-xs text-slate-500">{acc.type}</p>
+                             <p className="text-xs text-slate-500">{acc.bankName} - {acc.accountType}</p>
                            </div>
-                           <div className="text-center my-4">
-                                <p className="text-xs text-slate-400">Saldo Disponible</p>
-                                <p className={`text-3xl font-bold font-mono tracking-tighter ${currentBalance >= 0 ? 'text-white' : 'text-red-400'}`}>{formatCurrency(currentBalance)}</p>
+                           <div className="text-center my-3">
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Saldo Disponible</p>
+                                <p className={`text-2xl font-bold font-mono tracking-tighter ${currentBalance >= 0 ? 'text-white' : 'text-red-400'}`}>{formatCurrency(currentBalance)}</p>
                            </div>
-                           <div className="text-right">
-                               <p className="text-lg font-medium text-slate-300">{acc.name}</p>
-                               <p className="text-xs font-mono text-slate-500">{acc.accountNumber}</p>
+                           <div className="text-xs space-y-1 text-slate-400 border-t border-slate-800/50 pt-2">
+                               <div className="flex justify-between items-center">
+                                   <span className='flex items-center gap-1'><ArrowDownLeft className='h-3 w-3 text-emerald-500'/> Ingresos</span>
+                                   <span className='font-mono'>{formatCurrency(accIncome)}</span>
+                               </div>
+                                <div className="flex justify-between items-center">
+                                   <span className='flex items-center gap-1'><ArrowUpRight className='h-3 w-3 text-rose-500'/> Egresos</span>
+                                   <span className='font-mono'>{formatCurrency(accExpense)}</span>
+                               </div>
                            </div>
                         </CardContent>
                     </Card>
@@ -171,7 +173,6 @@ export default function FinancialsPage() {
           </div>
       </div>
 
-      {/* HISTORIAL */}
       <Card className="bg-slate-900 border-slate-800 shadow-lg">
           <CardHeader className="border-b border-slate-800 pb-4">
               <CardTitle className="text-lg text-slate-200 flex items-center gap-2">
@@ -182,8 +183,9 @@ export default function FinancialsPage() {
               <DataTable columns={columns} data={movementsWithContactNames}/>
           </CardContent>
       </Card>
-
-      <NewFinancialMovementSheet 
+    </div>
+    
+    <NewFinancialMovementSheet 
         isOpen={isSheetOpen}
         onOpenChange={setIsSheetOpen}
         onSave={handleSaveMovement}
@@ -194,23 +196,31 @@ export default function FinancialsPage() {
         salesOrders={salesOrders}
         serviceOrders={serviceOrders}
         contacts={contacts}
-      />
+    />
+
+    {selectedAccount && (
+        <AccountStatementDialog
+            isOpen={!!selectedAccount}
+            onOpenChange={() => setSelectedAccount(null)}
+            account={selectedAccount}
+            movements={financialMovements}
+        />
+    )}
       
-      <AlertDialog open={!!deletingMovement} onOpenChange={() => setDeletingMovement(null)}>
+    <AlertDialog open={!!deletingMovement} onOpenChange={() => setDeletingMovement(null)}>
         <AlertDialogContent className="bg-slate-950 border-slate-800 text-slate-100">
-          <AlertDialogHeader>
+        <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-400">
-              Esta acción eliminará el movimiento financiero permanentemente.
+            Esta acción eliminará el movimiento financiero permanentemente.
             </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
             <AlertDialogCancel className="border-slate-700 text-slate-300 hover:bg-slate-900">Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-500">Eliminar</AlertDialogAction>
-          </AlertDialogFooter>
+        </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
-
-    </div>
+    </AlertDialog>
+    </>
   );
 }
