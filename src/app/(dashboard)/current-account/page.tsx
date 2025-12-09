@@ -292,13 +292,13 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
         if (!account) return [];
         const movements: Omit<DetailedMovement, 'balance'>[] = [];
 
-        const isClient = account.contact.type.includes('client');
+        const isClient = (account.contact.type || []).includes('client');
         const relevantOrders = isClient ? salesOrders : purchaseOrders;
         const relevantPayments = financialMovements.filter(f => f.contactId === account.contact.id && (isClient ? f.type === 'income' : f.type === 'expense'));
         
         // Cargos (Ventas o Compras)
-        relevantOrders.filter(o => (isClient ? o.clientId : o.supplierId) === account.contact.id && o.status !== 'cancelled' && o.status !== 'draft').forEach(o => {
-            const grossAmount = o.includeVat !== false ? Math.round(o.totalAmount * 1.19) : o.totalAmount;
+        relevantOrders.filter(o => (isClient ? (o as SalesOrder).clientId : (o as PurchaseOrder).supplierId) === account.contact.id && o.status !== 'cancelled' && o.status !== 'draft').forEach(o => {
+            const grossAmount = o.includeVat !== false ? Math.round((o.totalAmount || 0) * 1.19) : (o.totalAmount || 0);
             movements.push({
                 date: o.date,
                 type: 'Cargo',
@@ -319,7 +319,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                 reference: f.voucherNumber || f.id,
                 details: f.description,
                 charge: 0,
-                payment: f.amount
+                payment: f.amount || 0
             });
         });
 
@@ -398,5 +398,3 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
         </Sheet>
     )
 }
-
-    
