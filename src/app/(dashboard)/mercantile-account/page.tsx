@@ -4,13 +4,14 @@
 import React, { useState, useMemo } from 'react';
 import { useMasterData } from '@/hooks/use-master-data';
 import { useOperations } from '@/hooks/use-operations';
-import { Contact, SalesOrder, PurchaseOrder, FinancialMovement, OrderItem } from '@/lib/types';
+import { Contact, SalesOrder, PurchaseOrder, FinancialMovement, OrderItem, BankAccount } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { 
   Search, Wallet, FileText, ChevronRight, User, ArrowUpRight, ArrowDownLeft,
   Truck, Briefcase, Download, Printer, Package, Scale
@@ -352,6 +353,8 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                     order={{...account.contact, items: detailedMovements, totalAmount: account.balance}}
                                     clientName={account.contact.name}
                                     clientRut={account.contact.rut}
+                                    clientAddress={account.contact.address}
+                                    clientContact={account.contact.contactPerson}
                                     type="VENTA" // O un tipo "REPORTE" si lo tienes
                                     fileName={`Cartola_${account.contact.name}.pdf`}
                                 />
@@ -380,10 +383,14 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                             <TableCell className="text-slate-400 text-xs">{format(parseISO(mov.date), 'dd-MM-yy')}</TableCell>
                                             <TableCell><Badge variant={mov.type === 'Cargo' ? 'outline' : 'default'} className={mov.type === 'Abono' ? 'bg-emerald-500/80 border-emerald-700' : 'border-slate-700'}>{mov.documentType}</Badge></TableCell>
                                             <TableCell className="font-mono text-xs">{mov.reference}</TableCell>
-                                            <TableCell className="text-xs max-w-[200px] truncate">
+                                            <TableCell className="text-xs max-w-xs">
                                                 {typeof mov.details === 'string' 
                                                     ? mov.details 
-                                                    : mov.details.map(item => `${item.quantity}kg ${item.product} ${item.caliber}`).join(', ')
+                                                    : mov.details.map((item, idx) => (
+                                                        <div key={idx} className="truncate">
+                                                          {item.quantity} kg de {item.product} ({item.caliber})
+                                                        </div>
+                                                    ))
                                                 }
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-red-400">{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</TableCell>
@@ -400,5 +407,3 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
         </Sheet>
     )
 }
-
-    

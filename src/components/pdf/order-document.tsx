@@ -158,7 +158,7 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                                 {bankAccount ? (
                                     <>
                                         <Text style={{fontSize: 7}}>{bankAccount.bank || bankAccount.bankName}</Text>
-                                        <Text style={{fontSize: 7, marginBottom: 4}}>{bankAccount.type || 'Cta'} N° {bankAccount.accountNumber}</Text>
+                                        <Text style={{fontSize: 7, marginBottom: 4}}>{(bankAccount.type || bankAccount.accountType) || 'Cta'} N° {bankAccount.accountNumber}</Text>
                                         
                                         {/* NUEVOS DATOS AGREGADOS */}
                                         <Text style={{fontSize: 7, fontWeight: 'bold'}}>Agrocomercial Viña Negra SpA</Text>
