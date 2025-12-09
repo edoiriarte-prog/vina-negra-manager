@@ -259,7 +259,7 @@ function AccountCard({ account, type, onClick }: { account: AccountSummary, type
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center mb-4">
-                    <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Operado</p><p className="font-bold text-slate-200 text-sm">{formatCurrency(account.totalBilled)}</p></div>
+                    <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Facturado</p><p className="font-bold text-slate-200 text-sm">{formatCurrency(account.totalBilled)}</p></div>
                     <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Pagado</p><p className="font-bold text-emerald-400 text-sm">{formatCurrency(account.totalPaid)}</p></div>
                     <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Saldo</p><p className={`font-bold ${balanceColor} text-sm`}>{formatCurrency(account.balance)}</p></div>
                 </div>
@@ -369,7 +369,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                         </div>
                     </div>
                     <div className="mt-4 grid grid-cols-3 gap-4 text-center">
-                        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800"><p className="text-xs text-slate-500 uppercase">Total Operado</p><p className="text-lg font-bold">{formatCurrency(account.totalBilled)}</p></div>
+                        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800"><p className="text-xs text-slate-500 uppercase">Total Facturado</p><p className="text-lg font-bold">{formatCurrency(account.totalBilled)}</p></div>
                         <div className="bg-slate-950 p-3 rounded-lg border border-slate-800"><p className="text-xs text-slate-500 uppercase">Total Pagado</p><p className="text-lg font-bold text-emerald-400">{formatCurrency(account.totalPaid)}</p></div>
                          <div className="bg-slate-950 p-3 rounded-lg border border-slate-800"><p className="text-xs text-slate-500 uppercase">Saldo Actual</p><p className="text-lg font-bold text-amber-400">{formatCurrency(account.balance)}</p></div>
                     </div>

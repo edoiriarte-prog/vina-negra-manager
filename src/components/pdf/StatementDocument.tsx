@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
   colPayment: { width: '15%', textAlign: 'right', color: '#059669' },
   colBalance: { width: '15%', textAlign: 'right', fontWeight: 'bold' },
 
-  footer: { marginTop: 20, paddingTop: 10, borderTop: '1px solid #E5E7EB', flexDirection: 'row', justifyContent: 'space-between' },
+  footer: { position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1px solid #E5E7EB', paddingTop: 8 },
   footerText: { fontSize: 7, color: '#6B7280' },
   
   summaryBox: {
@@ -75,6 +75,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+   signatures: {
+    position: 'absolute',
+    bottom: 70,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 60
+  },
+  signatureBox: {
+    width: '40%',
+    alignItems: 'center',
+  },
+  signatureLine: {
+    width: '70%',
+    borderTop: '1px solid #374151',
+    marginBottom: 4,
+  },
+  signatureText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
 });
 
 // Helpers
@@ -100,7 +123,7 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                         <Text style={styles.companyDetails}>ventas@agrocomercialavn.com</Text>
                     </View>
                     <View style={styles.docInfo}>
-                        <Text style={styles.docTitle}>ESTADO DE CUENTA</Text>
+                        <Text style={styles.docTitle}>ESTADO DE CUENTA CORRIENTE</Text>
                         <Text style={styles.docSubtitle}>Al {format(new Date(), "dd 'de' MMMM, yyyy", {locale: es})}</Text>
                     </View>
                 </View>
@@ -116,13 +139,12 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                         <Text style={[styles.tableHeaderCell, styles.colDate]}>Fecha</Text>
                         <Text style={[styles.tableHeaderCell, styles.colRef]}>Referencia</Text>
                         <Text style={[styles.tableHeaderCell, styles.colConcept]}>Concepto / Detalle</Text>
-                        <Text style={[styles.tableHeaderCell, styles.colCharge]}>Cargo (-)</Text>
-                        <Text style={[styles.tableHeaderCell, styles.colPayment]}>Abono (+)</Text>
+                        <Text style={[styles.tableHeaderCell, styles.colCharge]}>Cargos (-)</Text>
+                        <Text style={[styles.tableHeaderCell, styles.colPayment]}>Abonos (+)</Text>
                         <Text style={[styles.tableHeaderCell, styles.colBalance]}>Saldo</Text>
                     </View>
 
                     {movements.map((mov, i) => {
-                        const isPayment = mov.type === 'Abono';
                         const conceptText = typeof mov.details === 'string' 
                             ? mov.details
                             : mov.details.map((item: any) => `${item.quantity}kg ${item.product} ${item.caliber}`).join(', ');
@@ -131,10 +153,7 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                             <View key={i} style={[styles.tableRow, i % 2 !== 0 && styles.tableRowAlt]}>
                                 <Text style={[styles.tableCell, styles.colDate]}>{formatDate(mov.date)}</Text>
                                 <Text style={[styles.tableCell, styles.colRef, {fontSize: 7, fontFamily: 'Helvetica-Oblique'}]}>{mov.reference}</Text>
-                                <Text style={[styles.tableCell, styles.colConcept]}>
-                                    <Text style={{fontWeight: 'bold'}}>{isPayment ? 'ABONO' : 'CARGO'}: </Text>
-                                    {conceptText}
-                                </Text>
+                                <Text style={[styles.tableCell, styles.colConcept]}>{conceptText}</Text>
                                 <Text style={[styles.tableCell, styles.colCharge]}>{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</Text>
                                 <Text style={[styles.tableCell, styles.colPayment]}>{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</Text>
                                 <Text style={[styles.tableCell, styles.colBalance]}>{formatCurrency(mov.balance)}</Text>
@@ -145,7 +164,7 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
 
                 <View style={styles.summaryBox}>
                     <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Total Operado (Facturado):</Text>
+                        <Text style={styles.summaryLabel}>Total Facturado:</Text>
                         <Text style={styles.summaryValue}>{formatCurrency(account.totalBilled)}</Text>
                     </View>
                      <View style={styles.summaryRow}>
@@ -155,6 +174,17 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                     <View style={styles.summaryTotalRow}>
                         <Text style={styles.summaryTotalLabel}>Saldo Pendiente:</Text>
                         <Text style={[styles.summaryTotalValue, { color: account.balance > 0 ? '#DC2626' : '#111827'}]}>{formatCurrency(account.balance)}</Text>
+                    </View>
+                </View>
+
+                <View style={styles.signatures} fixed>
+                     <View style={styles.signatureBox}>
+                        <View style={styles.signatureLine} />
+                        <Text style={styles.signatureText}>Gerencia de Ventas</Text>
+                    </View>
+                     <View style={styles.signatureBox}>
+                        <View style={styles.signatureLine} />
+                        <Text style={styles.signatureText}>Recepción Cliente</Text>
                     </View>
                 </View>
 
