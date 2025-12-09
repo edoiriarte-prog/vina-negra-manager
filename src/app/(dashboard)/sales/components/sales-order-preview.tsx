@@ -14,7 +14,8 @@ import { SalesOrder } from "@/lib/types";
 import { Printer, Download, FileSpreadsheet } from "lucide-react";
 import { useMasterData } from "@/hooks/use-master-data";
 import { useReactToPrint } from 'react-to-print';
-import { PDFDownloadButton } from "@/components/pdf/pdf-download-button";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { OrderDocument } from "@/components/pdf/order-document";
 import { SalesOrderPreviewContent } from './sales-order-preview-content';
 
 interface SalesOrderPreviewProps {
@@ -25,7 +26,7 @@ interface SalesOrderPreviewProps {
 }
 
 export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest }: SalesOrderPreviewProps) {
-  const { contacts } = useMasterData();
+  const { contacts, bankAccounts } = useMasterData();
   const printRef = useRef<HTMLDivElement>(null);
   
   const handlePrint = useReactToPrint({
@@ -35,6 +36,7 @@ export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest
   if (!order) return null;
 
   const client = contacts.find(c => c.id === order.clientId);
+  const bankAccount = bankAccounts.find(b => b.id === order.bankAccountId);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -52,13 +54,27 @@ export function SalesOrderPreview({ order, isOpen, onOpenChange, onExportRequest
         <DialogFooter className="p-4 bg-white border-t sm:justify-end no-print">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>Cerrar</Button>
             {client && (
-                 <PDFDownloadButton 
-                    order={order}
-                    clientName={client.name}
-                    clientRut={client.rut}
-                    type="VENTA"
+                 <PDFDownloadLink
+                    document={
+                        <OrderDocument 
+                            order={order}
+                            clientName={client.name}
+                            clientRut={client.rut}
+                            clientAddress={client.address}
+                            clientContact={client.contactPerson}
+                            bankAccount={bankAccount}
+                            type="VENTA"
+                        />
+                    }
                     fileName={`OV_${order.number || order.id}.pdf`}
-                />
+                 >
+                 {({ loading }) => (
+                    <Button variant="outline" disabled={loading} className="gap-2">
+                        <Download className="h-4 w-4" />
+                        {loading ? 'Generando...' : 'Descargar PDF'}
+                    </Button>
+                 )}
+                 </PDFDownloadLink>
             )}
             {onExportRequest && (
                 <Button onClick={onExportRequest} variant="outline" className="gap-2">

@@ -5,8 +5,8 @@ import { SalesOrder, Contact, BankAccount } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMasterData } from '@/hooks/use-master-data';
-import { PDFDownloadButton } from '@/components/pdf/pdf-download-button'; 
-import { Download } from 'lucide-react';
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { OrderDocument } from "@/components/pdf/order-document";
 
 interface PreviewContentProps {
     order: SalesOrder;
@@ -43,16 +43,33 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
             {/* BARRA SUPERIOR */}
             <div className="flex justify-between items-center p-4 bg-white border-b shadow-sm">
                 <h2 className="text-lg font-bold text-gray-800">Vista Previa</h2>
-                <PDFDownloadButton 
-                    order={order} 
-                    clientName={client?.name || 'Cliente'} 
-                    clientRut={client?.rut || ''}
-                    clientAddress={client?.address || ''}      
-                    clientContact={client?.contactPerson || ''}
-                    bankAccount={bankAccount}
-                    type="VENTA" 
-                    fileName={fileName} 
-                />
+                <PDFDownloadLink
+                  document={
+                    <OrderDocument
+                      order={order}
+                      clientName={client?.name || "Cliente"}
+                      clientRut={client?.rut || ""}
+                      clientAddress={client?.address || ""}
+                      clientContact={client?.contactPerson || ""}
+                      bankAccount={bankAccount}
+                      type="VENTA"
+                    />
+                  }
+                  fileName={fileName}
+                >
+                  {({ loading }) => (
+                     <button
+                      className={`px-4 py-2 text-sm font-medium rounded-md flex items-center gap-2 ${
+                        loading
+                          ? 'bg-gray-400 text-white cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                      disabled={loading}
+                    >
+                      {loading ? 'Generando...' : 'Descargar PDF'}
+                    </button>
+                  )}
+                </PDFDownloadLink>
             </div>
 
             {/* DOCUMENTO */}
@@ -100,7 +117,7 @@ export const SalesOrderPreviewContent = React.forwardRef<HTMLDivElement, Preview
                         {/* Condiciones */}
                         <div className="border rounded-sm p-3 space-y-1 bg-gray-50/50">
                             <h4 className="font-bold text-gray-600 uppercase border-b border-gray-200 pb-1 mb-2 text-[10px] tracking-wide">Condiciones Comerciales</h4>
-                            <p><span className="font-semibold text-gray-600">Operación:</span> {order.saleType || 'Venta en Firme'}</p>
+                            <p><span className="font-semibold text-gray-600">Op:</span> {order.saleType || 'Venta Firme'}</p>
                             <p><span className="font-semibold text-gray-600">Pago:</span> {(order as any).paymentMethod} {(order as any).creditDays ? `(${(order as any).creditDays} días)`: ''}</p>
                             <p><span className="font-semibold text-gray-600">Vencimiento:</span> {formatDate((order as any).paymentDueDate)}</p>
                             <div className="mt-2 pt-2 border-t border-gray-200">

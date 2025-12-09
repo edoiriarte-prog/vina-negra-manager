@@ -13,8 +13,9 @@ import { PurchaseOrder, Contact } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Separator } from "@/components/ui/separator";
-import { Printer, MapPin, Calendar, CreditCard, Building2, Package, FileText } from "lucide-react";
-import { PDFDownloadButton } from "@/components/pdf/pdf-download-button";
+import { Printer, MapPin, Calendar, CreditCard, Building2, Package, FileText, Download } from "lucide-react";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { OrderDocument } from "@/components/pdf/order-document";
 import { useMasterData } from "@/hooks/use-master-data";
 import { Badge } from "@/components/ui/badge";
 
@@ -192,13 +193,24 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
           <div className="flex gap-2">
              <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-slate-400 hover:text-white">Cerrar</Button>
              
-             <PDFDownloadButton 
-                order={order}
-                clientName={supplierData?.name || 'Proveedor'}
-                clientRut={supplierData?.rut}
-                type="COMPRA"
+             <PDFDownloadLink
+                document={
+                <OrderDocument
+                    order={order}
+                    clientName={supplierData?.name || 'Proveedor'}
+                    clientRut={supplierData?.rut}
+                    type="COMPRA"
+                />
+                }
                 fileName={`OC_${order.number || order.id}.pdf`}
-            />
+            >
+                {({ loading }) => (
+                <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800" disabled={loading}>
+                    <Download className="h-4 w-4 mr-2" />
+                    {loading ? 'Generando...' : 'Descargar PDF'}
+                </Button>
+                )}
+            </PDFDownloadLink>
 
             <Button onClick={() => window.print()} variant="outline" className="gap-2 border-slate-700 text-slate-300 hover:bg-slate-800">
               <Printer className="h-4 w-4" /> Imprimir
