@@ -191,7 +191,13 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
   ];
   
   const costCenters = [
-      { name: 'Administración' }, { name: 'Campo' }, { name: 'Packing' }, { name: 'Comercial' }, { name: 'Logística' }
+      { name: 'Administración' },
+      { name: 'Campo' },
+      { name: 'Packing' },
+      { name: 'Comercial' },
+      { name: 'Logística' },
+      { name: 'Gestión Empresarial' },
+      { name: 'Gestión Comercial' },
   ];
 
   const value: MasterDataContextType = {
