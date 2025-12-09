@@ -29,7 +29,7 @@ import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder } from '@/li
 import { cn } from '@/lib/utils';
 import { 
     CalendarIcon, Trash2, ArrowDownLeft, ArrowUpRight, GitCompareArrows, 
-    FileText, Plus, RefreshCw, UserPlus, Calculator, Wallet, Percent, AlertTriangle
+    FileText, Plus, RefreshCw, UserPlus, Calculator, Wallet, Percent, AlertTriangle, Eye
 } from 'lucide-react';
 
 // --- Esquema de Validación con Zod ---
@@ -87,9 +87,10 @@ type NewFinancialMovementSheetProps = {
   contacts: any[]; // Consider using a more specific type if possible
 };
 
-export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements, purchaseOrders, salesOrders }: NewFinancialMovementSheetProps) {
+export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, movement, allMovements, purchaseOrders, salesOrders, serviceOrders, contacts }: NewFinancialMovementSheetProps) {
   const { toast } = useToast();
-  const { bankAccounts, contacts, products, costCenters } = useMasterData();
+  const { bankAccounts, products } = useMasterData();
+  const { costCenters } = useMasterData();
   
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -226,6 +227,21 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       if (fields.length > 1) {
           form.setValue('items', [{ concept: concept, amount: amountToPay }]);
       }
+  };
+
+  const handleViewDocument = () => {
+    if (!pendingDocId) return;
+
+    const isSale = salesOrders.some(order => order.id === pendingDocId);
+    if (isSale) {
+        window.open('/sales', '_blank');
+        return;
+    }
+
+    const isPurchase = purchaseOrders.some(order => order.id === pendingDocId);
+    if (isPurchase) {
+        window.open('/purchases', '_blank');
+    }
   };
 
   const onSubmit = (data: FormData) => {
@@ -417,7 +433,12 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
                                               <FileText className="h-5 w-5 text-blue-400" />
                                           </div>
                                           <div className="flex-1 space-y-1">
-                                              <h4 className="text-sm font-semibold text-slate-200">Resumen del Documento</h4>
+                                              <h4 className="text-sm font-semibold text-slate-200 flex justify-between items-center">
+                                                  <span>Resumen del Documento</span>
+                                                  <Button type="button" variant="ghost" size="sm" onClick={handleViewDocument} className="h-7 text-xs text-blue-400 hover:bg-blue-900/30">
+                                                    <Eye className="h-3 w-3 mr-1.5"/> Ver
+                                                  </Button>
+                                              </h4>
                                               <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs">
                                                   <div className="flex justify-between">
                                                       <span className="text-slate-500">Monto Neto:</span>
@@ -648,11 +669,12 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         isOpen={isQuickContactOpen}
         onOpenChange={setIsQuickContactOpen}
         type={movementType === 'income' ? 'client' : 'supplier'}
-        onSuccess={(newId) => {
-            form.setValue('contactId', newId.id);
+        onSuccess={(newContact) => {
+            form.setValue('contactId', newContact.id);
         }}
     />
     </>
   );
 }
 
+    
