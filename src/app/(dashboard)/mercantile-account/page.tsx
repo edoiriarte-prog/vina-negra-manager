@@ -22,7 +22,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from '@/components/ui/button';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { PDFDownloadButton } from '@/components/pdf/pdf-download-button';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { StatementDocument } from '@/components/pdf/StatementDocument';
 
 
 // --- FORMATO MONEDA ---
@@ -348,17 +349,22 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                             </div>
                         </div>
                         <div className="flex gap-2">
-                             {account.contact && (
-                                <PDFDownloadButton
-                                    order={{...account.contact, items: detailedMovements, totalAmount: account.balance}}
-                                    clientName={account.contact.name}
-                                    clientRut={account.contact.rut}
-                                    clientAddress={account.contact.address}
-                                    clientContact={account.contact.contactPerson}
-                                    type="VENTA" // O un tipo "REPORTE" si lo tienes
-                                    fileName={`Cartola_${account.contact.name}.pdf`}
+                             <PDFDownloadLink
+                                document={
+                                <StatementDocument
+                                    account={account}
+                                    movements={detailedMovements}
                                 />
-                             )}
+                                }
+                                fileName={`Estado_Cuenta_${account.contact.name}.pdf`}
+                            >
+                                {({ loading }) => (
+                                <Button variant="outline" className="border-slate-700" disabled={loading}>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    {loading ? 'Generando...' : 'PDF'}
+                                </Button>
+                                )}
+                            </PDFDownloadLink>
                             <Button variant="outline" className="border-slate-700"><Printer className="h-4 w-4 mr-2"/> Imprimir</Button>
                         </div>
                     </div>
