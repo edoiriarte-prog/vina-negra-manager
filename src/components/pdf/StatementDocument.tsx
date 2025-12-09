@@ -8,13 +8,21 @@ import { es } from 'date-fns/locale';
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 9, fontFamily: 'Helvetica', color: '#111827' },
   
-  headerContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 25 },
-  companyInfo: { flexDirection: 'column' },
-  companyName: { fontSize: 16, fontWeight: 'bold' },
+  headerContainer: { 
+      flexDirection: 'row', 
+      justifyContent: 'space-between', 
+      alignItems: 'flex-start', 
+      marginBottom: 25,
+      borderBottom: '2px solid #111827',
+      paddingBottom: 10
+  },
+  companyWrapper: { flexDirection: 'column' },
+  logo: { width: 60, height: 40, objectFit: 'contain', marginBottom: 5 },
+  companyName: { fontSize: 16, fontWeight: 'bold', textTransform: 'uppercase' },
   companyDetails: { fontSize: 8, color: '#4B5563' },
   
   docInfo: { alignItems: 'flex-end' },
-  docTitle: { fontSize: 18, fontWeight: 'bold', color: '#1F2937', marginBottom: 5 },
+  docTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827', marginBottom: 5, textTransform: 'uppercase' },
   docSubtitle: { fontSize: 9, color: '#4B5563' },
 
   clientBox: { border: '1px solid #E5E7EB', borderRadius: 3, padding: 10, marginBottom: 20, backgroundColor: '#F9FAFB' },
@@ -115,20 +123,23 @@ const formatDate = (dateString?: string) => {
 export const StatementDocument = ({ account, movements }: { account: any, movements: any[] }) => {
     
     const { contact } = account;
+    const logoUrl = '/logo.jpg'; 
 
     return (
         <Document>
             <Page size="A4" style={styles.page}>
             
                 <View style={styles.headerContainer}>
-                    <View style={styles.companyInfo}>
-                        <Text style={styles.companyName}>Viña Negra SpA</Text>
-                        <Text style={styles.companyDetails}>RUT: 78.261.683-8</Text>
-                        <Text style={styles.companyDetails}>Tulahuén S/N, Monte Patria</Text>
-                        <Text style={styles.companyDetails}>ventas@agrocomercialavn.com</Text>
+                    <View style={styles.companyWrapper}>
+                        <Image src={logoUrl} style={styles.logo} />
+                        <View>
+                            <Text style={styles.companyName}>Viña Negra SpA</Text>
+                            <Text style={styles.companyDetails}>RUT: 78.261.683-8</Text>
+                            <Text style={styles.companyDetails}>ventas@agrocomercialavn.com</Text>
+                        </View>
                     </View>
                     <View style={styles.docInfo}>
-                        <Text style={styles.docTitle}>ESTADO DE CUENTA CORRIENTE</Text>
+                        <Text style={styles.docTitle}>ESTADO DE CUENTA</Text>
                         <Text style={styles.docSubtitle}>Al {format(new Date(), "dd 'de' MMMM, yyyy", {locale: es})}</Text>
                     </View>
                 </View>
@@ -150,15 +161,13 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                     </View>
 
                     {movements.map((mov, i) => {
-                        const conceptText = typeof mov.details === 'string' 
-                            ? mov.details
-                            : mov.details.map((item: any) => `${item.quantity}kg ${item.product} ${item.caliber}`).join(', ');
+                        const conceptText = mov.details.map((item: any) => `${item.quantity}kg ${item.product} ${item.caliber}`).join(', ');
 
                         return (
                             <View key={i} style={[styles.tableRow, i % 2 !== 0 && styles.tableRowAlt]}>
                                 <Text style={[styles.tableCell, styles.colDate]}>{formatDate(mov.date)}</Text>
                                 <Text style={[styles.tableCell, styles.colRef, {fontSize: 7, fontFamily: 'Helvetica-Oblique'}]}>{mov.reference}</Text>
-                                <Text style={[styles.tableCell, styles.colConcept]}>{conceptText}</Text>
+                                <Text style={[styles.tableCell, styles.colConcept]}>{typeof mov.details === 'string' ? mov.details : conceptText}</Text>
                                 <Text style={[styles.tableCell, styles.colCharge]}>{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</Text>
                                 <Text style={[styles.tableCell, styles.colPayment]}>{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</Text>
                                 <Text style={[styles.tableCell, styles.colBalance]}>{formatCurrency(mov.balance)}</Text>
