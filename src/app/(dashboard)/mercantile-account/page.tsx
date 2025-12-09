@@ -259,8 +259,8 @@ function AccountCard({ account, type, onClick }: { account: AccountSummary, type
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center mb-4">
-                    <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Facturado</p><p className="font-bold text-slate-200 text-sm">{formatCurrency(account.totalBilled)}</p></div>
-                    <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Pagado</p><p className="font-bold text-emerald-400 text-sm">{formatCurrency(account.totalPaid)}</p></div>
+                    <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Total Facturado</p><p className="font-bold text-slate-200 text-sm">{formatCurrency(account.totalBilled)}</p></div>
+                    <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Total Pagado</p><p className="font-bold text-emerald-400 text-sm">{formatCurrency(account.totalPaid)}</p></div>
                     <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Saldo</p><p className={`font-bold ${balanceColor} text-sm`}>{formatCurrency(account.balance)}</p></div>
                 </div>
                 
@@ -316,12 +316,19 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
 
         // Abonos (Pagos)
         relevantPayments.forEach(f => {
+            let description = f.description || "Abono general";
+            if (f.relatedDocument) {
+              const docType = f.relatedDocument.type;
+              const docId = f.relatedDocument.id;
+              const order = [...salesOrders, ...purchaseOrders].find(o => o.id === docId);
+              description = `Pago ${docType} ${order?.number || docId}`;
+            }
             movements.push({
                 date: f.date,
                 type: 'Abono',
                 documentType: 'Pago',
                 reference: f.voucherNumber || f.id,
-                details: f.description,
+                details: description,
                 charge: 0,
                 payment: f.amount || 0
             });
@@ -356,7 +363,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                     movements={detailedMovements}
                                 />
                                 }
-                                fileName={`Estado_Cuenta_${account.contact.name}.pdf`}
+                                fileName={`Estado_Cuenta_${account.contact.name.replace(/ /g, '_')}.pdf`}
                             >
                                 {({ loading }) => (
                                 <Button variant="outline" className="border-slate-700" disabled={loading}>
@@ -379,7 +386,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                     <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><FileText className="h-4 w-4" /> Cartola Histórica de Movimientos</h4>
                     <ScrollArea className="h-[calc(100vh-300px)]">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargo</TableHead><TableHead className="text-right">Abono</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
+                            <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargos (-)</TableHead><TableHead className="text-right">Abonos (+)</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {detailedMovements.length === 0 ? (
                                     <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">No hay movimientos para este contacto.</TableCell></TableRow>

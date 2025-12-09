@@ -98,6 +98,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
+  signatureSubtext: {
+    fontSize: 7,
+    color: '#374151',
+    marginTop: 1,
+  },
 });
 
 // Helpers
@@ -181,6 +186,7 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                      <View style={styles.signatureBox}>
                         <View style={styles.signatureLine} />
                         <Text style={styles.signatureText}>Gerencia de Ventas</Text>
+                        <Text style={styles.signatureSubtext}>JOSE ROJAS CARMONA</Text>
                     </View>
                      <View style={styles.signatureBox}>
                         <View style={styles.signatureLine} />
