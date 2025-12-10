@@ -35,7 +35,17 @@ export function AccountStatementDialog({ isOpen, onOpenChange, account, movement
 
     const relatedMovements = movements.filter(
       m => m.sourceAccountId === account.id || m.destinationAccountId === account.id
-    ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    ).sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        if (dateA !== dateB) {
+            return dateA - dateB;
+        }
+        // Si las fechas son iguales, ordenar por voucher
+        const voucherA = a.voucherNumber || '';
+        const voucherB = b.voucherNumber || '';
+        return voucherA.localeCompare(voucherB);
+    });
 
     let runningBalance = account.initialBalance || 0;
 
