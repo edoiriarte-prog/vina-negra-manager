@@ -41,10 +41,10 @@ export function AccountStatementDialog({ isOpen, onOpenChange, account, movement
         if (dateA !== dateB) {
             return dateA - dateB;
         }
-        // Si las fechas son iguales, ordenar por voucher
-        const voucherA = a.voucherNumber || '';
-        const voucherB = b.voucherNumber || '';
-        return voucherA.localeCompare(voucherB);
+        // Ordenamiento seguro por voucher
+        const voucherA = String(a.voucherNumber || '');
+        const voucherB = String(b.voucherNumber || '');
+        return voucherA.localeCompare(voucherB, undefined, { numeric: true });
     });
 
     let runningBalance = account.initialBalance || 0;
