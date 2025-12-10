@@ -14,7 +14,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { BankAccount, FinancialMovement } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Banknote, ArrowDown, ArrowUp } from 'lucide-react';
+import { Banknote, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { BankAccountStatementDocument } from '@/components/pdf/BankAccountStatementDocument';
 
 interface AccountStatementDialogProps {
   isOpen: boolean;
@@ -71,7 +74,7 @@ export function AccountStatementDialog({ isOpen, onOpenChange, account, movement
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[85vh] flex flex-col p-0 bg-slate-950 border-slate-800 text-slate-100">
-        <DialogHeader className="p-6 pb-4 border-b border-slate-800 bg-slate-900">
+        <DialogHeader className="p-6 pb-4 border-b border-slate-800 bg-slate-900 flex flex-row justify-between items-center">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-blue-600/10 border border-blue-500/20">
                 <Banknote className="h-6 w-6 text-blue-400" />
@@ -83,6 +86,17 @@ export function AccountStatementDialog({ isOpen, onOpenChange, account, movement
                 </DialogDescription>
             </div>
           </div>
+          <PDFDownloadLink
+            document={<BankAccountStatementDocument account={account} movements={statementLines} />}
+            fileName={`Cartola_${account.name.replace(/ /g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`}
+          >
+            {({ loading }) => (
+              <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800" disabled={loading}>
+                <Download className="mr-2 h-4 w-4" />
+                {loading ? 'Generando...' : 'Descargar PDF'}
+              </Button>
+            )}
+          </PDFDownloadLink>
         </DialogHeader>
         
         <div className="flex-1 overflow-hidden px-6 py-4">
