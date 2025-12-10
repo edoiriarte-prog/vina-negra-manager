@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -50,16 +51,16 @@ export default function FinancialsPage() {
     return { totalBalance: globalTotal, totalIncome: income, totalExpense: expense };
   }, [bankAccounts, financialMovements]);
 
-  const handleSaveMovement = async (movementData: any) => {
-    if (Array.isArray(movementData)) {
-        await createFinancialMovement(movementData);
+  const handleSaveMovement = async (movementData: FinancialMovement | Omit<FinancialMovement, 'id'>) => {
+    // Si el objeto tiene un 'id', es una actualización.
+    if ('id' in movementData && movementData.id) {
+        await updateFinancialMovement(movementData.id, movementData);
     } else {
-        if ('id' in movementData && movementData.id) {
-            await updateFinancialMovement(movementData.id, movementData);
-        } else {
-            await createFinancialMovement(movementData);
-        }
+        // Si no, es una creación.
+        await createFinancialMovement(movementData);
     }
+    
+    // Cerramos y reseteamos el estado del formulario.
     setIsSheetOpen(false);
     setEditingMovement(null);
   };
