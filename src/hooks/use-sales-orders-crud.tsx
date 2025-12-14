@@ -33,18 +33,19 @@ export function useSalesOrdersCRUD() {
   const updateSalesOrder = async (id: string, data: Partial<SalesOrder>) => {
     if (!db) {
         console.error("Intento de actualizar sin conexión a DB");
+        toast({ variant: "destructive", title: "Error", description: "Sin conexión a base de datos." });
         return;
     }
     try {
       const docRef = doc(db, "salesOrders", id);
       await updateDoc(docRef, data);
       
+      // Ya no necesitamos router.refresh() porque onSnapshot se encargará.
+      // Solo mostramos la confirmación.
       toast({ 
-          title: "Estado Actualizado", 
-          description: "Los cambios se guardaron correctamente." 
+          title: "Orden Actualizada", 
+          description: "Los cambios se han guardado correctamente en la base de datos." 
       });
-      
-      router.refresh();
       
     } catch (error) {
       console.error("Error actualizando:", error);

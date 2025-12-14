@@ -15,66 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
 
-// --- 1. COMPONENTE DE ESTADO INTERACTIVO (CORREGIDO) ---
-const StatusCell = ({ row }: { row: any }) => {
-  const order = row.original as SalesOrder;
-  const { updateSalesOrder } = useSalesOrdersCRUD();
-
-  const currentStatus = order.status || 'pending';
-
-  const statusConfig: Record<string, { label: string, color: string, icon: any }> = {
-    'pending': { label: 'Pendiente', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20', icon: FileText },
-    'dispatched': { label: 'Despachada', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20', icon: Truck },
-    'invoiced': { label: 'Facturada', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20', icon: Check },
-    'cancelled': { label: 'Cancelada', color: 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20', icon: Ban },
-  };
-
-  const activeConfig = statusConfig[currentStatus] || statusConfig['pending'];
-
-  const handleStatusChange = async (newStatus: string) => {
-    console.log("Intentando cambiar estado a:", newStatus, "ID:", order.id);
-    await updateSalesOrder(order.id, { status: newStatus as any });
-  };
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Badge variant="outline" className={`${activeConfig.color} px-3 py-1 cursor-pointer transition-all flex items-center w-fit gap-1 pr-2`}>
-           {activeConfig.label} 
-           <ChevronDown className="h-3 w-3 opacity-50" />
-        </Badge>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="bg-slate-900 border-slate-800 text-slate-200">
-        <DropdownMenuLabel className="text-xs text-slate-500 uppercase">Cambiar Estado</DropdownMenuLabel>
-        
-        <DropdownMenuItem onClick={() => handleStatusChange('pending')} className="hover:bg-slate-800 cursor-pointer gap-2">
-            <FileText className="h-3 w-3 text-yellow-500"/> Pendiente
-            {currentStatus === 'pending' && <Check className="ml-auto h-3 w-3" />}
-        </DropdownMenuItem>
-        
-        <DropdownMenuItem onClick={() => handleStatusChange('dispatched')} className="hover:bg-slate-800 cursor-pointer gap-2">
-            <Truck className="h-3 w-3 text-blue-500"/> Despachada
-            {currentStatus === 'dispatched' && <Check className="ml-auto h-3 w-3" />}
-        </DropdownMenuItem>
-        
-        <DropdownMenuItem onClick={() => handleStatusChange('invoiced')} className="hover:bg-slate-800 cursor-pointer gap-2">
-            <Check className="h-3 w-3 text-emerald-500"/> Facturada
-            {currentStatus === 'invoiced' && <Check className="ml-auto h-3 w-3" />}
-        </DropdownMenuItem>
-        
-        <DropdownMenuSeparator className="bg-slate-800" />
-        
-        <DropdownMenuItem onClick={() => handleStatusChange('cancelled')} className="hover:bg-slate-800 cursor-pointer gap-2 text-red-400">
-            <Ban className="h-3 w-3"/> Cancelar
-            {currentStatus === 'cancelled' && <Check className="ml-auto h-3 w-3" />}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-};
-
-
-// --- 2. COMPONENTE DE ACCIONES (EL RESTO DE BOTONES) ---
+// --- 1. COMPONENTE DE ACCIONES (EL RESTO DE BOTONES) ---
 const ActionsCell = ({ row, onEdit, onDelete, onPreview }: { row: any, onEdit: any, onDelete: any, onPreview: any }) => {
   const order = row.original;
 
@@ -139,7 +80,56 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
   {
     accessorKey: "status",
     header: "Estado",
-    cell: ({ row }) => <StatusCell row={row} />,
+    cell: ({ row }) => {
+        const order = row.original as SalesOrder;
+        const { updateSalesOrder } = useSalesOrdersCRUD();
+        const currentStatus = order.status || 'pending';
+
+        const statusConfig: Record<string, { label: string, color: string, icon: any }> = {
+            'pending': { label: 'Pendiente', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20', icon: FileText },
+            'dispatched': { label: 'Despachada', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20', icon: Truck },
+            'invoiced': { label: 'Facturada', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20', icon: Check },
+            'cancelled': { label: 'Cancelada', color: 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20', icon: Ban },
+        };
+
+        const activeConfig = statusConfig[currentStatus] || statusConfig['pending'];
+
+        return (
+            <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Badge variant="outline" className={`${activeConfig.color} px-3 py-1 cursor-pointer transition-all flex items-center w-fit gap-1 pr-2`}>
+                {activeConfig.label} 
+                <ChevronDown className="h-3 w-3 opacity-50" />
+                </Badge>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="bg-slate-900 border-slate-800 text-slate-200">
+                <DropdownMenuLabel className="text-xs text-slate-500 uppercase">Cambiar Estado</DropdownMenuLabel>
+                
+                <DropdownMenuItem onClick={() => updateSalesOrder(order.id, { status: 'pending' })} className="hover:bg-slate-800 cursor-pointer gap-2">
+                    <FileText className="h-3 w-3 text-yellow-500"/> Pendiente
+                    {currentStatus === 'pending' && <Check className="ml-auto h-3 w-3" />}
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem onClick={() => updateSalesOrder(order.id, { status: 'dispatched' })} className="hover:bg-slate-800 cursor-pointer gap-2">
+                    <Truck className="h-3 w-3 text-blue-500"/> Despachada
+                    {currentStatus === 'dispatched' && <Check className="ml-auto h-3 w-3" />}
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem onClick={() => updateSalesOrder(order.id, { status: 'invoiced' })} className="hover:bg-slate-800 cursor-pointer gap-2">
+                    <Check className="h-3 w-3 text-emerald-500"/> Facturada
+                    {currentStatus === 'invoiced' && <Check className="ml-auto h-3 w-3" />}
+                </DropdownMenuItem>
+                
+                <DropdownMenuSeparator className="bg-slate-800" />
+                
+                <DropdownMenuItem onClick={() => updateSalesOrder(order.id, { status: 'cancelled' })} className="hover:bg-slate-800 cursor-pointer gap-2 text-red-400">
+                    <Ban className="h-3 w-3"/> Cancelar
+                    {currentStatus === 'cancelled' && <Check className="ml-auto h-3 w-3" />}
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+            </DropdownMenu>
+        );
+    },
   },
   {
     accessorKey: "totalAmount",
