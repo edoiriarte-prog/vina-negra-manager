@@ -13,16 +13,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud"; // Tu hook reparado
+import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
 
-// --- 1. COMPONENTE DE ESTADO INTERACTIVO (NUEVO) ---
+// --- 1. COMPONENTE DE ESTADO INTERACTIVO (CORREGIDO) ---
 const StatusCell = ({ row }: { row: any }) => {
-  const order = row.original;
+  const order = row.original as SalesOrder;
   const { updateSalesOrder } = useSalesOrdersCRUD();
 
   const currentStatus = order.status || 'pending';
 
-  // Configuración visual de los estados
   const statusConfig: Record<string, { label: string, color: string, icon: any }> = {
     'pending': { label: 'Pendiente', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20', icon: FileText },
     'dispatched': { label: 'Despachada', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20', icon: Truck },
@@ -33,7 +32,7 @@ const StatusCell = ({ row }: { row: any }) => {
   const activeConfig = statusConfig[currentStatus] || statusConfig['pending'];
 
   const handleStatusChange = async (newStatus: string) => {
-    console.log("Intentando cambiar estado a:", newStatus, "ID:", order.id); // Debug
+    console.log("Intentando cambiar estado a:", newStatus, "ID:", order.id);
     await updateSalesOrder(order.id, { status: newStatus as any });
   };
 
@@ -73,6 +72,7 @@ const StatusCell = ({ row }: { row: any }) => {
     </DropdownMenu>
   );
 };
+
 
 // --- 2. COMPONENTE DE ACCIONES (EL RESTO DE BOTONES) ---
 const ActionsCell = ({ row, onEdit, onDelete, onPreview }: { row: any, onEdit: any, onDelete: any, onPreview: any }) => {
@@ -139,7 +139,6 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
   {
     accessorKey: "status",
     header: "Estado",
-    // AQUÍ USAMOS EL NUEVO COMPONENTE INTERACTIVO
     cell: ({ row }) => <StatusCell row={row} />,
   },
   {
