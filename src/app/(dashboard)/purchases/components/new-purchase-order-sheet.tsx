@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { QuickContactDialog } from '@/components/contacts/quick-contact-dialog';
+import QuickContactDialog from '@/components/contacts/quick-contact-dialog';
 
 type NewPurchaseOrderSheetProps = {
   isOpen: boolean;
@@ -119,8 +119,8 @@ export function NewPurchaseOrderSheet({
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleQuickContactSuccess = (newContact: {id: string; name: string}) => {
-    setFormData(prev => ({ ...prev, supplierId: newContact.id }));
+  const handleQuickContactSuccess = (newContactId: string) => {
+    setFormData(prev => ({ ...prev, supplierId: newContactId }));
   };
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
