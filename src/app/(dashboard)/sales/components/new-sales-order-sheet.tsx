@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMasterData } from "@/hooks/use-master-data";
 import { ItemMatrixDialog } from "./item-matrix-dialog";
 import { format, addDays, parseISO } from 'date-fns';
-import { QuickContactDialog } from "@/components/contacts/quick-contact-dialog";
+import QuickContactDialog from "@/components/contacts/quick-contact-dialog";
 
 interface NewSalesOrderSheetProps {
   isOpen: boolean;
@@ -168,10 +168,10 @@ export function NewSalesOrderSheet({
     setItems(prev => prev.filter((_, i) => i !== index));
   };
   
-  const handleQuickContactSuccess = (newContact: {id: string; name: string}) => {
+  const handleQuickContactSuccess = (newId: string) => {
     // La lista de clientes se actualizará globalmente gracias a onSnapshot,
     // solo necesitamos seleccionar el nuevo valor.
-    setFormData(prev => ({ ...prev, clientId: newContact.id }));
+    setFormData(prev => ({ ...prev, clientId: newId }));
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -557,3 +557,5 @@ export function NewSalesOrderSheet({
     </>
   );
 }
+
+    
