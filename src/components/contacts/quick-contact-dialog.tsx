@@ -14,26 +14,22 @@ import { collection, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
-// Esquema de validación
 const formSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
   rut: z.string().optional(),
 });
 type FormData = z.infer<typeof formSchema>;
 
-// Props
 interface QuickContactDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  // Simplificamos el tipo para evitar dependencias circulares si ContactType no está a mano
-  type: 'client' | 'supplier'; 
-  // CAMBIO: Definimos explícitamente que devuelve el ID (string) para que el formulario padre no falle
+  type: 'client' | 'supplier';
+  // DEFINIMOS QUE RETORNA UN STRING (ID) PARA EVITAR ERRORES DE TIPO "ANY"
   onSuccess: (newId: string) => void;
 }
 
-// CAMBIO: 'export default' para evitar errores de importación (Element type invalid)
+// CAMBIO CRÍTICO: 'export default' soluciona el error "Module has no default export"
 export default function QuickContactDialog({ isOpen, onOpenChange, type, onSuccess }: QuickContactDialogProps) {
-  // CAMBIO: Usamos 'db' o 'firestore: db' para asegurar consistencia con el resto de la app
   const { firestore: db } = useFirebase();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -57,7 +53,6 @@ export default function QuickContactDialog({ isOpen, onOpenChange, type, onSucce
     
     setIsSaving(true);
     try {
-      // Guardar en mayúsculas por convención
       const docRef = await addDoc(collection(db, "contacts"), {
         ...data,
         name: data.name.toUpperCase(),
@@ -66,13 +61,13 @@ export default function QuickContactDialog({ isOpen, onOpenChange, type, onSucce
         phone: '',
         address: '',
         status: 'active',
-        type: [type], // Guardar el tipo como un array para filtros
+        type: [type], 
         createdAt: new Date().toISOString(),
       });
       
       toast({ title: "Contacto Creado", description: `${data.name} ha sido agregado.` });
       
-      // CAMBIO: Devolvemos solo el ID para que el Select del padre funcione directo
+      // RETORNAMOS SOLO EL ID
       onSuccess(docRef.id);
       
       onOpenChange(false);

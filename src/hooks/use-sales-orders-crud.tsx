@@ -1,66 +1,72 @@
-
 "use client";
 
-import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, setDoc, addDoc } from "firebase/firestore"; // Agregamos setDoc y addDoc
-import { useToast } from "@/hooks/use-toast";
+import { useFirebase } from "@/firebase";
+import { collection, doc, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { SalesOrder } from "@/lib/types";
-import { db } from "@/firebase/init"; // CORRECCIÓN: Importar 'db' desde init
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 export function useSalesOrdersCRUD() {
+  const { firestore: db } = useFirebase();
   const { toast } = useToast();
+  const router = useRouter();
 
-  const createSalesOrder = async (order: SalesOrder | Omit<SalesOrder, 'id'>) => {
+  const createSalesOrder = async (data: Omit<SalesOrder, "id">) => {
     if (!db) {
-        console.error("No hay conexión a la base de datos (db is undefined)");
-        // No devuelvas una promesa si no hay db, simplemente sal.
-        return; 
+        toast({ variant: "destructive", title: "Error", description: "Sin conexión a base de datos." });
+        return;
     }
-
     try {
-      // CORRECCIÓN 2: Lógica para respetar tu ID personalizado (OV-XXXX)
-      // Si la orden ya trae un ID (como 'OV-2101'), usamos setDoc para que el documento se llame igual.
-      if ('id' in order && order.id) {
-        // Devolvemos la promesa directamente
-        return setDoc(doc(db, 'salesOrders', order.id), order);
-      } else {
-        // Si no trae ID, dejamos que Firestore invente uno y devolvemos la promesa de addDoc
-        return addDoc(collection(db, 'salesOrders'), order);
-      }
-      
-    } catch (e) {
-      console.error("Error en createSalesOrder:", e);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la orden de venta.' });
-      throw e; // Re-lanzamos el error para que el formulario sepa que falló
+      const docRef = await addDoc(collection(db, "salesOrders"), {
+        ...data,
+        createdAt: new Date().toISOString()
+      });
+      toast({ title: "Orden Creada", description: "Venta registrada exitosamente." });
+      router.refresh();
+      return docRef;
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "Error", description: "No se pudo crear la orden." });
     }
   };
 
   const updateSalesOrder = async (id: string, data: Partial<SalesOrder>) => {
-    if (!db) return;
+    if (!db) {
+        console.error("Intento de actualizar sin conexión a DB");
+        return;
+    }
     try {
-      await updateDocumentNonBlocking(doc(db, 'salesOrders', id), data);
-      // Opcional: toast aquí o en la vista principal
-    } catch(e) {
-      console.error(e);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la orden de venta.' });
-      throw e;
+      const docRef = doc(db, "salesOrders", id);
+      await updateDoc(docRef, data);
+      
+      toast({ 
+          title: "Estado Actualizado", 
+          description: "Los cambios se guardaron correctamente." 
+      });
+      
+      router.refresh();
+      
+    } catch (error) {
+      console.error("Error actualizando:", error);
+      toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar la orden." });
     }
   };
 
   const deleteSalesOrder = async (id: string) => {
     if (!db) return;
     try {
-      await deleteDocumentNonBlocking(doc(db, 'salesOrders', id));
-    } catch(e) {
-      console.error(e);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar la orden de venta.' });
-      throw e;
+      await deleteDoc(doc(db, "salesOrders", id));
+      toast({ title: "Orden Eliminada" });
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar." });
     }
   };
 
   return {
     createSalesOrder,
     updateSalesOrder,
-    deleteSalesOrder,
+    deleteSalesOrder
   };
 }

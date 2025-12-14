@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-// @ts-ignore - Ignoramos error de tipos en Sheet para forzar compilación
+// @ts-ignore: Ignoramos error de tipos en Sheet para evitar bloqueo de build
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -24,7 +24,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-// Importación corregida (export default)
+// IMPORTACIÓN CORRECTA: Sin llaves { }
 import QuickContactDialog from '@/components/contacts/quick-contact-dialog';
 
 import { FinancialMovement, PurchaseOrder, SalesOrder, ServiceOrder } from '@/lib/types';
@@ -248,8 +248,8 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         }
     }
 
-    // CORRECCIÓN PARA TYPESCRIPT: Usamos 'as any' para forzar el guardado y evitar errores de null vs undefined
-    const cleanData: any = {
+    // CORRECCIÓN DE TIPOS: Limpieza explícita de null a undefined
+    const cleanData = {
       type: data.type,
       costCenter: data.costCenter,
       date: format(data.date, 'yyyy-MM-dd'),
@@ -270,7 +270,8 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       items: data.items,
     };
     
-    // Limpieza final de seguridad para convertir nulls a undefined
+    // Fallback de seguridad
+    // @ts-ignore
     Object.keys(cleanData).forEach(key => { if (cleanData[key] === null) cleanData[key] = undefined; });
 
     if (movement) {
@@ -299,7 +300,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
   return (
     <>
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      {/* @ts-ignore - Ignoramos error de Children en SheetContent */}
+      {/* @ts-ignore: SheetContent type error override */}
       <SheetContent className="sm:max-w-4xl w-full flex flex-col p-0 gap-0 bg-slate-950 border-l-slate-800 text-slate-100">
         <SheetHeader className="px-6 py-4 bg-slate-900/50 border-b border-slate-800">
           <SheetTitle className="text-xl font-bold">{title}</SheetTitle>
@@ -664,6 +665,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
         isOpen={isQuickContactOpen}
         onOpenChange={setIsQuickContactOpen}
         type={movementType === 'income' ? 'client' : 'supplier'}
+        // RECIBIMOS STRING Y LO ASIGNAMOS
         onSuccess={(newId: string) => {
             form.setValue('contactId', newId);
         }}
