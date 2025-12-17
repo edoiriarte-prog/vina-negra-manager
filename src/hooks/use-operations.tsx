@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase/init'; 
 import { 
   PurchaseOrder, 
@@ -45,27 +45,42 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
         return;
     };
 
-    const subscribe = (collectionName: string, setter: Function, loadingKey: keyof typeof loadingStates) => {
-      const q = query(collection(db, collectionName), orderBy('date', 'desc'));
-      return onSnapshot(q, (snapshot) => {
-        setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const fetchDataOnce = async (collectionName: string, setter: Function, loadingKey: keyof typeof loadingStates) => {
+      try {
+        const q = query(collection(db, collectionName), orderBy('date', 'desc'));
+        const querySnapshot = await getDocs(q);
+        setter(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+         console.error(`Error fetching ${collectionName}:`, error);
+      } finally {
         setLoadingStates(prev => ({...prev, [loadingKey]: false}));
-      }, (error) => {
-        console.error(`Error loading ${collectionName}:`, error);
-        setLoadingStates(prev => ({...prev, [loadingKey]: false}));
-      });
+      }
     };
+    
+    // Cargar colecciones grandes una sola vez
+    fetchDataOnce('purchaseOrders', setPurchaseOrders, 'purchases');
+    fetchDataOnce('salesOrders', setSalesOrders, 'sales');
+    fetchDataOnce('financialMovements', setFinancialMovements, 'financials');
+    
+    // Podemos mantener onSnapshot para colecciones más pequeñas o que necesiten real-time
+    const unsubServices = onSnapshot(query(collection(db, 'serviceOrders'), orderBy('date', 'desc')), (snapshot) => {
+      setServiceOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ServiceOrder)));
+      setLoadingStates(prev => ({...prev, services: false}));
+    }, (error) => {
+      console.error(`Error loading serviceOrders:`, error);
+      setLoadingStates(prev => ({...prev, services: false}));
+    });
 
-    const unsubPurchases = subscribe('purchaseOrders', setPurchaseOrders, 'purchases');
-    const unsubSales = subscribe('salesOrders', setSalesOrders, 'sales');
-    const unsubFinancials = subscribe('financialMovements', setFinancialMovements, 'financials');
-    const unsubServices = subscribe('serviceOrders', setServiceOrders, 'services');
-    const unsubAdjustments = subscribe('inventoryAdjustments', setInventoryAdjustments, 'adjustments');
+    const unsubAdjustments = onSnapshot(query(collection(db, 'inventoryAdjustments'), orderBy('date', 'desc')), (snapshot) => {
+      setInventoryAdjustments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryAdjustment)));
+      setLoadingStates(prev => ({...prev, adjustments: false}));
+    }, (error) => {
+      console.error(`Error loading inventoryAdjustments:`, error);
+      setLoadingStates(prev => ({...prev, adjustments: false}));
+    });
+
 
     return () => {
-      unsubPurchases();
-      unsubSales();
-      unsubFinancials();
       unsubServices();
       unsubAdjustments();
     };

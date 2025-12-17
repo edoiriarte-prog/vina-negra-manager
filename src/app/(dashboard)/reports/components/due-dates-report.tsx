@@ -92,26 +92,24 @@ export function DueDatesReport({ onPrint }: DueDatesReportProps) {
         relevantSalesOrders.forEach(order => {
             const clientName = contacts.find(c => c.id === order.clientId)?.name || 'Desconocido';
             
-            if (order.paymentMethod === 'Pago con Anticipo y Saldo' && order.advancePercentage) {
-                if (order.advanceDueDate) {
-                    const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
+            if (order.paymentMethod === 'Pago con Anticipo y Saldo' && order.advanceAmount) {
+                if (order.date) { // Assume advance is due on order date
                     allDueItems.push({
                         id: `${order.id}-advance`, clientId: order.clientId, clientName, orderId: order.id,
-                        paymentType: 'Anticipo', dueDate: order.advanceDueDate, amount: advanceAmount,
-                        paidAmount: 0, pendingAmount: advanceAmount, status: 'Pendiente',
+                        paymentType: 'Anticipo', dueDate: order.date, amount: order.advanceAmount,
+                        paidAmount: 0, pendingAmount: order.advanceAmount, status: 'Pendiente',
                     });
                 }
-                if (order.balanceDueDate) {
-                    const advanceAmount = order.totalAmount * (order.advancePercentage / 100);
-                    const balanceAmount = order.totalAmount - advanceAmount;
+                if (order.paymentDueDate) {
+                    const balanceAmount = order.totalAmount - order.advanceAmount;
                      allDueItems.push({
                         id: `${order.id}-balance`, clientId: order.clientId, clientName, orderId: order.id,
-                        paymentType: 'Saldo', dueDate: order.balanceDueDate, amount: balanceAmount,
+                        paymentType: 'Saldo', dueDate: order.paymentDueDate, amount: balanceAmount,
                         paidAmount: 0, pendingAmount: balanceAmount, status: 'Pendiente',
                     });
                 }
             } else if (order.paymentMethod === 'Crédito' || order.paymentMethod === 'Contado') {
-                 const dueDate = order.balanceDueDate || order.date;
+                 const dueDate = order.paymentDueDate || order.date;
                  allDueItems.push({
                     id: `${order.id}-full`, clientId: order.clientId, clientName, orderId: order.id,
                     paymentType: order.paymentMethod, dueDate: dueDate, amount: order.totalAmount,
