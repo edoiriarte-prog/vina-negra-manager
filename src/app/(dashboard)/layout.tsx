@@ -1,12 +1,12 @@
 "use client";
 
-import { ReactNode } from 'react';
-import { OperationsProvider } from '@/hooks/use-operations';
-import { MasterDataProvider } from '@/hooks/use-master-data';
+import { ReactNode, Suspense } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import { AuthGuard } from '@/app/auth-guard';
+import { DataProviders } from './providers';
+import Loading from './loading';
 
 export default function DashboardLayout({
   children,
@@ -26,11 +26,11 @@ export default function DashboardLayout({
             </div>
           </header>
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
-            <OperationsProvider>
-              <MasterDataProvider>
+            <Suspense fallback={<Loading />}>
+              <DataProviders>
                 {children}
-              </MasterDataProvider>
-            </OperationsProvider>
+              </DataProviders>
+            </Suspense>
           </main>
         </SidebarInset>
       </SidebarProvider>

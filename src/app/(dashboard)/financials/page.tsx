@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -17,16 +16,13 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Wallet, Landmark, History, ArrowUpRight, ArrowDownLeft, Plus, Banknote } from "lucide-react";
-import { Skeleton } from '@/components/ui/skeleton';
 
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
 
 export default function FinancialsPage() {
-  const { bankAccounts, contacts, isLoading: l1 } = useMasterData();
-  const { financialMovements, purchaseOrders, salesOrders, serviceOrders, isLoading: l2 } = useOperations();
+  const { bankAccounts, contacts } = useMasterData();
+  const { financialMovements, purchaseOrders, salesOrders, serviceOrders } = useOperations();
   const { createFinancialMovement, updateFinancialMovement, deleteFinancialMovement } = useFinancialsCRUD();
-
-  const isLoading = l1 || l2;
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingMovement, setEditingMovement] = useState<FinancialMovement | null>(null);
@@ -52,15 +48,12 @@ export default function FinancialsPage() {
   }, [bankAccounts, financialMovements]);
 
   const handleSaveMovement = async (movementData: FinancialMovement | Omit<FinancialMovement, 'id'>) => {
-    // Si el objeto tiene un 'id', es una actualización.
     if ('id' in movementData && movementData.id) {
         await updateFinancialMovement(movementData.id, movementData);
     } else {
-        // Si no, es una creación.
         await createFinancialMovement(movementData);
     }
     
-    // Cerramos y reseteamos el estado del formulario.
     setIsSheetOpen(false);
     setEditingMovement(null);
   };
@@ -95,9 +88,6 @@ export default function FinancialsPage() {
       onDelete: setDeletingMovement, 
       bankAccounts: bankAccounts || [] 
   }), [bankAccounts, handleEdit]);
-
-
-  if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-32 w-full"/><Skeleton className="h-64 w-full"/></div>;
 
   return (
     <>

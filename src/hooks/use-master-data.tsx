@@ -73,7 +73,6 @@ const MasterDataContext = createContext<MasterDataContextType | undefined>(undef
 export function MasterDataProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
-  // --- ESTADOS LOCALES ---
   const [settings, setSettings] = useState<MasterSettings>({
     products: [],
     calibers: [],
@@ -85,39 +84,42 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  const [loadingStates, setLoadingStates] = useState({
+    settings: true,
+    banks: true,
+    contacts: true,
+    inventory: true,
+  });
 
-  // --- SUSCRIPCIONES A FIREBASE (REALTIME) ---
+  const isLoading = Object.values(loadingStates).some(state => state);
+
   useEffect(() => {
-    if (!db) return;
-    setLoading(true);
+    if (!db) {
+      Object.keys(loadingStates).forEach(key => setLoadingStates(prev => ({...prev, [key]: false})));
+      return;
+    };
 
-    // 1. Configuración General (Settings)
     const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as Partial<MasterSettings>;
-        setSettings(prev => ({ ...prev, ...data }));
-      }
-    });
+      if (docSnap.exists()) setSettings(prev => ({ ...prev, ...(docSnap.data() as Partial<MasterSettings>) }));
+      setLoadingStates(prev => ({...prev, settings: false}));
+    }, () => setLoadingStates(prev => ({...prev, settings: false})));
 
-    // 2. Cuentas Bancarias
     const unsubBanks = onSnapshot(collection(db, 'bankAccounts'), (snapshot) => {
       setBankAccounts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BankAccount)));
-    });
+      setLoadingStates(prev => ({...prev, banks: false}));
+    }, () => setLoadingStates(prev => ({...prev, banks: false})));
 
-    // 3. Contactos
     const unsubContacts = onSnapshot(collection(db, 'contacts'), (snapshot) => {
       setContacts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contact)));
-    });
+      setLoadingStates(prev => ({...prev, contacts: false}));
+    }, () => setLoadingStates(prev => ({...prev, contacts: false})));
 
-    // 4. Inventario
     const unsubInventory = onSnapshot(collection(db, 'inventory'), (snapshot) => {
       setInventory(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
-    });
+       setLoadingStates(prev => ({...prev, inventory: false}));
+    }, () => setLoadingStates(prev => ({...prev, inventory: false})));
 
-    setLoading(false);
-
-    // Cleanup al desmontar
     return () => {
       unsubSettings();
       unsubBanks();
@@ -126,7 +128,6 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // --- HELPERS DE ESCRITURA ---
   const updateSettingList = async (field: keyof MasterSettings, newList: any[]) => {
     if (!db) return;
     try {
@@ -137,36 +138,25 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // --- FUNCIONES CRUD CONFIG ---
   const addProduct = (p: string) => { if (!settings.products.includes(p)) updateSettingList('products', [...settings.products, p]); };
   const removeProduct = (p: string) => updateSettingList('products', settings.products.filter(item => item !== p));
-
-  const addCaliber = (c: { name: string; code: string }) => { 
-      if (!settings.calibers.find(cal => cal.name === c.name)) updateSettingList('calibers', [...settings.calibers, c]); 
-  };
+  const addCaliber = (c: { name: string; code: string }) => { if (!settings.calibers.find(cal => cal.name === c.name)) updateSettingList('calibers', [...settings.calibers, c]); };
   const removeCaliber = (name: string) => updateSettingList('calibers', settings.calibers.filter(item => item.name !== name));
-
   const addWarehouse = (w: string) => { if (!settings.warehouses.includes(w)) updateSettingList('warehouses', [...settings.warehouses, w]); };
   const removeWarehouse = (w: string) => updateSettingList('warehouses', settings.warehouses.filter(item => item !== w));
-
   const addUnit = (u: string) => { if (!settings.units.includes(u)) updateSettingList('units', [...settings.units, u]); };
   const removeUnit = (u: string) => updateSettingList('units', settings.units.filter(item => item !== u));
-
   const addPackagingType = (p: string) => { if (!settings.packagingTypes.includes(p)) updateSettingList('packagingTypes', [...settings.packagingTypes, p]); };
   const removePackagingType = (p: string) => updateSettingList('packagingTypes', settings.packagingTypes.filter(item => item !== p));
 
   const updateProductCalibers = (productName: string, caliberNames: string[]) => {
     const index = settings.productCaliberAssociations.findIndex(a => a.id === productName);
     let newAssociations = [...settings.productCaliberAssociations];
-    if (index >= 0) {
-      newAssociations[index] = { id: productName, calibers: caliberNames };
-    } else {
-      newAssociations.push({ id: productName, calibers: caliberNames });
-    }
+    if (index >= 0) newAssociations[index] = { id: productName, calibers: caliberNames };
+    else newAssociations.push({ id: productName, calibers: caliberNames });
     updateSettingList('productCaliberAssociations', newAssociations);
   };
 
-  // --- FUNCIONES CRUD CUENTAS ---
   const addBankAccount = async (account: Omit<BankAccount, 'id'>) => {
     await addDoc(collection(db, 'bankAccounts'), account);
     toast({ title: "Cuenta Agregada" });
@@ -183,47 +173,21 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
      toast({ title: "Cuenta Eliminada" });
   };
 
-  // Datos estáticos
-  const internalConcepts = [
-    { name: 'Retiro de Socios' }, { name: 'Pago de Impuestos' }, { name: 'Comisión Bancaria' },
-    { name: 'Préstamo Interno' }, { name: 'Gastos Generales' }, { name: 'Mantención' },
-    { name: 'Combustible' }, { name: 'Remuneraciones' }, { name: 'Leyes Sociales' }
-  ];
-  
-  const costCenters = [
-      { name: 'Administración' },
-      { name: 'Campo' },
-      { name: 'Packing' },
-      { name: 'Comercial' },
-      { name: 'Logística' },
-      { name: 'Gestión Empresarial' },
-      { name: 'Gestión Comercial' },
-  ];
+  const internalConcepts = [{ name: 'Retiro de Socios' }, { name: 'Pago de Impuestos' }, { name: 'Comisión Bancaria' }, { name: 'Préstamo Interno' }, { name: 'Gastos Generales' }, { name: 'Mantención' }, { name: 'Combustible' }, { name: 'Remuneraciones' }, { name: 'Leyes Sociales' }];
+  const costCenters = [{ name: 'Administración' }, { name: 'Campo' }, { name: 'Packing' }, { name: 'Comercial' }, { name: 'Logística' }, { name: 'Gestión Empresarial' }, { name: 'Gestión Comercial' }];
 
   const value: MasterDataContextType = {
-    ...settings,
-    inventory,
-    contacts,
-    bankAccounts,
-    addProduct, removeProduct,
-    addCaliber, removeCaliber,
-    addWarehouse, removeWarehouse,
-    addUnit, removeUnit,
-    addPackagingType, removePackagingType,
-    updateProductCalibers,
-    addBankAccount, updateBankAccount, removeBankAccount,
-    internalConcepts, costCenters,
-    isLoading: loading
+    ...settings, inventory, contacts, bankAccounts, addProduct, removeProduct,
+    addCaliber, removeCaliber, addWarehouse, removeWarehouse, addUnit, removeUnit,
+    addPackagingType, removePackagingType, updateProductCalibers, addBankAccount,
+    updateBankAccount, removeBankAccount, internalConcepts, costCenters, isLoading
   };
 
   return <MasterDataContext.Provider value={value}>{children}</MasterDataContext.Provider>;
 }
 
-// --- HOOK EXPORTADO ---
 export function useMasterData() {
   const context = useContext(MasterDataContext);
-  if (context === undefined) {
-    throw new Error('useMasterData must be used within a MasterDataProvider');
-  }
+  if (context === undefined) throw new Error('useMasterData must be used within a MasterDataProvider');
   return context;
 }

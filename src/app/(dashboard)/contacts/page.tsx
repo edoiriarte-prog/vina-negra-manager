@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -8,8 +7,7 @@ import { DataTable } from "./components/data-table";
 import { getColumns } from "./components/columns";
 import { NewContactSheet } from "./components/new-contact-sheet";
 import { Contact, Interaction } from "@/lib/types";
-import { useMasterData } from "@/hooks/use-master-data"; // <--- USAMOS EL HOOK CENTRALIZADO
-import { Skeleton } from "@/components/ui/skeleton";
+import { useMasterData } from "@/hooks/use-master-data";
 import { useFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -18,13 +16,10 @@ export default function ContactsPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   
-  // 1. CARGAR DATOS (Ahora usamos useMasterData que ya tiene los contactos en la nube)
-  const { contacts, isLoading } = useMasterData();
+  const { contacts } = useMasterData();
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-
-  // --- HANDLERS CRUD (Directos a Firebase) ---
 
   const handleCreateNew = () => {
     setEditingContact(null);
@@ -47,7 +42,6 @@ export default function ContactsPage() {
   const handleSave = (contactData: Contact | Omit<Contact, "id">, newInteraction?: Omit<Interaction, "id">) => {
     if (!firestore) return;
 
-    // Preparar la interacción si existe
     let updatedInteractions = (contactData as Contact).interactions || [];
     if (newInteraction) {
         const interactionToAdd: Interaction = {
@@ -63,11 +57,9 @@ export default function ContactsPage() {
     };
 
     if ('id' in contactData) {
-        // Edición
         updateDocumentNonBlocking(doc(firestore, 'contacts', contactData.id), finalData);
         toast({ title: "Contacto Actualizado", description: "Cambios guardados correctamente." });
     } else {
-        // Creación
         addDocumentNonBlocking(collection(firestore, 'contacts'), finalData);
         toast({ title: "Contacto Creado", description: `${contactData.name} ha sido agregado.` });
     }
@@ -90,15 +82,6 @@ export default function ContactsPage() {
       onEdit: handleEdit,
       onDelete: handleDelete
   }), []);
-
-  if (isLoading) {
-    return (
-        <div className="p-8 space-y-4">
-            <Skeleton className="h-12 w-1/3" />
-            <Skeleton className="h-96 w-full" />
-        </div>
-    )
-  }
 
   return (
     <div className="h-full flex-1 flex-col space-y-8 p-8 md:flex bg-slate-950 min-h-screen text-slate-100">

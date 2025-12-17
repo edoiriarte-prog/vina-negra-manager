@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo } from 'react';
@@ -13,7 +12,6 @@ import {
 } from './components/charts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import AiSummary from './components/ai-summary';
-import { Skeleton } from '@/components/ui/skeleton';
 import { 
     DollarSign, 
     ShoppingCart, 
@@ -23,7 +21,7 @@ import {
     PieChart,
     Activity
 } from "lucide-react";
-import { InventoryItem, PurchaseOrder, SalesOrder } from '@/lib/types';
+import { PurchaseOrder, SalesOrder } from '@/lib/types';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
@@ -35,7 +33,6 @@ export default function DashboardPage() {
   const { purchaseOrders, salesOrders, financialMovements, inventoryAdjustments, isLoading: loadingOps } = useOperations();
   const isLoading = loadingMaster || loadingOps;
 
-  // --- FILTROS DE DATOS PRIMARIOS ---
   const completedPurchases: PurchaseOrder[] = useMemo(() => {
     return purchaseOrders.filter(o => o.status === 'completed' || o.status === 'received');
   }, [purchaseOrders]);
@@ -44,7 +41,6 @@ export default function DashboardPage() {
     return salesOrders.filter(o => o.status === 'dispatched' || o.status === 'invoiced');
   }, [salesOrders]);
 
-  // Cálculo de Stock en tiempo real
   const availableStock = useMemo(() => {
       let stock = 0;
       completedPurchases.forEach(o => o.items.forEach(i => stock += i.quantity));
@@ -72,7 +68,6 @@ export default function DashboardPage() {
       completedPurchasesCount: completedPurchases.length,
     };
 
-    // Texto para la IA
     const financialString = `Ventas: ${formatCurrency(totalSalesAmount)}. Compras: ${formatCurrency(totalPurchaseAmount)}. Flujo Neto: ${formatCurrency(netCashflow)}. Stock: ${formatKilos(availableStock)}kg.`;
     
     return { kpis: kpiData, financialDataString: financialString };
@@ -80,14 +75,13 @@ export default function DashboardPage() {
 
 
   if (isLoading || !kpis) {
-      return <div className="p-8"><Skeleton className="h-96 w-full rounded-xl bg-slate-800" /></div>
+      return null;
   }
 
-  const cardStyle = "bg-slate-900 border-slate-800 shadow-lg hover:border-slate-700 transition-all";
+  const cardClass = "bg-slate-900 border-slate-800 shadow-lg hover:border-slate-700 transition-all";
 
   return (
     <div className="flex-1 space-y-6 p-6 bg-slate-950 min-h-screen">
-      {/* Header */}
       <div className="flex justify-between items-end">
         <div>
             <h2 className="text-3xl font-bold tracking-tight text-white">Dashboard Gerencial</h2>
@@ -95,7 +89,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 1. KPIs Principales */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard title="Ventas Totales" value={formatCurrency(kpis.totalSalesAmount)} description={`${kpis.completedSalesCount} OP despachadas`} icon={<TrendingUp className="text-blue-500" />} isLoading={isLoading} />
         <KpiCard title="Compras Totales" value={formatCurrency(kpis.totalPurchaseAmount)} description={`${kpis.completedPurchasesCount} OC recepcionadas`} icon={<ShoppingCart className="text-amber-500" />} isLoading={isLoading} />
@@ -103,11 +96,9 @@ export default function DashboardPage() {
         <KpiCard title="Stock Disponible" value={`${formatKilos(kpis.availableStock)} kg`} description="Inventario actual global" icon={<Warehouse className="text-purple-500" />} isLoading={isLoading} />
       </div>
 
-      {/* 2. Gráficos Estratégicos (Fila Superior) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Gráfico Grande: Comparativa Comercial */}
           <div className="lg:col-span-2">
-             <Card className={cardStyle}>
+             <Card className={cardClass}>
                   <CardHeader>
                     <CardTitle className="text-white flex items-center gap-2"><BarChart3 className="h-5 w-5 text-blue-500"/> Rendimiento Comercial</CardTitle>
                     <CardDescription className="text-slate-400">Comparativa semanal de Ventas (Línea) vs. Compras (Barras).</CardDescription>
@@ -118,7 +109,6 @@ export default function DashboardPage() {
               </Card>
           </div>
           
-          {/* Columna Derecha: IA + Proveedores */}
           <div className="space-y-6">
               <Card className="bg-gradient-to-br from-slate-900 to-blue-950 border-blue-900/50">
                   <CardHeader>
@@ -128,7 +118,7 @@ export default function DashboardPage() {
                     <AiSummary financialData={financialDataString} />
                   </CardContent>
               </Card>
-              <Card className={cardStyle}>
+              <Card className={cardClass}>
                   <CardHeader>
                     <CardTitle className="text-white flex items-center gap-2"><PieChart className="h-5 w-5 text-amber-500"/> Top Proveedores (Kg)</CardTitle>
                   </CardHeader>
@@ -139,9 +129,8 @@ export default function DashboardPage() {
           </div>
       </div>
       
-      {/* 3. Gráficos Operativos (Fila Inferior) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-         <Card className={cardStyle}>
+         <Card className={cardClass}>
             <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2"><Warehouse className="h-5 w-5 text-purple-500"/> Rotación de Inventario (Kilos)</CardTitle>
                 <CardDescription className="text-slate-400">Productos más comprados vs. vendidos.</CardDescription>
@@ -151,7 +140,7 @@ export default function DashboardPage() {
             </CardContent>
         </Card>
 
-        <Card className={cardStyle}>
+        <Card className={cardClass}>
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2"><DollarSign className="h-5 w-5 text-emerald-500"/> Flujo de Caja Real</CardTitle>
             <CardDescription className="text-slate-400">Ingresos y Egresos de Tesorería.</CardDescription>

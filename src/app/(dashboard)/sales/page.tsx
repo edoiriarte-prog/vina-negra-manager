@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -10,7 +9,7 @@ import { useMasterData } from "@/hooks/use-master-data";
 import { useOperations } from "@/hooks/use-operations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, DollarSign, FileText, FileSpreadsheet, Users, Calendar, Search } from "lucide-react";
+import { Plus, FileSpreadsheet, Users, Calendar, Search } from "lucide-react";
 import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
 import { SalesOrderPreview } from "./components/sales-order-preview"; 
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,7 +33,6 @@ import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
 import * as XLSX from 'xlsx';
 import { format, parseISO } from "date-fns";
 import { es } from 'date-fns/locale';
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
 // Helper
@@ -45,12 +43,10 @@ export default function SalesPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const { salesOrders, purchaseOrders, inventoryAdjustments, isLoading: loadingOps } = useOperations();
-  const { contacts, inventory, isLoading: loadingMaster } = useMasterData();
+  const { salesOrders, purchaseOrders, inventoryAdjustments } = useOperations();
+  const { contacts, inventory } = useMasterData();
   const { createSalesOrder, updateSalesOrder } = useSalesOrdersCRUD();
   
-  const isLoading = loadingOps || loadingMaster;
-
   const clients = useMemo(() => contacts?.filter(c => Array.isArray(c.type) ? c.type.includes('client') : c.type === 'client') || [], [contacts]);
   const salesList = useMemo(() => (salesOrders || []).filter(o => o.orderType !== 'dispatch' && o.status !== 'cancelled'), [salesOrders]);
 
@@ -64,12 +60,9 @@ export default function SalesPage() {
     try {
         if ('id' in orderData && orderData.id) {
             await updateSalesOrder(orderData.id, orderData as SalesOrder);
-            toast({ title: "Actualizado", description: "La orden se actualizó correctamente." });
         } else {
             await createSalesOrder(orderData as SalesOrder);
-            toast({ title: "Creado", description: "Nueva orden de venta registrada." });
         }
-        router.refresh();
         setIsSheetOpen(false);
         setEditingOrder(null);
     } catch (error) {
@@ -93,7 +86,6 @@ export default function SalesPage() {
         await deleteDoc(doc(db, "salesOrders", deletingOrder.id));
         toast({ title: "Orden Eliminada", description: `La orden ${deletingOrder.number} ha sido eliminada.`});
         setDeletingOrder(null);
-        router.refresh();
     } catch(e) {
         console.error("Error al eliminar:", e);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar la orden.' });
@@ -102,16 +94,13 @@ export default function SalesPage() {
 
   const handleExportPackingList = () => {
     if (salesList.length === 0) return toast({ variant: "destructive", title: "No hay datos", description: "No hay órdenes para exportar." });
-    // ... Lógica de exportación existente
   };
 
-  // --- LÓGICA DE FILTRADO Y AGRUPACIÓN ---
   const { filteredOrders, groupedByClient, groupedByDate, totalGrossAmount } = useMemo(() => {
     if (!salesList || !clients) return { filteredOrders: [], groupedByClient: [], groupedByDate: [], totalGrossAmount: 0 };
     
     const searchTermLower = searchTerm.toLowerCase();
 
-    // Filtro Universal
     const orders = salesList.filter((o) => {
         const clientName = clients.find(c => c.id === o.clientId)?.name || '';
         const clientRut = clients.find(c => c.id === o.clientId)?.rut || '';
@@ -125,7 +114,6 @@ export default function SalesPage() {
         return sum + (order.includeVat !== false ? netAmount * 1.19 : netAmount);
     }, 0);
 
-    // Agrupar por Cliente
     const byClient = orders.reduce((acc, order) => {
       const clientName = clients.find(c => c.id === order.clientId)?.name || 'Cliente Desconocido';
       if (!acc[clientName]) acc[clientName] = { orders: [], total: 0 };
@@ -136,7 +124,6 @@ export default function SalesPage() {
     }, {} as Record<string, { orders: SalesOrder[], total: number }>);
     const clientArray = Object.entries(byClient).map(([name, data]) => ({ name, ...data }));
     
-    // Agrupar por Fecha
     const byDate = orders.reduce((acc, order) => {
       const date = formatDate(order.date);
       if (!acc[date]) acc[date] = { orders: [], total: 0 };
@@ -152,13 +139,9 @@ export default function SalesPage() {
   
   const columns = useMemo(() => getColumns({ onEdit: handleEdit, onDelete: handleDeleteRequest, onPreview: setPreviewOrder, clients }), [clients]);
 
-  if (isLoading) {
-    return <div className="p-8 space-y-4"><Skeleton className="h-64 w-full" /></div>;
-  }
-
   const renderGroupedTable = (items: SalesOrder[]) => (
     <div className="p-2 bg-slate-900/50 rounded-md border border-slate-800">
-        <Table size="sm">
+        <Table>
             <TableHeader>
                 <TableRow className="border-slate-800">
                     <TableHead className="text-slate-400">N° Orden</TableHead>
@@ -275,7 +258,6 @@ export default function SalesPage() {
         </CardContent>
       </Card>
       
-      {/* Modals and Sheets */}
       {isSheetOpen && (
           <NewSalesOrderSheet
             isOpen={isSheetOpen}

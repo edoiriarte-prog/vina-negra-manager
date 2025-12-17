@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
@@ -16,7 +15,6 @@ import {
   Search, Package, Filter, Download, History,
   ArrowUp, ArrowDown, Calendar as CalendarIcon, TrendingUp, TrendingDown, Boxes
 } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -28,8 +26,6 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { Calendar } from '@/components/ui/calendar';
 
-
-// --- DEFINICIÓN DE TIPOS LIMPIA ---
 type InventoryReportItem = {
     id: string; 
     product: string;
@@ -48,15 +44,11 @@ type ProductSummaryItem = {
 };
 type FilterMode = "day" | "range" | "month";
 
-
 const parseDateAsLocal = (dateString: string) => {
     if (!dateString) return new Date(0);
-    // Agrega T12:00:00 para forzar la interpretación en la zona horaria local
-    // y evitar que se mueva al día anterior.
     return new Date(`${dateString}T12:00:00`);
 };
 
-// --- AYUDAS VISUALES ---
 const formatKilos = (val: number) => new Intl.NumberFormat('es-CL').format(Math.round(val)) + ' kg';
 const normalize = (str?: string) => (str || '').trim().toUpperCase();
 
@@ -64,12 +56,9 @@ export default function InventoryPage() {
   const { toast } = useToast();
   const { firestore } = useFirebase();
   
-  // 1. OBTENER DATOS
-  const { purchaseOrders, salesOrders, inventoryAdjustments, isLoading: loadingOps } = useOperations();
-  const { warehouses, products, contacts, isLoading: loadingMaster } = useMasterData();
-  const isLoading = loadingOps || loadingMaster;
+  const { purchaseOrders, salesOrders, inventoryAdjustments } = useOperations();
+  const { warehouses, products, contacts } = useMasterData();
   
-  // 2. FILTROS
   const [filterMode, setFilterMode] = useState<FilterMode>("day");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) });
@@ -80,9 +69,8 @@ export default function InventoryPage() {
   const [busqueda, setBusqueda] = useState("");
   const [itemSeleccionado, setItemSeleccionado] = useState<InventoryReportItem | null>(null);
 
-  // 3. MOTOR DE CÁLCULO "TRANSACTIONAL PURO"
   const kardexData = useMemo(() => {
-    if (isLoading || !purchaseOrders || !salesOrders || !inventoryAdjustments) return [];
+    if (!purchaseOrders || !salesOrders || !inventoryAdjustments) return [];
     
     let fechaInicio: Date, fechaFin: Date;
     switch (filterMode) {
@@ -172,9 +160,8 @@ export default function InventoryPage() {
     });
 
     return reporte.sort((a, b) => a.product.localeCompare(b.product) || a.caliber.localeCompare(b.caliber));
-  }, [purchaseOrders, salesOrders, inventoryAdjustments, isLoading, date, dateRange, month, filterMode]);
+  }, [purchaseOrders, salesOrders, inventoryAdjustments, date, dateRange, month, filterMode]);
   
-  // 4. FILTRADO VISUAL Y AGRUPACIONES
   const { datosFiltrados, resumenPorProducto, totalEntradas, totalSalidas, stockFinalTotal } = useMemo(() => {
     let data = kardexData;
 
@@ -233,8 +220,6 @@ export default function InventoryPage() {
     }
   }, [filterMode, date, dateRange, month]);
   
-  if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
-
   return (
     <>
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 bg-slate-950 min-h-screen text-slate-100">

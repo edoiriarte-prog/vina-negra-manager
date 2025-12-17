@@ -1,9 +1,7 @@
-
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { PurchaseOrder, Contact } from "@/lib/types"; 
+import React, { useState, useMemo } from "react";
+import { PurchaseOrder } from "@/lib/types"; 
 import { getColumns } from "./components/columns";
 import { DataTable } from "./components/data-table"; 
 import { useOperations } from "@/hooks/use-operations"; 
@@ -13,39 +11,28 @@ import { Plus, DollarSign, FileText } from "lucide-react";
 import { NewPurchaseOrderSheet } from "./components/new-purchase-order-sheet";
 import { PurchaseOrderPreview } from "./components/purchase-order-preview";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { usePurchasesCRUD } from "@/hooks/use-purchases-crud";
 
-import { doc, deleteDoc } from "firebase/firestore";
-import { useFirebase } from "@/firebase";
-
 export default function PurchasesPage() {
-  const { firestore } = useFirebase();
   const { toast } = useToast();
-  const router = useRouter(); // Importado para refrescar datos
-
-  const { purchaseOrders, isLoading: loadingOps } = useOperations();
-  const { contacts, isLoading: loadingMaster } = useMasterData();
-  const { createPurchaseOrder, updatePurchaseOrder } = usePurchasesCRUD();
+  const { purchaseOrders } = useOperations();
+  const { contacts } = useMasterData();
+  const { createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder } = usePurchasesCRUD();
   
-  const isLoading = loadingOps || loadingMaster;
-
   const suppliers = useMemo(() => contacts?.filter((c) => Array.isArray(c.type) ? c.type.includes('supplier') : c.type === 'supplier') || [], [contacts]);
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [previewOrder, setPreviewOrder] = useState<PurchaseOrder | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-
+  
   const { totalNetAmount, totalGrossAmount } = useMemo(() => {
     if (!purchaseOrders) return { totalNetAmount: 0, totalGrossAmount: 0 };
     
     return purchaseOrders.reduce((acc, order) => {
         const netAmount = order.totalAmount || 0;
         acc.totalNetAmount += netAmount;
-        if (order.includeVat) {
+        if (order.includeVat !== false) {
             acc.totalGrossAmount += netAmount * 1.19;
         } else {
             acc.totalGrossAmount += netAmount;
@@ -54,57 +41,25 @@ export default function PurchasesPage() {
     }, { totalNetAmount: 0, totalGrossAmount: 0 });
   }, [purchaseOrders]);
 
-  const filteredOrders = useMemo(() => {
-      if (!purchaseOrders) return [];
-      return purchaseOrders.filter((o) => {
-        const supplierName = suppliers.find((s) => s.id === o.supplierId)?.name || '';
-        return (o.number?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            supplierName.toLowerCase().includes(searchTerm.toLowerCase());
-    });
-  }, [purchaseOrders, suppliers, searchTerm]);
-
   const handleSave = async (orderData: PurchaseOrder | Omit<PurchaseOrder, "id">) => {
-    const totalKilos = orderData.items.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0);
-    
-    const finalOrderData: any = {
-        ...orderData,
-        totalKilos,
-        status: orderData.status || 'received' 
-    };
-
     try {
         if ('id' in orderData && orderData.id) {
-            await updatePurchaseOrder(orderData.id, finalOrderData);
+            await updatePurchaseOrder(orderData.id, orderData);
         } else {
-            await createPurchaseOrder(finalOrderData);
+            await createPurchaseOrder(orderData as Omit<PurchaseOrder, "id">);
         }
-        router.refresh(); // Refresca los datos en la página
     } catch (error) {
         console.error("Error al guardar:", error);
-        toast({ variant: "destructive", title: "Error", description: "No se pudo guardar la orden." });
     } finally {
-        // Esto se ejecuta siempre, haya error o no.
         setIsSheetOpen(false);
         setEditingOrder(null);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!firestore) return;
-    if (!id) {
-        alert("ERROR CRÍTICO: El botón no encontró un ID válido para esta fila.");
-        return;
-    }
-
+    if (!id) return;
     if (window.confirm(`¿Estás seguro de eliminar la orden con ID: ${id}?\n\nEsta acción es permanente.`)) {
-      try {
-          await deleteDoc(doc(firestore, "purchaseOrders", id));
-          toast({ title: "Orden Eliminada", description: "La orden ha sido borrada exitosamente."});
-          router.refresh(); // Refresca los datos después de eliminar
-      } catch (error: any) {
-          console.error("Error fatal al eliminar:", error);
-          alert(`NO SE PUDO ELIMINAR.\n\nError técnico: ${error.message}`);
-      }
+        await deletePurchaseOrder(id);
     }
   }
 
@@ -131,15 +86,6 @@ export default function PurchasesPage() {
   }), [suppliers]);
 
   const cardClass = "bg-slate-900 border-slate-800 shadow-sm hover:border-slate-700 transition-all";
-
-  if (isLoading) {
-    return (
-      <div className="p-8 space-y-4">
-        <Skeleton className="h-12 w-1/3" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
 
   return (
     <div className="p-3 md:p-6 space-y-6 bg-slate-950 min-h-screen text-slate-100">
@@ -188,8 +134,8 @@ export default function PurchasesPage() {
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg p-1 overflow-x-auto">
             <DataTable 
                 columns={columns} 
-                data={filteredOrders} 
-                searchKey="id"
+                data={purchaseOrders} 
+                searchKey="supplierId"
             />
         </div>
       </div>

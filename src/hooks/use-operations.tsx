@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '@/firebase/init'; // Usamos la conexión limpia
+import { db } from '@/firebase/init'; 
 import { 
   PurchaseOrder, 
   SalesOrder, 
@@ -11,7 +11,6 @@ import {
   InventoryAdjustment 
 } from '@/lib/types';
 
-// --- DEFINICIÓN DEL CONTEXTO ---
 export type OperationsContextType = {
   purchaseOrders: PurchaseOrder[];
   salesOrders: SalesOrder[];
@@ -21,10 +20,8 @@ export type OperationsContextType = {
   isLoading: boolean;
 };
 
-// Lo creamos aquí mismo para exportarlo
 export const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
 
-// --- PROVIDER ---
 export function OperationsProvider({ children }: { children: ReactNode }) {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
@@ -32,44 +29,39 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [inventoryAdjustments, setInventoryAdjustments] = useState<InventoryAdjustment[]>([]);
   
-  const [loading, setLoading] = useState(true);
+  const [loadingStates, setLoadingStates] = useState({
+    purchases: true,
+    sales: true,
+    financials: true,
+    services: true,
+    adjustments: true,
+  });
+
+  const isLoading = Object.values(loadingStates).some(state => state);
 
   useEffect(() => {
-    if (!db) return;
-    setLoading(true);
+    if (!db) {
+        Object.keys(loadingStates).forEach(key => setLoadingStates(prev => ({...prev, [key]: false})));
+        return;
+    };
 
-    // Función auxiliar para suscribirse y mapear datos
-    const subscribe = (coll: string, setter: Function, orderField: string = 'date') => {
-      const q = query(collection(db, coll), orderBy(orderField, 'desc'));
+    const subscribe = (collectionName: string, setter: Function, loadingKey: keyof typeof loadingStates) => {
+      const q = query(collection(db, collectionName), orderBy('date', 'desc'));
       return onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          ...doc.data() 
-        }));
-        setter(data);
+        setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setLoadingStates(prev => ({...prev, [loadingKey]: false}));
       }, (error) => {
-        console.error(`Error loading ${coll}:`, error);
+        console.error(`Error loading ${collectionName}:`, error);
+        setLoadingStates(prev => ({...prev, [loadingKey]: false}));
       });
     };
 
-    // 1. Órdenes de Compra
-    const unsubPurchases = subscribe('purchaseOrders', setPurchaseOrders);
+    const unsubPurchases = subscribe('purchaseOrders', setPurchaseOrders, 'purchases');
+    const unsubSales = subscribe('salesOrders', setSalesOrders, 'sales');
+    const unsubFinancials = subscribe('financialMovements', setFinancialMovements, 'financials');
+    const unsubServices = subscribe('serviceOrders', setServiceOrders, 'services');
+    const unsubAdjustments = subscribe('inventoryAdjustments', setInventoryAdjustments, 'adjustments');
 
-    // 2. Órdenes de Venta
-    const unsubSales = subscribe('salesOrders', setSalesOrders);
-
-    // 3. Movimientos Financieros (Tesorería)
-    const unsubFinancials = subscribe('financialMovements', setFinancialMovements);
-
-    // 4. Órdenes de Servicio
-    const unsubServices = subscribe('serviceOrders', setServiceOrders);
-
-    // 5. Ajustes de Inventario
-    const unsubAdjustments = subscribe('inventoryAdjustments', setInventoryAdjustments);
-
-    setLoading(false);
-
-    // Cleanup al desmontar
     return () => {
       unsubPurchases();
       unsubSales();
@@ -85,13 +77,12 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
     financialMovements,
     serviceOrders,
     inventoryAdjustments,
-    isLoading: loading
+    isLoading
   };
 
   return <OperationsContext.Provider value={value}>{children}</OperationsContext.Provider>;
 }
 
-// --- HOOK EXPORTADO ---
 export function useOperations() {
   const context = useContext(OperationsContext);
   if (context === undefined) {
