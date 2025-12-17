@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -199,6 +200,8 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
                     order={order}
                     clientName={supplierData?.name || 'Proveedor'}
                     clientRut={supplierData?.rut}
+                    clientAddress={supplierData?.address}
+                    clientContact={supplierData?.contactPerson}
                     type="COMPRA"
                 />
                 }
