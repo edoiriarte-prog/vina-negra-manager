@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { format, parseISO, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, isBefore } from 'date-fns';
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { StatementDocument } from '@/components/pdf/StatementDocument';
@@ -304,25 +304,31 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
     const { filteredMovements, initialBalance, finalBalance } = useMemo(() => {
         if (!account) return { filteredMovements: [], initialBalance: 0, finalBalance: 0 };
 
-        const movements: Omit<DetailedMovement, 'balance'>[] = [];
-
+        const allMovements: Omit<DetailedMovement, 'balance'>[] = [];
         const isClient = (account.contact.type || []).includes('client');
         const relevantOrders = isClient ? salesOrders : purchaseOrders;
         const relevantPayments = financialMovements.filter(f => f.contactId === account.contact.id && (isClient ? f.type === 'income' : f.type === 'expense'));
-        
-        relevantOrders.filter(o => ((isClient ? (o as SalesOrder).clientId : (o as PurchaseOrder).supplierId) === account.contact.id) && o.status !== 'cancelled' && o.status !== 'draft').forEach(o => {
-            const grossAmount = o.includeVat !== false ? Math.round((o.totalAmount || 0) * 1.19) : (o.totalAmount || 0);
-            movements.push({
-                date: o.date,
-                type: 'Cargo',
-                documentType: isClient ? 'O/V' : 'O/C',
-                reference: isClient ? `OV-${o.number}` : `OC-${o.number}`,
-                details: o.items,
-                charge: grossAmount,
-                payment: 0,
-                paymentDueDate: (o as SalesOrder).paymentDueDate
+
+        relevantOrders
+            .filter(o => ((isClient ? (o as SalesOrder).clientId : (o as PurchaseOrder).supplierId) === account.contact.id) && o.status !== 'cancelled' && o.status !== 'draft')
+            .forEach(o => {
+                const grossAmount = o.includeVat !== false ? Math.round((o.totalAmount || 0) * 1.19) : (o.totalAmount || 0);
+                let dueDate = (o as SalesOrder).paymentDueDate;
+                if (!dueDate && (o as SalesOrder).creditDays) {
+                    dueDate = format(addDays(parseISO(o.date), (o as SalesOrder).creditDays!), 'yyyy-MM-dd');
+                }
+                
+                allMovements.push({
+                    date: o.date,
+                    type: 'Cargo',
+                    documentType: isClient ? 'O/V' : 'O/C',
+                    reference: isClient ? `OV-${o.number}` : `OC-${o.number}`,
+                    details: o.items,
+                    charge: grossAmount,
+                    payment: 0,
+                    paymentDueDate: dueDate,
+                });
             });
-        });
 
         relevantPayments.forEach(f => {
             let description = f.description || "Abono general";
@@ -330,9 +336,9 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
               const docType = f.relatedDocument.type;
               const docId = f.relatedDocument.id;
               const order = [...salesOrders, ...purchaseOrders].find(o => o.id === docId);
-              description = `Pago ${docType} ${order?.number || docId}`;
+              description = `Pago ${docType}-${order?.number || docId}`;
             }
-            movements.push({
+            allMovements.push({
                 date: f.date,
                 type: 'Abono',
                 documentType: 'Pago',
@@ -343,13 +349,14 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
             });
         });
 
-        const sortedMovements = movements.sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
-        
+        const sortedMovements = allMovements.sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
         const fromDate = dateRange?.from ? startOfDay(dateRange.from) : null;
         
-        const initialBal = sortedMovements
-            .filter(m => fromDate && isBefore(parseISO(m.date), fromDate))
-            .reduce((balance, mov) => balance + mov.charge - mov.payment, 0);
+        const bal = sortedMovements.reduce((acc, mov) => acc + (mov.charge - mov.payment), 0);
+        
+        const initialBal = fromDate ? sortedMovements
+            .filter(m => isBefore(parseISO(m.date), fromDate))
+            .reduce((balance, mov) => balance + mov.charge - mov.payment, 0) : 0;
 
         let runningBalance = initialBal;
         const filtered = sortedMovements
@@ -383,7 +390,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                              <PDFDownloadLink
                                 document={
                                 <StatementDocument
-                                    account={{...account, finalBalance }}
+                                    account={{...account, finalBalance: finalBalance }}
                                     movements={filteredMovements}
                                     dateRange={dateRange}
                                     initialBalance={initialBalance}
