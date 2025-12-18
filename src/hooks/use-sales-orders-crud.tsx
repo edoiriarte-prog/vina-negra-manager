@@ -1,15 +1,15 @@
 "use client";
 
 import { useFirebase } from "@/firebase";
-import { collection, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, setDoc, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { SalesOrder } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation"; // 1. IMPORTAR ESTO
+import { useRouter } from "next/navigation"; 
 
 export function useSalesOrdersCRUD() {
   const { firestore: db } = useFirebase();
   const { toast } = useToast();
-  const router = useRouter(); // 2. INICIALIZAR ESTO
+  const router = useRouter(); 
 
   const createSalesOrder = async (data: Omit<SalesOrder, "id">) => {
     if (!db) {
@@ -25,28 +25,33 @@ export function useSalesOrdersCRUD() {
       });
       toast({ title: "Orden Creada", description: "Venta registrada exitosamente." });
       
-      router.refresh(); // 3. EL SECRETO: FORZAR RECARGA
+      router.refresh(); 
       
       return newDocRef;
     } catch (error: any) {
-      console.error(error);
-      toast({ variant: "destructive", title: "Error", description: error.message });
+      console.error("Error al crear la orden de venta:", error);
+      toast({ variant: "destructive", title: "Error de Creación", description: error.message });
+      throw error; // Re-lanza el error para que el componente que llama pueda manejarlo si es necesario
     }
   };
 
   const updateSalesOrder = async (id: string, data: Partial<SalesOrder>) => {
-    if (!db) return;
+    if (!db) {
+      toast({ variant: "destructive", title: "Error", description: "Sin conexión." });
+      return;
+    };
     try {
       const docRef = doc(db, "salesOrders", id);
       await updateDoc(docRef, data);
       
-      toast({ title: "Actualizado", description: "Estado cambiado correctamente." });
+      toast({ title: "Actualizado", description: "Los cambios se han guardado correctamente." });
       
-      router.refresh(); // 3. EL SECRETO: FORZAR RECARGA AQUÍ TAMBIÉN
+      router.refresh();
       
-    } catch (error) {
-      console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "Falló la actualización." });
+    } catch (error: any) {
+      console.error("Error al actualizar la orden de venta:", error);
+      toast({ variant: "destructive", title: "Error de Actualización", description: "No se pudieron guardar los cambios. " + error.message });
+      throw error; // Re-lanza el error
     }
   };
 
@@ -55,7 +60,7 @@ export function useSalesOrdersCRUD() {
     try {
       await deleteDoc(doc(db, "salesOrders", id));
       toast({ title: "Eliminado", description: "Orden borrada." });
-      router.refresh(); // 3. Y AQUÍ
+      router.refresh();
     } catch (error) {
       console.error(error);
       toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar." });
