@@ -451,7 +451,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                     </div>
                     <ScrollArea className="h-[calc(100vh-350px)]">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargos (-)</TableHead><TableHead className="text-right">Abonos (+)</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
+                            <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargos (-)</TableHead><TableHead className="text-right">Abonos (+)</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {filteredMovements.length === 0 ? (
                                     <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">No hay movimientos para este contacto en el período seleccionado.</TableCell></TableRow>
@@ -479,7 +479,6 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-red-400">{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</TableCell>
                                             <TableCell className="text-right font-mono text-emerald-400">{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</TableCell>
-                                            <TableCell className="text-right font-mono font-semibold">{formatCurrency(mov.balance)}</TableCell>
                                         </TableRow>
                                     ))
                                 )}
