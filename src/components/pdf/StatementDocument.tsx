@@ -16,7 +16,8 @@ const styles = StyleSheet.create({
       paddingBottom: 10
   },
   companyWrapper: { flexDirection: 'row', alignItems: 'center' },
-  logo: { width: 60, height: 40, objectFit: 'contain', marginRight: 10 },
+  logo: { width: 40, height: 40, objectFit: 'contain', marginRight: 10 },
+  companyInfo: { flexDirection: 'column' },
   companyName: { fontSize: 18, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' },
   companyDetails: { fontSize: 9, fontFamily: 'Helvetica', color: '#374151' },
   
@@ -115,6 +116,7 @@ const styles = StyleSheet.create({
   },
   detailItem: { fontSize: 8, fontFamily: 'Helvetica', marginBottom: 2 },
   detailHeader: { fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 3 },
+  detailVence: { fontSize: 8, color: '#DC2626', fontFamily: 'Helvetica-Oblique' }
 });
 
 // Helpers
@@ -136,8 +138,7 @@ export const StatementDocument = ({ account, movements, dateRange, initialBalanc
     ? `PERIODO: Del ${format(dateRange.from, 'dd/MM/yyyy')} al ${format(dateRange.to || dateRange.from, 'dd/MM/yyyy')}`
     : `Al ${format(new Date(), "dd 'de' MMMM, yyyy", { locale: es })}`;
     
-    // Suponemos que el logo está en la carpeta `public`
-    const logoUrl = '/logo.jpg';
+    const logoUrl = '/logo-avn.png';
 
     return (
         <Document>
@@ -187,13 +188,18 @@ export const StatementDocument = ({ account, movements, dateRange, initialBalanc
                         return (
                             <View key={i} style={[styles.tableRow, i % 2 === 0 && styles.tableRowAlt]} wrap={false}>
                                 <Text style={[styles.tableCell, styles.colDate]}>{formatDate(mov.date)}</Text>
-                                <Text style={[styles.tableCell, styles.colRef, {fontFamily: 'Helvetica-Oblique'}]}>{mov.reference}</Text>
+                                <Text style={[styles.tableCell, styles.colRef, {fontFamily: 'Helvetica-Oblique'}]}>{mov.reference.replace('OV-OV-', 'OV-')}</Text>
                                 <View style={[styles.tableCell, styles.colConcept]}>
                                   {isDetailsArray ? (
                                     <>
-                                        <Text style={styles.detailHeader}>
-                                            {mov.reference} {mov.paymentDueDate ? `(Vence: ${formatDate(mov.paymentDueDate)})` : ''}
-                                        </Text>
+                                        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
+                                            <Text style={styles.detailHeader}>
+                                                {mov.reference.replace('OV-OV-', 'OV-')}
+                                            </Text>
+                                            {mov.paymentDueDate && (
+                                                <Text style={styles.detailVence}> (Vence: {formatDate(mov.paymentDueDate)})</Text>
+                                            )}
+                                        </View>
                                         {mov.details.map((item: any, idx: number) => (
                                           <Text key={idx} style={styles.detailItem}>
                                               • {item.product} ({item.caliber}): {item.quantity}kg a {formatCurrency(item.price * 1.19)}
@@ -225,8 +231,8 @@ export const StatementDocument = ({ account, movements, dateRange, initialBalanc
                         <Text style={[styles.summaryValue, { color: periodBalance > 0 ? '#DC2626' : '#111827'}]}>{formatCurrency(periodBalance)}</Text>
                     </View>
                     <View style={styles.summaryTotalRow}>
-                        <Text style={styles.summaryTotalLabel}>SALDO HISTÓRICO TOTAL:</Text>
-                        <Text style={[styles.summaryTotalValue, { color: account.balance > 0 ? '#DC2626' : '#111827'}]}>{formatCurrency(finalBalance)}</Text>
+                        <Text style={styles.summaryTotalLabel}>SALDO FINAL HISTÓRICO:</Text>
+                        <Text style={[styles.summaryTotalValue, { color: finalBalance > 0 ? '#DC2626' : '#111827'}]}>{formatCurrency(finalBalance)}</Text>
                     </View>
                 </View>
 

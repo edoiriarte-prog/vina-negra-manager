@@ -303,6 +303,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
 
     const { filteredMovements, initialBalance, finalBalance } = useMemo(() => {
         if (!account) return { filteredMovements: [], initialBalance: 0, finalBalance: 0 };
+
         const movements: Omit<DetailedMovement, 'balance'>[] = [];
 
         const isClient = (account.contact.type || []).includes('client');
@@ -312,9 +313,13 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
         relevantOrders.filter(o => ((isClient ? (o as SalesOrder).clientId : (o as PurchaseOrder).supplierId) === account.contact.id) && o.status !== 'cancelled' && o.status !== 'draft').forEach(o => {
             const grossAmount = o.includeVat !== false ? Math.round((o.totalAmount || 0) * 1.19) : (o.totalAmount || 0);
             movements.push({
-                date: o.date, type: 'Cargo', documentType: isClient ? 'O/V' : 'O/C',
+                date: o.date,
+                type: 'Cargo',
+                documentType: isClient ? 'O/V' : 'O/C',
                 reference: isClient ? `OV-${o.number}` : `OC-${o.number}`,
-                details: o.items, charge: grossAmount, payment: 0,
+                details: o.items,
+                charge: grossAmount,
+                payment: 0,
                 paymentDueDate: (o as SalesOrder).paymentDueDate
             });
         });
@@ -328,8 +333,13 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
               description = `Pago ${docType} ${order?.number || docId}`;
             }
             movements.push({
-                date: f.date, type: 'Abono', documentType: 'Pago', reference: f.voucherNumber || f.id,
-                details: description, charge: 0, payment: f.amount || 0
+                date: f.date,
+                type: 'Abono',
+                documentType: 'Pago',
+                reference: f.voucherNumber || f.id,
+                details: description,
+                charge: 0,
+                payment: f.amount || 0
             });
         });
 
@@ -373,7 +383,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                              <PDFDownloadLink
                                 document={
                                 <StatementDocument
-                                    account={{...account, finalBalance: finalBalance}}
+                                    account={{...account, finalBalance }}
                                     movements={filteredMovements}
                                     dateRange={dateRange}
                                     initialBalance={initialBalance}
@@ -445,7 +455,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                     </div>
                     <ScrollArea className="h-[calc(100vh-350px)]">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargos (-)</TableHead><TableHead className="text-right">Abonos (+)</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
+                            <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Crédito</TableHead><TableHead className="text-right">Abono</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 <TableRow className="border-slate-800/50 bg-slate-900 font-bold">
                                     <TableCell colSpan={6} className="text-slate-400">Saldo Anterior (Transporte)</TableCell>
