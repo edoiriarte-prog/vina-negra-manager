@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale';
 
 // Estilos
 const styles = StyleSheet.create({
-  page: { padding: 40, fontSize: 11, fontFamily: 'Helvetica', color: '#111827' },
+  page: { padding: 40, fontSize: 10, fontFamily: 'Helvetica', color: '#111827' },
   
   headerContainer: { 
       flexDirection: 'row', 
@@ -19,33 +19,32 @@ const styles = StyleSheet.create({
   companyWrapper: { flexDirection: 'row', alignItems: 'center' },
   logo: { width: 60, height: 40, objectFit: 'contain', marginBottom: 5, marginRight: 10 },
   companyName: { fontSize: 18, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' },
-  companyDetails: { fontSize: 10, fontFamily: 'Helvetica', color: '#000' },
+  companyDetails: { fontSize: 9, fontFamily: 'Helvetica', color: '#374151' },
   
   docInfo: { alignItems: 'flex-end' },
   docTitle: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 5, textTransform: 'uppercase' },
-  docSubtitle: { fontSize: 11, fontFamily: 'Helvetica', color: '#000' },
+  docSubtitle: { fontSize: 11, fontFamily: 'Helvetica', color: '#374151' },
 
   clientBox: { border: '1px solid #E5E7EB', borderRadius: 3, padding: 10, marginBottom: 20, backgroundColor: '#F9FAFB' },
   clientName: { fontFamily: 'Helvetica-Bold', fontSize: 12, marginBottom: 2 },
-  clientDetails: { fontSize: 10, fontFamily: 'Helvetica', color: '#000' },
+  clientDetails: { fontSize: 10, fontFamily: 'Helvetica', color: '#374151' },
 
   table: { width: '100%', border: '1px solid #E5E7EB', borderRadius: 3, overflow: 'hidden' },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderBottom: '1px solid #D1D5DB', padding: 8, alignItems: 'center' },
-  tableHeaderCell: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#000', textTransform: 'uppercase' },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderBottom: '1px solid #D1D5DB', padding: '6 8', alignItems: 'center' },
+  tableHeaderCell: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#374151', textTransform: 'uppercase' },
   
-  tableRow: { flexDirection: 'row', borderBottom: '1px solid #F3F4F6', padding: '6px 8px', alignItems: 'center' },
+  tableRow: { flexDirection: 'row', borderBottom: '1px solid #F3F4F6', padding: '6px 8px', alignItems: 'flex-start' },
   tableRowAlt: { backgroundColor: '#F9FAFB' },
-  tableCell: { fontSize: 10, fontFamily: 'Helvetica' },
-
+  tableCell: { fontSize: 9, fontFamily: 'Helvetica' },
+  
   colDate: { width: '12%' },
   colRef: { width: '15%' },
-  colConcept: { width: '28%' },
-  colCharge: { width: '15%', textAlign: 'right', color: '#DC2626', fontFamily: 'Helvetica' },
-  colPayment: { width: '15%', textAlign: 'right', color: '#059669', fontFamily: 'Helvetica' },
-  colBalance: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica-Bold' },
+  colConcept: { width: '43%' },
+  colCharge: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica-Bold' },
+  colPayment: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica-Bold', color: '#059669' },
 
   footer: { position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1px solid #E5E7EB', paddingTop: 8 },
-  footerText: { fontSize: 9, fontFamily: 'Helvetica', color: '#000' },
+  footerText: { fontSize: 8, fontFamily: 'Helvetica', color: '#6B7280' },
   
   summaryBox: {
     marginTop: 20,
@@ -53,6 +52,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 3,
     border: '1px solid #E5E7EB',
+    width: '50%',
+    alignSelf: 'flex-end',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -62,7 +63,7 @@ const styles = StyleSheet.create({
   summaryLabel: {
     fontSize: 10,
     fontFamily: 'Helvetica',
-    color: '#000',
+    color: '#374151',
   },
   summaryValue: {
     fontSize: 10,
@@ -110,7 +111,7 @@ const styles = StyleSheet.create({
   signatureSubtext: {
     fontSize: 9,
     fontFamily: 'Helvetica',
-    color: '#000',
+    color: '#6B7280',
     marginTop: 1,
   },
 });
@@ -126,6 +127,9 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
     
     const { contact } = account;
     const logoUrl = '/logo.jpg'; 
+
+    const totalCargos = movements.reduce((sum, mov) => sum + (mov.charge || 0), 0);
+    const totalAbonos = movements.reduce((sum, mov) => sum + (mov.payment || 0), 0);
 
     return (
         <Document>
@@ -157,9 +161,8 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                         <Text style={[styles.tableHeaderCell, styles.colDate]}>Fecha</Text>
                         <Text style={[styles.tableHeaderCell, styles.colRef]}>Referencia</Text>
                         <Text style={[styles.tableHeaderCell, styles.colConcept]}>Concepto / Detalle</Text>
-                        <Text style={[styles.tableHeaderCell, styles.colCharge]}>Cargos (-)</Text>
-                        <Text style={[styles.tableHeaderCell, styles.colPayment]}>Abonos (+)</Text>
-                        <Text style={[styles.tableHeaderCell, styles.colBalance]}>Saldo</Text>
+                        <Text style={[styles.tableHeaderCell, styles.colCharge]}>Crédito</Text>
+                        <Text style={[styles.tableHeaderCell, styles.colPayment]}>Abono</Text>
                     </View>
 
                     {movements.map((mov, i) => {
@@ -172,7 +175,7 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                                 <View style={[styles.tableCell, styles.colConcept]}>
                                   {isDetailsArray ? (
                                       mov.details.map((item: any, idx: number) => (
-                                          <Text key={idx} style={{fontSize: 8}}>
+                                          <Text key={idx} style={{fontSize: 8, fontFamily: 'Helvetica', marginBottom: 2}}>
                                               • {item.product} ({item.caliber}): {item.quantity}kg a {formatCurrency(item.price)}
                                           </Text>
                                       ))
@@ -182,7 +185,6 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                                 </View>
                                 <Text style={[styles.tableCell, styles.colCharge]}>{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</Text>
                                 <Text style={[styles.tableCell, styles.colPayment]}>{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</Text>
-                                <Text style={[styles.tableCell, styles.colBalance]}>{formatCurrency(mov.balance)}</Text>
                             </View>
                         );
                     })}
@@ -190,15 +192,15 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
 
                 <View style={styles.summaryBox}>
                     <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Total Facturado:</Text>
-                        <Text style={styles.summaryValue}>{formatCurrency(account.totalBilled)}</Text>
+                        <Text style={styles.summaryLabel}>Total Créditos (Periodo):</Text>
+                        <Text style={styles.summaryValue}>{formatCurrency(totalCargos)}</Text>
                     </View>
                      <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Total Pagado:</Text>
-                        <Text style={[styles.summaryValue, { color: '#059669'}]}>{formatCurrency(account.totalPaid)}</Text>
+                        <Text style={styles.summaryLabel}>Total Abonos (Periodo):</Text>
+                        <Text style={[styles.summaryValue, { color: '#059669'}]}>{formatCurrency(totalAbonos)}</Text>
                     </View>
                     <View style={styles.summaryTotalRow}>
-                        <Text style={styles.summaryTotalLabel}>Saldo Pendiente:</Text>
+                        <Text style={styles.summaryTotalLabel}>SALDO TOTAL (Histórico):</Text>
                         <Text style={[styles.summaryTotalValue, { color: account.balance > 0 ? '#DC2626' : '#111827'}]}>{formatCurrency(account.balance)}</Text>
                     </View>
                 </View>
@@ -206,8 +208,8 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                 <View style={styles.signatures} fixed>
                      <View style={styles.signatureBox}>
                         <View style={styles.signatureLine} />
-                        <Text style={styles.signatureText}>Gerencia de Ventas</Text>
-                        <Text style={styles.signatureSubtext}>JOSE ROJAS CARMONA</Text>
+                        <Text style={styles.signatureText}>Gerencia</Text>
+                        <Text style={styles.signatureSubtext}>EDUARDO IRIARTE</Text>
                     </View>
                      <View style={styles.signatureBox}>
                         <View style={styles.signatureLine} />
