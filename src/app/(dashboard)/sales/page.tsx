@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -39,7 +40,6 @@ const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 
 const formatDate = (dateString?: string) => {
     if (!dateString) return "-";
     try {
-        // Asegurarse que la fecha es interpretada correctamente antes de formatear
         const parsedDate = parseISO(dateString);
         if (isValid(parsedDate)) {
             return format(parsedDate, "dd-MM-yyyy");
@@ -53,8 +53,16 @@ const formatDate = (dateString?: string) => {
 const excelDate = (dateString?: string): Date | null => {
     if (!dateString) return null;
     try {
-        const parsed = parseISO(dateString);
-        return isValid(parsed) ? parsed : null;
+        // Corrección: Crear la fecha en UTC para evitar desfases de zona horaria.
+        // new Date('2023-12-25') puede ser interpretado como 24 de Dic a las 20:00 en algunas zonas.
+        // Añadir 'T00:00:00' lo estandariza.
+        const date = new Date(dateString + 'T00:00:00');
+        if (isValid(date)) {
+          // Corrección para evitar que la fecha se muestre un día antes en Excel
+          const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+          return new Date(date.getTime() + userTimezoneOffset);
+        }
+        return null;
     } catch {
         return null;
     }
@@ -144,18 +152,16 @@ export default function SalesPage() {
 
     const ws = XLSX.utils.json_to_sheet(data);
     
-    // Aplicar formato a columnas numéricas
     const range = XLSX.utils.decode_range(ws['!ref']!);
-    for (let R = range.s.r + 1; R <= range.e.r; ++R) { // +1 para saltar header
-        const numCols = ['E', 'F', 'G', 'J']; // Kilos, Neto, c/IVA, Días Crédito
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) { 
+        const numCols = ['E', 'F', 'G', 'J']; 
         numCols.forEach(col => {
             const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
             if (!ws[cell_address]) return;
             ws[cell_address].t = 'n';
-            ws[cell_address].z = '#,##0';
         });
         
-        const dateCols = ['B', 'K', 'O', 'P']; // Emisión, Vencimiento, Despacho, Facturación
+        const dateCols = ['B', 'K', 'O', 'P']; 
         dateCols.forEach(col => {
              const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
              if (!ws[cell_address] || !ws[cell_address].v) return;
