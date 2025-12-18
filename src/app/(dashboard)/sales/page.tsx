@@ -29,7 +29,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
 import * as XLSX from 'xlsx';
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 import { es } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,9 +39,24 @@ const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 
 const formatDate = (dateString?: string) => {
     if (!dateString) return "-";
     try {
-        return format(parseISO(dateString), "dd-MM-yyyy");
+        // Asegurarse que la fecha es interpretada correctamente antes de formatear
+        const parsedDate = parseISO(dateString);
+        if (isValid(parsedDate)) {
+            return format(parsedDate, "dd-MM-yyyy");
+        }
+        return dateString;
     } catch (e) {
         return dateString;
+    }
+};
+
+const excelDate = (dateString?: string): Date | null => {
+    if (!dateString) return null;
+    try {
+        const parsed = parseISO(dateString);
+        return isValid(parsed) ? parsed : null;
+    } catch {
+        return null;
     }
 };
 
@@ -108,7 +123,7 @@ export default function SalesPage() {
         const total = o.includeVat !== false ? net * 1.19 : net;
         return {
             'N° Venta': o.number,
-            'Fecha Emisión': formatDate(o.date),
+            'Fecha Emisión': excelDate(o.date),
             'Cliente': clientName,
             'Estado': o.status,
             'Kilos Totales': o.totalKilos || 0,
@@ -116,18 +131,39 @@ export default function SalesPage() {
             'Monto Total c/IVA': total,
             'Tipo de Venta': o.saleType,
             'Forma de Pago': o.paymentMethod,
-            'Días Crédito': o.creditDays,
-            'Fecha Vencimiento': formatDate(o.paymentDueDate),
+            'Días Crédito': o.creditDays || 0,
+            'Fecha Vencimiento': excelDate(o.paymentDueDate),
             'Bodega Origen': o.warehouse,
             'Chofer': o.driver,
             'Patente': o.plate,
-            'Fecha Despacho': formatDate(o.dispatchedDate),
-            'Fecha Facturación': formatDate(o.invoicedDate),
+            'Fecha Despacho': excelDate(o.dispatchedDate),
+            'Fecha Facturación': excelDate(o.invoicedDate),
             'N° Factura': o.invoiceNumber || '-',
         };
     });
 
     const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Aplicar formato a columnas numéricas
+    const range = XLSX.utils.decode_range(ws['!ref']!);
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) { // +1 para saltar header
+        const numCols = ['E', 'F', 'G', 'J']; // Kilos, Neto, c/IVA, Días Crédito
+        numCols.forEach(col => {
+            const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
+            if (!ws[cell_address]) return;
+            ws[cell_address].t = 'n';
+            ws[cell_address].z = '#,##0';
+        });
+        
+        const dateCols = ['B', 'K', 'O', 'P']; // Emisión, Vencimiento, Despacho, Facturación
+        dateCols.forEach(col => {
+             const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
+             if (!ws[cell_address] || !ws[cell_address].v) return;
+             ws[cell_address].t = 'd';
+             ws[cell_address].z = 'dd-mm-yyyy';
+        });
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ventas");
     XLSX.writeFile(wb, `Reporte_Ventas_${format(new Date(), 'ddMMyyyy')}.xlsx`);
@@ -373,4 +409,3 @@ export default function SalesPage() {
   );
 }
 
-    
