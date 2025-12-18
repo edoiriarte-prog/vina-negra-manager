@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { SalesOrder } from "@/lib/types"; 
 import { getColumns } from "./components/columns"; 
 import { DataTable } from "./components/data-table"; 
@@ -10,7 +9,7 @@ import { useOperations } from "@/hooks/use-operations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, FileSpreadsheet, Users, Calendar, Search, FileText } from "lucide-react";
-import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
+import NewSalesOrderSheet from "./components/new-sales-order-sheet";
 import { SalesOrderPreview } from "./components/sales-order-preview"; 
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,26 +25,33 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { db } from "@/firebase/init";
-import { doc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
 import * as XLSX from 'xlsx';
 import { format, parseISO } from "date-fns";
 import { es } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Helper
+// Helpers
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
-const formatDate = (dateString: string) => format(parseISO(dateString), "dd-MM-yyyy");
+const formatDate = (dateString: string) => {
+    try {
+        return format(parseISO(dateString), "dd-MM-yyyy");
+    } catch (e) {
+        return dateString;
+    }
+};
 
 export default function SalesPage() {
-  const router = useRouter();
   const { toast } = useToast();
 
-  const { salesOrders, purchaseOrders, inventoryAdjustments } = useOperations();
-  const { contacts, inventory } = useMasterData();
-  const { createSalesOrder, updateSalesOrder } = useSalesOrdersCRUD();
+  // Hooks de Datos (Providers)
+  const { salesOrders, purchaseOrders, inventoryAdjustments, isLoading: opsLoading } = useOperations();
+  const { contacts, inventory, isLoading: masterLoading } = useMasterData();
+  
+  // Hook de Acciones (CRUD)
+  const { createSalesOrder, updateSalesOrder, deleteSalesOrder } = useSalesOrdersCRUD();
   
   const clients = useMemo(() => contacts?.filter(c => Array.isArray(c.type) ? c.type.includes('client') : c.type === 'client') || [], [contacts]);
   const salesList = useMemo(() => (salesOrders || []).filter(o => o.orderType !== 'dispatch' && o.status !== 'cancelled'), [salesOrders]);
@@ -56,12 +62,14 @@ export default function SalesPage() {
   const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Guardar (Crear o Editar)
   const handleSave = async (orderData: SalesOrder | Omit<SalesOrder, "id">) => {
     try {
         if ('id' in orderData && orderData.id) {
-            await updateSalesOrder(orderData.id, orderData as SalesOrder);
+            await updateSalesOrder(orderData.id, orderData);
         } else {
-            await createSalesOrder(orderData as SalesOrder);
+            // @ts-ignore
+            await createSalesOrder(orderData);
         }
         setIsSheetOpen(false);
         setEditingOrder(null);
@@ -74,26 +82,44 @@ export default function SalesPage() {
   const handleEdit = (order: SalesOrder) => { setEditingOrder(order); setIsSheetOpen(true); };
   const handleCreate = () => { setEditingOrder(null); setIsSheetOpen(true); };
 
-  const handleDeleteRequest = async (order: SalesOrder) => {
-      if (!db) return;
-      if (!order.id) return toast({ variant: 'destructive', title: 'Error', description: 'ID de orden no encontrado.' });
+  // Eliminar
+  const handleDeleteRequest = (order: SalesOrder) => {
       setDeletingOrder(order);
   }
   
   const confirmDelete = async () => {
-    if (!deletingOrder || !db) return;
+    if (!deletingOrder) return;
     try {
-        await deleteDoc(doc(db, "salesOrders", deletingOrder.id));
-        toast({ title: "Orden Eliminada", description: `La orden ${deletingOrder.number} ha sido eliminada.`});
+        await deleteSalesOrder(deletingOrder.id);
         setDeletingOrder(null);
     } catch(e) {
         console.error("Error al eliminar:", e);
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar la orden.' });
     }
   };
 
+  // Exportar Excel
   const handleExportPackingList = () => {
-    if (salesList.length === 0) return toast({ variant: "destructive", title: "No hay datos", description: "No hay órdenes para exportar." });
+    if (filteredOrders.length === 0) return toast({ variant: "destructive", title: "No hay datos", description: "No hay órdenes para exportar." });
+    
+    const data = filteredOrders.map(o => {
+        const clientName = clients.find(c => c.id === o.clientId)?.name || 'Desconocido';
+        const net = o.totalAmount || 0;
+        const total = o.includeVat !== false ? net * 1.19 : net;
+        return {
+            'N° Venta': o.number,
+            'Fecha': formatDate(o.date),
+            'Cliente': clientName,
+            'Estado': o.status,
+            'Kilos': o.totalKilos || 0,
+            'Neto': net,
+            'Total c/IVA': total
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+    XLSX.writeFile(wb, `Reporte_Ventas_${format(new Date(), 'ddMMyyyy')}.xlsx`);
   };
 
   const { filteredOrders, groupedByClient, groupedByDate, totalGrossAmount } = useMemo(() => {
@@ -104,9 +130,11 @@ export default function SalesPage() {
     const orders = salesList.filter((o) => {
         const clientName = clients.find(c => c.id === o.clientId)?.name || '';
         const clientRut = clients.find(c => c.id === o.clientId)?.rut || '';
+        const status = o.status || '';
         return (o.number?.toLowerCase() || '').includes(searchTermLower) ||
                clientName.toLowerCase().includes(searchTermLower) ||
-               clientRut.toLowerCase().includes(searchTermLower);
+               clientRut.toLowerCase().includes(searchTermLower) ||
+               status.toLowerCase().includes(searchTermLower);
     });
 
     const total = orders.reduce((sum, order) => {
@@ -132,7 +160,16 @@ export default function SalesPage() {
       acc[date].total += order.includeVat !== false ? net * 1.19 : net;
       return acc;
     }, {} as Record<string, { orders: SalesOrder[], total: number }>);
-    const dateArray = Object.entries(byDate).map(([date, data]) => ({ date, ...data }));
+
+    // --- CORRECCIÓN CRÍTICA AQUÍ ---
+    // Usamos a[1] y b[1] para acceder al valor, porque [0] es la clave (fecha string)
+    const dateArray = Object.entries(byDate)
+        .sort((a, b) => {
+            const dateA = a[1].orders[0]?.date ? new Date(a[1].orders[0].date).getTime() : 0;
+            const dateB = b[1].orders[0]?.date ? new Date(b[1].orders[0].date).getTime() : 0;
+            return dateB - dateA;
+        })
+        .map(([date, data]) => ({ date, ...data }));
 
     return { filteredOrders: orders, groupedByClient: clientArray, groupedByDate: dateArray, totalGrossAmount: total };
   }, [salesList, clients, searchTerm]);
@@ -144,25 +181,37 @@ export default function SalesPage() {
         <Table>
             <TableHeader>
                 <TableRow className="border-slate-800">
-                    <TableHead className="text-slate-400">N° Orden</TableHead>
-                    <TableHead className="text-slate-400">Fecha</TableHead>
-                    <TableHead className="text-slate-400 text-right">Monto c/IVA</TableHead>
+                    <TableHead className="text-slate-400 text-xs">N° Orden</TableHead>
+                    <TableHead className="text-slate-400 text-xs">Fecha</TableHead>
+                    <TableHead className="text-slate-400 text-xs text-right">Monto c/IVA</TableHead>
                     <TableHead className="w-10"></TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {items.map(order => (
-                    <TableRow key={order.id} className="border-slate-800">
-                        <TableCell className="font-medium text-slate-200">{order.number}</TableCell>
-                        <TableCell className="text-slate-400">{formatDate(order.date)}</TableCell>
-                        <TableCell className="text-right text-emerald-400 font-mono">{formatCurrency(order.totalAmount * (order.includeVat !== false ? 1.19 : 1))}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewOrder(order)}><FileText className="h-4 w-4"/></Button></TableCell>
+                    <TableRow key={order.id} className="border-slate-800 hover:bg-slate-800/50">
+                        <TableCell className="font-medium text-slate-200 text-xs">{order.number}</TableCell>
+                        <TableCell className="text-slate-400 text-xs">{formatDate(order.date)}</TableCell>
+                        <TableCell className="text-right text-emerald-400 font-mono text-xs font-bold">{formatCurrency(order.totalAmount * (order.includeVat !== false ? 1.19 : 1))}</TableCell>
+                        <TableCell><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPreviewOrder(order)}><FileText className="h-3 w-3 text-blue-400"/></Button></TableCell>
                     </TableRow>
                 ))}
             </TableBody>
         </Table>
     </div>
   );
+
+  if (opsLoading || masterLoading) {
+      return (
+          <div className="p-6 space-y-6 bg-slate-950 min-h-screen">
+              <div className="flex justify-between">
+                  <Skeleton className="h-10 w-48 bg-slate-900" />
+                  <Skeleton className="h-10 w-32 bg-slate-900" />
+              </div>
+              <Skeleton className="h-[500px] w-full bg-slate-900 rounded-xl border border-slate-800" />
+          </div>
+      )
+  }
 
   return (
     <div className="p-3 md:p-6 space-y-6 bg-slate-950 min-h-screen text-slate-100">
@@ -187,9 +236,9 @@ export default function SalesPage() {
             <Tabs defaultValue="list">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                     <TabsList className="bg-slate-800/50 border border-slate-700 p-1 h-auto">
-                        <TabsTrigger value="list" className="data-[state=active]:bg-slate-700 data-[state=active]:text-white">Listado General</TabsTrigger>
-                        <TabsTrigger value="byClient" className="data-[state=active]:bg-slate-700 data-[state=active]:text-white"><Users className="mr-2 h-4 w-4"/>Por Cliente</TabsTrigger>
-                        <TabsTrigger value="byDate" className="data-[state=active]:bg-slate-700 data-[state=active]:text-white"><Calendar className="mr-2 h-4 w-4"/>Por Fecha</TabsTrigger>
+                        <TabsTrigger value="list" className="data-[state=active]:bg-slate-700 data-[state=active]:text-white text-xs md:text-sm">Listado General</TabsTrigger>
+                        <TabsTrigger value="byClient" className="data-[state=active]:bg-slate-700 data-[state=active]:text-white text-xs md:text-sm"><Users className="mr-2 h-3 w-3 md:h-4 md:w-4"/>Por Cliente</TabsTrigger>
+                        <TabsTrigger value="byDate" className="data-[state=active]:bg-slate-700 data-[state=active]:text-white text-xs md:text-sm"><Calendar className="mr-2 h-3 w-3 md:h-4 md:w-4"/>Por Fecha</TabsTrigger>
                     </TabsList>
 
                     <div className="relative w-full md:w-auto">
@@ -208,24 +257,26 @@ export default function SalesPage() {
                     <span className="text-xl font-bold text-emerald-400">{formatCurrency(totalGrossAmount)}</span>
                 </div>
 
-                <TabsContent value="list">
-                    <DataTable columns={columns} data={filteredOrders} />
+                <TabsContent value="list" className="space-y-4">
+                    <div className="rounded-md border border-slate-800 overflow-hidden">
+                        <DataTable columns={columns} data={filteredOrders} />
+                    </div>
                 </TabsContent>
                 
                 <TabsContent value="byClient">
-                    <Accordion type="single" collapsible>
+                    <Accordion type="single" collapsible className="space-y-2">
                         {groupedByClient.map(group => (
-                            <AccordionItem value={group.name} key={group.name} className="border-slate-800">
-                                <AccordionTrigger className="hover:no-underline hover:bg-slate-800/50 px-4 rounded-md">
-                                    <div className="flex justify-between items-center w-full">
-                                        <span className="font-semibold text-slate-200">{group.name}</span>
+                            <AccordionItem value={group.name} key={group.name} className="border border-slate-800 rounded-lg bg-slate-900/30 overflow-hidden">
+                                <AccordionTrigger className="hover:no-underline hover:bg-slate-800/50 px-4 py-3">
+                                    <div className="flex justify-between items-center w-full pr-4">
+                                        <span className="font-semibold text-slate-200 text-left">{group.name}</span>
                                         <div className="flex items-center gap-4">
-                                            <Badge variant="outline">{group.orders.length} orden(es)</Badge>
-                                            <span className="font-mono text-emerald-400">{formatCurrency(group.total)}</span>
+                                            <Badge variant="outline" className="hidden sm:inline-flex">{group.orders.length} orden(es)</Badge>
+                                            <span className="font-mono text-emerald-400 font-bold">{formatCurrency(group.total)}</span>
                                         </div>
                                     </div>
                                 </AccordionTrigger>
-                                <AccordionContent className="p-2">
+                                <AccordionContent className="p-4 bg-slate-950/30 border-t border-slate-800">
                                     {renderGroupedTable(group.orders)}
                                 </AccordionContent>
                             </AccordionItem>
@@ -234,19 +285,25 @@ export default function SalesPage() {
                 </TabsContent>
                 
                 <TabsContent value="byDate">
-                    <Accordion type="single" collapsible>
+                    <Accordion type="single" collapsible className="space-y-2">
                         {groupedByDate.map(group => (
-                             <AccordionItem value={group.date} key={group.date} className="border-slate-800">
-                                <AccordionTrigger className="hover:no-underline hover:bg-slate-800/50 px-4 rounded-md">
-                                    <div className="flex justify-between items-center w-full">
-                                        <span className="font-semibold text-slate-200">{format(parseISO(group.orders[0].date), "EEEE, dd 'de' MMMM", { locale: es })}</span>
+                             <AccordionItem value={group.date} key={group.date} className="border border-slate-800 rounded-lg bg-slate-900/30 overflow-hidden">
+                                <AccordionTrigger className="hover:no-underline hover:bg-slate-800/50 px-4 py-3">
+                                    <div className="flex justify-between items-center w-full pr-4">
+                                        <span className="font-semibold text-slate-200 capitalize">
+                                            {(() => {
+                                                try {
+                                                    return format(parseISO(group.orders[0].date), "EEEE, dd 'de' MMMM", { locale: es });
+                                                } catch { return group.date }
+                                            })()}
+                                        </span>
                                         <div className="flex items-center gap-4">
-                                            <Badge variant="outline">{group.orders.length} orden(es)</Badge>
-                                            <span className="font-mono text-emerald-400">{formatCurrency(group.total)}</span>
+                                            <Badge variant="outline" className="hidden sm:inline-flex">{group.orders.length} orden(es)</Badge>
+                                            <span className="font-mono text-emerald-400 font-bold">{formatCurrency(group.total)}</span>
                                         </div>
                                     </div>
                                 </AccordionTrigger>
-                                <AccordionContent className="p-2">
+                                <AccordionContent className="p-4 bg-slate-950/30 border-t border-slate-800">
                                     {renderGroupedTable(group.orders)}
                                 </AccordionContent>
                             </AccordionItem>
@@ -258,22 +315,25 @@ export default function SalesPage() {
         </CardContent>
       </Card>
       
-      {isSheetOpen && (
-          <NewSalesOrderSheet
-            isOpen={isSheetOpen}
-            onOpenChange={(open) => !open && setIsSheetOpen(false)}
-            onSave={handleSave}
-            order={editingOrder}
-            clients={clients}
-            inventory={inventory}
-            sheetType="sale"
-            salesOrders={salesOrders}
-            purchaseOrders={purchaseOrders}
-            inventoryAdjustments={inventoryAdjustments}
-            contacts={contacts}
-          />
-      )}
+      {/* Modal de Crear/Editar */}
+      <NewSalesOrderSheet
+        isOpen={isSheetOpen}
+        onOpenChange={(open) => {
+            if (!open) setEditingOrder(null);
+            setIsSheetOpen(open);
+        }}
+        onSave={handleSave}
+        order={editingOrder}
+        clients={clients}
+        inventory={inventory}
+        sheetType="sale"
+        salesOrders={salesOrders}
+        purchaseOrders={purchaseOrders}
+        inventoryAdjustments={inventoryAdjustments}
+        contacts={contacts}
+      />
 
+      {/* Modal de Vista Previa */}
       {previewOrder && (
           <SalesOrderPreview
             order={previewOrder}
@@ -282,22 +342,21 @@ export default function SalesPage() {
           />
       )}
       
-      {deletingOrder && (
-        <AlertDialog open={!!deletingOrder} onOpenChange={() => setDeletingOrder(null)}>
-            <AlertDialogContent className="bg-slate-950 border-slate-800 text-slate-100">
-                <AlertDialogHeader>
-                    <AlertDialogTitle>¿Confirmas la eliminación?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-slate-400">
-                        La orden <strong>{deletingOrder.number}</strong> será eliminada permanentemente.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel className="border-slate-700 text-slate-300 hover:bg-slate-900">Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-500">Eliminar</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-      )}
+      {/* Diálogo de Confirmación de Eliminación */}
+      <AlertDialog open={!!deletingOrder} onOpenChange={() => setDeletingOrder(null)}>
+          <AlertDialogContent className="bg-slate-950 border-slate-800 text-slate-100">
+              <AlertDialogHeader>
+                  <AlertDialogTitle>¿Confirmas la eliminación?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-slate-400">
+                      La orden <strong>{deletingOrder?.number}</strong> será eliminada permanentemente. Esta acción afectará el inventario y las cuentas corrientes asociadas.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel className="border-slate-700 text-slate-300 hover:bg-slate-900">Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-500 text-white border-none">Eliminar Orden</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

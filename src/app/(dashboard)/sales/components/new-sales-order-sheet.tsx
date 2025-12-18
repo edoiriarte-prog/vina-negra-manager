@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -61,9 +60,8 @@ const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
         };
     }
     
-    // Devolvemos un estado inicial vacío para evitar discrepancias en el servidor
     return {
-        number: '', // El número se generará en el cliente
+        number: '',
         clientId: "",
         date: format(new Date(), 'yyyy-MM-dd'),
         items: [],
@@ -81,8 +79,7 @@ const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
     };
 };
 
-
-export function NewSalesOrderSheet({
+export default function NewSalesOrderSheet({ // CORRECCIÓN: Export Default
   isOpen,
   onOpenChange,
   onSave,
@@ -103,12 +100,10 @@ export function NewSalesOrderSheet({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
 
-  // LÓGICA DE GENERACIÓN DE ID MOVIDA A useEffect PARA EJECUTAR SOLO EN CLIENTE
   useEffect(() => {
     if (isOpen) {
       const initialData = getInitialFormData(order);
       if (!order) {
-          // Generar ID solo si es una nueva orden y en el cliente
           const existingIds = (salesOrders || [])
               .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
               .filter(n => !isNaN(n) && n > 0);
@@ -160,7 +155,6 @@ export function NewSalesOrderSheet({
     setFormData(prev => ({ ...prev, [name]: ['creditDays', 'advanceAmount'].includes(name) ? Number(value) : value }));
   };
 
-
   const removeItem = (index: number) => {
     setItems(prev => prev.filter((_, i) => i !== index));
   };
@@ -187,27 +181,44 @@ export function NewSalesOrderSheet({
 
     const safeNumber = formData.number || `OV-${Date.now()}`;
 
+    // Construcción limpia del objeto para evitar undefined
     const finalOrder: any = {
-        ...formData,
-        id: order?.id || safeNumber,
         number: safeNumber,
-        items: items,
+        clientId: formData.clientId || '',
+        date: formData.date,
+        status: formData.status || 'pending',
+        includeVat: formData.includeVat ?? true,
+        warehouse: formData.warehouse || 'Bodega Central',
+        paymentMethod: formData.paymentMethod || 'Contado',
+        creditDays: Number(formData.creditDays || 0),
+        notes: formData.notes || '',
+        saleType: formData.saleType || 'Venta en Firme',
+        advanceAmount: Number(formData.advanceAmount || 0),
+        bankAccountId: formData.bankAccountId || '',
+        driver: formData.driver || '',
+        plate: formData.plate || '',
+        items: items.map(item => ({
+            ...item,
+            // Asegurar que los items tampoco tengan undefined
+            quantity: Number(item.quantity || 0),
+            price: Number(item.price || 0),
+            total: Number(item.total || 0),
+            packagingQuantity: Number(item.packagingQuantity || 0)
+        })),
         totalAmount: netAmount, 
         totalKilos,
         totalPackages,
-        status: formData.status || 'pending',
     };
 
-    // SOLUCIÓN CLAVE: Eliminar claves con valor `undefined` antes de guardar.
-    Object.keys(finalOrder).forEach(key => {
-        if (finalOrder[key] === undefined) {
-            delete finalOrder[key];
-        }
-    });
+    if (order?.id) {
+        finalOrder.id = order.id;
+    }
 
     try {
         setIsSubmitting(true);
+        // @ts-ignore
         await onSave(finalOrder);
+        onOpenChange(false); // Cerrar al guardar exitosamente
     } catch (error) {
         console.error("Error al guardar desde el sheet:", error);
     } finally {
@@ -552,4 +563,3 @@ export function NewSalesOrderSheet({
     </>
   );
 }
-

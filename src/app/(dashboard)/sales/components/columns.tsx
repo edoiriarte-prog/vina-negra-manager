@@ -1,5 +1,7 @@
+
 "use client";
 
+import { useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { SalesOrder } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -12,34 +14,96 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
+import { useToast } from "@/hooks/use-toast";
 
-// --- 1. COMPONENTE DE ACCIONES (EL RESTO DE BOTONES) ---
+// --- COMPONENTE INTELIGENTE DE ESTADO (AHORA CON SELECT) ---
+const StatusCell = ({ row }: { row: any }) => {
+  const order = row.original as SalesOrder;
+  const { updateSalesOrder } = useSalesOrdersCRUD();
+  const { toast } = useToast();
+  const [currentStatus, setCurrentStatus] = useState(order.status || 'pending');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const statusConfig: Record<string, { label: string, color: string }> = {
+    'pending': { label: 'Pendiente', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20' },
+    'dispatched': { label: 'Despachada', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20' },
+    'invoiced': { label: 'Facturada', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20' },
+    'cancelled': { label: 'Cancelada', color: 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' },
+  };
+
+  const activeConfig = statusConfig[currentStatus] || statusConfig['pending'];
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (newStatus === currentStatus) return;
+    
+    setIsLoading(true);
+    setCurrentStatus(newStatus as any);
+
+    try {
+      await updateSalesOrder(order.id, { status: newStatus as any });
+      toast({
+        title: "Estado Actualizado",
+        description: `La orden #${order.number} ahora está ${statusConfig[newStatus].label}.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error al actualizar",
+        description: "No se pudo cambiar el estado de la orden.",
+      });
+      setCurrentStatus(order.status); // Revertir en caso de error
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+        <Select value={currentStatus} onValueChange={handleStatusChange} disabled={isLoading}>
+            <SelectTrigger className={`h-7 w-[130px] text-xs font-semibold border rounded-full px-3 transition-all ${activeConfig.color}`}>
+                <SelectValue>{activeConfig.label}</SelectValue>
+            </SelectTrigger>
+            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100 z-50">
+                <SelectItem value="pending" className="text-yellow-400 focus:bg-slate-800 cursor-pointer">Pendiente</SelectItem>
+                <SelectItem value="dispatched" className="text-blue-400 focus:bg-slate-800 cursor-pointer">Despachada</SelectItem>
+                <SelectItem value="invoiced" className="text-emerald-400 focus:bg-slate-800 cursor-pointer">Facturada</SelectItem>
+                <SelectItem value="cancelled" className="text-red-400 focus:bg-slate-800 cursor-pointer">Cancelada</SelectItem>
+            </SelectContent>
+        </Select>
+    </div>
+  );
+};
+
+
+// --- COMPONENTE DE ACCIONES ---
 const ActionsCell = ({ row, onEdit, onDelete, onPreview }: { row: any, onEdit: any, onDelete: any, onPreview: any }) => {
   const order = row.original;
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-800 text-slate-400">
-          <span className="sr-only">Abrir menú</span>
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200">
         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(order.number || order.id)} className="hover:bg-slate-800 cursor-pointer">
-          Copiar N° Orden
-        </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-slate-800" />
         <DropdownMenuItem onClick={() => onPreview(order)} className="hover:bg-slate-800 cursor-pointer">
           <Eye className="mr-2 h-4 w-4" /> Ver Detalle
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onEdit(order)} className="hover:bg-slate-800 cursor-pointer">
           <Edit className="mr-2 h-4 w-4" /> Editar
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onDelete(order)} className="text-red-500 hover:bg-red-900/20 cursor-pointer">
+        <DropdownMenuSeparator className="bg-slate-800" />
+        <DropdownMenuItem onClick={() => onDelete(order)} className="text-red-500 hover:bg-red-900/20 cursor-pointer focus:text-red-400 focus:bg-red-900/30">
           <Trash className="mr-2 h-4 w-4" /> Eliminar
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -80,56 +144,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
   {
     accessorKey: "status",
     header: "Estado",
-    cell: ({ row }) => {
-        const order = row.original as SalesOrder;
-        const { updateSalesOrder } = useSalesOrdersCRUD();
-        const currentStatus = order.status || 'pending';
-
-        const statusConfig: Record<string, { label: string, color: string, icon: any }> = {
-            'pending': { label: 'Pendiente', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20', icon: FileText },
-            'dispatched': { label: 'Despachada', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20', icon: Truck },
-            'invoiced': { label: 'Facturada', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20', icon: Check },
-            'cancelled': { label: 'Cancelada', color: 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20', icon: Ban },
-        };
-
-        const activeConfig = statusConfig[currentStatus] || statusConfig['pending'];
-
-        return (
-            <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Badge variant="outline" className={`${activeConfig.color} px-3 py-1 cursor-pointer transition-all flex items-center w-fit gap-1 pr-2`}>
-                {activeConfig.label} 
-                <ChevronDown className="h-3 w-3 opacity-50" />
-                </Badge>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="bg-slate-900 border-slate-800 text-slate-200">
-                <DropdownMenuLabel className="text-xs text-slate-500 uppercase">Cambiar Estado</DropdownMenuLabel>
-                
-                <DropdownMenuItem onClick={() => updateSalesOrder(order.id, { status: 'pending' })} className="hover:bg-slate-800 cursor-pointer gap-2">
-                    <FileText className="h-3 w-3 text-yellow-500"/> Pendiente
-                    {currentStatus === 'pending' && <Check className="ml-auto h-3 w-3" />}
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem onClick={() => updateSalesOrder(order.id, { status: 'dispatched' })} className="hover:bg-slate-800 cursor-pointer gap-2">
-                    <Truck className="h-3 w-3 text-blue-500"/> Despachada
-                    {currentStatus === 'dispatched' && <Check className="ml-auto h-3 w-3" />}
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem onClick={() => updateSalesOrder(order.id, { status: 'invoiced' })} className="hover:bg-slate-800 cursor-pointer gap-2">
-                    <Check className="h-3 w-3 text-emerald-500"/> Facturada
-                    {currentStatus === 'invoiced' && <Check className="ml-auto h-3 w-3" />}
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator className="bg-slate-800" />
-                
-                <DropdownMenuItem onClick={() => updateSalesOrder(order.id, { status: 'cancelled' })} className="hover:bg-slate-800 cursor-pointer gap-2 text-red-400">
-                    <Ban className="h-3 w-3"/> Cancelar
-                    {currentStatus === 'cancelled' && <Check className="ml-auto h-3 w-3" />}
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-            </DropdownMenu>
-        );
-    },
+    cell: ({ row }) => <StatusCell row={row} />,
   },
   {
     accessorKey: "totalAmount",
