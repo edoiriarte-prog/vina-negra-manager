@@ -13,16 +13,20 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { 
   Search, Wallet, FileText, ChevronRight, User, ArrowUpRight, ArrowDownLeft,
-  Truck, Briefcase, Download, Printer, Package, Scale
+  Truck, Briefcase, Download, Printer, Package, Scale, Calendar as CalendarIcon, X
 } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { StatementDocument } from '@/components/pdf/StatementDocument';
+import { DateRange } from 'react-day-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 
 // --- FORMATO MONEDA ---
@@ -291,7 +295,12 @@ function AccountCard({ account, type, onClick }: { account: AccountSummary, type
 
 function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financialMovements, purchaseOrders }: { account: AccountSummary, isOpen: boolean, onOpenChange: () => void, salesOrders: SalesOrder[], financialMovements: FinancialMovement[], purchaseOrders: PurchaseOrder[] }) {
     
-    const detailedMovements: DetailedMovement[] = useMemo(() => {
+    const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+      from: startOfMonth(new Date()),
+      to: endOfMonth(new Date()),
+    });
+
+    const allMovements: DetailedMovement[] = useMemo(() => {
         if (!account) return [];
         const movements: Omit<DetailedMovement, 'balance'>[] = [];
 
@@ -333,14 +342,25 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
             });
         });
 
-        movements.sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+        return movements.sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
 
+    }, [account, salesOrders, purchaseOrders, financialMovements]);
+    
+    const filteredMovements = useMemo(() => {
         let balance = 0;
-        return movements.map(m => {
+        const filtered = allMovements.filter(m => {
+            if (!dateRange?.from) return true;
+            const date = parseISO(m.date);
+            const to = dateRange.to || dateRange.from;
+            return isWithinInterval(date, { start: startOfDay(dateRange.from), end: endOfDay(to) });
+        });
+
+        return filtered.map(m => {
             balance += m.charge - m.payment;
             return { ...m, balance };
         });
-    }, [account, salesOrders, purchaseOrders, financialMovements]);
+    }, [allMovements, dateRange]);
+
 
     return (
         <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -359,7 +379,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                 document={
                                 <StatementDocument
                                     account={account}
-                                    movements={detailedMovements}
+                                    movements={filteredMovements}
                                 />
                                 }
                                 fileName={`Estado_Cuenta_${account.contact.name.replace(/ /g, '_')}.pdf`}
@@ -381,16 +401,59 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                     </div>
                 </SheetHeader>
 
-                <div className="flex-1 overflow-y-auto p-6">
-                    <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><FileText className="h-4 w-4" /> Cartola Histórica de Movimientos</h4>
-                    <ScrollArea className="h-[calc(100vh-300px)]">
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2"><FileText className="h-4 w-4" /> Cartola Histórica de Movimientos</h4>
+                        <div className="flex items-center gap-2">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  id="date"
+                                  variant={"outline"}
+                                  className={cn(
+                                    "w-[260px] justify-start text-left font-normal bg-slate-900 border-slate-700 hover:bg-slate-800 hover:text-slate-100",
+                                    !dateRange && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {dateRange?.from ? (
+                                    dateRange.to ? (
+                                      <>
+                                        {format(dateRange.from, "LLL dd, y")} -{" "}
+                                        {format(dateRange.to, "LLL dd, y")}
+                                      </>
+                                    ) : (
+                                      format(dateRange.from, "LLL dd, y")
+                                    )
+                                  ) : (
+                                    <span>Seleccionar rango</span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="end">
+                                <Calendar
+                                  initialFocus
+                                  mode="range"
+                                  defaultMonth={dateRange?.from}
+                                  selected={dateRange}
+                                  onSelect={setDateRange}
+                                  numberOfMonths={2}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                             <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-white" onClick={() => setDateRange(undefined)}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                    <ScrollArea className="h-[calc(100vh-350px)]">
                         <Table>
                             <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargos (-)</TableHead><TableHead className="text-right">Abonos (+)</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {detailedMovements.length === 0 ? (
-                                    <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">No hay movimientos para este contacto.</TableCell></TableRow>
+                                {filteredMovements.length === 0 ? (
+                                    <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">No hay movimientos para este contacto en el período seleccionado.</TableCell></TableRow>
                                 ) : (
-                                    detailedMovements.map((mov, i) => (
+                                    filteredMovements.map((mov, i) => (
                                         <TableRow key={i} className={`border-slate-800/50 ${mov.type === 'Abono' ? 'bg-emerald-950/20' : ''}`}>
                                             <TableCell className="text-slate-400 text-xs">{format(parseISO(mov.date), 'dd-MM-yy')}</TableCell>
                                             <TableCell><Badge variant={mov.type === 'Cargo' ? 'outline' : 'default'} className={mov.type === 'Abono' ? 'bg-emerald-500/80 border-emerald-700' : 'border-slate-700'}>{mov.documentType}</Badge></TableCell>
