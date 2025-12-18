@@ -301,7 +301,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
       to: endOfMonth(new Date()),
     });
 
-    const allMovements: DetailedMovement[] = useMemo(() => {
+    const allMovements = useMemo(() => {
         if (!account) return [];
         const movements: Omit<DetailedMovement, 'balance'>[] = [];
 
@@ -349,18 +349,26 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
     }, [account, salesOrders, purchaseOrders, financialMovements]);
     
     const filteredMovements = useMemo(() => {
-        let balance = 0;
-        const filtered = allMovements.filter(m => {
-            if (!dateRange?.from) return true;
-            const date = parseISO(m.date);
-            const to = dateRange.to || dateRange.from;
-            return isWithinInterval(date, { start: startOfDay(dateRange.from), end: endOfDay(to) });
-        });
+        const historicalBalance = allMovements.reduce((acc, mov) => {
+            if (!dateRange?.from || isWithinInterval(parseISO(mov.date), { start: new Date(0), end: startOfDay(dateRange.from) })) {
+                return acc + mov.charge - mov.payment;
+            }
+            return acc;
+        }, 0);
 
-        return filtered.map(m => {
-            balance += m.charge - m.payment;
-            return { ...m, balance };
-        });
+        let runningBalance = historicalBalance;
+
+        return allMovements
+            .filter(m => {
+                if (!dateRange?.from) return true;
+                const date = parseISO(m.date);
+                const to = dateRange.to || dateRange.from;
+                return isWithinInterval(date, { start: startOfDay(dateRange.from), end: endOfDay(to) });
+            })
+            .map(m => {
+                runningBalance += m.charge - m.payment;
+                return { ...m, balance: runningBalance };
+            });
     }, [allMovements, dateRange]);
 
 
@@ -451,7 +459,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                     </div>
                     <ScrollArea className="h-[calc(100vh-350px)]">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargos (-)</TableHead><TableHead className="text-right">Abonos (+)</TableHead></TableRow></TableHeader>
+                            <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargos (-)</TableHead><TableHead className="text-right">Abonos (+)</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {filteredMovements.length === 0 ? (
                                     <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">No hay movimientos para este contacto en el período seleccionado.</TableCell></TableRow>
@@ -479,6 +487,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-red-400">{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</TableCell>
                                             <TableCell className="text-right font-mono text-emerald-400">{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</TableCell>
+                                            <TableCell className="text-right font-mono font-semibold">{formatCurrency(mov.balance)}</TableCell>
                                         </TableRow>
                                     ))
                                 )}

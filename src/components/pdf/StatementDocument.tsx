@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
 import { format, parseISO } from 'date-fns';
@@ -128,8 +127,7 @@ const formatDate = (dateString?: string) => {
 export const StatementDocument = ({ account, movements, dateRange }: { account: any, movements: any[], dateRange: any }) => {
     
     const { contact } = account;
-    const logoUrl = '/logo.jpg'; 
-
+    
     // CALCULATE TOTALS BASED ON FILTERED MOVEMENTS
     const totalCredits = movements.reduce((sum, mov) => sum + (mov.charge || 0), 0);
     const totalPayments = movements.reduce((sum, mov) => sum + (mov.payment || 0), 0);
@@ -183,7 +181,7 @@ export const StatementDocument = ({ account, movements, dateRange }: { account: 
                                   {isDetailsArray ? (
                                     <>
                                         <Text style={styles.detailHeader}>
-                                            OV-{mov.reference} {mov.paymentDueDate ? `(Vence: ${formatDate(mov.paymentDueDate)})` : ''}
+                                            {mov.documentType}-{mov.reference} {mov.paymentDueDate ? `(Vence: ${formatDate(mov.paymentDueDate)})` : ''}
                                         </Text>
                                         {mov.details.map((item: any, idx: number) => (
                                           <Text key={idx} style={styles.detailItem}>
