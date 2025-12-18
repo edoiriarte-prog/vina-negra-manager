@@ -16,18 +16,18 @@ const styles = StyleSheet.create({
       paddingBottom: 10
   },
   companyWrapper: { flexDirection: 'column' },
-  companyName: { fontSize: 16, fontWeight: 'bold', textTransform: 'uppercase' },
-  companyDetails: { fontSize: 8, color: '#4B5563' },
+  companyName: { fontSize: 16, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' },
+  companyDetails: { fontSize: 8, color: '#000' },
   
   docInfo: { alignItems: 'flex-end' },
-  docTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 5, textTransform: 'uppercase' },
-  docSubtitle: { fontSize: 9, color: '#4B5563' },
+  docTitle: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 5, textTransform: 'uppercase' },
+  docSubtitle: { fontSize: 9, color: '#000' },
   accountBox: { border: '1px solid #E5E7EB', borderRadius: 3, padding: 10, marginBottom: 20, backgroundColor: '#F9FAFB' },
-  accountName: { fontWeight: 'bold', fontSize: 10, marginBottom: 2 },
-  accountDetails: { fontSize: 8, color: '#374151' },
+  accountName: { fontFamily: 'Helvetica-Bold', fontSize: 10, marginBottom: 2 },
+  accountDetails: { fontSize: 8, color: '#000' },
   table: { width: '100%', border: '1px solid #E5E7EB', borderRadius: 3, overflow: 'hidden' },
   tableHeader: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderBottom: '1px solid #D1D5DB', padding: 6, alignItems: 'center' },
-  tableHeaderCell: { fontSize: 7, fontWeight: 'bold', color: '#374151', textTransform: 'uppercase' },
+  tableHeaderCell: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#000', textTransform: 'uppercase' },
   
   tableRow: { flexDirection: 'row', borderBottom: '1px solid #F3F4F6', padding: '5px 6px', alignItems: 'center' },
   tableRowAlt: { backgroundColor: '#F9FAFB' },
@@ -38,10 +38,10 @@ const styles = StyleSheet.create({
   colConcept: { width: '28%' },
   colCharge: { width: '15%', textAlign: 'right', color: '#DC2626' },
   colPayment: { width: '15%', textAlign: 'right', color: '#059669' },
-  colBalance: { width: '15%', textAlign: 'right', fontWeight: 'bold' },
+  colBalance: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica-Bold' },
   
   footer: { position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1px solid #E5E7EB', paddingTop: 8 },
-  footerText: { fontSize: 7, color: '#6B7280' },
+  footerText: { fontSize: 7, color: '#000' },
 });
 
 // --- HELPERS ---
@@ -86,9 +86,9 @@ export const BankAccountStatementDocument = ({ account, movements }: { account: 
 
                     {/* Saldo Inicial */}
                     <View style={[styles.tableRow, {backgroundColor: '#E5E7EB'}]}>
-                        <Text style={[styles.tableCell, styles.colDate, {fontWeight: 'bold'}]}></Text>
+                        <Text style={[styles.tableCell, styles.colDate, {fontFamily: 'Helvetica-Bold'}]}></Text>
                         <Text style={[styles.tableCell, styles.colRef]}></Text>
-                        <Text style={[styles.tableCell, styles.colConcept, {fontWeight: 'bold'}]}>SALDO INICIAL</Text>
+                        <Text style={[styles.tableCell, styles.colConcept, {fontFamily: 'Helvetica-Bold'}]}>SALDO INICIAL</Text>
                         <Text style={[styles.tableCell, styles.colCharge]}></Text>
                         <Text style={[styles.tableCell, styles.colPayment]}></Text>
                         <Text style={[styles.tableCell, styles.colBalance]}>{formatCurrency(account.initialBalance || 0)}</Text>
@@ -109,7 +109,7 @@ export const BankAccountStatementDocument = ({ account, movements }: { account: 
                      <View style={[styles.tableRow, {backgroundColor: '#111827'}]}>
                         <Text style={[styles.tableCell, styles.colDate, {color: '#fff'}]}></Text>
                         <Text style={[styles.tableCell, styles.colRef, {color: '#fff'}]}></Text>
-                        <Text style={[styles.tableCell, styles.colConcept, {fontWeight: 'bold', color: '#fff'}]}>SALDO FINAL</Text>
+                        <Text style={[styles.tableCell, styles.colConcept, {fontFamily: 'Helvetica-Bold', color: '#fff'}]}>SALDO FINAL</Text>
                         <Text style={[styles.tableCell, styles.colCharge, {color: '#fff'}]}></Text>
                         <Text style={[styles.tableCell, styles.colPayment, {color: '#fff'}]}></Text>
                         <Text style={[styles.tableCell, styles.colBalance, {color: '#fff', fontSize: 10}]}>{formatCurrency(finalBalance)}</Text>

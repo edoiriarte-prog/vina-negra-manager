@@ -18,20 +18,20 @@ const styles = StyleSheet.create({
   },
   companyWrapper: { flexDirection: 'column' },
   logo: { width: 60, height: 40, objectFit: 'contain', marginBottom: 5 },
-  companyName: { fontSize: 16, fontWeight: 'bold', textTransform: 'uppercase' },
-  companyDetails: { fontSize: 8, color: '#4B5563' },
+  companyName: { fontSize: 16, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' },
+  companyDetails: { fontSize: 8, color: '#000' },
   
   docInfo: { alignItems: 'flex-end' },
-  docTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827', marginBottom: 5, textTransform: 'uppercase' },
-  docSubtitle: { fontSize: 9, color: '#4B5563' },
+  docTitle: { fontSize: 20, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 5, textTransform: 'uppercase' },
+  docSubtitle: { fontSize: 9, color: '#000' },
 
   clientBox: { border: '1px solid #E5E7EB', borderRadius: 3, padding: 10, marginBottom: 20, backgroundColor: '#F9FAFB' },
-  clientName: { fontWeight: 'bold', fontSize: 10, marginBottom: 2 },
-  clientDetails: { fontSize: 8, color: '#374151' },
+  clientName: { fontFamily: 'Helvetica-Bold', fontSize: 10, marginBottom: 2 },
+  clientDetails: { fontSize: 8, color: '#000' },
 
   table: { width: '100%', border: '1px solid #E5E7EB', borderRadius: 3, overflow: 'hidden' },
   tableHeader: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderBottom: '1px solid #D1D5DB', padding: 6, alignItems: 'center' },
-  tableHeaderCell: { fontSize: 7, fontWeight: 'bold', color: '#374151', textTransform: 'uppercase' },
+  tableHeaderCell: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#000', textTransform: 'uppercase' },
   
   tableRow: { flexDirection: 'row', borderBottom: '1px solid #F3F4F6', padding: '5px 6px', alignItems: 'center' },
   tableRowAlt: { backgroundColor: '#F9FAFB' },
@@ -42,10 +42,10 @@ const styles = StyleSheet.create({
   colConcept: { width: '28%' },
   colCharge: { width: '15%', textAlign: 'right', color: '#DC2626' },
   colPayment: { width: '15%', textAlign: 'right', color: '#059669' },
-  colBalance: { width: '15%', textAlign: 'right', fontWeight: 'bold' },
+  colBalance: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica-Bold' },
 
   footer: { position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1px solid #E5E7EB', paddingTop: 8 },
-  footerText: { fontSize: 7, color: '#6B7280' },
+  footerText: { fontSize: 7, color: '#000' },
   
   summaryBox: {
     marginTop: 20,
@@ -61,11 +61,11 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 8,
-    color: '#374151',
+    color: '#000',
   },
   summaryValue: {
     fontSize: 8,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
   },
   summaryTotalRow: {
     marginTop: 5,
@@ -77,11 +77,11 @@ const styles = StyleSheet.create({
   },
   summaryTotalLabel: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
   },
   summaryTotalValue: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
   },
    signatures: {
     position: 'absolute',
@@ -98,17 +98,17 @@ const styles = StyleSheet.create({
   },
   signatureLine: {
     width: '70%',
-    borderTop: '1px solid #374151',
+    borderTop: '1px solid #000',
     marginBottom: 4,
   },
   signatureText: {
     fontSize: 8,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     textTransform: 'uppercase',
   },
   signatureSubtext: {
     fontSize: 7,
-    color: '#374151',
+    color: '#000',
     marginTop: 1,
   },
 });

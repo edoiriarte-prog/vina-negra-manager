@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale';
 
 // Estilos
 const styles = StyleSheet.create({
-  page: { padding: 30, fontSize: 11, fontFamily: 'Helvetica', color: '#000' }, // Aumentado a 11
+  page: { padding: 30, fontSize: 11, fontFamily: 'Helvetica', color: '#000' },
   
   logo: {
       width: 80,
@@ -26,24 +26,24 @@ const styles = StyleSheet.create({
   
   companyWrapper: { flexDirection: 'row', alignItems: 'center' },
   companyInfo: { flexDirection: 'column' },
-  companyName: { fontSize: 22, fontWeight: 'bold', textTransform: 'uppercase' }, // Aumentado
-  companySub: { fontSize: 10, color: '#000', marginBottom: 1 }, // Aumentado y negro
+  companyName: { fontSize: 22, fontWeight: 'bold', textTransform: 'uppercase', fontFamily: 'Helvetica-Bold' }, 
+  companySub: { fontSize: 10, color: '#000', marginBottom: 1 }, 
   
   docInfo: { alignItems: 'flex-end' },
-  docTitle: { fontSize: 16, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 4 }, // Aumentado
+  docTitle: { fontSize: 16, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 4, fontFamily: 'Helvetica-Bold' }, 
   docNumberBox: { backgroundColor: '#f0f0f0', padding: '4 10', borderRadius: 4, marginBottom: 4, border: '1px solid #ccc' },
-  docNumber: { fontSize: 14, fontWeight: 'bold' }, // Aumentado
-  docDate: { fontSize: 11 }, // Aumentado
+  docNumber: { fontSize: 14, fontFamily: 'Helvetica-Bold' }, 
+  docDate: { fontSize: 11 },
 
   boxesContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, gap: 5 },
   infoBox: { width: '32%', border: '1px solid #ddd', borderRadius: 2, backgroundColor: '#fdfdfd' },
   boxHeader: { borderBottom: '1px solid #ddd', padding: '4 6', marginBottom: 4, backgroundColor: '#f0f0f0' },
-  boxTitle: { fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }, // Aumentado y negro
+  boxTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', color: '#000' }, 
   boxContent: { padding: '2 6 6 6' },
   boxRow: { marginBottom: 3, flexDirection: 'row' },
   
-  boxLabel: { fontWeight: 'bold', fontSize: 9, color: '#000', width: 45 }, // Aumentado y negro
-  boxValue: { fontSize: 9, color: '#000', flex: 1 }, // Aumentado y negro
+  boxLabel: { fontFamily: 'Helvetica-Bold', fontSize: 9, color: '#000', width: 45 }, 
+  boxValue: { fontSize: 9, color: '#000', flex: 1 }, 
 
   table: { width: '100%', marginBottom: 10 },
   tableHeader: { flexDirection: 'row', backgroundColor: '#eee', borderBottom: '1px solid #999', padding: '8 0' },
@@ -56,14 +56,14 @@ const styles = StyleSheet.create({
   colNet: { width: '11%', textAlign: 'right', fontSize: 9 },
   colVat: { width: '11%', textAlign: 'right', fontSize: 9 },
   colSub: { width: '11%', textAlign: 'right', fontSize: 9 },
-  colTotal: { width: '12%', textAlign: 'right', paddingRight: 4, fontSize: 9, fontWeight: 'bold' },
+  colTotal: { width: '12%', textAlign: 'right', paddingRight: 4, fontSize: 9, fontFamily: 'Helvetica-Bold' },
 
   totalsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '1px solid #ddd' },
   totalsLeft: { width: '50%', backgroundColor: '#f9fafb', padding: 8, borderRadius: 4 },
   totalsRight: { width: '40%' },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  totalLabel: { fontSize: 10, color: '#000' }, // Aumentado y negro
-  totalValue: { fontSize: 10, fontWeight: 'bold' }, // Aumentado
+  totalLabel: { fontSize: 10, color: '#000' }, 
+  totalValue: { fontSize: 10, fontFamily: 'Helvetica-Bold' }, 
   totalFinalBox: { backgroundColor: '#111', padding: 8, borderRadius: 2, flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   
   obsContainer: { marginTop: 15 },
@@ -72,10 +72,10 @@ const styles = StyleSheet.create({
   signatures: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 50 },
   signatureBox: { width: '30%', alignItems: 'center' },
   signatureLine: { width: '80%', borderTop: '1px solid #000', marginBottom: 6 },
-  signatureText: { fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase' }, // Aumentado
-  signatureSub: { fontSize: 8, color: '#000', textTransform: 'uppercase', marginTop: 2 }, // Aumentado y negro
+  signatureText: { fontSize: 9, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }, 
+  signatureSub: { fontSize: 8, color: '#000', textTransform: 'uppercase', marginTop: 2 }, 
   
-  disclaimer: { textAlign: 'center', fontSize: 8, color: '#000', marginTop: 40 }, // Aumentado y negro
+  disclaimer: { textAlign: 'center', fontSize: 8, color: '#000', marginTop: 40 },
 });
 
 // Helpers
@@ -106,8 +106,8 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                         <Image src={logoUrl} style={styles.logo} />
                         <View style={styles.companyInfo}>
                             <Text style={styles.companyName}>VIÑA NEGRA SPA</Text>
-                            <Text style={[styles.companySub, {fontWeight:'bold'}]}>RUT: 78.261.683-8</Text>
-                            <Text style={styles.companySub}>eduardoiriarte@agrocomercialavn.com</Text>
+                            <Text style={[styles.companySub, {fontFamily:'Helvetica-Bold'}]}>RUT: 78.261.683-8</Text>
+                            <Text style={styles.companySub}>{type === 'VENTA' ? 'ventas@agrocomercialavn.com' : 'eduardoiriarte@agrocomercialavn.com'}</Text>
                         </View>
                     </View>
                     <View style={styles.docInfo}>
@@ -126,7 +126,7 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                     <View style={styles.infoBox}>
                         <View style={styles.boxHeader}><Text style={styles.boxTitle}>{type === 'VENTA' ? 'CLIENTE' : 'PROVEEDOR'}</Text></View>
                         <View style={styles.boxContent}>
-                            <View style={styles.boxRow}><Text style={[styles.boxValue, {fontSize: 10, fontWeight: 'bold'}]}>{clientName}</Text></View>
+                            <View style={styles.boxRow}><Text style={[styles.boxValue, {fontSize: 10, fontFamily: 'Helvetica-Bold'}]}>{clientName}</Text></View>
                             <View style={styles.boxRow}><Text style={styles.boxLabel}>RUT:</Text><Text style={styles.boxValue}>{clientRut || 'S/I'}</Text></View>
                             <View style={styles.boxRow}><Text style={styles.boxLabel}>Dir:</Text><Text style={styles.boxValue}>{clientAddress || 'S/I'}</Text></View>
                             <View style={styles.boxRow}><Text style={styles.boxLabel}>Att:</Text><Text style={styles.boxValue}>{clientContact || '-'}</Text></View>
@@ -155,7 +155,7 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                                     <Text style={[styles.boxLabel, {marginBottom:3, width: '100%'}]}>DATOS TRANSFERENCIA:</Text>
                                         <Text style={{fontSize: 9}}>{bankAccount.bank || bankAccount.bankName}</Text>
                                         <Text style={{fontSize: 9, marginBottom: 4}}>{(bankAccount.type || bankAccount.accountType) || 'Cta'} N° {bankAccount.accountNumber}</Text>
-                                        <Text style={{fontSize: 9, fontWeight: 'bold'}}>Agrocomercial Viña Negra SpA</Text>
+                                        <Text style={{fontSize: 9, fontFamily: 'Helvetica-Bold'}}>Agrocomercial Viña Negra SpA</Text>
                                         <Text style={{fontSize: 9}}>RUT: 78.261.683-8</Text>
                                         <Text style={{fontSize: 9}}>eduardoiriarte@agrocomercialavn.com</Text>
                                 </View>
@@ -187,7 +187,7 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                             <View key={i} style={styles.tableRow}>
                                 <Text style={styles.colCode}>{item.code || (i + 1) * 10}</Text>
                                 <View style={styles.colDesc}>
-                                    <Text style={{fontSize: 9, fontWeight: 'bold'}}>{item.product}</Text>
+                                    <Text style={{fontSize: 9, fontFamily: 'Helvetica-Bold'}}>{item.product}</Text>
                                     <Text style={{fontSize: 8, color: '#000'}}>{item.caliber}</Text>
                                 </View>
                                 <Text style={styles.colEnv}>{item.packagingQuantity || '-'}</Text>
@@ -224,8 +224,8 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                             <Text style={styles.totalValue}>{formatCurrency(totalIVA)}</Text>
                         </View>
                         <View style={styles.totalFinalBox}>
-                            <Text style={{color:'#fff', fontSize:11, fontWeight:'bold'}}>TOTAL A PAGAR:</Text>
-                            <Text style={{color:'#fff', fontSize:12, fontWeight:'bold'}}>{formatCurrency(totalBruto)}</Text>
+                            <Text style={{color:'#fff', fontSize:11, fontFamily:'Helvetica-Bold'}}>TOTAL A PAGAR:</Text>
+                            <Text style={{color:'#fff', fontSize:12, fontFamily:'Helvetica-Bold'}}>{formatCurrency(totalBruto)}</Text>
                         </View>
                     </View>
                 </View>
