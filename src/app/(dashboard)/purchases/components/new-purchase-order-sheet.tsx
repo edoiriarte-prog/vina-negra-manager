@@ -34,7 +34,7 @@ type PurchaseOrderFormData = Partial<Omit<PurchaseOrder, 'id' | 'items'>> & {
     items: OrderItem[];
 };
 
-const getInitialFormData = (order: PurchaseOrder | null, allPurchaseOrders: PurchaseOrder[]): PurchaseOrderFormData => {
+const getInitialFormData = (order: PurchaseOrder | null): PurchaseOrderFormData => {
     if (order) {
         return {
             ...order,
@@ -42,17 +42,9 @@ const getInitialFormData = (order: PurchaseOrder | null, allPurchaseOrders: Purc
             items: order.items || [],
         };
     }
-    
-    const existingIds = (allPurchaseOrders || [])
-        .map(o => o.number ? parseInt(o.number.replace(/OC-|\D/g, ''), 10) : 0)
-        .filter(n => !isNaN(n) && n > 0);
-    
-    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 1101;
-    const nextNum = maxId < 1101 ? 1102 : maxId + 1;
-    const newId = `OC-${nextNum}`;
 
     return {
-        number: newId,
+        number: '', // Se generará en el cliente
         supplierId: '',
         date: format(new Date(), 'yyyy-MM-dd'),
         items: [],
@@ -71,7 +63,7 @@ export function NewPurchaseOrderSheet({
     isOpen, onOpenChange, onSave, order, suppliers, purchaseOrders 
 }: NewPurchaseOrderSheetProps) {
   
-  const [formData, setFormData] = useState<PurchaseOrderFormData>(() => getInitialFormData(order, purchaseOrders));
+  const [formData, setFormData] = useState<PurchaseOrderFormData>(() => getInitialFormData(order));
   const [items, setItems] = useState<OrderItem[]>(order?.items || []);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
@@ -81,7 +73,17 @@ export function NewPurchaseOrderSheet({
   
   useEffect(() => {
     if (isOpen) {
-      const initialData = getInitialFormData(order, purchaseOrders);
+      const initialData = getInitialFormData(order);
+      if (!order) {
+        // Generar ID solo si es una nueva orden y en el cliente
+        const existingIds = (purchaseOrders || [])
+            .map(o => o.number ? parseInt(o.number.replace(/OC-|\D/g, ''), 10) : 0)
+            .filter(n => !isNaN(n) && n > 0);
+        
+        const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 1101;
+        const nextNum = maxId < 1101 ? 1102 : maxId + 1;
+        initialData.number = `OC-${nextNum}`;
+      }
       setFormData(initialData);
       setItems(initialData.items || []);
     }
@@ -388,7 +390,7 @@ export function NewPurchaseOrderSheet({
                                                     <Input type="number" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))} className="h-7 text-center font-bold bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-100" />
                                                 </td>
                                                 <td className="px-4 py-2">
-                                                    <Input type="number" value={item.price || ''} onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500 text-slate-100" />
+                                                    <Input type="number" value={item.price || ''} onChange={(e) => handleItemChange(index, 'price', Number(e.target.value))} className="h-7 text-right font-mono text-blue-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-blue-500" />
                                                 </td>
                                                 <td className="px-4 py-2">
                                                     <Input type="number" value={item.price ? Math.round(item.price * 1.19) : ''} onChange={(e) => handleItemChange(index, 'price', Math.round(Number(e.target.value) / 1.19))} className="h-7 text-right font-mono text-emerald-400 bg-slate-950 border-transparent group-hover:border-slate-700 focus:border-emerald-500" />

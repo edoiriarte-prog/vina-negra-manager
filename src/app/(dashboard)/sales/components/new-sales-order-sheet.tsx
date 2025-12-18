@@ -47,7 +47,7 @@ type SalesOrderFormData = Partial<Omit<SalesOrder, 'id' | 'items'>> & {
   items: OrderItem[];
 };
 
-const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder[]): SalesOrderFormData => {
+const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
     if (order) {
         return {
             ...order,
@@ -55,25 +55,15 @@ const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder
             items: (order.items || []).map(item => ({...item, total: (item.quantity || 0) * (item.price || 0)})),
             saleType: order.saleType || 'Venta en Firme',
             paymentMethod: order.paymentMethod || 'Contado',
-            // @ts-ignore
             paymentDueDate: order.paymentDueDate ? format(new Date(order.paymentDueDate), 'yyyy-MM-dd') : undefined,
-            // @ts-ignore
-            driver: order.driver || '',
-            // @ts-ignore
-            plate: order.plate || '',
+            driver: (order as any).driver || '',
+            plate: (order as any).plate || '',
         };
     }
     
-    const existingIds = (allSalesOrders || [])
-        .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
-        .filter(n => !isNaN(n) && n > 0);
-    
-    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 2100;
-    const nextNum = maxId < 2100 ? 2101 : maxId + 1;
-    const newId = `OV-${nextNum}`;
-
+    // Devolvemos un estado inicial vacío para evitar discrepancias en el servidor
     return {
-        number: newId,
+        number: '', // El número se generará en el cliente
         clientId: "",
         date: format(new Date(), 'yyyy-MM-dd'),
         items: [],
@@ -84,13 +74,9 @@ const getInitialFormData = (order: SalesOrder | null, allSalesOrders: SalesOrder
         creditDays: 0,
         notes: '',
         saleType: 'Venta en Firme',
-        // @ts-ignore
         advanceAmount: 0,
-        // @ts-ignore
         bankAccountId: '',
-        // @ts-ignore
         driver: '',
-        // @ts-ignore
         plate: ''
     };
 };
@@ -111,15 +97,27 @@ export function NewSalesOrderSheet({
   const { warehouses, bankAccounts } = useMasterData(); 
   const isDispatch = sheetType === 'dispatch';
 
-  const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order, salesOrders));
+  const [formData, setFormData] = useState<SalesOrderFormData>(() => getInitialFormData(order));
   const [items, setItems] = useState<OrderItem[]>(order?.items || []);
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
 
+  // LÓGICA DE GENERACIÓN DE ID MOVIDA A useEffect PARA EJECUTAR SOLO EN CLIENTE
   useEffect(() => {
     if (isOpen) {
-      const initialData = getInitialFormData(order, salesOrders);
+      const initialData = getInitialFormData(order);
+      if (!order) {
+          // Generar ID solo si es una nueva orden y en el cliente
+          const existingIds = (salesOrders || [])
+              .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
+              .filter(n => !isNaN(n) && n > 0);
+          
+          const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 2100;
+          const nextNum = maxId < 2100 ? 2101 : maxId + 1;
+          const newId = `OV-${nextNum}`;
+          initialData.number = newId;
+      }
       setFormData(initialData);
       setItems(initialData.items || []);
       setIsSubmitting(false);
@@ -129,7 +127,6 @@ export function NewSalesOrderSheet({
   useEffect(() => {
       if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {
           const dueDate = addDays(parseISO(formData.date), formData.creditDays);
-          // @ts-ignore
           setFormData(prev => ({...prev, paymentDueDate: format(dueDate, 'yyyy-MM-dd')}))
       }
   }, [formData.creditDays, formData.date, formData.paymentMethod]);
@@ -169,8 +166,6 @@ export function NewSalesOrderSheet({
   };
   
   const handleQuickContactSuccess = (newId: string) => {
-    // La lista de clientes se actualizará globalmente gracias a onSnapshot,
-    // solo necesitamos seleccionar el nuevo valor.
     setFormData(prev => ({ ...prev, clientId: newId }));
   };
 
@@ -321,7 +316,6 @@ export function NewSalesOrderSheet({
                                 <Input 
                                     name="driver" 
                                     placeholder="Nombre Chofer" 
-                                    // @ts-ignore
                                     value={formData.driver || ''} 
                                     onChange={handleInputChange} 
                                     className={darkInputClass} 
@@ -332,7 +326,6 @@ export function NewSalesOrderSheet({
                                 <Input 
                                     name="plate" 
                                     placeholder="AB-CD-12" 
-                                    // @ts-ignore
                                     value={formData.plate || ''} 
                                     onChange={handleInputChange} 
                                     className={`${darkInputClass} uppercase`} 
@@ -546,6 +539,7 @@ export function NewSalesOrderSheet({
         onOpenChange={setIsMatrixOpen}
         onSave={handleMatrixSave}
         orderType="sale"
+        inventory={inventory}
       />
       
     <QuickContactDialog
@@ -558,4 +552,3 @@ export function NewSalesOrderSheet({
   );
 }
 
-    
