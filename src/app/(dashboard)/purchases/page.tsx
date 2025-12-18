@@ -13,6 +13,7 @@ import { PurchaseOrderPreview } from "./components/purchase-order-preview";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { usePurchasesCRUD } from "@/hooks/use-purchases-crud";
+import { Contact } from "@/lib/types";
 
 export default function PurchasesPage() {
   const { toast } = useToast();
@@ -24,7 +25,7 @@ export default function PurchasesPage() {
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
-  const [previewOrder, setPreviewOrder] = useState<PurchaseOrder | null>(null);
+  const [previewingData, setPreviewingData] = useState<{order: PurchaseOrder, supplier: Contact | null} | null>(null);
   
   const { totalNetAmount, totalGrossAmount } = useMemo(() => {
     if (!purchaseOrders) return { totalNetAmount: 0, totalGrossAmount: 0 };
@@ -67,6 +68,11 @@ export default function PurchasesPage() {
     setEditingOrder(order);
     setIsSheetOpen(true);
   };
+  
+  const handlePreview = (order: PurchaseOrder) => {
+    const supplier = suppliers.find(s => s.id === order.supplierId) || null;
+    setPreviewingData({ order, supplier });
+  };
 
   const handleCreate = () => {
     setEditingOrder(null);
@@ -81,7 +87,7 @@ export default function PurchasesPage() {
   const columns = useMemo(() => getColumns({
       onEdit: handleEdit,
       onDelete: (order) => handleDelete(order.id), 
-      onPreview: setPreviewOrder,
+      onPreview: handlePreview,
       suppliers: suppliers
   }), [suppliers]);
 
@@ -150,10 +156,10 @@ export default function PurchasesPage() {
       />
 
       <PurchaseOrderPreview
-        isOpen={!!previewOrder}
-        onOpenChange={(open) => !open && setPreviewOrder(null)}
-        order={previewOrder}
-        supplier={suppliers.find((s) => s.id === previewOrder?.supplierId) || null}
+        isOpen={!!previewingData}
+        onOpenChange={(open) => !open && setPreviewingData(null)}
+        order={previewingData?.order || null}
+        supplier={previewingData?.supplier || null}
       />
 
     </div>

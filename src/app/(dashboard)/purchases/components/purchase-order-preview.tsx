@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -24,15 +23,12 @@ interface PurchaseOrderPreviewProps {
   order: PurchaseOrder | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  supplier?: Contact | null; 
+  supplier: Contact | null; 
 }
 
-export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOrderPreviewProps) {
-  const { contacts } = useMasterData();
+export function PurchaseOrderPreview({ order, isOpen, onOpenChange, supplier }: PurchaseOrderPreviewProps) {
   
   if (!order) return null;
-
-  const supplierData = contacts.find(c => c.id === order.supplierId);
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
@@ -92,10 +88,10 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
                         <Building2 className="h-3 w-3" /> Datos del Proveedor
                     </h4>
                     <div className="space-y-1">
-                        <p className="text-lg font-bold text-white">{supplierData?.name || 'Proveedor Desconocido'}</p>
-                        <p className="text-sm text-slate-400">RUT: {supplierData?.rut || 'S/I'}</p>
-                        <p className="text-sm text-slate-400">{supplierData?.address || 'Dirección no registrada'}</p>
-                        <p className="text-sm text-slate-400">{supplierData?.email}</p>
+                        <p className="text-lg font-bold text-white">{supplier?.name || 'Proveedor Desconocido'}</p>
+                        <p className="text-sm text-slate-400">RUT: {supplier?.rut || 'S/I'}</p>
+                        <p className="text-sm text-slate-400">{supplier?.address || 'Dirección no registrada'}</p>
+                        <p className="text-sm text-slate-400">{supplier?.email}</p>
                     </div>
                 </div>
 
@@ -198,10 +194,10 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
                 document={
                 <OrderDocument
                     order={order}
-                    clientName={supplierData?.name || 'Proveedor'}
-                    clientRut={supplierData?.rut}
-                    clientAddress={supplierData?.address}
-                    clientContact={supplierData?.contactPerson}
+                    clientName={supplier?.name || 'Proveedor'}
+                    clientRut={supplier?.rut}
+                    clientAddress={supplier?.address}
+                    clientContact={supplier?.contactPerson}
                     bankAccount={null}
                     type="COMPRA"
                 />
