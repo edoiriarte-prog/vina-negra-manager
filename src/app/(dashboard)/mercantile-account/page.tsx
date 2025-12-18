@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { format, parseISO, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { StatementDocument } from '@/components/pdf/StatementDocument';
@@ -301,30 +301,24 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
       to: endOfMonth(new Date()),
     });
 
-    const allMovements = useMemo(() => {
-        if (!account) return [];
+    const { filteredMovements, initialBalance, finalBalance } = useMemo(() => {
+        if (!account) return { filteredMovements: [], initialBalance: 0, finalBalance: 0 };
         const movements: Omit<DetailedMovement, 'balance'>[] = [];
 
         const isClient = (account.contact.type || []).includes('client');
         const relevantOrders = isClient ? salesOrders : purchaseOrders;
         const relevantPayments = financialMovements.filter(f => f.contactId === account.contact.id && (isClient ? f.type === 'income' : f.type === 'expense'));
         
-        // Cargos (Ventas o Compras)
         relevantOrders.filter(o => ((isClient ? (o as SalesOrder).clientId : (o as PurchaseOrder).supplierId) === account.contact.id) && o.status !== 'cancelled' && o.status !== 'draft').forEach(o => {
             const grossAmount = o.includeVat !== false ? Math.round((o.totalAmount || 0) * 1.19) : (o.totalAmount || 0);
             movements.push({
-                date: o.date,
-                type: 'Cargo',
-                documentType: isClient ? 'O/V' : 'O/C',
-                reference: o.number || o.id,
-                details: o.items,
-                charge: grossAmount,
-                payment: 0,
+                date: o.date, type: 'Cargo', documentType: isClient ? 'O/V' : 'O/C',
+                reference: isClient ? `OV-${o.number}` : `OC-${o.number}`,
+                details: o.items, charge: grossAmount, payment: 0,
                 paymentDueDate: (o as SalesOrder).paymentDueDate
             });
         });
 
-        // Abonos (Pagos)
         relevantPayments.forEach(f => {
             let description = f.description || "Abono general";
             if (f.relatedDocument) {
@@ -334,42 +328,33 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
               description = `Pago ${docType} ${order?.number || docId}`;
             }
             movements.push({
-                date: f.date,
-                type: 'Abono',
-                documentType: 'Pago',
-                reference: f.voucherNumber || f.id,
-                details: description,
-                charge: 0,
-                payment: f.amount || 0
+                date: f.date, type: 'Abono', documentType: 'Pago', reference: f.voucherNumber || f.id,
+                details: description, charge: 0, payment: f.amount || 0
             });
         });
 
-        return movements.sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+        const sortedMovements = movements.sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+        
+        const fromDate = dateRange?.from ? startOfDay(dateRange.from) : null;
+        
+        const initialBal = sortedMovements
+            .filter(m => fromDate && isBefore(parseISO(m.date), fromDate))
+            .reduce((balance, mov) => balance + mov.charge - mov.payment, 0);
 
-    }, [account, salesOrders, purchaseOrders, financialMovements]);
-    
-    const filteredMovements = useMemo(() => {
-        const historicalBalance = allMovements.reduce((acc, mov) => {
-            if (!dateRange?.from || isWithinInterval(parseISO(mov.date), { start: new Date(0), end: startOfDay(dateRange.from) })) {
-                return acc + mov.charge - mov.payment;
-            }
-            return acc;
-        }, 0);
-
-        let runningBalance = historicalBalance;
-
-        return allMovements
+        let runningBalance = initialBal;
+        const filtered = sortedMovements
             .filter(m => {
-                if (!dateRange?.from) return true;
-                const date = parseISO(m.date);
-                const to = dateRange.to || dateRange.from;
-                return isWithinInterval(date, { start: startOfDay(dateRange.from), end: endOfDay(to) });
+                if (!fromDate) return true;
+                const toDate = dateRange?.to ? endOfDay(dateRange.to) : endOfDay(fromDate);
+                return isWithinInterval(parseISO(m.date), { start: fromDate, end: toDate });
             })
             .map(m => {
                 runningBalance += m.charge - m.payment;
                 return { ...m, balance: runningBalance };
             });
-    }, [allMovements, dateRange]);
+
+        return { filteredMovements: filtered, initialBalance: initialBal, finalBalance: runningBalance };
+    }, [account, salesOrders, purchaseOrders, financialMovements, dateRange]);
 
 
     return (
@@ -388,9 +373,10 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                              <PDFDownloadLink
                                 document={
                                 <StatementDocument
-                                    account={account}
+                                    account={{...account, finalBalance: finalBalance}}
                                     movements={filteredMovements}
                                     dateRange={dateRange}
+                                    initialBalance={initialBalance}
                                 />
                                 }
                                 fileName={`Estado_Cuenta_${account.contact.name.replace(/ /g, '_')}.pdf`}
@@ -461,6 +447,11 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                         <Table>
                             <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargos (-)</TableHead><TableHead className="text-right">Abonos (+)</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
                             <TableBody>
+                                <TableRow className="border-slate-800/50 bg-slate-900 font-bold">
+                                    <TableCell colSpan={6} className="text-slate-400">Saldo Anterior (Transporte)</TableCell>
+                                    <TableCell className="text-right text-slate-400 font-mono">{formatCurrency(initialBalance)}</TableCell>
+                                </TableRow>
+
                                 {filteredMovements.length === 0 ? (
                                     <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">No hay movimientos para este contacto en el período seleccionado.</TableCell></TableRow>
                                 ) : (
@@ -478,7 +469,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                                             <TooltipTrigger asChild><span className="cursor-help underline decoration-dotted">{mov.details.length} ítem(s) de producto</span></TooltipTrigger>
                                                             <TooltipContent className="bg-slate-900 border-slate-800 text-slate-200">
                                                                 <div className="space-y-1 p-2">
-                                                                    {mov.details.map((item, idx) => <p key={idx} className="text-xs">• {item.product} ({item.caliber}): {item.quantity}kg a {formatCurrency(item.price)}</p>)}
+                                                                    {mov.details.map((item, idx) => <p key={idx} className="text-xs">• {item.product} ({item.caliber}): {item.quantity}kg a {formatCurrency(item.price * 1.19)}</p>)}
                                                                 </div>
                                                             </TooltipContent>
                                                         </Tooltip>
@@ -491,6 +482,12 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                         </TableRow>
                                     ))
                                 )}
+                            </TableBody>
+                             <TableBody>
+                                <TableRow className="border-t-2 border-slate-700 bg-slate-900 font-bold">
+                                    <TableCell colSpan={6} className="text-right text-lg text-white">SALDO FINAL</TableCell>
+                                    <TableCell className="text-right text-lg font-mono text-amber-400">{formatCurrency(finalBalance)}</TableCell>
+                                </TableRow>
                             </TableBody>
                         </Table>
                     </ScrollArea>
