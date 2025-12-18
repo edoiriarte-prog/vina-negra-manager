@@ -277,3 +277,5 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     cell: ({ row }) => <ActionsCell row={row} onEdit={onEdit} onDelete={onDelete} onPreview={onPreview} />,
   },
 ];
+
+    
