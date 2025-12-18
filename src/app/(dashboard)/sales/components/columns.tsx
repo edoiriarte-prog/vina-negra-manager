@@ -44,48 +44,55 @@ const StatusCell = ({ row }: { row: any }) => {
   const { toast } = useToast();
   
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState(order.status);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [invoiceNumber, setInvoiceNumber] = useState(order.invoiceNumber || '');
+  
+  // Estado temporal para el popover
+  const [tempStatus, setTempStatus] = useState(order.status);
+  const [tempDate, setTempDate] = useState<Date | undefined>(
+      order.status === 'invoiced' && order.invoicedDate ? parseISO(order.invoicedDate) :
+      order.status === 'dispatched' && order.dispatchedDate ? parseISO(order.dispatchedDate) :
+      new Date()
+  );
+  const [tempInvoiceNumber, setTempInvoiceNumber] = useState(order.invoiceNumber || '');
+
   const [isLoading, setIsLoading] = useState(false);
 
   const currentStatusConfig = statusConfig[order.status] || statusConfig.pending;
-  const showExtraFields = selectedStatus === 'dispatched' || selectedStatus === 'invoiced';
+  const showExtraFields = tempStatus === 'dispatched' || tempStatus === 'invoiced';
 
-  // Sincronizar estado interno si la orden cambia desde fuera
+  // Sincronizar estado si la orden cambia desde fuera
   useEffect(() => {
-    setSelectedStatus(order.status);
-    setInvoiceNumber(order.invoiceNumber || '');
-  }, [order.status, order.invoiceNumber]);
+    setTempStatus(order.status);
+    setTempInvoiceNumber(order.invoiceNumber || '');
+    setTempDate(
+      order.status === 'invoiced' && order.invoicedDate ? parseISO(order.invoicedDate) :
+      order.status === 'dispatched' && order.dispatchedDate ? parseISO(order.dispatchedDate) :
+      new Date()
+    );
+  }, [order]);
 
   const handleSave = async () => {
-    if (selectedStatus === order.status && !showExtraFields) {
-        setIsOpen(false);
-        return;
-    }
-    
-    if (showExtraFields && !selectedDate) {
+    if (showExtraFields && !tempDate) {
         toast({ variant: "destructive", title: "Fecha requerida" });
         return;
     }
     
-    if (selectedStatus === 'invoiced' && !invoiceNumber) {
+    if (tempStatus === 'invoiced' && !tempInvoiceNumber) {
         toast({ variant: "destructive", title: "N° de Factura requerido" });
         return;
     }
 
     setIsLoading(true);
-    const updateData: Partial<SalesOrder> = { status: selectedStatus as any };
-    if (selectedStatus === 'dispatched') {
-        updateData.dispatchedDate = selectedDate!.toISOString();
-    } else if (selectedStatus === 'invoiced') {
-        updateData.invoicedDate = selectedDate!.toISOString();
-        updateData.invoiceNumber = invoiceNumber;
+    const updateData: Partial<SalesOrder> = { status: tempStatus as any };
+    if (tempStatus === 'dispatched') {
+        updateData.dispatchedDate = tempDate!.toISOString();
+    } else if (tempStatus === 'invoiced') {
+        updateData.invoicedDate = tempDate!.toISOString();
+        updateData.invoiceNumber = tempInvoiceNumber;
     }
 
     try {
         await updateSalesOrder(order.id, updateData);
-        toast({ title: "Estado Actualizado", description: `La orden ahora está ${statusConfig[selectedStatus].label}.` });
+        toast({ title: "Estado Actualizado", description: `La orden ahora está ${statusConfig[tempStatus].label}.` });
         setIsOpen(false);
     } catch (error) {
         toast({ variant: "destructive", title: "Error al actualizar" });
@@ -121,15 +128,17 @@ const StatusCell = ({ row }: { row: any }) => {
             <ChevronDown className="h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-80 bg-slate-950 border-slate-800 text-slate-100 p-4" 
-        align="start" 
+      <PopoverContent
+        className="w-80 bg-slate-950 border-slate-800 text-slate-100 p-4"
+        align="start"
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         <div className="space-y-4">
             <div className="space-y-1">
                 <Label className="text-xs text-slate-400">Cambiar estado a:</Label>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <Select value={tempStatus} onValueChange={setTempStatus}>
                     <SelectTrigger className="w-full bg-slate-900 border-slate-700">
                         <SelectValue placeholder="Seleccionar estado" />
                     </SelectTrigger>
@@ -145,23 +154,23 @@ const StatusCell = ({ row }: { row: any }) => {
                 <div className="space-y-4 border-t border-slate-800 pt-4">
                     <div className="space-y-1">
                          <Label className="text-xs text-slate-400">
-                            Fecha de {selectedStatus === 'dispatched' ? 'Despacho' : 'Facturación'}
+                            Fecha de {tempStatus === 'dispatched' ? 'Despacho' : 'Facturación'}
                          </Label>
                          <Calendar
                             mode="single"
-                            selected={selectedDate}
-                            onSelect={setSelectedDate}
+                            selected={tempDate}
+                            onSelect={(d) => d && setTempDate(d)}
                             locale={es}
                             className="rounded-md border border-slate-800 bg-slate-900 p-0"
                          />
                     </div>
-                    {selectedStatus === 'invoiced' && (
+                    {tempStatus === 'invoiced' && (
                         <div className="space-y-1">
                             <Label htmlFor="invoiceNumber" className="text-xs text-slate-400">N° Factura</Label>
                             <Input
                                 id="invoiceNumber"
-                                value={invoiceNumber}
-                                onChange={(e) => setInvoiceNumber(e.target.value)}
+                                value={tempInvoiceNumber}
+                                onChange={(e) => setTempInvoiceNumber(e.target.value)}
                                 className="bg-slate-900 border-slate-700 h-9"
                                 placeholder="Ej: 12345"
                             />
@@ -187,11 +196,11 @@ const ActionsCell = ({ row, onEdit, onDelete, onPreview }: { row: any, onEdit: a
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-800 text-slate-400">
+        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-800 text-slate-400" onClick={(e) => e.stopPropagation()}>
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200">
+      <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => onPreview(order)} className="hover:bg-slate-800 cursor-pointer">
           <Eye className="mr-2 h-4 w-4" /> Ver Detalle
