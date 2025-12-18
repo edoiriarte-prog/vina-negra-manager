@@ -51,16 +51,14 @@ const formatDate = (dateString?: string) => {
 };
 
 const excelDate = (dateString?: string): Date | null => {
-    if (!dateString) return null;
+    if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return null;
     try {
-        // Corrección: Crear la fecha en UTC para evitar desfases de zona horaria.
-        // new Date('2023-12-25') puede ser interpretado como 24 de Dic a las 20:00 en algunas zonas.
-        // Añadir 'T00:00:00' lo estandariza.
-        const date = new Date(dateString + 'T00:00:00');
+        const [year, month, day] = dateString.split('-').map(Number);
+        // Crear la fecha usando componentes numéricos para evitar problemas de zona horaria.
+        // new Date(year, month - 1, day) la interpreta en la zona horaria local del navegador.
+        const date = new Date(year, month - 1, day);
         if (isValid(date)) {
-          // Corrección para evitar que la fecha se muestre un día antes en Excel
-          const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-          return new Date(date.getTime() + userTimezoneOffset);
+          return date;
         }
         return null;
     } catch {
