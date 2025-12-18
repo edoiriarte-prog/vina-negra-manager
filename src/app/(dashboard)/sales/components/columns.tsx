@@ -149,7 +149,7 @@ const StatusCell = ({ row }: { row: any }) => {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={!!targetStatus} onOpenChange={(isOpen) => !isOpen && setTargetStatus(null)}>
+      <Dialog open={!!targetStatus} onOpenChange={(isOpen) => !isOpen && setTargetStatus(null)} modal={false}>
         <DialogContent className="sm:max-w-md bg-slate-950 border-slate-800 text-slate-100">
           <DialogHeader>
             <DialogTitle>Registrar Trazabilidad</DialogTitle>
@@ -241,7 +241,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     header: "Fecha",
     cell: ({ row }) => {
         try {
-            return <div className="text-slate-400 text-xs">{row.getValue("date")}</div>
+            return <div className="text-slate-400 text-xs">{format(parseISO(row.getValue("date")), "dd-MM-yyyy", { locale: es })}</div>
         } catch (e) { return <span className="text-red-500">Error</span> }
     },
   },
