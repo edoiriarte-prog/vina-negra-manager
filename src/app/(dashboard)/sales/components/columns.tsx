@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
+  DialogPortal,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -150,46 +151,48 @@ const StatusCell = ({ row }: { row: any }) => {
       </DropdownMenu>
 
       <Dialog open={!!targetStatus} onOpenChange={(isOpen) => !isOpen && setTargetStatus(null)} modal={false}>
-        <DialogContent className="sm:max-w-md bg-slate-950 border-slate-800 text-slate-100">
-          <DialogHeader>
-            <DialogTitle>Registrar Trazabilidad</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p>
-              Estás marcando la orden como <span className="font-bold text-blue-400">{statusConfig[targetStatus!]?.label}</span>. 
-              Por favor, selecciona la fecha del evento.
-            </p>
-            <div className="flex justify-center">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                locale={es}
-                className="rounded-md border border-slate-800 bg-slate-900"
-              />
-            </div>
-            {targetStatus === 'invoiced' && (
-              <div className="space-y-2">
-                <Label htmlFor="invoiceNumber">Número de Factura</Label>
-                <Input
-                  id="invoiceNumber"
-                  value={invoiceNumber}
-                  onChange={(e) => setInvoiceNumber(e.target.value)}
-                  className="bg-slate-900 border-slate-700"
-                  placeholder="Ej: 12345"
+        <DialogPortal>
+            <DialogContent className="sm:max-w-md bg-slate-950 border-slate-800 text-slate-100">
+            <DialogHeader>
+                <DialogTitle>Registrar Trazabilidad</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <p>
+                Estás marcando la orden como <span className="font-bold text-blue-400">{statusConfig[targetStatus!]?.label}</span>. 
+                Por favor, selecciona la fecha del evento.
+                </p>
+                <div className="flex justify-center">
+                <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    locale={es}
+                    className="rounded-md border border-slate-800 bg-slate-900"
                 />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost" className="hover:bg-slate-800">Cancelar</Button>
-            </DialogClose>
-            <Button onClick={handleConfirmStatusChange} disabled={isLoading}>
-              {isLoading ? "Guardando..." : "Confirmar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+                </div>
+                {targetStatus === 'invoiced' && (
+                <div className="space-y-2">
+                    <Label htmlFor="invoiceNumber">Número de Factura</Label>
+                    <Input
+                    id="invoiceNumber"
+                    value={invoiceNumber}
+                    onChange={(e) => setInvoiceNumber(e.target.value)}
+                    className="bg-slate-900 border-slate-700"
+                    placeholder="Ej: 12345"
+                    />
+                </div>
+                )}
+            </div>
+            <DialogFooter>
+                <DialogClose asChild>
+                <Button type="button" variant="ghost" className="hover:bg-slate-800">Cancelar</Button>
+                </DialogClose>
+                <Button onClick={handleConfirmStatusChange} disabled={isLoading}>
+                {isLoading ? "Guardando..." : "Confirmar"}
+                </Button>
+            </DialogFooter>
+            </DialogContent>
+        </DialogPortal>
       </Dialog>
     </>
   );
@@ -270,7 +273,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     id: "totalWithVat",
     header: () => <div className="text-right">TOTAL C/IVA</div>,
     cell: ({ row }) => {
-        const net = parseFloat(row.getValue("totalAmount") || "0");
+        const net = parseFloat(row.original.totalAmount?.toString() || "0");
         const includeVat = row.original.includeVat !== false; 
         const total = includeVat ? net * 1.19 : net;
         return <div className="text-right font-mono font-bold text-emerald-400">{new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(total)}</div>;
@@ -281,3 +284,5 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     cell: ({ row }) => <ActionsCell row={row} onEdit={onEdit} onDelete={onDelete} onPreview={onPreview} />,
   },
 ];
+
+    
