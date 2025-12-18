@@ -459,14 +459,20 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                             <TableCell><Badge variant={mov.type === 'Cargo' ? 'outline' : 'default'} className={mov.type === 'Abono' ? 'bg-emerald-500/80 border-emerald-700' : 'border-slate-700'}>{mov.documentType}</Badge></TableCell>
                                             <TableCell className="font-mono text-xs">{mov.reference}</TableCell>
                                             <TableCell className="text-xs max-w-xs">
-                                                {typeof mov.details === 'string' 
-                                                    ? mov.details 
-                                                    : mov.details.map((item, idx) => (
-                                                        <div key={idx} className="truncate">
-                                                          {item.quantity} kg de {item.product} ({item.caliber})
-                                                        </div>
-                                                    ))
-                                                }
+                                                {typeof mov.details === 'string' ? (
+                                                    mov.details
+                                                ) : (
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild><span className="cursor-help underline decoration-dotted">{mov.details.length} ítem(s) de producto</span></TooltipTrigger>
+                                                            <TooltipContent className="bg-slate-900 border-slate-800 text-slate-200">
+                                                                <div className="space-y-1 p-2">
+                                                                    {mov.details.map((item, idx) => <p key={idx} className="text-xs">• {item.product} ({item.caliber}): {item.quantity}kg a {formatCurrency(item.price)}</p>)}
+                                                                </div>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-red-400">{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</TableCell>
                                             <TableCell className="text-right font-mono text-emerald-400">{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</TableCell>

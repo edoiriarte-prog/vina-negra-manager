@@ -164,15 +164,22 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
 
                     {movements.map((mov, i) => {
                         const isDetailsArray = Array.isArray(mov.details);
-                        const conceptText = isDetailsArray
-                          ? mov.details.map((item: any) => `${item.quantity}kg ${item.product} ${item.caliber}`).join(', ')
-                          : mov.details;
-
+                        
                         return (
-                            <View key={i} style={[styles.tableRow, i % 2 !== 0 && styles.tableRowAlt]}>
+                            <View key={i} style={[styles.tableRow, i % 2 !== 0 && styles.tableRowAlt]} wrap={false}>
                                 <Text style={[styles.tableCell, styles.colDate]}>{formatDate(mov.date)}</Text>
                                 <Text style={[styles.tableCell, styles.colRef, {fontFamily: 'Helvetica-Oblique'}]}>{mov.reference}</Text>
-                                <Text style={[styles.tableCell, styles.colConcept]}>{conceptText}</Text>
+                                <View style={[styles.tableCell, styles.colConcept]}>
+                                  {isDetailsArray ? (
+                                      mov.details.map((item: any, idx: number) => (
+                                          <Text key={idx} style={{fontSize: 8}}>
+                                              • {item.product} ({item.caliber}): {item.quantity}kg a {formatCurrency(item.price)}
+                                          </Text>
+                                      ))
+                                  ) : (
+                                      <Text>{mov.details}</Text>
+                                  )}
+                                </View>
                                 <Text style={[styles.tableCell, styles.colCharge]}>{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</Text>
                                 <Text style={[styles.tableCell, styles.colPayment]}>{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</Text>
                                 <Text style={[styles.tableCell, styles.colBalance]}>{formatCurrency(mov.balance)}</Text>
