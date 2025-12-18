@@ -6,11 +6,11 @@ import { es } from 'date-fns/locale';
 
 // Estilos
 const styles = StyleSheet.create({
-  page: { padding: 30, fontSize: 12, fontFamily: 'Helvetica', color: '#000' },
+  page: { padding: 30, fontSize: 10, fontFamily: 'Helvetica', color: '#000' },
   
   logo: {
-      width: 80,
-      height: 50,
+      width: 60,
+      height: 40,
       objectFit: 'contain',
       marginRight: 10
   },
@@ -26,56 +26,56 @@ const styles = StyleSheet.create({
   
   companyWrapper: { flexDirection: 'row', alignItems: 'center' },
   companyInfo: { flexDirection: 'column' },
-  companyName: { fontSize: 24, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }, 
-  companySub: { fontSize: 12, fontFamily: 'Helvetica', color: '#000', marginBottom: 1 }, 
+  companyName: { fontSize: 22, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }, 
+  companySub: { fontSize: 10, fontFamily: 'Helvetica', color: '#000', marginBottom: 1 }, 
   
   docInfo: { alignItems: 'flex-end' },
-  docTitle: { fontSize: 18, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', marginBottom: 4 }, 
+  docTitle: { fontSize: 16, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', marginBottom: 4 }, 
   docNumberBox: { backgroundColor: '#f0f0f0', padding: '4 10', borderRadius: 4, marginBottom: 4, border: '1px solid #ccc' },
-  docNumber: { fontSize: 16, fontFamily: 'Helvetica-Bold' }, 
-  docDate: { fontSize: 12, fontFamily: 'Helvetica' },
+  docNumber: { fontSize: 14, fontFamily: 'Helvetica-Bold' }, 
+  docDate: { fontSize: 10, fontFamily: 'Helvetica' },
 
   boxesContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, gap: 5 },
   infoBox: { width: '32%', border: '1px solid #ddd', borderRadius: 2, backgroundColor: '#fdfdfd' },
   boxHeader: { borderBottom: '1px solid #ddd', padding: '4 6', marginBottom: 4, backgroundColor: '#f0f0f0' },
-  boxTitle: { fontSize: 11, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', color: '#000' }, 
+  boxTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', color: '#000' }, 
   boxContent: { padding: '2 6 6 6' },
   boxRow: { marginBottom: 3, flexDirection: 'row' },
   
-  boxLabel: { fontFamily: 'Helvetica-Bold', fontSize: 11, color: '#000', width: 45 }, 
-  boxValue: { fontSize: 11, fontFamily: 'Helvetica', color: '#000', flex: 1 }, 
+  boxLabel: { fontFamily: 'Helvetica-Bold', fontSize: 9, color: '#000', width: 45 }, 
+  boxValue: { fontSize: 9, fontFamily: 'Helvetica', color: '#000', flex: 1 }, 
 
-  table: { width: '100%', marginBottom: 10 },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#eee', borderBottom: '1px solid #999', padding: '8 0' },
-  tableRow: { flexDirection: 'row', borderBottom: '1px solid #eee', padding: '10 0' },
+  table: { width: '100%', marginBottom: 10, fontFamily: 'Helvetica' },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#eee', borderBottom: '1px solid #999', padding: '6 0', fontFamily: 'Helvetica-Bold' },
+  tableRow: { flexDirection: 'row', borderBottom: '1px solid #eee', padding: '8 0' },
   
-  colCode: { width: '8%', paddingLeft: 4, fontSize: 11, fontFamily: 'Helvetica' },
-  colDesc: { width: '27%', fontSize: 11, fontFamily: 'Helvetica' },
-  colEnv: { width: '10%', textAlign: 'center', fontSize: 11, fontFamily: 'Helvetica' },
-  colKg: { width: '10%', textAlign: 'center', fontSize: 11, fontFamily: 'Helvetica' },
-  colNet: { width: '11%', textAlign: 'right', fontSize: 11, fontFamily: 'Helvetica' },
-  colVat: { width: '11%', textAlign: 'right', fontSize: 11, fontFamily: 'Helvetica' },
-  colSub: { width: '11%', textAlign: 'right', fontSize: 11, fontFamily: 'Helvetica' },
-  colTotal: { width: '12%', textAlign: 'right', paddingRight: 4, fontSize: 11, fontFamily: 'Helvetica-Bold' },
+  colCode: { width: '8%', paddingLeft: 4, fontSize: 9 },
+  colDesc: { width: '27%', fontSize: 9 },
+  colEnv: { width: '10%', textAlign: 'center', fontSize: 9 },
+  colKg: { width: '10%', textAlign: 'center', fontSize: 9 },
+  colNet: { width: '11%', textAlign: 'right', fontSize: 9 },
+  colVat: { width: '11%', textAlign: 'right', fontSize: 9 },
+  colSub: { width: '11%', textAlign: 'right', fontSize: 9 },
+  colTotal: { width: '12%', textAlign: 'right', paddingRight: 4, fontSize: 9, fontFamily: 'Helvetica-Bold' },
 
-  totalsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '1px solid #ddd' },
+  totalsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '1px solid #ddd', fontFamily: 'Helvetica' },
   totalsLeft: { width: '50%', backgroundColor: '#f9fafb', padding: 8, borderRadius: 4 },
   totalsRight: { width: '40%' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  totalLabel: { fontSize: 12, fontFamily: 'Helvetica', color: '#000' }, 
-  totalValue: { fontSize: 12, fontFamily: 'Helvetica-Bold' }, 
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, fontFamily: 'Helvetica' },
+  totalLabel: { fontSize: 10, fontFamily: 'Helvetica', color: '#000' }, 
+  totalValue: { fontSize: 10, fontFamily: 'Helvetica-Bold' }, 
   totalFinalBox: { backgroundColor: '#111', padding: 8, borderRadius: 2, flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   
-  obsContainer: { marginTop: 15 },
+  obsContainer: { marginTop: 15, fontFamily: 'Helvetica' },
   obsBox: { border: '1px solid #ddd', padding: 8, borderRadius: 4, backgroundColor: '#fafafa', minHeight: 30 },
   
-  signatures: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 50 },
+  signatures: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 50, fontFamily: 'Helvetica' },
   signatureBox: { width: '30%', alignItems: 'center' },
   signatureLine: { width: '80%', borderTop: '1px solid #000', marginBottom: 6 },
-  signatureText: { fontSize: 11, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }, 
-  signatureSub: { fontSize: 10, fontFamily: 'Helvetica', color: '#000', textTransform: 'uppercase', marginTop: 2 }, 
+  signatureText: { fontSize: 9, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }, 
+  signatureSub: { fontSize: 8, fontFamily: 'Helvetica', color: '#000', textTransform: 'uppercase', marginTop: 2 }, 
   
-  disclaimer: { textAlign: 'center', fontSize: 10, fontFamily: 'Helvetica', color: '#000', marginTop: 40 },
+  disclaimer: { textAlign: 'center', fontSize: 8, fontFamily: 'Helvetica', color: '#000', marginTop: 40 },
 });
 
 // Helpers
@@ -126,7 +126,7 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                     <View style={styles.infoBox}>
                         <View style={styles.boxHeader}><Text style={styles.boxTitle}>{type === 'VENTA' ? 'CLIENTE' : 'PROVEEDOR'}</Text></View>
                         <View style={styles.boxContent}>
-                            <View style={styles.boxRow}><Text style={[styles.boxValue, {fontSize: 12, fontFamily: 'Helvetica-Bold'}]}>{clientName}</Text></View>
+                            <View style={styles.boxRow}><Text style={[styles.boxValue, {fontSize: 10, fontFamily: 'Helvetica-Bold'}]}>{clientName}</Text></View>
                             <View style={styles.boxRow}><Text style={styles.boxLabel}>RUT:</Text><Text style={styles.boxValue}>{clientRut || 'S/I'}</Text></View>
                             <View style={styles.boxRow}><Text style={styles.boxLabel}>Dir:</Text><Text style={styles.boxValue}>{clientAddress || 'S/I'}</Text></View>
                             <View style={styles.boxRow}><Text style={styles.boxLabel}>Att:</Text><Text style={styles.boxValue}>{clientContact || '-'}</Text></View>
@@ -152,12 +152,12 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                             
                             {bankAccount && (
                                 <View style={{marginTop: 6, paddingTop: 6, borderTop: '1px solid #ddd'}}>
-                                    <Text style={[styles.boxLabel, {marginBottom:3, width: '100%'}]}>DATOS TRANSFERENCIA:</Text>
-                                        <Text style={{fontSize: 11, fontFamily: 'Helvetica'}}>{bankAccount.bank || bankAccount.bankName}</Text>
-                                        <Text style={{fontSize: 11, fontFamily: 'Helvetica', marginBottom: 4}}>{(bankAccount.type || bankAccount.accountType) || 'Cta'} N° {bankAccount.accountNumber}</Text>
-                                        <Text style={{fontSize: 11, fontFamily: 'Helvetica-Bold'}}>Agrocomercial Viña Negra SpA</Text>
-                                        <Text style={{fontSize: 11, fontFamily: 'Helvetica'}}>RUT: 78.261.683-8</Text>
-                                        <Text style={{fontSize: 11, fontFamily: 'Helvetica'}}>eduardoiriarte@agrocomercialavn.com</Text>
+                                    <Text style={[styles.boxLabel, {marginBottom:3, width: '100%', fontFamily: 'Helvetica-Bold'}]}>DATOS TRANSFERENCIA:</Text>
+                                        <Text style={{fontSize: 9, fontFamily: 'Helvetica'}}>{bankAccount.bank || bankAccount.bankName}</Text>
+                                        <Text style={{fontSize: 9, fontFamily: 'Helvetica', marginBottom: 4}}>{(bankAccount.type || bankAccount.accountType) || 'Cta'} N° {bankAccount.accountNumber}</Text>
+                                        <Text style={{fontSize: 9, fontFamily: 'Helvetica-Bold'}}>Agrocomercial Viña Negra SpA</Text>
+                                        <Text style={{fontSize: 9, fontFamily: 'Helvetica'}}>RUT: 78.261.683-8</Text>
+                                        <Text style={{fontSize: 9, fontFamily: 'Helvetica'}}>eduardoiriarte@agrocomercialavn.com</Text>
                                 </View>
                             )}
                         </View>
@@ -187,8 +187,8 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                             <View key={i} style={styles.tableRow}>
                                 <Text style={styles.colCode}>{item.code || (i + 1) * 10}</Text>
                                 <View style={styles.colDesc}>
-                                    <Text style={{fontSize: 11, fontFamily: 'Helvetica-Bold'}}>{item.product}</Text>
-                                    <Text style={{fontSize: 10, color: '#000', fontFamily: 'Helvetica'}}>{item.caliber}</Text>
+                                    <Text style={{fontSize: 9, fontFamily: 'Helvetica-Bold'}}>{item.product}</Text>
+                                    <Text style={{fontSize: 8, color: '#000', fontFamily: 'Helvetica'}}>{item.caliber}</Text>
                                 </View>
                                 <Text style={styles.colEnv}>{item.packagingQuantity || '-'}</Text>
                                 <Text style={styles.colKg}>{formatNumber(qty)}</Text>
@@ -224,8 +224,8 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                             <Text style={styles.totalValue}>{formatCurrency(totalIVA)}</Text>
                         </View>
                         <View style={styles.totalFinalBox}>
-                            <Text style={{color:'#fff', fontSize:13, fontFamily:'Helvetica-Bold'}}>TOTAL A PAGAR:</Text>
-                            <Text style={{color:'#fff', fontSize:14, fontFamily:'Helvetica-Bold'}}>{formatCurrency(totalBruto)}</Text>
+                            <Text style={{color:'#fff', fontSize:11, fontFamily:'Helvetica-Bold'}}>TOTAL A PAGAR:</Text>
+                            <Text style={{color:'#fff', fontSize:12, fontFamily:'Helvetica-Bold'}}>{formatCurrency(totalBruto)}</Text>
                         </View>
                     </View>
                 </View>
@@ -234,7 +234,7 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                 <View style={styles.obsContainer}>
                     <Text style={[styles.boxLabel, {marginBottom: 4, width: '100%'}]}>OBSERVACIONES</Text>
                     <View style={styles.obsBox}>
-                        <Text style={{fontSize: 11, fontStyle: 'italic', fontFamily: 'Helvetica'}}>{order.notes || 'Sin observaciones.'}</Text>
+                        <Text style={{fontSize: 9, fontStyle: 'italic', fontFamily: 'Helvetica'}}>{order.notes || 'Sin observaciones.'}</Text>
                     </View>
                 </View>
 

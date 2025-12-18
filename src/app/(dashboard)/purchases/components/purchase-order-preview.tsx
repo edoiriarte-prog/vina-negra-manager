@@ -202,6 +202,7 @@ export function PurchaseOrderPreview({ order, isOpen, onOpenChange }: PurchaseOr
                     clientRut={supplierData?.rut}
                     clientAddress={supplierData?.address}
                     clientContact={supplierData?.contactPerson}
+                    bankAccount={null}
                     type="COMPRA"
                 />
                 }
