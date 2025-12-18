@@ -5,7 +5,9 @@ import { useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { SalesOrder } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, ArrowUpDown, Eye, Edit, Trash, Check, Truck, FileText, Ban, ChevronDown } from "lucide-react";
+import { 
+  MoreHorizontal, ArrowUpDown, Eye, Edit, Trash, Check, Truck, FileText, Ban, ChevronDown, Calendar as CalendarIcon 
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,71 +17,181 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
 import { useToast } from "@/hooks/use-toast";
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 
-// --- COMPONENTE INTELIGENTE DE ESTADO (AHORA CON SELECT) ---
+
+const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+    pending: { label: 'Pendiente', color: 'border-yellow-500/50 bg-yellow-950/50 text-yellow-400', icon: Check },
+    dispatched: { label: 'Despachada', color: 'border-blue-500/50 bg-blue-950/50 text-blue-400', icon: Truck },
+    invoiced: { label: 'Facturada', color: 'border-emerald-500/50 bg-emerald-950/50 text-emerald-400', icon: FileText },
+    cancelled: { label: 'Cancelada', color: 'border-red-500/50 bg-red-950/50 text-red-500', icon: Ban },
+};
+
+
+// --- COMPONENTE INTELIGENTE DE ESTADO (CON DIÁLOGO) ---
 const StatusCell = ({ row }: { row: any }) => {
   const order = row.original as SalesOrder;
   const { updateSalesOrder } = useSalesOrdersCRUD();
   const { toast } = useToast();
-  const [currentStatus, setCurrentStatus] = useState(order.status || 'pending');
+  
+  const [targetStatus, setTargetStatus] = useState<string | null>(null);
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [invoiceNumber, setInvoiceNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const statusConfig: Record<string, { label: string, color: string }> = {
-    'pending': { label: 'Pendiente', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20' },
-    'dispatched': { label: 'Despachada', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20' },
-    'invoiced': { label: 'Facturada', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20' },
-    'cancelled': { label: 'Cancelada', color: 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20' },
-  };
+  const currentStatusConfig = statusConfig[order.status] || statusConfig.pending;
 
-  const activeConfig = statusConfig[currentStatus] || statusConfig['pending'];
+  const handleStatusSelect = (newStatus: string) => {
+    if (newStatus === order.status) return;
 
-  const handleStatusChange = async (newStatus: string) => {
-    if (newStatus === currentStatus) return;
-    
-    setIsLoading(true);
-    setCurrentStatus(newStatus as any);
-
-    try {
-      await updateSalesOrder(order.id, { status: newStatus as any });
-      toast({
-        title: "Estado Actualizado",
-        description: `La orden #${order.number} ahora está ${statusConfig[newStatus].label}.`,
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error al actualizar",
-        description: "No se pudo cambiar el estado de la orden.",
-      });
-      setCurrentStatus(order.status); // Revertir en caso de error
-    } finally {
-      setIsLoading(false);
+    if (newStatus === 'dispatched' || newStatus === 'invoiced') {
+      setTargetStatus(newStatus);
+      setDate(new Date()); // Reset date on open
+      setInvoiceNumber(''); // Reset invoice number
+    } else {
+      // Para estados simples como 'cancelled' o 'pending', actualizar directamente
+      setIsLoading(true);
+      updateSalesOrder(order.id, { status: newStatus as any })
+        .then(() => toast({ title: "Estado Actualizado" }))
+        .catch(() => toast({ variant: "destructive", title: "Error al actualizar" }))
+        .finally(() => setIsLoading(false));
     }
   };
 
+  const handleConfirmStatusChange = async () => {
+    if (!targetStatus || !date) return;
+    
+    setIsLoading(true);
+    const updateData: Partial<SalesOrder> = { status: targetStatus as any };
+
+    if (targetStatus === 'dispatched') {
+        updateData.dispatchedDate = date.toISOString();
+    } else if (targetStatus === 'invoiced') {
+        if (!invoiceNumber) {
+            toast({ variant: 'destructive', title: 'Falta N° de Factura' });
+            setIsLoading(false);
+            return;
+        }
+        updateData.invoicedDate = date.toISOString();
+        updateData.invoiceNumber = invoiceNumber;
+    }
+
+    try {
+        await updateSalesOrder(order.id, updateData);
+        toast({ title: "Trazabilidad Registrada", description: `La orden ahora está ${statusConfig[targetStatus].label}.` });
+        setTargetStatus(null);
+    } catch (error) {
+        toast({ variant: 'destructive', title: "Error al guardar trazabilidad" });
+    } finally {
+        setIsLoading(false);
+    }
+  };
+  
+  const displayDate = order.status === 'invoiced' && order.invoicedDate 
+    ? order.invoicedDate 
+    : (order.status === 'dispatched' && order.dispatchedDate ? order.dispatchedDate : null);
+
   return (
-    <div onClick={(e) => e.stopPropagation()}>
-        <Select value={currentStatus} onValueChange={handleStatusChange} disabled={isLoading}>
-            <SelectTrigger className={`h-7 w-[130px] text-xs font-semibold border rounded-full px-3 transition-all ${activeConfig.color}`}>
-                <SelectValue>{activeConfig.label}</SelectValue>
-            </SelectTrigger>
-            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100 z-50">
-                <SelectItem value="pending" className="text-yellow-400 focus:bg-slate-800 cursor-pointer">Pendiente</SelectItem>
-                <SelectItem value="dispatched" className="text-blue-400 focus:bg-slate-800 cursor-pointer">Despachada</SelectItem>
-                <SelectItem value="invoiced" className="text-emerald-400 focus:bg-slate-800 cursor-pointer">Facturada</SelectItem>
-                <SelectItem value="cancelled" className="text-red-400 focus:bg-slate-800 cursor-pointer">Cancelada</SelectItem>
-            </SelectContent>
-        </Select>
-    </div>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            className={`h-auto min-w-[150px] justify-between text-xs font-semibold px-3 py-1.5 transition-all ${currentStatusConfig.color}`}
+            disabled={isLoading}
+          >
+            <div className="flex flex-col items-start">
+              <span className="flex items-center gap-1.5">
+                <currentStatusConfig.icon className="h-3.5 w-3.5" />
+                {currentStatusConfig.label}
+              </span>
+              {displayDate && (
+                 <span className="text-[10px] font-normal text-slate-500 pl-5">
+                    {format(parseISO(displayDate), 'dd/MM/yy')}
+                 </span>
+              )}
+            </div>
+            <ChevronDown className="h-4 w-4 opacity-50" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent 
+            align="start" 
+            className="bg-slate-900 border-slate-800 text-slate-200"
+            onCloseAutoFocus={(e) => e.preventDefault()} // Previene que el trigger tome foco y propague el click
+        >
+          {Object.entries(statusConfig).map(([key, { label }]) => (
+            <DropdownMenuItem 
+                key={key} 
+                onSelect={(e) => {
+                    e.preventDefault(); // Detiene el cierre del menú y la propagación a la fila
+                    e.stopPropagation();
+                    handleStatusSelect(key);
+                }}
+                className="cursor-pointer focus:bg-slate-800"
+            >
+              {label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Dialog open={!!targetStatus} onOpenChange={(isOpen) => !isOpen && setTargetStatus(null)}>
+        <DialogContent className="sm:max-w-md bg-slate-950 border-slate-800 text-slate-100">
+          <DialogHeader>
+            <DialogTitle>Registrar Trazabilidad</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p>
+              Estás marcando la orden como <span className="font-bold text-blue-400">{statusConfig[targetStatus!]?.label}</span>. 
+              Por favor, selecciona la fecha del evento.
+            </p>
+            <div className="flex justify-center">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                locale={es}
+                className="rounded-md border border-slate-800 bg-slate-900"
+              />
+            </div>
+            {targetStatus === 'invoiced' && (
+              <div className="space-y-2">
+                <Label htmlFor="invoiceNumber">Número de Factura</Label>
+                <Input
+                  id="invoiceNumber"
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                  className="bg-slate-900 border-slate-700"
+                  placeholder="Ej: 12345"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="ghost" className="hover:bg-slate-800">Cancelar</Button>
+            </DialogClose>
+            <Button onClick={handleConfirmStatusChange} disabled={isLoading}>
+              {isLoading ? "Guardando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

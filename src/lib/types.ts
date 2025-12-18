@@ -204,6 +204,11 @@ export interface SalesOrder {
   driver?: string;         // Nombre del chofer
   plate?: string;          // Patente
 
+  // Campos de Trazabilidad
+  dispatchedDate?: string; // Fecha ISO
+  invoicedDate?: string;   // Fecha ISO
+  invoiceNumber?: string;  // N° Documento
+
   // Campos opcionales para visualización en PDF/Vistas (Expandidos)
   customer?: Contact;
   bankAccount?: BankAccount;

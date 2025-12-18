@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -35,7 +36,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 // Helpers
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
-const formatDate = (dateString: string) => {
+const formatDate = (dateString?: string) => {
+    if (!dateString) return "-";
     try {
         return format(parseISO(dateString), "dd-MM-yyyy");
     } catch (e) {
@@ -68,8 +70,7 @@ export default function SalesPage() {
         if ('id' in orderData && orderData.id) {
             await updateSalesOrder(orderData.id, orderData);
         } else {
-            // @ts-ignore
-            await createSalesOrder(orderData);
+            await createSalesOrder(orderData as Omit<SalesOrder, "id">);
         }
         setIsSheetOpen(false);
         setEditingOrder(null);
@@ -110,6 +111,9 @@ export default function SalesPage() {
             'Fecha': formatDate(o.date),
             'Cliente': clientName,
             'Estado': o.status,
+            'Fecha Despacho': formatDate(o.dispatchedDate),
+            'Fecha Facturación': formatDate(o.invoicedDate),
+            'N° Factura': o.invoiceNumber || '-',
             'Kilos': o.totalKilos || 0,
             'Neto': net,
             'Total c/IVA': total
@@ -316,22 +320,24 @@ export default function SalesPage() {
       </Card>
       
       {/* Modal de Crear/Editar */}
-      <NewSalesOrderSheet
-        isOpen={isSheetOpen}
-        onOpenChange={(open) => {
-            if (!open) setEditingOrder(null);
-            setIsSheetOpen(open);
-        }}
-        onSave={handleSave}
-        order={editingOrder}
-        clients={clients}
-        inventory={inventory}
-        sheetType="sale"
-        salesOrders={salesOrders}
-        purchaseOrders={purchaseOrders}
-        inventoryAdjustments={inventoryAdjustments}
-        contacts={contacts}
-      />
+      {isSheetOpen && (
+        <NewSalesOrderSheet
+            isOpen={isSheetOpen}
+            onOpenChange={(open) => {
+                if (!open) setEditingOrder(null);
+                setIsSheetOpen(open);
+            }}
+            onSave={handleSave}
+            order={editingOrder}
+            clients={clients}
+            inventory={inventory}
+            sheetType="sale"
+            salesOrders={salesOrders}
+            purchaseOrders={purchaseOrders}
+            inventoryAdjustments={inventoryAdjustments}
+            contacts={contacts}
+        />
+      )}
 
       {/* Modal de Vista Previa */}
       {previewOrder && (
