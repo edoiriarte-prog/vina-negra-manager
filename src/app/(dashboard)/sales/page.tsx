@@ -108,15 +108,22 @@ export default function SalesPage() {
         const total = o.includeVat !== false ? net * 1.19 : net;
         return {
             'N° Venta': o.number,
-            'Fecha': formatDate(o.date),
+            'Fecha Emisión': formatDate(o.date),
             'Cliente': clientName,
             'Estado': o.status,
+            'Kilos Totales': o.totalKilos || 0,
+            'Monto Neto': net,
+            'Monto Total c/IVA': total,
+            'Tipo de Venta': o.saleType,
+            'Forma de Pago': o.paymentMethod,
+            'Días Crédito': o.creditDays,
+            'Fecha Vencimiento': formatDate(o.paymentDueDate),
+            'Bodega Origen': o.warehouse,
+            'Chofer': o.driver,
+            'Patente': o.plate,
             'Fecha Despacho': formatDate(o.dispatchedDate),
             'Fecha Facturación': formatDate(o.invoicedDate),
             'N° Factura': o.invoiceNumber || '-',
-            'Kilos': o.totalKilos || 0,
-            'Neto': net,
-            'Total c/IVA': total
         };
     });
 
@@ -165,8 +172,6 @@ export default function SalesPage() {
       return acc;
     }, {} as Record<string, { orders: SalesOrder[], total: number }>);
 
-    // --- CORRECCIÓN CRÍTICA AQUÍ ---
-    // Usamos a[1] y b[1] para acceder al valor, porque [0] es la clave (fecha string)
     const dateArray = Object.entries(byDate)
         .sort((a, b) => {
             const dateA = a[1].orders[0]?.date ? new Date(a[1].orders[0].date).getTime() : 0;
@@ -367,3 +372,5 @@ export default function SalesPage() {
     </div>
   );
 }
+
+    
