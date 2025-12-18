@@ -198,6 +198,7 @@ export function NewSalesOrderSheet({
         status: formData.status || 'pending',
     };
 
+    // SOLUCIÓN CLAVE: Eliminar claves con valor `undefined` antes de guardar.
     Object.keys(finalOrder).forEach(key => {
         if (finalOrder[key] === undefined) {
             delete finalOrder[key];

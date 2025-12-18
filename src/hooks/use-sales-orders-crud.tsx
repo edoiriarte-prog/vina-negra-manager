@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useFirebase } from "@/firebase";
@@ -24,9 +25,13 @@ export function useSalesOrdersCRUD() {
       toast({ title: "Orden Creada", description: "Venta registrada exitosamente." });
       router.refresh();
       return docRef;
-    } catch (error) {
-      console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "No se pudo crear la orden." });
+    } catch (error: any) {
+      console.error("Error al crear la orden de venta:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Error al Guardar", 
+        description: `No se pudo crear la orden. Causa: ${error.message}` 
+      });
     }
   };
 
@@ -71,3 +76,4 @@ export function useSalesOrdersCRUD() {
     deleteSalesOrder
   };
 }
+
