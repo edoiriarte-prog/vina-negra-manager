@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale';
 
 // Estilos
 const styles = StyleSheet.create({
-  page: { padding: 30, fontSize: 11, fontFamily: 'Helvetica', color: '#000' },
+  page: { padding: 30, fontSize: 10, fontFamily: 'Helvetica', color: '#000' },
   
   logo: {
       width: 80,
@@ -26,14 +26,14 @@ const styles = StyleSheet.create({
   
   companyWrapper: { flexDirection: 'row', alignItems: 'center' },
   companyInfo: { flexDirection: 'column' },
-  companyName: { fontSize: 22, fontWeight: 'bold', textTransform: 'uppercase', fontFamily: 'Helvetica-Bold' }, 
-  companySub: { fontSize: 10, color: '#000', marginBottom: 1 }, 
+  companyName: { fontSize: 22, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }, 
+  companySub: { fontSize: 10, fontFamily: 'Helvetica', color: '#000', marginBottom: 1 }, 
   
   docInfo: { alignItems: 'flex-end' },
-  docTitle: { fontSize: 16, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 4, fontFamily: 'Helvetica-Bold' }, 
+  docTitle: { fontSize: 16, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', marginBottom: 4 }, 
   docNumberBox: { backgroundColor: '#f0f0f0', padding: '4 10', borderRadius: 4, marginBottom: 4, border: '1px solid #ccc' },
   docNumber: { fontSize: 14, fontFamily: 'Helvetica-Bold' }, 
-  docDate: { fontSize: 11 },
+  docDate: { fontSize: 11, fontFamily: 'Helvetica' },
 
   boxesContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, gap: 5 },
   infoBox: { width: '32%', border: '1px solid #ddd', borderRadius: 2, backgroundColor: '#fdfdfd' },
@@ -43,26 +43,26 @@ const styles = StyleSheet.create({
   boxRow: { marginBottom: 3, flexDirection: 'row' },
   
   boxLabel: { fontFamily: 'Helvetica-Bold', fontSize: 9, color: '#000', width: 45 }, 
-  boxValue: { fontSize: 9, color: '#000', flex: 1 }, 
+  boxValue: { fontSize: 9, fontFamily: 'Helvetica', color: '#000', flex: 1 }, 
 
   table: { width: '100%', marginBottom: 10 },
   tableHeader: { flexDirection: 'row', backgroundColor: '#eee', borderBottom: '1px solid #999', padding: '8 0' },
   tableRow: { flexDirection: 'row', borderBottom: '1px solid #eee', padding: '10 0' },
   
-  colCode: { width: '8%', paddingLeft: 4, fontSize: 9 },
-  colDesc: { width: '27%', fontSize: 9 },
-  colEnv: { width: '10%', textAlign: 'center', fontSize: 9 },
-  colKg: { width: '10%', textAlign: 'center', fontSize: 9 },
-  colNet: { width: '11%', textAlign: 'right', fontSize: 9 },
-  colVat: { width: '11%', textAlign: 'right', fontSize: 9 },
-  colSub: { width: '11%', textAlign: 'right', fontSize: 9 },
+  colCode: { width: '8%', paddingLeft: 4, fontSize: 9, fontFamily: 'Helvetica' },
+  colDesc: { width: '27%', fontSize: 9, fontFamily: 'Helvetica' },
+  colEnv: { width: '10%', textAlign: 'center', fontSize: 9, fontFamily: 'Helvetica' },
+  colKg: { width: '10%', textAlign: 'center', fontSize: 9, fontFamily: 'Helvetica' },
+  colNet: { width: '11%', textAlign: 'right', fontSize: 9, fontFamily: 'Helvetica' },
+  colVat: { width: '11%', textAlign: 'right', fontSize: 9, fontFamily: 'Helvetica' },
+  colSub: { width: '11%', textAlign: 'right', fontSize: 9, fontFamily: 'Helvetica' },
   colTotal: { width: '12%', textAlign: 'right', paddingRight: 4, fontSize: 9, fontFamily: 'Helvetica-Bold' },
 
   totalsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '1px solid #ddd' },
   totalsLeft: { width: '50%', backgroundColor: '#f9fafb', padding: 8, borderRadius: 4 },
   totalsRight: { width: '40%' },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  totalLabel: { fontSize: 10, color: '#000' }, 
+  totalLabel: { fontSize: 10, fontFamily: 'Helvetica', color: '#000' }, 
   totalValue: { fontSize: 10, fontFamily: 'Helvetica-Bold' }, 
   totalFinalBox: { backgroundColor: '#111', padding: 8, borderRadius: 2, flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   
@@ -73,9 +73,9 @@ const styles = StyleSheet.create({
   signatureBox: { width: '30%', alignItems: 'center' },
   signatureLine: { width: '80%', borderTop: '1px solid #000', marginBottom: 6 },
   signatureText: { fontSize: 9, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }, 
-  signatureSub: { fontSize: 8, color: '#000', textTransform: 'uppercase', marginTop: 2 }, 
+  signatureSub: { fontSize: 8, fontFamily: 'Helvetica', color: '#000', textTransform: 'uppercase', marginTop: 2 }, 
   
-  disclaimer: { textAlign: 'center', fontSize: 8, color: '#000', marginTop: 40 },
+  disclaimer: { textAlign: 'center', fontSize: 8, fontFamily: 'Helvetica', color: '#000', marginTop: 40 },
 });
 
 // Helpers
@@ -153,11 +153,11 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                             {bankAccount && (
                                 <View style={{marginTop: 6, paddingTop: 6, borderTop: '1px solid #ddd'}}>
                                     <Text style={[styles.boxLabel, {marginBottom:3, width: '100%'}]}>DATOS TRANSFERENCIA:</Text>
-                                        <Text style={{fontSize: 9}}>{bankAccount.bank || bankAccount.bankName}</Text>
-                                        <Text style={{fontSize: 9, marginBottom: 4}}>{(bankAccount.type || bankAccount.accountType) || 'Cta'} N° {bankAccount.accountNumber}</Text>
+                                        <Text style={{fontSize: 9, fontFamily: 'Helvetica'}}>{bankAccount.bank || bankAccount.bankName}</Text>
+                                        <Text style={{fontSize: 9, fontFamily: 'Helvetica', marginBottom: 4}}>{(bankAccount.type || bankAccount.accountType) || 'Cta'} N° {bankAccount.accountNumber}</Text>
                                         <Text style={{fontSize: 9, fontFamily: 'Helvetica-Bold'}}>Agrocomercial Viña Negra SpA</Text>
-                                        <Text style={{fontSize: 9}}>RUT: 78.261.683-8</Text>
-                                        <Text style={{fontSize: 9}}>eduardoiriarte@agrocomercialavn.com</Text>
+                                        <Text style={{fontSize: 9, fontFamily: 'Helvetica'}}>RUT: 78.261.683-8</Text>
+                                        <Text style={{fontSize: 9, fontFamily: 'Helvetica'}}>eduardoiriarte@agrocomercialavn.com</Text>
                                 </View>
                             )}
                         </View>
@@ -188,7 +188,7 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                                 <Text style={styles.colCode}>{item.code || (i + 1) * 10}</Text>
                                 <View style={styles.colDesc}>
                                     <Text style={{fontSize: 9, fontFamily: 'Helvetica-Bold'}}>{item.product}</Text>
-                                    <Text style={{fontSize: 8, color: '#000'}}>{item.caliber}</Text>
+                                    <Text style={{fontSize: 8, color: '#000', fontFamily: 'Helvetica'}}>{item.caliber}</Text>
                                 </View>
                                 <Text style={styles.colEnv}>{item.packagingQuantity || '-'}</Text>
                                 <Text style={styles.colKg}>{formatNumber(qty)}</Text>
@@ -234,7 +234,7 @@ export const OrderDocument = ({ order, clientName, clientRut, clientAddress, cli
                 <View style={styles.obsContainer}>
                     <Text style={[styles.boxLabel, {marginBottom: 4, width: '100%'}]}>OBSERVACIONES</Text>
                     <View style={styles.obsBox}>
-                        <Text style={{fontSize: 9, fontStyle: 'italic'}}>{order.notes || 'Sin observaciones.'}</Text>
+                        <Text style={{fontSize: 9, fontStyle: 'italic', fontFamily: 'Helvetica'}}>{order.notes || 'Sin observaciones.'}</Text>
                     </View>
                 </View>
 

@@ -19,15 +19,15 @@ const styles = StyleSheet.create({
   companyWrapper: { flexDirection: 'column' },
   logo: { width: 60, height: 40, objectFit: 'contain', marginBottom: 5 },
   companyName: { fontSize: 16, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' },
-  companyDetails: { fontSize: 8, color: '#000' },
+  companyDetails: { fontSize: 8, fontFamily: 'Helvetica', color: '#000' },
   
   docInfo: { alignItems: 'flex-end' },
   docTitle: { fontSize: 20, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 5, textTransform: 'uppercase' },
-  docSubtitle: { fontSize: 9, color: '#000' },
+  docSubtitle: { fontSize: 9, fontFamily: 'Helvetica', color: '#000' },
 
   clientBox: { border: '1px solid #E5E7EB', borderRadius: 3, padding: 10, marginBottom: 20, backgroundColor: '#F9FAFB' },
   clientName: { fontFamily: 'Helvetica-Bold', fontSize: 10, marginBottom: 2 },
-  clientDetails: { fontSize: 8, color: '#000' },
+  clientDetails: { fontSize: 8, fontFamily: 'Helvetica', color: '#000' },
 
   table: { width: '100%', border: '1px solid #E5E7EB', borderRadius: 3, overflow: 'hidden' },
   tableHeader: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderBottom: '1px solid #D1D5DB', padding: 6, alignItems: 'center' },
@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
   
   tableRow: { flexDirection: 'row', borderBottom: '1px solid #F3F4F6', padding: '5px 6px', alignItems: 'center' },
   tableRowAlt: { backgroundColor: '#F9FAFB' },
-  tableCell: { fontSize: 8 },
+  tableCell: { fontSize: 8, fontFamily: 'Helvetica' },
 
   colDate: { width: '12%' },
   colRef: { width: '15%' },
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   colBalance: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica-Bold' },
 
   footer: { position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1px solid #E5E7EB', paddingTop: 8 },
-  footerText: { fontSize: 7, color: '#000' },
+  footerText: { fontSize: 7, fontFamily: 'Helvetica', color: '#000' },
   
   summaryBox: {
     marginTop: 20,
@@ -61,6 +61,7 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 8,
+    fontFamily: 'Helvetica',
     color: '#000',
   },
   summaryValue: {
@@ -108,6 +109,7 @@ const styles = StyleSheet.create({
   },
   signatureSubtext: {
     fontSize: 7,
+    fontFamily: 'Helvetica',
     color: '#000',
     marginTop: 1,
   },
