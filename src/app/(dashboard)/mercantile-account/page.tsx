@@ -390,10 +390,9 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                              <PDFDownloadLink
                                 document={
                                 <StatementDocument
-                                    account={{...account, finalBalance: finalBalance }}
+                                    account={account}
                                     movements={filteredMovements}
                                     dateRange={dateRange}
-                                    initialBalance={initialBalance}
                                 />
                                 }
                                 fileName={`Estado_Cuenta_${account.contact.name.replace(/ /g, '_')}.pdf`}

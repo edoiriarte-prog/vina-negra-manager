@@ -128,7 +128,7 @@ const formatDate = (dateString?: string) => {
 
 export const StatementDocument = ({ account, movements, dateRange, initialBalance }: { account: any, movements: any[], dateRange: any, initialBalance: number }) => {
     
-    const { contact, finalBalance } = account;
+    const { contact } = account;
     
     const totalCredits = movements.reduce((sum, mov) => sum + (mov.charge || 0), 0);
     const totalPayments = movements.reduce((sum, mov) => sum + (mov.payment || 0), 0);
@@ -174,14 +174,6 @@ export const StatementDocument = ({ account, movements, dateRange, initialBalanc
                         <Text style={[styles.tableHeaderCell, styles.colPayment]}>Abono</Text>
                     </View>
 
-                     <View style={[styles.tableRow, {backgroundColor: '#F9FAFB'}]} wrap={false}>
-                        <Text style={[styles.tableCell, styles.colDate]}></Text>
-                        <Text style={[styles.tableCell, styles.colRef]}></Text>
-                        <Text style={[styles.tableCell, styles.colConcept, {fontFamily:'Helvetica-Bold'}]}>SALDO ANTERIOR (TRANSPORTE)</Text>
-                        <Text style={[styles.tableCell, styles.colCredit, {fontFamily:'Helvetica-Bold'}]}>{formatCurrency(initialBalance)}</Text>
-                        <Text style={[styles.tableCell, styles.colPayment]}></Text>
-                    </View>
-
                     {movements.map((mov, i) => {
                         const isDetailsArray = Array.isArray(mov.details);
                         
@@ -194,7 +186,7 @@ export const StatementDocument = ({ account, movements, dateRange, initialBalanc
                                     <>
                                         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
                                             <Text style={styles.detailHeader}>
-                                                {mov.reference.replace('OV-OV-', 'OV-')}
+                                                Ref: {mov.reference.replace('OV-OV-', 'OV-')}
                                             </Text>
                                             {mov.paymentDueDate && (
                                                 <Text style={styles.detailVence}> (Vence: {formatDate(mov.paymentDueDate)})</Text>
@@ -226,13 +218,9 @@ export const StatementDocument = ({ account, movements, dateRange, initialBalanc
                         <Text style={styles.summaryLabel}>Total Abonos (Periodo):</Text>
                         <Text style={[styles.summaryValue, { color: '#059669'}]}>{formatCurrency(totalPayments)}</Text>
                     </View>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Saldo del Periodo:</Text>
-                        <Text style={[styles.summaryValue, { color: periodBalance > 0 ? '#DC2626' : '#111827'}]}>{formatCurrency(periodBalance)}</Text>
-                    </View>
                     <View style={styles.summaryTotalRow}>
-                        <Text style={styles.summaryTotalLabel}>SALDO FINAL HISTÓRICO:</Text>
-                        <Text style={[styles.summaryTotalValue, { color: finalBalance > 0 ? '#DC2626' : '#111827'}]}>{formatCurrency(finalBalance)}</Text>
+                        <Text style={styles.summaryTotalLabel}>SALDO PERIODO:</Text>
+                        <Text style={[styles.summaryTotalValue, { color: periodBalance > 0 ? '#DC2626' : '#111827'}]}>{formatCurrency(periodBalance)}</Text>
                     </View>
                 </View>
 
