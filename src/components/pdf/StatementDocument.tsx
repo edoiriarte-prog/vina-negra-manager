@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
   
   docInfo: { alignItems: 'flex-end' },
   docTitle: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 5, textTransform: 'uppercase' },
-  docSubtitle: { fontSize: 11, fontFamily: 'Helvetica', color: '#374151' },
+  docSubtitle: { fontSize: 10, fontFamily: 'Helvetica', color: '#374151' },
 
   clientBox: { border: '1px solid #E5E7EB', borderRadius: 3, padding: 10, marginBottom: 20, backgroundColor: '#F9FAFB' },
   clientName: { fontFamily: 'Helvetica-Bold', fontSize: 12, marginBottom: 2 },
@@ -40,8 +40,8 @@ const styles = StyleSheet.create({
   colDate: { width: '12%' },
   colRef: { width: '15%' },
   colConcept: { width: '43%' },
-  colCharge: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica-Bold' },
-  colPayment: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica-Bold', color: '#059669' },
+  colCredit: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica' },
+  colPayment: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica' },
 
   footer: { position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1px solid #E5E7EB', paddingTop: 8 },
   footerText: { fontSize: 8, fontFamily: 'Helvetica', color: '#6B7280' },
@@ -114,6 +114,8 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 1,
   },
+  detailItem: { fontSize: 8, fontFamily: 'Helvetica', marginBottom: 2 },
+  detailHeader: { fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 3 },
 });
 
 // Helpers
@@ -123,13 +125,19 @@ const formatDate = (dateString?: string) => {
     try { return format(parseISO(dateString), "dd-MM-yyyy", { locale: es }); } catch { return dateString; }
 }
 
-export const StatementDocument = ({ account, movements }: { account: any, movements: any[] }) => {
+export const StatementDocument = ({ account, movements, dateRange }: { account: any, movements: any[], dateRange: any }) => {
     
     const { contact } = account;
     const logoUrl = '/logo.jpg'; 
 
-    const totalCargos = movements.reduce((sum, mov) => sum + (mov.charge || 0), 0);
-    const totalAbonos = movements.reduce((sum, mov) => sum + (mov.payment || 0), 0);
+    // CALCULATE TOTALS BASED ON FILTERED MOVEMENTS
+    const totalCredits = movements.reduce((sum, mov) => sum + (mov.charge || 0), 0);
+    const totalPayments = movements.reduce((sum, mov) => sum + (mov.payment || 0), 0);
+    const periodBalance = totalCredits - totalPayments;
+
+    const periodLabel = dateRange?.from
+    ? `PERIODO: Del ${format(dateRange.from, 'dd/MM/yyyy')} al ${format(dateRange.to || dateRange.from, 'dd/MM/yyyy')}`
+    : `Al ${format(new Date(), "dd 'de' MMMM, yyyy", { locale: es })}`;
 
     return (
         <Document>
@@ -137,16 +145,15 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
             
                 <View style={styles.headerContainer}>
                     <View style={styles.companyWrapper}>
-                        <Image src={logoUrl} style={styles.logo} />
-                        <View>
+                        <View style={styles.companyInfo}>
                             <Text style={styles.companyName}>Viña Negra SpA</Text>
                             <Text style={styles.companyDetails}>RUT: 78.261.683-8</Text>
-                            <Text style={styles.companyDetails}>ventas@agrocomercialavn.com</Text>
+                            <Text style={styles.companyDetails}>eduardoiriarte@agrocomercialavn.com</Text>
                         </View>
                     </View>
                     <View style={styles.docInfo}>
                         <Text style={styles.docTitle}>ESTADO DE CUENTA</Text>
-                        <Text style={styles.docSubtitle}>Al {format(new Date(), "dd 'de' MMMM, yyyy", {locale: es})}</Text>
+                        <Text style={styles.docSubtitle}>{periodLabel}</Text>
                     </View>
                 </View>
 
@@ -161,7 +168,7 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                         <Text style={[styles.tableHeaderCell, styles.colDate]}>Fecha</Text>
                         <Text style={[styles.tableHeaderCell, styles.colRef]}>Referencia</Text>
                         <Text style={[styles.tableHeaderCell, styles.colConcept]}>Concepto / Detalle</Text>
-                        <Text style={[styles.tableHeaderCell, styles.colCharge]}>Crédito</Text>
+                        <Text style={[styles.tableHeaderCell, styles.colCredit]}>Crédito</Text>
                         <Text style={[styles.tableHeaderCell, styles.colPayment]}>Abono</Text>
                     </View>
 
@@ -174,16 +181,21 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                                 <Text style={[styles.tableCell, styles.colRef, {fontFamily: 'Helvetica-Oblique'}]}>{mov.reference}</Text>
                                 <View style={[styles.tableCell, styles.colConcept]}>
                                   {isDetailsArray ? (
-                                      mov.details.map((item: any, idx: number) => (
-                                          <Text key={idx} style={{fontSize: 8, fontFamily: 'Helvetica', marginBottom: 2}}>
-                                              • {item.product} ({item.caliber}): {item.quantity}kg a {formatCurrency(item.price)}
+                                    <>
+                                        <Text style={styles.detailHeader}>
+                                            OV-{mov.reference} {mov.paymentDueDate ? `(Vence: ${formatDate(mov.paymentDueDate)})` : ''}
+                                        </Text>
+                                        {mov.details.map((item: any, idx: number) => (
+                                          <Text key={idx} style={styles.detailItem}>
+                                              • {item.product} ({item.caliber}): {item.quantity}kg a {formatCurrency(item.price * 1.19)}
                                           </Text>
-                                      ))
+                                        ))}
+                                    </>
                                   ) : (
                                       <Text>{mov.details}</Text>
                                   )}
                                 </View>
-                                <Text style={[styles.tableCell, styles.colCharge]}>{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</Text>
+                                <Text style={[styles.tableCell, styles.colCredit]}>{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</Text>
                                 <Text style={[styles.tableCell, styles.colPayment]}>{mov.payment > 0 ? formatCurrency(mov.payment) : '-'}</Text>
                             </View>
                         );
@@ -193,14 +205,18 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                 <View style={styles.summaryBox}>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>Total Créditos (Periodo):</Text>
-                        <Text style={styles.summaryValue}>{formatCurrency(totalCargos)}</Text>
+                        <Text style={styles.summaryValue}>{formatCurrency(totalCredits)}</Text>
                     </View>
                      <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>Total Abonos (Periodo):</Text>
-                        <Text style={[styles.summaryValue, { color: '#059669'}]}>{formatCurrency(totalAbonos)}</Text>
+                        <Text style={[styles.summaryValue, { color: '#059669'}]}>{formatCurrency(totalPayments)}</Text>
+                    </View>
+                    <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>Saldo del Periodo:</Text>
+                        <Text style={[styles.summaryValue, { color: periodBalance > 0 ? '#DC2626' : '#111827'}]}>{formatCurrency(periodBalance)}</Text>
                     </View>
                     <View style={styles.summaryTotalRow}>
-                        <Text style={styles.summaryTotalLabel}>SALDO TOTAL (Histórico):</Text>
+                        <Text style={styles.summaryTotalLabel}>SALDO HISTÓRICO TOTAL:</Text>
                         <Text style={[styles.summaryTotalValue, { color: account.balance > 0 ? '#DC2626' : '#111827'}]}>{formatCurrency(account.balance)}</Text>
                     </View>
                 </View>
@@ -208,8 +224,7 @@ export const StatementDocument = ({ account, movements }: { account: any, moveme
                 <View style={styles.signatures} fixed>
                      <View style={styles.signatureBox}>
                         <View style={styles.signatureLine} />
-                        <Text style={styles.signatureText}>Gerencia</Text>
-                        <Text style={styles.signatureSubtext}>EDUARDO IRIARTE</Text>
+                        <Text style={styles.signatureText}>GERENCIA - EDUARDO IRIARTE</Text>
                     </View>
                      <View style={styles.signatureBox}>
                         <View style={styles.signatureLine} />

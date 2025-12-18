@@ -55,6 +55,7 @@ type DetailedMovement = {
     charge: number;
     payment: number;
     balance: number;
+    paymentDueDate?: string; // Nuevo campo para vencimiento
 };
 
 export default function MercantileAccountPage() {
@@ -318,7 +319,8 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                 reference: o.number || o.id,
                 details: o.items,
                 charge: grossAmount,
-                payment: 0
+                payment: 0,
+                paymentDueDate: (o as SalesOrder).paymentDueDate
             });
         });
 
@@ -380,6 +382,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                 <StatementDocument
                                     account={account}
                                     movements={filteredMovements}
+                                    dateRange={dateRange}
                                 />
                                 }
                                 fileName={`Estado_Cuenta_${account.contact.name.replace(/ /g, '_')}.pdf`}
