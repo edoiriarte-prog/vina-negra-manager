@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale';
 
 // --- ESTILOS ---
 const styles = StyleSheet.create({
-  page: { padding: 40, fontSize: 9, fontFamily: 'Helvetica', color: '#111827' },
+  page: { padding: 40, fontSize: 11, fontFamily: 'Helvetica', color: '#111827' },
   headerContainer: { 
       flexDirection: 'row', 
       justifyContent: 'space-between', 
@@ -16,32 +16,32 @@ const styles = StyleSheet.create({
       paddingBottom: 10
   },
   companyWrapper: { flexDirection: 'column' },
-  companyName: { fontSize: 16, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' },
-  companyDetails: { fontSize: 8, fontFamily: 'Helvetica', color: '#000' },
+  companyName: { fontSize: 18, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' },
+  companyDetails: { fontSize: 10, fontFamily: 'Helvetica', color: '#000' },
   
   docInfo: { alignItems: 'flex-end' },
-  docTitle: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 5, textTransform: 'uppercase' },
-  docSubtitle: { fontSize: 9, fontFamily: 'Helvetica', color: '#000' },
+  docTitle: { fontSize: 20, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 5, textTransform: 'uppercase' },
+  docSubtitle: { fontSize: 11, fontFamily: 'Helvetica', color: '#000' },
   accountBox: { border: '1px solid #E5E7EB', borderRadius: 3, padding: 10, marginBottom: 20, backgroundColor: '#F9FAFB' },
-  accountName: { fontFamily: 'Helvetica-Bold', fontSize: 10, marginBottom: 2 },
-  accountDetails: { fontSize: 8, fontFamily: 'Helvetica', color: '#000' },
+  accountName: { fontFamily: 'Helvetica-Bold', fontSize: 12, marginBottom: 2 },
+  accountDetails: { fontSize: 10, fontFamily: 'Helvetica', color: '#000' },
   table: { width: '100%', border: '1px solid #E5E7EB', borderRadius: 3, overflow: 'hidden' },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderBottom: '1px solid #D1D5DB', padding: 6, alignItems: 'center' },
-  tableHeaderCell: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#000', textTransform: 'uppercase' },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderBottom: '1px solid #D1D5DB', padding: 8, alignItems: 'center' },
+  tableHeaderCell: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#000', textTransform: 'uppercase' },
   
-  tableRow: { flexDirection: 'row', borderBottom: '1px solid #F3F4F6', padding: '5px 6px', alignItems: 'center' },
+  tableRow: { flexDirection: 'row', borderBottom: '1px solid #F3F4F6', padding: '6px 8px', alignItems: 'center' },
   tableRowAlt: { backgroundColor: '#F9FAFB' },
-  tableCell: { fontSize: 8, fontFamily: 'Helvetica' },
+  tableCell: { fontSize: 10, fontFamily: 'Helvetica' },
 
   colDate: { width: '12%' },
   colRef: { width: '15%' },
   colConcept: { width: '28%' },
-  colCharge: { width: '15%', textAlign: 'right', color: '#DC2626' },
-  colPayment: { width: '15%', textAlign: 'right', color: '#059669' },
+  colCharge: { width: '15%', textAlign: 'right', color: '#DC2626', fontFamily: 'Helvetica' },
+  colPayment: { width: '15%', textAlign: 'right', color: '#059669', fontFamily: 'Helvetica' },
   colBalance: { width: '15%', textAlign: 'right', fontFamily: 'Helvetica-Bold' },
   
   footer: { position: 'absolute', bottom: 30, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1px solid #E5E7EB', paddingTop: 8 },
-  footerText: { fontSize: 7, fontFamily: 'Helvetica', color: '#000' },
+  footerText: { fontSize: 9, fontFamily: 'Helvetica', color: '#000' },
 });
 
 // --- HELPERS ---
@@ -97,7 +97,7 @@ export const BankAccountStatementDocument = ({ account, movements }: { account: 
                     {movements.map((mov, i) => (
                         <View key={i} style={[styles.tableRow, i % 2 !== 0 && styles.tableRowAlt]}>
                             <Text style={[styles.tableCell, styles.colDate]}>{formatDate(mov.date)}</Text>
-                            <Text style={[styles.tableCell, styles.colRef, {fontSize: 7, fontFamily: 'Helvetica-Oblique'}]}>{mov.voucher}</Text>
+                            <Text style={[styles.tableCell, styles.colRef, {fontFamily: 'Helvetica-Oblique'}]}>{mov.voucher}</Text>
                             <Text style={[styles.tableCell, styles.colConcept]}>{mov.concept}</Text>
                             <Text style={[styles.tableCell, styles.colCharge]}>{mov.charge > 0 ? formatCurrency(mov.charge) : '-'}</Text>
                             <Text style={[styles.tableCell, styles.colPayment]}>{mov.credit > 0 ? formatCurrency(mov.credit) : '-'}</Text>
@@ -112,7 +112,7 @@ export const BankAccountStatementDocument = ({ account, movements }: { account: 
                         <Text style={[styles.tableCell, styles.colConcept, {fontFamily: 'Helvetica-Bold', color: '#fff'}]}>SALDO FINAL</Text>
                         <Text style={[styles.tableCell, styles.colCharge, {color: '#fff'}]}></Text>
                         <Text style={[styles.tableCell, styles.colPayment, {color: '#fff'}]}></Text>
-                        <Text style={[styles.tableCell, styles.colBalance, {color: '#fff', fontSize: 10}]}>{formatCurrency(finalBalance)}</Text>
+                        <Text style={[styles.tableCell, styles.colBalance, {color: '#fff', fontSize: 12}]}>{formatCurrency(finalBalance)}</Text>
                     </View>
                 </View>
 
@@ -124,3 +124,4 @@ export const BankAccountStatementDocument = ({ account, movements }: { account: 
         </Document>
     );
 };
+
