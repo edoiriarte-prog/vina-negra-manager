@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { SalesOrder } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { 
-  MoreHorizontal, ArrowUpDown, Eye, Edit, Trash, Check, Truck, FileText, Ban, ChevronDown, Calendar as CalendarIcon 
+  MoreHorizontal, ArrowUpDown, Eye, Edit, Trash, Check, Truck, FileText, Ban, ChevronDown, Calendar as CalendarIcon, Save
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -23,8 +23,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
@@ -41,149 +43,140 @@ const StatusCell = ({ row }: { row: any }) => {
   const { updateSalesOrder } = useSalesOrdersCRUD();
   const { toast } = useToast();
   
-  const [popoverState, setPopoverState] = useState<{ open: boolean; targetStatus: string | null }>({ open: false, targetStatus: null });
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState(order.status);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [invoiceNumber, setInvoiceNumber] = useState(order.invoiceNumber || '');
   const [isLoading, setIsLoading] = useState(false);
 
   const currentStatusConfig = statusConfig[order.status] || statusConfig.pending;
+  const showExtraFields = selectedStatus === 'dispatched' || selectedStatus === 'invoiced';
 
-  const handleStatusSelect = (newStatus: string) => {
-    if (newStatus === order.status) return;
+  // Sincronizar estado interno si la orden cambia desde fuera
+  useEffect(() => {
+    setSelectedStatus(order.status);
+    setInvoiceNumber(order.invoiceNumber || '');
+  }, [order.status, order.invoiceNumber]);
 
-    if (newStatus === 'dispatched' || newStatus === 'invoiced') {
-      setDate(new Date());
-      setInvoiceNumber('');
-      setPopoverState({ open: true, targetStatus: newStatus });
-    } else {
-      setIsLoading(true);
-      updateSalesOrder(order.id, { status: newStatus as any })
-        .then(() => toast({ title: "Estado Actualizado" }))
-        .catch(() => toast({ variant: "destructive", title: "Error al actualizar" }))
-        .finally(() => setIsLoading(false));
+  const handleSave = async () => {
+    if (selectedStatus === order.status && !showExtraFields) {
+        setIsOpen(false);
+        return;
     }
-  };
-
-  const handleConfirmStatusChange = async () => {
-    if (!popoverState.targetStatus || !date) return;
     
-    setIsLoading(true);
-    const updateData: Partial<SalesOrder> = { status: popoverState.targetStatus as any };
+    if (showExtraFields && !selectedDate) {
+        toast({ variant: "destructive", title: "Fecha requerida" });
+        return;
+    }
+    
+    if (selectedStatus === 'invoiced' && !invoiceNumber) {
+        toast({ variant: "destructive", title: "N° de Factura requerido" });
+        return;
+    }
 
-    if (popoverState.targetStatus === 'dispatched') {
-        updateData.dispatchedDate = date.toISOString();
-    } else if (popoverState.targetStatus === 'invoiced') {
-        if (!invoiceNumber) {
-            toast({ variant: 'destructive', title: 'Falta N° de Factura' });
-            setIsLoading(false);
-            return;
-        }
-        updateData.invoicedDate = date.toISOString();
+    setIsLoading(true);
+    const updateData: Partial<SalesOrder> = { status: selectedStatus as any };
+    if (selectedStatus === 'dispatched') {
+        updateData.dispatchedDate = selectedDate!.toISOString();
+    } else if (selectedStatus === 'invoiced') {
+        updateData.invoicedDate = selectedDate!.toISOString();
         updateData.invoiceNumber = invoiceNumber;
     }
 
     try {
         await updateSalesOrder(order.id, updateData);
-        toast({ title: "Trazabilidad Registrada", description: `La orden ahora está ${statusConfig[popoverState.targetStatus].label}.` });
-        setPopoverState({ open: false, targetStatus: null });
+        toast({ title: "Estado Actualizado", description: `La orden ahora está ${statusConfig[selectedStatus].label}.` });
+        setIsOpen(false);
     } catch (error) {
-        toast({ variant: 'destructive', title: "Error al guardar trazabilidad" });
+        toast({ variant: "destructive", title: "Error al actualizar" });
     } finally {
         setIsLoading(false);
     }
   };
-
-  const handleDateSelect = (selectedDate: Date | undefined) => {
-    setDate(selectedDate);
-    if (selectedDate && popoverState.targetStatus) {
-        handleConfirmStatusChange();
-    }
-  }
   
   const displayDate = order.status === 'invoiced' && order.invoicedDate 
     ? order.invoicedDate 
     : (order.status === 'dispatched' && order.dispatchedDate ? order.dispatchedDate : null);
 
   return (
-    <>
-      <Popover open={popoverState.open} onOpenChange={(open) => setPopoverState({ open, targetStatus: open ? popoverState.targetStatus : null })}>
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-            <Button
-                variant="outline"
-                className={`h-auto min-w-[150px] justify-between text-xs font-semibold px-3 py-1.5 transition-all ${currentStatusConfig.color}`}
-                disabled={isLoading}
-            >
-                <div className="flex flex-col items-start">
-                <span className="flex items-center gap-1.5">
-                    <currentStatusConfig.icon className="h-3.5 w-3.5" />
-                    {currentStatusConfig.label}
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+            variant="outline"
+            onClick={(e) => { e.stopPropagation(); setIsOpen(true); }}
+            className={`h-auto min-w-[150px] justify-between text-xs font-semibold px-3 py-1.5 transition-all ${currentStatusConfig.color}`}
+            disabled={isLoading}
+        >
+            <div className="flex flex-col items-start">
+            <span className="flex items-center gap-1.5">
+                <currentStatusConfig.icon className="h-3.5 w-3.5" />
+                {currentStatusConfig.label}
+            </span>
+            {displayDate && (
+                <span className="text-[10px] font-normal text-slate-500 pl-5">
+                    {format(parseISO(displayDate), 'dd/MM/yy')}
                 </span>
-                {displayDate && (
-                    <span className="text-[10px] font-normal text-slate-500 pl-5">
-                        {format(parseISO(displayDate), 'dd/MM/yy')}
-                    </span>
-                )}
-                </div>
-                <ChevronDown className="h-4 w-4 opacity-50" />
-            </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent 
-                align="start" 
-                className="bg-slate-900 border-slate-800 text-slate-200"
-                onCloseAutoFocus={(e) => e.preventDefault()}
-            >
-            {Object.entries(statusConfig).map(([key, { label }]) => (
-                <DropdownMenuItem 
-                    key={key} 
-                    onSelect={() => handleStatusSelect(key)}
-                    className="cursor-pointer focus:bg-slate-800"
-                >
-                {label}
-                </DropdownMenuItem>
-            ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
-
-        <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800" align="start">
-          <div className="p-4 space-y-2">
-            <p className="text-sm text-slate-300">
-                Registrar fecha de <span className="font-bold">{statusConfig[popoverState.targetStatus || 'pending'].label}</span>
-            </p>
-            {popoverState.targetStatus === 'invoiced' && (
-              <div className="space-y-1">
-                  <Label htmlFor="invoiceNumber" className="text-xs text-slate-400">N° Factura</Label>
-                  <Input
-                      id="invoiceNumber"
-                      value={invoiceNumber}
-                      onChange={(e) => setInvoiceNumber(e.target.value)}
-                      className="bg-slate-950 border-slate-700 h-8"
-                      placeholder="Ej: 12345"
-                      onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleConfirmStatusChange();
-                      }}
-                  />
-              </div>
             )}
-          </div>
-          <Calendar
-            mode="single"
-            selected={date}
-            onSelect={handleDateSelect}
-            locale={es}
-            className="rounded-md"
-            initialFocus
-          />
-          {popoverState.targetStatus === 'invoiced' && (
-             <div className="p-2 border-t border-slate-800">
-                <Button onClick={handleConfirmStatusChange} className="w-full h-8" disabled={isLoading || !invoiceNumber}>
-                    {isLoading ? 'Guardando...' : 'Confirmar Facturación'}
-                </Button>
             </div>
-          )}
-        </PopoverContent>
-      </Popover>
-    </>
+            <ChevronDown className="h-4 w-4 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent 
+        className="w-80 bg-slate-950 border-slate-800 text-slate-100 p-4" 
+        align="start" 
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="space-y-4">
+            <div className="space-y-1">
+                <Label className="text-xs text-slate-400">Cambiar estado a:</Label>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger className="w-full bg-slate-900 border-slate-700">
+                        <SelectValue placeholder="Seleccionar estado" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-700 text-slate-100">
+                        {Object.entries(statusConfig).map(([key, { label }]) => (
+                            <SelectItem key={key} value={key}>{label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            {showExtraFields && (
+                <div className="space-y-4 border-t border-slate-800 pt-4">
+                    <div className="space-y-1">
+                         <Label className="text-xs text-slate-400">
+                            Fecha de {selectedStatus === 'dispatched' ? 'Despacho' : 'Facturación'}
+                         </Label>
+                         <Calendar
+                            mode="single"
+                            selected={selectedDate}
+                            onSelect={setSelectedDate}
+                            locale={es}
+                            className="rounded-md border border-slate-800 bg-slate-900 p-0"
+                         />
+                    </div>
+                    {selectedStatus === 'invoiced' && (
+                        <div className="space-y-1">
+                            <Label htmlFor="invoiceNumber" className="text-xs text-slate-400">N° Factura</Label>
+                            <Input
+                                id="invoiceNumber"
+                                value={invoiceNumber}
+                                onChange={(e) => setInvoiceNumber(e.target.value)}
+                                className="bg-slate-900 border-slate-700 h-9"
+                                placeholder="Ej: 12345"
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+            
+            <Button onClick={handleSave} className="w-full bg-blue-600 hover:bg-blue-500 text-white" disabled={isLoading}>
+                <Save className="mr-2 h-4 w-4"/>
+                {isLoading ? 'Guardando...' : 'Guardar'}
+            </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 };
 
@@ -233,7 +226,9 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     header: "Fecha",
     cell: ({ row }) => {
         try {
-            return <div className="text-slate-400 text-xs">{format(parseISO(row.getValue("date")), "dd-MM-yyyy", { locale: es })}</div>
+            const dateValue = row.getValue("date") as string;
+            if (!dateValue || !isValid(parseISO(dateValue))) return <span className="text-red-500">Inválida</span>;
+            return <div className="text-slate-400 text-xs">{format(parseISO(dateValue), "dd-MM-yyyy", { locale: es })}</div>
         } catch (e) { return <span className="text-red-500">Error</span> }
     },
   },
@@ -255,7 +250,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     header: () => <div className="text-right">TOTAL NETO</div>,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("totalAmount") || "0");
-      return <div className="text-right font-mono font-medium text-slate-300">{new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(amount)}</div>;
+      return <div className="text-right font-mono font-medium text-slate-300">{new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(amount)}</div>;
     },
   },
   {
@@ -265,7 +260,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
         const net = parseFloat(row.original.totalAmount?.toString() || "0");
         const includeVat = row.original.includeVat !== false; 
         const total = includeVat ? net * 1.19 : net;
-        return <div className="text-right font-mono font-bold text-emerald-400">{new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(total)}</div>;
+        return <div className="text-right font-mono font-bold text-emerald-400">{new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(total)}</div>;
     }
   },
   {
@@ -273,5 +268,3 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     cell: ({ row }) => <ActionsCell row={row} onEdit={onEdit} onDelete={onDelete} onPreview={onPreview} />,
   },
 ];
-
-    
