@@ -79,7 +79,7 @@ const getInitialFormData = (order: SalesOrder | null): SalesOrderFormData => {
     };
 };
 
-export default function NewSalesOrderSheet({ // CORRECCIÓN: Export Default
+export function NewSalesOrderSheet({
   isOpen,
   onOpenChange,
   onSave,
