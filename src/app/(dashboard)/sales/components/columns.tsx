@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -47,11 +46,7 @@ const StatusCell = ({ row }: { row: any }) => {
   
   // Estado temporal para el popover
   const [tempStatus, setTempStatus] = useState(order.status);
-  const [tempDate, setTempDate] = useState<Date | undefined>(
-      order.status === 'invoiced' && order.invoicedDate ? parseISO(order.invoicedDate) :
-      order.status === 'dispatched' && order.dispatchedDate ? parseISO(order.dispatchedDate) :
-      new Date()
-  );
+  const [tempDate, setTempDate] = useState<Date | undefined>();
   const [tempInvoiceNumber, setTempInvoiceNumber] = useState(order.invoiceNumber || '');
 
   const [isLoading, setIsLoading] = useState(false);
@@ -61,14 +56,16 @@ const StatusCell = ({ row }: { row: any }) => {
 
   // Sincronizar estado si la orden cambia desde fuera
   useEffect(() => {
-    setTempStatus(order.status);
-    setTempInvoiceNumber(order.invoiceNumber || '');
-    setTempDate(
-      order.status === 'invoiced' && order.invoicedDate ? parseISO(order.invoicedDate) :
-      order.status === 'dispatched' && order.dispatchedDate ? parseISO(order.dispatchedDate) :
-      new Date()
-    );
-  }, [order]);
+    if (isOpen) {
+        setTempStatus(order.status);
+        setTempInvoiceNumber(order.invoiceNumber || '');
+        setTempDate(
+            order.status === 'invoiced' && order.invoicedDate ? parseISO(order.invoicedDate) :
+            order.status === 'dispatched' && order.dispatchedDate ? parseISO(order.dispatchedDate) :
+            new Date()
+        );
+    }
+  }, [isOpen, order.status, order.invoicedDate, order.dispatchedDate, order.invoiceNumber]);
 
   const handleSave = async () => {
     if (showExtraFields && !tempDate) {
@@ -110,7 +107,7 @@ const StatusCell = ({ row }: { row: any }) => {
       <PopoverTrigger asChild>
         <Button
             variant="outline"
-            onClick={(e) => { e.stopPropagation(); setIsOpen(true); }}
+            onClick={(e) => { e.stopPropagation(); }}
             className={`h-auto min-w-[150px] justify-between text-xs font-semibold px-3 py-1.5 transition-all ${currentStatusConfig.color}`}
             disabled={isLoading}
         >
@@ -277,5 +274,3 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
     cell: ({ row }) => <ActionsCell row={row} onEdit={onEdit} onDelete={onDelete} onPreview={onPreview} />,
   },
 ];
-
-    
