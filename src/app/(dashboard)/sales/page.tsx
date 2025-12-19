@@ -11,7 +11,7 @@ import { useOperations } from "@/hooks/use-operations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, FileSpreadsheet, Users, Calendar, Search, FileText } from "lucide-react";
-import NewSalesOrderSheet from "./components/new-sales-order-sheet";
+import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
 import { SalesOrderPreview } from "./components/sales-order-preview"; 
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -412,7 +412,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-
-
-    
