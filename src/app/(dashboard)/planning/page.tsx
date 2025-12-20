@@ -1,155 +1,182 @@
 
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { usePlanning } from "@/hooks/use-planning";
 import { useMasterData } from "@/hooks/use-master-data";
-import { PlannedOrder, OrderItem, Contact } from "@/lib/types";
+import { PlannedOrder } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Calendar, Plus, Clock, CheckCircle2, MoreVertical, 
-  Trash2, Edit, Send
-} from "lucide-react";
-import { format, parseISO, endOfWeek, addDays, isPast, isToday } from "date-fns";
+import { Calendar, Plus, Clock, MoreHorizontal, ArrowRight, Trash2, Edit } from "lucide-react";
+import { format, parseISO, endOfWeek, addDays, startOfToday } from "date-fns";
 import { es } from "date-fns/locale";
-import { NewSalesOrderSheet } from "../sales/components/new-sales-order-sheet";
+import { NewSalesOrderSheet } from "../sales/components/new-sales-order-sheet"; 
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 
-// Helper
-const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val || 0);
+// Helper defensivo para moneda (evita NaN)
+const formatCurrency = (val: number | undefined) => {
+    if (val === undefined || isNaN(val)) return "$0";
+    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
+};
 
 export default function PlanningPage() {
-  const { 
-    plannedOrders, isLoading, createPlan, updatePlan, deletePlan, promoteToSale 
-  } = usePlanning();
-  
+  const { plannedOrders, isLoading, createPlan, updatePlan, deletePlan, promoteToSale } = usePlanning();
   const { contacts = [], inventory = [] } = useMasterData(); 
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannedOrder | null>(null);
 
+  // Filtro de clientes
   const clients = useMemo(() => {
     if (!contacts) return [];
-    return contacts.filter(c => Array.isArray(c.type) && c.type.includes('client'));
+    return contacts.filter(c => {
+      const typeStr = Array.isArray(c.type) ? c.type.join(' ') : String(c.type || '');
+      return typeStr.toLowerCase().includes('client') || typeStr.toLowerCase().includes('cliente');
+    });
   }, [contacts]);
 
+  // Vistas Semanales
   const weeklyView = useMemo(() => {
     if (!plannedOrders) return { thisWeek: [], nextWeek: [], later: [] };
     
-    const today = new Date();
+    const today = startOfToday();
     const endOfThisWeek = endOfWeek(today, { weekStartsOn: 1 });
     const endOfNextWeek = endOfWeek(addDays(today, 7), { weekStartsOn: 1 });
 
-    const thisWeek = plannedOrders.filter(p => parseISO(p.deliveryDate) <= endOfThisWeek && p.status !== 'entregado' && p.status !== 'cancelado');
-    const nextWeek = plannedOrders.filter(p => parseISO(p.deliveryDate) > endOfThisWeek && parseISO(p.deliveryDate) <= endOfNextWeek && p.status !== 'entregado' && p.status !== 'cancelado');
-    const later = plannedOrders.filter(p => parseISO(p.deliveryDate) > endOfNextWeek && p.status !== 'entregado' && p.status !== 'cancelado');
+    const thisWeek = plannedOrders.filter(p => parseISO(p.deliveryDate) <= endOfThisWeek && p.status !== 'entregado');
+    const nextWeek = plannedOrders.filter(p => parseISO(p.deliveryDate) > endOfThisWeek && parseISO(p.deliveryDate) <= endOfNextWeek && p.status !== 'entregado');
     
-    return { thisWeek, nextWeek, later };
+    return { thisWeek, nextWeek };
   }, [plannedOrders]);
 
-  const handleSavePlan = useCallback(async (data: Partial<Omit<PlannedOrder, 'id'>>) => {
-    if (editingPlan) {
-        await updatePlan(editingPlan.id, data);
-    } else {
-        await createPlan(data);
+  // --- HANDLER: Guardar Planificación (CORREGIDO con ASYNC) ---
+  const handleSavePlan = useCallback(async (data: any) => {
+    // Calculamos totales aquí también por seguridad
+    const items = data.items || [];
+    const calculatedTotal = items.reduce((acc: number, item: any) => acc + ((item.price || 0) * item.quantity), 0);
+    const calculatedKilos = items.reduce((acc: number, item: any) => acc + item.quantity, 0);
+
+    const planData: any = {
+        ...data,
+        deliveryDate: data.date, 
+        status: editingPlan ? editingPlan.status : 'borrador', 
+        totalKilos: calculatedKilos,
+        totalAmount: calculatedTotal
+    };
+
+    // Limpieza de campos de Ventas que no necesitamos en Planning
+    delete planData.paymentStatus;
+    delete planData.saleType;
+
+    try {
+        if (editingPlan) {
+            await updatePlan(editingPlan.id, planData);
+        } else {
+            await createPlan(planData);
+        }
+        setIsSheetOpen(false);
+        setEditingPlan(null);
+    } catch (error) {
+        console.error("Error guardando plan:", error);
     }
-    setIsSheetOpen(false);
-    setEditingPlan(null);
   }, [editingPlan, createPlan, updatePlan]);
-  
+
   const handleEdit = useCallback((plan: PlannedOrder) => {
     setEditingPlan(plan);
     setIsSheetOpen(true);
   }, []);
 
-  const handleToggleStatus = useCallback((plan: PlannedOrder) => {
-      const newStatus = plan.status === 'borrador' ? 'confirmado' : plan.status === 'confirmado' ? 'entregado' : 'borrador';
-      updatePlan(plan.id, { status: newStatus });
-  }, [updatePlan]);
-  
-  const handleDeletePlan = useCallback((id: string) => {
-    if(confirm(`¿Estás seguro de eliminar el plan ${id}?`)) {
-      deletePlan(id);
-    }
-  }, [deletePlan]);
-
-  const handlePromoteToSale = useCallback((plan: PlannedOrder) => {
-    promoteToSale(plan);
-  }, [promoteToSale]);
-
-
-  if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full"/></div>;
+  if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full bg-slate-800"/></div>;
 
   return (
     <div className="flex-1 space-y-6 p-6 bg-slate-950 min-h-screen text-slate-100">
       
       <div className="flex justify-between items-center">
         <div>
-            <h2 className="text-3xl font-bold text-white">Planificación de Entregas</h2>
-            <p className="text-slate-400">Gestiona los compromisos de venta y proyecciones de despacho.</p>
+            <h2 className="text-3xl font-bold text-white">Planificación de Pedidos</h2>
+            <p className="text-slate-400">Gestiona los compromisos de entrega y proyecciones de venta.</p>
         </div>
-        <Button onClick={() => { setEditingPlan(null); setIsSheetOpen(true); }} className="bg-indigo-600 hover:bg-indigo-500">
-            <Plus className="mr-2 h-4 w-4"/> Nuevo Plan
+        <Button onClick={() => { setEditingPlan(null); setIsSheetOpen(true); }} className="bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-900/20">
+            <Plus className="mr-2 h-4 w-4"/> Nuevo Pedido
         </Button>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      <Tabs defaultValue="week" className="space-y-6">
+        <TabsList className="bg-slate-900 border border-slate-800">
+            <TabsTrigger value="week">Vista Semanal</TabsTrigger>
+            <TabsTrigger value="list">Lista Completa</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="week" className="grid md:grid-cols-2 gap-6">
+            
+            {/* COLUMNA: ESTA SEMANA */}
             <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader className="border-b border-slate-800 pb-3">
-                    <CardTitle className="text-emerald-400 flex items-center gap-2">
-                        <Calendar className="h-5 w-5"/> Esta Semana
+                    <CardTitle className="text-emerald-400 flex items-center gap-2 text-lg">
+                        <Calendar className="h-5 w-5"/> Entregas Esta Semana
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
-                    {weeklyView.thisWeek.length === 0 && <p className="text-slate-500 text-sm italic py-8 text-center">No hay entregas para esta semana.</p>}
+                <CardContent className="p-4 space-y-3">
+                    {weeklyView.thisWeek.length === 0 && <p className="text-slate-500 text-sm italic py-4 text-center">No hay entregas pendientes esta semana.</p>}
                     {weeklyView.thisWeek.map(plan => (
-                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={() => handleEdit(plan)} onDelete={() => handleDeletePlan(plan.id)} onPromote={() => handlePromoteToSale(plan)} onToggleStatus={() => handleToggleStatus(plan)} />
+                        <PlanCard 
+                            key={plan.id} 
+                            plan={plan} 
+                            contacts={contacts} 
+                            onEdit={() => handleEdit(plan)}
+                            onDelete={() => deletePlan(plan.id)}
+                            onPromote={() => promoteToSale(plan)}
+                        />
                     ))}
                 </CardContent>
             </Card>
+
+            {/* COLUMNA: PRÓXIMA SEMANA */}
             <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader className="border-b border-slate-800 pb-3">
-                    <CardTitle className="text-blue-400 flex items-center gap-2">
+                    <CardTitle className="text-blue-400 flex items-center gap-2 text-lg">
                         <Clock className="h-5 w-5"/> Próxima Semana
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
-                      {weeklyView.nextWeek.length === 0 && <p className="text-slate-500 text-sm italic py-8 text-center">Nada planificado aún.</p>}
+                <CardContent className="p-4 space-y-3">
+                      {weeklyView.nextWeek.length === 0 && <p className="text-slate-500 text-sm italic py-4 text-center">Nada planificado para la próxima semana.</p>}
                       {weeklyView.nextWeek.map(plan => (
-                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={() => handleEdit(plan)} onDelete={() => handleDeletePlan(plan.id)} onPromote={() => handlePromoteToSale(plan)} onToggleStatus={() => handleToggleStatus(plan)} />
+                        <PlanCard 
+                            key={plan.id} 
+                            plan={plan} 
+                            contacts={contacts} 
+                            onEdit={() => handleEdit(plan)}
+                            onDelete={() => deletePlan(plan.id)}
+                            onPromote={() => promoteToSale(plan)}
+                        />
                     ))}
                 </CardContent>
             </Card>
-            <Card className="bg-slate-900/50 border-slate-800">
-                <CardHeader className="border-b border-slate-800 pb-3">
-                    <CardTitle className="text-purple-400 flex items-center gap-2">
-                        <Clock className="h-5 w-5"/> Más Adelante
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
-                      {weeklyView.later.length === 0 && <p className="text-slate-500 text-sm italic py-8 text-center">Nada planificado aún.</p>}
-                      {weeklyView.later.map(plan => (
-                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={() => handleEdit(plan)} onDelete={() => handleDeletePlan(plan.id)} onPromote={() => handlePromoteToSale(plan)} onToggleStatus={() => handleToggleStatus(plan)} />
-                    ))}
-                </CardContent>
-            </Card>
-      </div>
-      
+        </TabsContent>
+
+        <TabsContent value="list">
+            <div className="rounded-md border border-slate-800 bg-slate-900 p-8 text-center text-slate-500">
+                Vista de lista completa (Próximamente)
+            </div>
+        </TabsContent>
+      </Tabs>
+
       {isSheetOpen && (
         <NewSalesOrderSheet 
             isOpen={isSheetOpen}
-            onOpenChange={(open) => { if (!open) setIsSheetOpen(false) }}
-            onSave={handleSavePlan as any}
-            order={editingPlan as any}
+            onOpenChange={(open) => !open && setIsSheetOpen(false)}
+            onSave={handleSavePlan}
+            order={editingPlan ? { ...editingPlan, date: editingPlan.deliveryDate } : null}
             clients={clients} 
             inventory={inventory || []} 
             sheetType="sale" 
@@ -159,98 +186,88 @@ export default function PlanningPage() {
   );
 }
 
-function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus }: { plan: PlannedOrder, contacts: Contact[], onEdit: () => void, onDelete: () => void, onPromote: () => void, onToggleStatus: () => void }) {
-    const clientName = contacts?.find((c: any) => c.id === plan.clientId)?.name || 'Desconocido';
-    const deliveryDate = parseISO(plan.deliveryDate);
-    const isOverdue = isPast(deliveryDate) && !isToday(deliveryDate);
-    const [isConfirmed, setIsConfirmed] = useState(plan.status === 'confirmado');
-    
-    useEffect(() => {
-        setIsConfirmed(plan.status === 'confirmado');
-    }, [plan.status]);
+// --- COMPONENTE DE TARJETA MEJORADO (CON FIX DE BUCLE INFINITO) ---
+function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: PlannedOrder, contacts: Contact[], onEdit: () => void, onDelete: () => void, onPromote: () => void}) {
+    const clientName = contacts?.find((c: any) => c.id === plan.clientId)?.name || 'Cliente Desconocido';
+    const isConfirmed = plan.status === 'confirmado';
 
-    const statusStyles = {
-        borrador: 'border-yellow-500/50 bg-yellow-950/50 text-yellow-400',
-        confirmado: 'border-blue-500/50 bg-blue-950/50 text-blue-400',
-        entregado: 'border-green-500/50 bg-green-950/50 text-green-400',
-        cancelado: 'border-red-500/50 bg-red-950/50 text-red-500 line-through'
-    };
+    // Cálculo seguro del total si viene corrupto de BD antigua
+    const safeTotal = plan.totalAmount || (plan.items || []).reduce((acc: number, i: any) => acc + ((i.price||0) * (i.quantity || 0)), 0);
 
     return (
-        <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 hover:border-slate-700 transition-all group relative">
-            <div className="absolute top-2 right-2">
-                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 group-hover:opacity-100 opacity-20"><MoreVertical className="h-4 w-4"/></Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200">
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            setTimeout(() => { onPromote(); }, 0);
-                          }}
-                          className="text-emerald-400 focus:bg-slate-800 focus:text-emerald-300 cursor-pointer"
-                        >
-                            <Send className="mr-2 h-4 w-4"/> Convertir a Venta
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            setTimeout(() => { onEdit(); }, 0);
-                          }}
-                          className="focus:bg-slate-800 cursor-pointer"
-                        >
-                            <Edit className="mr-2 h-4 w-4"/> Editar Plan
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            setTimeout(() => { onDelete(); }, 0);
-                          }}
-                          className="text-red-500 focus:bg-slate-800 focus:text-red-400 cursor-pointer"
-                        >
-                            <Trash2 className="mr-2 h-4 w-4"/> Eliminar
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-            
-            <div className="flex justify-between items-start mb-2 pr-8">
+        <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 hover:border-slate-600 transition-all group relative shadow-sm">
+            <div className="flex justify-between items-start mb-2">
                 <div>
-                    <h4 className="font-bold text-white flex items-center gap-2">
+                    <h4 className="font-bold text-white flex items-center gap-2 text-sm uppercase tracking-wide">
                         {clientName}
                     </h4>
                     <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={cn("capitalize", statusStyles[plan.status as keyof typeof statusStyles])}>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${isConfirmed ? "text-emerald-400 border-emerald-900 bg-emerald-950/30" : "text-yellow-400 border-yellow-900 bg-yellow-950/30"}`}>
                             {plan.status}
                         </Badge>
-                        <p className={cn("text-xs text-slate-400 flex items-center gap-1", isOverdue && "text-red-400 font-bold")}>
-                            <Calendar className="h-3 w-3"/> {format(deliveryDate, 'EEEE dd MMM', { locale: es })}
-                        </p>
+                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                             <Calendar className="h-3 w-3"/> {format(parseISO(plan.deliveryDate), 'EEEE dd', { locale: es })}
+                        </span>
                     </div>
                 </div>
                 <div className="text-right">
-                    <p className="font-bold text-white text-lg">{formatCurrency(plan.totalAmount)}</p>
-                    <p className="text-xs text-slate-500">{plan.totalKilos.toLocaleString('es-CL')} kg</p>
+                    <p className="font-bold text-emerald-400 text-sm">{formatCurrency(safeTotal)}</p>
+                    <p className="text-[10px] text-slate-500 font-mono">{(plan.totalKilos || 0).toLocaleString('es-CL')} kg</p>
                 </div>
             </div>
             
             <div className="space-y-1 mt-3 border-t border-slate-800 pt-2">
-                {plan.items.slice(0, 3).map((item: any, i: number) => (
+                {(plan.items || []).slice(0, 3).map((item: any, i: number) => (
                     <div key={i} className="flex justify-between text-xs text-slate-300">
-                        <span>• {item.product} {item.caliber}</span>
-                        <span className="font-mono">{item.quantity || 0} kg a {formatCurrency((item.price || 0))}</span>
+                        <span className="truncate max-w-[180px]">{item.product} <span className="text-slate-500 text-[10px]">{item.caliber}</span></span>
+                        <span className="font-mono text-slate-400">{item.quantity}</span>
                     </div>
                 ))}
-                {plan.items.length > 3 && <p className="text-[10px] text-slate-500 italic text-right">+ {plan.items.length - 3} más...</p>}
+                {(plan.items || []).length > 3 && <p className="text-[10px] text-slate-500 italic text-right">+ {(plan.items || []).length - 3} ítems más</p>}
             </div>
 
-             <div className="mt-4 flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                {plan.status !== 'entregado' && (
-                    <Button size="sm" onClick={() => onToggleStatus()} className={`h-7 text-xs ${isConfirmed ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-blue-600 hover:bg-blue-500'} text-white`}>
-                        <CheckCircle2 className="h-3 w-3 mr-1"/> Marcar como {isConfirmed ? 'Entregado' : "Confirmado"}
-                    </Button>
-                )}
+            {/* ACCIONES - CORREGIDO PARA EVITAR ERROR DE BUCLE INFINITO */}
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-950 shadow-lg rounded-md z-10">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-6 w-6 p-0 hover:bg-slate-800"><MoreHorizontal className="h-4 w-4 text-slate-400"/></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200">
+                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                        
+                        <DropdownMenuItem 
+                            onSelect={(e) => {
+                                e.preventDefault();
+                                setTimeout(() => onPromote(), 0);
+                            }}
+                            className="cursor-pointer text-emerald-500 focus:text-emerald-400 focus:bg-emerald-950/20"
+                        >
+                            <ArrowRight className="mr-2 h-4 w-4" /> Convertir a Venta
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuSeparator className="bg-slate-800"/>
+                        
+                        <DropdownMenuItem 
+                            onSelect={(e) => {
+                                e.preventDefault();
+                                setTimeout(() => onEdit(), 0);
+                            }}
+                            className="cursor-pointer focus:bg-slate-800"
+                        >
+                            <Edit className="mr-2 h-4 w-4" /> Editar
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuItem 
+                            onSelect={(e) => {
+                                e.preventDefault();
+                                onDelete();
+                            }} 
+                            className="cursor-pointer text-red-500 focus:text-red-400 focus:bg-red-950/20"
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </div>
     )
