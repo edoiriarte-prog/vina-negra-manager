@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import dynamic from 'next/dynamic';
 import { PurchaseOrder } from "@/lib/types"; 
 import { getColumns } from "./components/columns";
 import { DataTable } from "./components/data-table"; 
@@ -8,12 +9,13 @@ import { useOperations } from "@/hooks/use-operations";
 import { useMasterData } from "@/hooks/use-master-data"; 
 import { Button } from "@/components/ui/button";
 import { Plus, DollarSign, FileText } from "lucide-react";
-import { NewPurchaseOrderSheet } from "./components/new-purchase-order-sheet";
-import { PurchaseOrderPreview } from "./components/purchase-order-preview";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { usePurchasesCRUD } from "@/hooks/use-purchases-crud";
 import { Contact } from "@/lib/types";
+
+const NewPurchaseOrderSheet = dynamic(() => import('./components/new-purchase-order-sheet').then(mod => mod.NewPurchaseOrderSheet), { ssr: false });
+const PurchaseOrderPreview = dynamic(() => import('./components/purchase-order-preview').then(mod => mod.PurchaseOrderPreview), { ssr: false });
 
 export default function PurchasesPage() {
   const { toast } = useToast();
@@ -146,21 +148,25 @@ export default function PurchasesPage() {
         </div>
       </div>
 
-      <NewPurchaseOrderSheet
-        isOpen={isSheetOpen}
-        onOpenChange={handleCloseSheet}
-        onSave={handleSave}
-        order={editingOrder}
-        suppliers={suppliers}
-        purchaseOrders={purchaseOrders}
-      />
+      {isSheetOpen && (
+        <NewPurchaseOrderSheet
+          isOpen={isSheetOpen}
+          onOpenChange={handleCloseSheet}
+          onSave={handleSave}
+          order={editingOrder}
+          suppliers={suppliers}
+          purchaseOrders={purchaseOrders}
+        />
+      )}
 
-      <PurchaseOrderPreview
-        isOpen={!!previewingData}
-        onOpenChange={(open) => !open && setPreviewingData(null)}
-        order={previewingData?.order || null}
-        supplier={previewingData?.supplier || null}
-      />
+      {previewingData && (
+        <PurchaseOrderPreview
+          isOpen={!!previewingData}
+          onOpenChange={(open) => !open && setPreviewingData(null)}
+          order={previewingData?.order || null}
+          supplier={previewingData?.supplier || null}
+        />
+      )}
 
     </div>
   );

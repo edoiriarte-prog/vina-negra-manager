@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import dynamic from 'next/dynamic';
 import { SalesOrder } from "@/lib/types"; 
 import { getColumns } from "./components/columns"; 
 import { DataTable } from "./components/data-table"; 
@@ -10,8 +11,6 @@ import { useOperations } from "@/hooks/use-operations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, FileSpreadsheet, Users, Calendar, Search, FileText, RefreshCw } from "lucide-react";
-import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
-import { SalesOrderPreview } from "./components/sales-order-preview"; 
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -35,6 +34,14 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFirebase } from "@/firebase";
 import { writeBatch, doc } from "firebase/firestore";
+import { useRouter } from 'next/navigation';
+
+// --- LAZY LOADING DE COMPONENTES PESADOS ---
+const NewSalesOrderSheet = dynamic(() => import('./components/new-sales-order-sheet').then(mod => mod.NewSalesOrderSheet), {
+  loading: () => <div className="flex items-center justify-center h-full"><Skeleton className="h-full w-full" /></div>,
+  ssr: false,
+});
+const SalesOrderPreview = dynamic(() => import('./components/sales-order-preview').then(mod => mod.SalesOrderPreview), { ssr: false });
 
 // Helpers
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
@@ -54,6 +61,7 @@ const formatDate = (dateString?: string) => {
 export default function SalesPage() {
   const { toast } = useToast();
   const { firestore } = useFirebase();
+  const router = useRouter(); 
 
   // Hooks de Datos (Providers)
   const { salesOrders, purchaseOrders, inventoryAdjustments, isLoading: opsLoading } = useOperations();
@@ -143,7 +151,7 @@ export default function SalesPage() {
     try {
         await batch.commit();
         toast({ title: "¡Sincronización Completa!", description: `${updatedCount} órdenes han sido marcadas como despachadas.`});
-        window.location.reload(); // Hard refresh to ensure UI update
+        window.location.reload(); 
     } catch (error) {
         console.error("Error en la actualización masiva:", error);
         toast({ variant: "destructive", title: "Error", description: "Ocurrió un error durante la sincronización."});
@@ -440,5 +448,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    

@@ -41,12 +41,10 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!db) {
-        Object.keys(loadingStates).forEach(key => setLoadingStates(prev => ({...prev, [key]: false})));
+        Object.keys(loadingStates).forEach(key => setLoadingStates(prev => ({...prev, [key as keyof typeof loadingStates]: false})));
         return;
     };
 
-    // SOLUCIÓN DE PERFORMANCE: Usar getDocs para cargar los datos una sola vez
-    // en lugar de mantener una conexión en tiempo real con onSnapshot para colecciones grandes.
     const fetchDataOnce = async (collectionName: string, setter: Function, loadingKey: keyof typeof loadingStates) => {
       try {
         const q = query(collection(db, collectionName), orderBy('date', 'desc'));
@@ -60,7 +58,7 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
       }
     };
     
-    // Cargar colecciones grandes una sola vez
+    // Cargar colecciones grandes una sola vez para mejorar performance
     fetchDataOnce('purchaseOrders', setPurchaseOrders, 'purchases');
     fetchDataOnce('salesOrders', setSalesOrders, 'sales');
     fetchDataOnce('financialMovements', setFinancialMovements, 'financials');
