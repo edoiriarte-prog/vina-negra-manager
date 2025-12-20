@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -14,15 +15,15 @@ import {z} from 'zod';
 const GenerateFinancialSummaryInputSchema = z.object({
   financialData: z
     .string()
-    .describe('The financial data to summarize.  Include key metrics like revenue, expenses, and profit.'),
+    .describe('A string containing key financial metrics and inventory data.'),
+  userPrompt: z
+    .string()
+    .describe('The specific question or topic the user wants the AI to analyze.'),
 });
 export type GenerateFinancialSummaryInput = z.infer<typeof GenerateFinancialSummaryInputSchema>;
 
 const GenerateFinancialSummaryOutputSchema = z.object({
-  summary: z.string().describe('The executive summary of the financial status.'),
-  suggestedDescription: z
-    .string()
-    .describe('A suggested description for a financial transaction.'),
+  summary: z.string().describe('The detailed analysis and response based on the provided data and user prompt.'),
 });
 export type GenerateFinancialSummaryOutput = z.infer<typeof GenerateFinancialSummaryOutputSchema>;
 
@@ -36,13 +37,19 @@ const prompt = ai.definePrompt({
   name: 'generateFinancialSummaryPrompt',
   input: {schema: GenerateFinancialSummaryInputSchema},
   output: {schema: GenerateFinancialSummaryOutputSchema},
-  prompt: `You are an expert financial analyst.
+  prompt: `Eres un experto analista de negocios y finanzas para una empresa agroindustrial.
+  
+  Tu tarea es analizar los datos proporcionados y responder a la consulta específica del usuario de manera clara, concisa y profesional. Usa un tono ejecutivo.
 
-  Generate an executive summary of the financial status based on the following data:
-  {{financialData}}
+  DATOS DISPONIBLES:
+  {{{financialData}}}
 
-  Also, suggest a description for a typical financial transaction based on this data.
-  Make sure the summary is concise and easy to understand.
+  CONSULTA DEL USUARIO:
+  "{{{userPrompt}}}"
+
+  Basándote en los datos y la consulta, genera una respuesta que aborde directamente la pregunta del usuario.
+  Si la pregunta es sobre precios, sugiere un precio de venta. Si es sobre stock, detalla el inventario. Si es una pregunta abierta, provee un resumen ejecutivo.
+  Usa viñetas o listas para estructurar tu respuesta si es apropiado.
   `,
 });
 

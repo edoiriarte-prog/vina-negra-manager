@@ -13,6 +13,7 @@ type KpiCardProps = {
   value: string;
   icon: React.ReactNode;
   description: string;
+  subValue?: string; // Nuevo para el desglose
   isLoading?: boolean;
 };
 
@@ -21,6 +22,7 @@ export default function KpiCard({
   value,
   icon,
   description,
+  subValue,
   isLoading = false,
 }: KpiCardProps) {
   if (isLoading) {
@@ -50,7 +52,11 @@ export default function KpiCard({
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold text-white">{value}</div>
-        <p className="text-xs text-muted-foreground h-4">{description}</p>
+        {subValue ? (
+            <p className="text-xs text-muted-foreground font-mono">{subValue}</p>
+        ) : (
+            <p className="text-xs text-muted-foreground h-4">{description}</p>
+        )}
       </CardContent>
     </Card>
   );

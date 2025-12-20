@@ -31,7 +31,7 @@ const formatKilos = (value: number) =>
   new Intl.NumberFormat('es-CL').format(value);
 
 export default function DashboardPage() {
-  const { contacts, isLoading: loadingMaster } = useMasterData();
+  const { contacts, inventory, isLoading: loadingMaster } = useMasterData();
   const { purchaseOrders, financialMovements, inventoryAdjustments, isLoading: loadingOps } = useOperations();
   const { salesOrders, isLoading: loadingSales } = useSalesOrdersCRUD();
   const isLoading = loadingMaster || loadingOps || loadingSales;
@@ -55,26 +55,56 @@ export default function DashboardPage() {
   const { kpis, financialDataString } = useMemo(() => {
     if (isLoading) return { kpis: null, financialDataString: '' };
 
-    const totalPurchaseAmount = completedPurchases.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
-    const totalSalesAmount = completedSales.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+    const { totalNetAmount: totalSalesNet, totalVatAmount: totalSalesVat } = completedSales.reduce((acc, order) => {
+        const net = order.totalAmount || 0;
+        acc.totalNetAmount += net;
+        if (order.includeVat !== false) {
+            acc.totalVatAmount += net * 0.19;
+        }
+        return acc;
+    }, { totalNetAmount: 0, totalVatAmount: 0 });
+
+    const { totalNetAmount: totalPurchasesNet, totalVatAmount: totalPurchasesVat } = completedPurchases.reduce((acc, order) => {
+        const net = order.totalAmount || 0;
+        acc.totalNetAmount += net;
+        if (order.includeVat !== false) {
+            acc.totalVatAmount += net * 0.19;
+        }
+        return acc;
+    }, { totalNetAmount: 0, totalVatAmount: 0 });
+
     
     const totalIncome = financialMovements.filter(m => m.type === 'income').reduce((sum, m) => sum + (m.amount || 0), 0);
     const totalExpense = financialMovements.filter(m => m.type === 'expense').reduce((sum, m) => sum + (m.amount || 0), 0);
     const netCashflow = totalIncome - totalExpense;
 
+    const inventoryDetails = (inventory || []).map(item => 
+      `- Producto: ${item.name}, Calibre: ${item.caliber}, Stock: ${item.stock} kg`
+    ).join('\n');
+
     const kpiData = {
-      totalSalesAmount,
-      totalPurchaseAmount,
+      totalSales: { net: totalSalesNet, vat: totalSalesVat },
+      totalPurchases: { net: totalPurchasesNet, vat: totalPurchasesVat },
       netCashflow,
       availableStock,
       completedSalesCount: completedSales.length,
       completedPurchasesCount: completedPurchases.length,
     };
 
-    const financialString = `Ventas: ${formatCurrency(totalSalesAmount)}. Compras: ${formatCurrency(totalPurchaseAmount)}. Flujo Neto: ${formatCurrency(netCashflow)}. Stock: ${formatKilos(availableStock)}kg.`;
+    const financialString = `
+      DATOS FINANCIEROS:
+      - Ventas Netas: ${formatCurrency(totalSalesNet)}
+      - Compras Netas: ${formatCurrency(totalPurchasesNet)}
+      - Flujo de Caja Neto (Ingresos - Egresos): ${formatCurrency(netCashflow)}
+      
+      DATOS DE INVENTARIO:
+      - Stock Total Disponible (Kg): ${formatKilos(availableStock)}
+      - Desglose de Inventario:
+      ${inventoryDetails || "No hay datos de inventario detallado."}
+    `;
     
     return { kpis: kpiData, financialDataString: financialString };
-  }, [completedPurchases, completedSales, financialMovements, availableStock, isLoading]);
+  }, [completedPurchases, completedSales, financialMovements, availableStock, isLoading, inventory]);
 
 
   if (isLoading || !kpis) {
@@ -93,10 +123,36 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KpiCard title="Ventas Totales" value={formatCurrency(kpis.totalSalesAmount)} description={`${kpis.completedSalesCount} OP despachadas`} icon={<TrendingUp className="text-blue-500" />} isLoading={isLoading} />
-        <KpiCard title="Compras Totales" value={formatCurrency(kpis.totalPurchaseAmount)} description={`${kpis.completedPurchasesCount} OC recepcionadas`} icon={<ShoppingCart className="text-amber-500" />} isLoading={isLoading} />
-        <KpiCard title="Flujo de Caja Neto" value={formatCurrency(kpis.netCashflow)} description="Ingresos reales - Egresos" icon={<DollarSign className={kpis.netCashflow >= 0 ? "text-emerald-500" : "text-red-500"} />} isLoading={isLoading} />
-        <KpiCard title="Stock Disponible" value={`${formatKilos(kpis.availableStock)} kg`} description="Inventario actual global" icon={<Warehouse className="text-purple-500" />} isLoading={isLoading} />
+        <KpiCard 
+          title="Ventas Totales" 
+          value={formatCurrency(kpis.totalSales.net)} 
+          description={`en ${kpis.completedSalesCount} OP despachadas`}
+          subValue={`(+ ${formatCurrency(kpis.totalSales.vat)} IVA) = ${formatCurrency(kpis.totalSales.net + kpis.totalSales.vat)}`}
+          icon={<TrendingUp className="text-blue-500" />} 
+          isLoading={isLoading} 
+        />
+        <KpiCard 
+          title="Compras Totales" 
+          value={formatCurrency(kpis.totalPurchases.net)} 
+          description={`en ${kpis.completedPurchasesCount} OC recepcionadas`}
+          subValue={`(+ ${formatCurrency(kpis.totalPurchases.vat)} IVA) = ${formatCurrency(kpis.totalPurchases.net + kpis.totalPurchases.vat)}`}
+          icon={<ShoppingCart className="text-amber-500" />} 
+          isLoading={isLoading} 
+        />
+        <KpiCard 
+          title="Flujo de Caja Neto" 
+          value={formatCurrency(kpis.netCashflow)} 
+          description="Ingresos reales - Egresos" 
+          icon={<DollarSign className={kpis.netCashflow >= 0 ? "text-emerald-500" : "text-red-500"} />} 
+          isLoading={isLoading} 
+        />
+        <KpiCard 
+          title="Stock Disponible" 
+          value={`${formatKilos(kpis.availableStock)} kg`} 
+          description="Inventario actual global" 
+          icon={<Warehouse className="text-purple-500" />} 
+          isLoading={isLoading} 
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
