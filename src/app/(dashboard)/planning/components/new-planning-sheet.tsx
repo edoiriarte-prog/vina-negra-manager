@@ -162,7 +162,7 @@ export function NewPlanningSheet({
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
                     <div className="bg-indigo-600/20 p-2.5 rounded-xl border border-indigo-600/30">
-                        <Calendar className="h-6 w-6 text-indigo-400" />
+                        <CalendarIcon className="h-6 w-6 text-indigo-400" />
                     </div>
                     <div>
                         <SheetTitle className="text-xl font-bold text-slate-100 tracking-tight">{title}</SheetTitle>
