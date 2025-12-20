@@ -15,7 +15,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,61 +45,57 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.E
 };
 
 
-// --- COMPONENTE INTELIGENTE DE ESTADO (CON POPOVER) ---
+// --- COMPONENTE INTELIGENTE DE ESTADO (CON DIALOG/MODAL) ---
 const StatusCell = ({ row }: { row: any }) => {
   const order = row.original as SalesOrder;
   const { updateSalesOrder } = useSalesOrdersCRUD();
   const { toast } = useToast();
   
-  const [isOpen, setIsOpen] = useState(false);
-  
-  // Estado temporal para el popover
-  const [tempStatus, setTempStatus] = useState(order.status);
-  const [tempDate, setTempDate] = useState<Date | undefined>();
-  const [tempInvoiceNumber, setTempInvoiceNumber] = useState(order.invoiceNumber || '');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalData, setModalData] = useState<{ newStatus: string; date?: Date; invoiceNumber?: string } | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
 
   const currentStatusConfig = statusConfig[order.status] || statusConfig.pending;
-  const showExtraFields = tempStatus === 'dispatched' || tempStatus === 'invoiced';
 
-  // Sincronizar estado si la orden cambia desde fuera
-  useEffect(() => {
-    if (isOpen) {
-        setTempStatus(order.status);
-        setTempInvoiceNumber(order.invoiceNumber || '');
-        setTempDate(
-            order.status === 'invoiced' && order.invoicedDate ? parseISO(order.invoicedDate) :
-            order.status === 'dispatched' && order.dispatchedDate ? parseISO(order.dispatchedDate) :
-            new Date()
-        );
-    }
-  }, [isOpen, order.status, order.invoicedDate, order.dispatchedDate, order.invoiceNumber]);
+  const handleStatusChange = (newStatus: string) => {
+    if (newStatus === order.status) return;
 
-  const handleSave = async () => {
-    if (showExtraFields && !tempDate) {
-        toast({ variant: "destructive", title: "Fecha requerida" });
-        return;
-    }
-    
-    if (tempStatus === 'invoiced' && !tempInvoiceNumber) {
-        toast({ variant: "destructive", title: "N° de Factura requerido" });
-        return;
-    }
+    // Si el nuevo estado requiere fecha o factura, abre el modal.
+    if (newStatus === 'dispatched' || newStatus === 'invoiced') {
+        const initialDate = 
+            newStatus === 'invoiced' && order.invoicedDate ? parseISO(order.invoicedDate) :
+            newStatus === 'dispatched' && order.dispatchedDate ? parseISO(order.dispatchedDate) :
+            new Date();
 
+        setModalData({
+            newStatus,
+            date: initialDate,
+            invoiceNumber: order.invoiceNumber || ''
+        });
+        setIsModalOpen(true);
+    } else {
+        // Para estados simples, actualiza directamente.
+        saveStatus(newStatus);
+    }
+  };
+
+  const saveStatus = async (statusToSave: string, date?: Date, invoiceNumber?: string) => {
     setIsLoading(true);
-    const updateData: Partial<SalesOrder> = { status: tempStatus as any };
-    if (tempStatus === 'dispatched') {
-        updateData.dispatchedDate = tempDate!.toISOString();
-    } else if (tempStatus === 'invoiced') {
-        updateData.invoicedDate = tempDate!.toISOString();
-        updateData.invoiceNumber = tempInvoiceNumber;
+    const updateData: Partial<SalesOrder> = { status: statusToSave as any };
+
+    if (statusToSave === 'dispatched' && date) {
+        updateData.dispatchedDate = date.toISOString();
+    } else if (statusToSave === 'invoiced' && date) {
+        updateData.invoicedDate = date.toISOString();
+        updateData.invoiceNumber = invoiceNumber;
     }
 
     try {
         await updateSalesOrder(order.id, updateData);
-        toast({ title: "Estado Actualizado", description: `La orden ahora está ${statusConfig[tempStatus].label}.` });
-        setIsOpen(false);
+        toast({ title: "Estado Actualizado", description: `La orden ahora está ${statusConfig[statusToSave].label}.` });
+        setIsModalOpen(false);
+        setModalData(null);
     } catch (error) {
         toast({ variant: "destructive", title: "Error al actualizar" });
     } finally {
@@ -98,91 +103,95 @@ const StatusCell = ({ row }: { row: any }) => {
     }
   };
   
+  const handleModalSave = () => {
+      if (!modalData) return;
+      if (!modalData.date) {
+          toast({ variant: "destructive", title: "Fecha requerida" });
+          return;
+      }
+      if (modalData.newStatus === 'invoiced' && !modalData.invoiceNumber) {
+          toast({ variant: "destructive", title: "N° de Factura requerido" });
+          return;
+      }
+      saveStatus(modalData.newStatus, modalData.date, modalData.invoiceNumber);
+  }
+
   const displayDate = order.status === 'invoiced' && order.invoicedDate 
     ? order.invoicedDate 
     : (order.status === 'dispatched' && order.dispatchedDate ? order.dispatchedDate : null);
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button
-            variant="outline"
-            onClick={(e) => { e.stopPropagation(); }}
+    <>
+      <Select value={order.status} onValueChange={handleStatusChange}>
+        <SelectTrigger 
             className={`h-auto min-w-[150px] justify-between text-xs font-semibold px-3 py-1.5 transition-all ${currentStatusConfig.color}`}
             disabled={isLoading}
         >
-            <div className="flex flex-col items-start">
-            <span className="flex items-center gap-1.5">
-                <currentStatusConfig.icon className="h-3.5 w-3.5" />
-                {currentStatusConfig.label}
-            </span>
-            {displayDate && (
-                <span className="text-[10px] font-normal text-slate-500 pl-5">
-                    {format(parseISO(displayDate), 'dd/MM/yy')}
-                </span>
-            )}
-            </div>
-            <ChevronDown className="h-4 w-4 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-80 bg-slate-950 border-slate-800 text-slate-100 p-4"
-        align="start"
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        <div className="space-y-4">
-            <div className="space-y-1">
-                <Label className="text-xs text-slate-400">Cambiar estado a:</Label>
-                <Select value={tempStatus} onValueChange={setTempStatus}>
-                    <SelectTrigger className="w-full bg-slate-900 border-slate-700">
-                        <SelectValue placeholder="Seleccionar estado" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-700 text-slate-100">
-                        {Object.entries(statusConfig).map(([key, { label }]) => (
-                            <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-
-            {showExtraFields && (
-                <div className="space-y-4 border-t border-slate-800 pt-4">
-                    <div className="space-y-1">
-                         <Label className="text-xs text-slate-400">
-                            Fecha de {tempStatus === 'dispatched' ? 'Despacho' : 'Facturación'}
-                         </Label>
-                         <Calendar
-                            mode="single"
-                            selected={tempDate}
-                            onSelect={(d) => d && setTempDate(d)}
-                            locale={es}
-                            className="rounded-md border border-slate-800 bg-slate-900 p-0"
-                         />
-                    </div>
-                    {tempStatus === 'invoiced' && (
-                        <div className="space-y-1">
-                            <Label htmlFor="invoiceNumber" className="text-xs text-slate-400">N° Factura</Label>
-                            <Input
-                                id="invoiceNumber"
-                                value={tempInvoiceNumber}
-                                onChange={(e) => setTempInvoiceNumber(e.target.value)}
-                                className="bg-slate-900 border-slate-700 h-9"
-                                placeholder="Ej: 12345"
-                            />
-                        </div>
+            <SelectValue>
+                <div className="flex flex-col items-start">
+                    <span className="flex items-center gap-1.5">
+                        <currentStatusConfig.icon className="h-3.5 w-3.5" />
+                        {currentStatusConfig.label}
+                    </span>
+                    {displayDate && (
+                        <span className="text-[10px] font-normal text-slate-500 pl-5">
+                            {format(parseISO(displayDate), 'dd/MM/yy')}
+                        </span>
                     )}
                 </div>
-            )}
-            
-            <Button onClick={handleSave} className="w-full bg-blue-600 hover:bg-blue-500 text-white" disabled={isLoading}>
-                <Save className="mr-2 h-4 w-4"/>
-                {isLoading ? 'Guardando...' : 'Guardar'}
-            </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+            </SelectValue>
+        </SelectTrigger>
+        <SelectContent className="bg-slate-900 border-slate-700 text-slate-100">
+             {Object.entries(statusConfig).map(([key, { label }]) => (
+                <SelectItem key={key} value={key} className="focus:bg-slate-800">{label}</SelectItem>
+            ))}
+        </SelectContent>
+      </Select>
+
+      <AlertDialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <AlertDialogContent className="bg-slate-950 border-slate-800 text-slate-100">
+            <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar Estado: {statusConfig[modalData?.newStatus || '']?.label}</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Por favor, proporcione la información adicional requerida.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-4 py-4">
+                 <div className="space-y-2">
+                    <Label className="text-xs text-slate-400">
+                        Fecha de {modalData?.newStatus === 'dispatched' ? 'Despacho' : 'Facturación'}
+                    </Label>
+                    <Calendar
+                        mode="single"
+                        selected={modalData?.date}
+                        onSelect={(d) => d && setModalData(prev => prev ? {...prev, date: d} : null)}
+                        locale={es}
+                        className="rounded-md border border-slate-800 bg-slate-900 p-2"
+                    />
+                </div>
+                {modalData?.newStatus === 'invoiced' && (
+                    <div className="space-y-2">
+                        <Label htmlFor="invoiceNumber" className="text-xs text-slate-400">N° Factura</Label>
+                        <Input
+                            id="invoiceNumber"
+                            value={modalData.invoiceNumber}
+                            onChange={(e) => setModalData(prev => prev ? {...prev, invoiceNumber: e.target.value} : null)}
+                            className="bg-slate-900 border-slate-700 h-9"
+                            placeholder="Ej: 12345"
+                        />
+                    </div>
+                )}
+            </div>
+            <AlertDialogFooter>
+                <AlertDialogCancel className="border-slate-700 hover:bg-slate-800">Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleModalSave} className="bg-blue-600 hover:bg-blue-500" disabled={isLoading}>
+                    <Save className="mr-2 h-4 w-4"/>
+                    {isLoading ? 'Guardando...' : 'Confirmar y Guardar'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
