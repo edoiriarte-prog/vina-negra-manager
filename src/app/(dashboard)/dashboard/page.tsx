@@ -1,8 +1,10 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
 import { useMasterData } from '@/hooks/use-master-data';
 import { useOperations } from '@/hooks/use-operations'; 
+import { useSalesOrdersCRUD } from '@/hooks/use-sales-orders-crud';
 import KpiCard from './components/kpi-card';
 import { 
   ComparativeFinancialChart,
@@ -30,15 +32,16 @@ const formatKilos = (value: number) =>
 
 export default function DashboardPage() {
   const { contacts, isLoading: loadingMaster } = useMasterData();
-  const { purchaseOrders, salesOrders, financialMovements, inventoryAdjustments, isLoading: loadingOps } = useOperations();
-  const isLoading = loadingMaster || loadingOps;
+  const { purchaseOrders, financialMovements, inventoryAdjustments, isLoading: loadingOps } = useOperations();
+  const { salesOrders, isLoading: loadingSales } = useSalesOrdersCRUD();
+  const isLoading = loadingMaster || loadingOps || loadingSales;
 
   const completedPurchases: PurchaseOrder[] = useMemo(() => {
-    return purchaseOrders.filter(o => o.status === 'completed' || o.status === 'received');
+    return (purchaseOrders || []).filter(o => o.status === 'completed' || o.status === 'received');
   }, [purchaseOrders]);
   
   const completedSales: SalesOrder[] = useMemo(() => {
-    return salesOrders.filter(o => o.status === 'dispatched' || o.status === 'invoiced');
+    return (salesOrders || []).filter(o => o.status === 'dispatched' || o.status === 'invoiced');
   }, [salesOrders]);
 
   const availableStock = useMemo(() => {
