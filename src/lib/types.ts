@@ -157,16 +157,17 @@ export interface FinancialMovement {
 
 export interface PlannedOrder {
   id: string;
-  date: string;           
-  deliveryDate: string;   
   clientId: string;
-  status: PlanningStatus;
-  items: OrderItem[];     
+  deliveryDate: string;
+  status: 'borrador' | 'confirmado' | 'entregado';
+  items: OrderItem[];
   totalAmount: number;
   totalKilos: number;
   notes?: string;
-  createdBy?: string;     
+  // Campos de compatibilidad con SalesOrder para el sheet
+  date: string;
 }
+
 
 // --- 3. ÓRDENES DE VENTA (Más complejo, depende de otros tipos) ---
 
