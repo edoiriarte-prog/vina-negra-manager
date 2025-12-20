@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { usePlanning } from "@/hooks/use-planning";
 import { useMasterData } from "@/hooks/use-master-data";
 import { PlannedOrder } from "@/lib/types";
@@ -11,8 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Plus, Clock, MoreHorizontal, ArrowRight, Trash2, Edit } from "lucide-react";
 import { format, parseISO, endOfWeek, addDays, startOfToday } from "date-fns";
-import { es } from "date-fns/locale";
-import { NewSalesOrderSheet } from "../sales/components/new-sales-order-sheet"; 
+import { es } from 'date-fns/locale';
+import { NewPlanningSheet } from "./components/new-planning-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     DropdownMenu,
@@ -59,24 +58,20 @@ export default function PlanningPage() {
     return { thisWeek, nextWeek };
   }, [plannedOrders]);
 
-  // --- HANDLER: Guardar Planificación (CORREGIDO: ASYNC) ---
-  const handleSavePlan = async (data: any) => {
-    // Calculamos totales aquí también por seguridad
+  const handleSavePlan = useCallback(async (data: any) => {
     const items = data.items || [];
     const calculatedTotal = items.reduce((acc: number, item: any) => acc + ((item.price || 0) * item.quantity), 0);
     const calculatedKilos = items.reduce((acc: number, item: any) => acc + item.quantity, 0);
 
     const planData: any = {
         ...data,
-        deliveryDate: data.date, 
+        deliveryDate: data.deliveryDate, 
         status: editingPlan ? editingPlan.status : 'borrador', 
         totalKilos: calculatedKilos,
         totalAmount: calculatedTotal
     };
-
-    // Limpieza de campos de Ventas que no necesitamos en Planning
-    delete planData.paymentStatus;
-    delete planData.saleType;
+    
+    delete planData.date;
 
     try {
         if (editingPlan) {
@@ -89,12 +84,12 @@ export default function PlanningPage() {
     } catch (error) {
         console.error("Error al guardar el plan:", error);
     }
-  };
+  }, [editingPlan, createPlan, updatePlan]);
 
-  const handleEdit = (plan: PlannedOrder) => {
+  const handleEdit = useCallback((plan: PlannedOrder) => {
       setEditingPlan(plan);
       setIsSheetOpen(true);
-  }
+  }, []);
 
   if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full bg-slate-800"/></div>;
 
@@ -172,15 +167,13 @@ export default function PlanningPage() {
       </Tabs>
 
       {isSheetOpen && (
-        <NewSalesOrderSheet 
+        <NewPlanningSheet 
             isOpen={isSheetOpen}
             onOpenChange={(open) => !open && setIsSheetOpen(false)}
             onSave={handleSavePlan}
-            // @ts-ignore
-            order={editingPlan ? { ...editingPlan, date: editingPlan.deliveryDate } : null}
+            order={editingPlan}
             clients={clients} 
             inventory={inventory || []} 
-            sheetType="sale" 
         />
       )}
     </div>
@@ -191,7 +184,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: any) {
     const clientName = contacts?.find((c: any) => c.id === plan.clientId)?.name || 'Cliente Desconocido';
     const isConfirmed = plan.status === 'confirmado';
 
-    const safeTotal = plan.totalAmount || plan.items.reduce((acc: number, i: any) => acc + ((i.price||0) * (i.quantity||0)), 0);
+    const safeTotal = plan.totalAmount || (plan.items || []).reduce((acc: number, i: any) => acc + ((i.price||0) * (i.quantity||0)), 0);
 
     return (
         <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 hover:border-slate-600 transition-all group relative shadow-sm">
