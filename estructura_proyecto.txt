@@ -94,9 +94,6 @@ src/app/page.tsx
 src/app/globals.css
 src/app/auth-guard.tsx
 src/app/favicon.ico
-src/app/(dashboard
-src/app/(dashboard/purchases
-src/app/(dashboard/purchases/components
 src/app/login
 src/app/login/page.tsx
 src/app/register
@@ -126,7 +123,6 @@ src/app/(dashboard)/sales/components
 src/app/(dashboard)/financials
 src/app/(dashboard)/financials/page.tsx
 src/app/(dashboard)/financials/components
-src/app/(dashboard)/main-nav.tsx
 src/app/(dashboard)/components
 src/app/(dashboard)/help
 src/app/(dashboard)/help/page.tsx
@@ -147,5 +143,4 @@ src/app/(dashboard)/inventory-adjustments/components
 src/app/(dashboard)/import
 src/app/(dashboard)/dispatches
 src/app/(dashboard)/dispatches/page.tsx
-src/app/(dashboard)/mercantile-account
 src/app/(dashboard)/providers.tsx

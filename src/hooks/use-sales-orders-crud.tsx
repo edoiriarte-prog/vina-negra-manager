@@ -63,7 +63,7 @@ export function useSalesOrdersCRUD() {
   }, [fetchInitialSalesOrders]);
 
   const loadMore = useCallback(async () => {
-    if (!db || !lastVisible) return;
+    if (!db || !lastVisible || !hasMore) return;
     setIsLoadingMore(true);
 
     try {
@@ -83,7 +83,7 @@ export function useSalesOrdersCRUD() {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [db, lastVisible, toast]);
+  }, [db, lastVisible, hasMore, toast]);
 
   const createSalesOrder = async (data: Omit<SalesOrder, "id">) => {
     if (!db) {
@@ -92,16 +92,17 @@ export function useSalesOrdersCRUD() {
     }
     try {
       const newDocRef = doc(collection(db, "salesOrders"));
-      await setDoc(newDocRef, {
+      const newOrder: SalesOrder = {
         ...data,
         id: newDocRef.id,
-        createdAt: new Date().toISOString()
-      });
+      }
+      await setDoc(newDocRef, newOrder);
+      
       toast({ title: "Orden Creada", description: "Venta registrada exitosamente." });
       
-      // Refresh data after creation
-      fetchInitialSalesOrders(); 
-      
+      // Add to local state for instant UI update
+      setSalesOrders(prev => [newOrder, ...prev]);
+
       return newDocRef;
     } catch (error: any) {
       console.error("Error al crear la orden de venta:", error);
@@ -122,7 +123,7 @@ export function useSalesOrdersCRUD() {
       toast({ title: "Actualizado", description: "Los cambios se han guardado correctamente." });
       
       // Update local state instead of full reload for better UX
-      setSalesOrders(prev => prev.map(order => order.id === id ? { ...order, ...data } : order));
+      setSalesOrders(prev => prev.map(order => order.id === id ? { ...order, ...data } as SalesOrder : order));
       
     } catch (error: any) {
       console.error("Error al actualizar la orden de venta:", error);

@@ -64,7 +64,7 @@ export default function SalesPage() {
   // Hooks de Datos (Providers)
   const { 
     salesOrders,
-    isLoading: opsLoading,
+    isLoading,
     isLoadingMore,
     hasMore,
     loadMore,
@@ -289,7 +289,7 @@ export default function SalesPage() {
     </div>
   );
 
-  if (opsLoading || masterLoading) {
+  if (isLoading) {
       return (
           <div className="p-6 space-y-6 bg-slate-950 min-h-screen">
               <div className="flex justify-between">
@@ -354,7 +354,7 @@ export default function SalesPage() {
                     </div>
                      {hasMore && (
                         <div className="flex justify-center mt-4">
-                            <Button onClick={loadMore} disabled={isLoadingMore} variant="outline" className="w-full md:w-1/2">
+                            <Button onClick={loadMore} disabled={isLoadingMore} variant="outline" className="w-full md:w-1/2 border-slate-700 text-slate-300 hover:bg-slate-800">
                                 {isLoadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Cargar ventas anteriores'}
                             </Button>
                         </div>
@@ -460,5 +460,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    
