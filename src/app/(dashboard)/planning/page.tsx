@@ -1,13 +1,12 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { usePlanning } from "@/hooks/use-planning";
 import { useMasterData } from "@/hooks/use-master-data";
-import { PlannedOrder, OrderItem } from "@/lib/types";
+import { PlannedOrder, OrderItem, Contact } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { 
   Calendar, Plus, Clock, CheckCircle2, MoreVertical, 
@@ -57,7 +56,7 @@ export default function PlanningPage() {
     return { thisWeek, nextWeek, later };
   }, [plannedOrders]);
 
-  const handleSavePlan = async (data: Partial<Omit<PlannedOrder, 'id'>>) => {
+  const handleSavePlan = useCallback(async (data: Partial<Omit<PlannedOrder, 'id'>>) => {
     if (editingPlan) {
         await updatePlan(editingPlan.id, data);
     } else {
@@ -65,17 +64,26 @@ export default function PlanningPage() {
     }
     setIsSheetOpen(false);
     setEditingPlan(null);
-  };
+  }, [editingPlan, createPlan, updatePlan]);
   
-  const handleEdit = (plan: PlannedOrder) => {
+  const handleEdit = useCallback((plan: PlannedOrder) => {
     setEditingPlan(plan);
     setIsSheetOpen(true);
-  };
+  }, []);
 
-  const toggleStatus = (plan: PlannedOrder) => {
+  const handleToggleStatus = useCallback((plan: PlannedOrder) => {
       const newStatus = plan.status === 'borrador' ? 'confirmado' : plan.status === 'confirmado' ? 'entregado' : 'borrador';
       updatePlan(plan.id, { status: newStatus });
-  };
+  }, [updatePlan]);
+  
+  const handleDeletePlan = useCallback((id: string) => {
+    deletePlan(id);
+  }, [deletePlan]);
+
+  const handlePromoteToSale = useCallback((plan: PlannedOrder) => {
+    promoteToSale(plan);
+  }, [promoteToSale]);
+
 
   if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full"/></div>;
 
@@ -102,7 +110,7 @@ export default function PlanningPage() {
                 <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
                     {weeklyView.thisWeek.length === 0 && <p className="text-slate-500 text-sm italic py-8 text-center">No hay entregas para esta semana.</p>}
                     {weeklyView.thisWeek.map(plan => (
-                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={handleEdit} onDelete={deletePlan} onPromote={promoteToSale} onToggleStatus={toggleStatus} />
+                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={handleEdit} onDelete={handleDeletePlan} onPromote={handlePromoteToSale} onToggleStatus={handleToggleStatus} />
                     ))}
                 </CardContent>
             </Card>
@@ -115,7 +123,7 @@ export default function PlanningPage() {
                 <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
                       {weeklyView.nextWeek.length === 0 && <p className="text-slate-500 text-sm italic py-8 text-center">Nada planificado aún.</p>}
                       {weeklyView.nextWeek.map(plan => (
-                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={handleEdit} onDelete={deletePlan} onPromote={promoteToSale} onToggleStatus={toggleStatus} />
+                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={handleEdit} onDelete={handleDeletePlan} onPromote={handlePromoteToSale} onToggleStatus={handleToggleStatus} />
                     ))}
                 </CardContent>
             </Card>
@@ -128,7 +136,7 @@ export default function PlanningPage() {
                 <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
                       {weeklyView.later.length === 0 && <p className="text-slate-500 text-sm italic py-8 text-center">Nada planificado aún.</p>}
                       {weeklyView.later.map(plan => (
-                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={handleEdit} onDelete={deletePlan} onPromote={promoteToSale} onToggleStatus={toggleStatus} />
+                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={handleEdit} onDelete={handleDeletePlan} onPromote={handlePromoteToSale} onToggleStatus={handleToggleStatus} />
                     ))}
                 </CardContent>
             </Card>
@@ -138,7 +146,7 @@ export default function PlanningPage() {
         <NewSalesOrderSheet 
             isOpen={isSheetOpen}
             onOpenChange={(open) => { if (!open) setIsSheetOpen(false) }}
-            onSave={(data) => handleSavePlan(data)}
+            onSave={handleSavePlan as any}
             order={editingPlan as any}
             clients={clients} 
             inventory={inventory || []} 
@@ -153,12 +161,17 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus 
     const clientName = contacts?.find((c: any) => c.id === plan.clientId)?.name || 'Desconocido';
     const deliveryDate = parseISO(plan.deliveryDate);
     const isOverdue = isPast(deliveryDate) && !isToday(deliveryDate);
-    const isConfirmed = plan.status === 'confirmado';
+    const [isConfirmed, setIsConfirmed] = useState(plan.status === 'confirmado');
+    
+    useEffect(() => {
+        setIsConfirmed(plan.status === 'confirmado');
+    }, [plan.status]);
 
     const statusStyles = {
         borrador: 'border-yellow-500/50 bg-yellow-950/50 text-yellow-400',
         confirmado: 'border-blue-500/50 bg-blue-950/50 text-blue-400',
         entregado: 'border-green-500/50 bg-green-950/50 text-green-400',
+        cancelado: 'border-red-500/50 bg-red-950/50 text-red-500 line-through'
     };
 
     return (
@@ -188,7 +201,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus 
                         {clientName}
                     </h4>
                     <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={cn("capitalize", statusStyles[plan.status])}>
+                        <Badge variant="outline" className={cn("capitalize", statusStyles[plan.status as keyof typeof statusStyles])}>
                             {plan.status}
                         </Badge>
                         <p className={cn("text-xs text-slate-400 flex items-center gap-1", isOverdue && "text-red-400 font-bold")}>
@@ -206,7 +219,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus 
                 {plan.items.slice(0, 3).map((item: any, i: number) => (
                     <div key={i} className="flex justify-between text-xs text-slate-300">
                         <span>• {item.product} {item.caliber}</span>
-                        <span className="font-mono">{item.quantity} kg a {formatCurrency((item.price || 0))}</span>
+                        <span className="font-mono">{item.quantity || 0} kg a {formatCurrency(item.price || 0)}</span>
                     </div>
                 ))}
                 {plan.items.length > 3 && <p className="text-[10px] text-slate-500 italic text-right">+ {plan.items.length - 3} más...</p>}
@@ -222,3 +235,5 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus 
         </div>
     )
 }
+
+    
