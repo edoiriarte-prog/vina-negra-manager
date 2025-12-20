@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   collection, 
   query, 
@@ -9,26 +9,15 @@ import {
   addDoc, 
   updateDoc, 
   doc,
-  serverTimestamp,
-  Timestamp
+  writeBatch,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/firebase/init';
 import { useToast } from '@/hooks/use-toast';
+import { PlannedOrder, SalesOrder } from '@/lib/types';
 
-// 1. Tipado de la Orden
-export interface Order {
-  id: string;
-  clientName: string;
-  deliveryDate: string; // Formato YYYY-MM-DD
-  totalKilos: number;
-  status: 'pending' | 'delivered';
-  notes?: string;
-  createdAt: Timestamp;
-}
-
-// 2. Funcionalidades del Hook
 export function usePlanning() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [plannedOrders, setPlannedOrders] = useState<PlannedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -39,18 +28,17 @@ export function usePlanning() {
       return;
     }
 
-    // Query para obtener las órdenes, ordenadas por fecha de creación descendente
-    const q = query(collection(db, "plannedOrders"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "plannedOrders"), orderBy("deliveryDate", "desc"));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const ordersData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      } as Order));
-      setOrders(ordersData);
+      } as PlannedOrder));
+      setPlannedOrders(ordersData);
       setLoading(false);
     }, (error) => {
-      console.error("Error al obtener las órdenes:", error);
+      console.error("Error al obtener las órdenes de planificación:", error);
       toast({
         variant: "destructive",
         title: "Error de Conexión",
@@ -59,63 +47,97 @@ export function usePlanning() {
       setLoading(false);
     });
 
-    // Limpieza al desmontar el componente
     return () => unsubscribe();
   }, [toast]);
 
-  // Función para agregar una nueva orden
-  const addOrder = async (newOrderData: Omit<Order, 'id' | 'status' | 'createdAt'>) => {
+  const createPlan = useCallback(async (planData: Partial<Omit<PlannedOrder, 'id'>>) => {
     if (!db) return;
-    setLoading(true);
+    
+    const totalKilos = (planData.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const totalAmount = (planData.items || []).reduce((sum, item) => sum + ((item.quantity || 0) * (item.price || 0)), 0);
+
     try {
       await addDoc(collection(db, "plannedOrders"), {
-        ...newOrderData,
-        status: 'pending', // Estado por defecto
-        createdAt: serverTimestamp() // Fecha de creación del servidor
+        ...planData,
+        totalKilos,
+        totalAmount,
+        status: 'borrador',
+        createdAt: serverTimestamp(),
       });
-      toast({
-        title: "Éxito",
-        description: "El pedido ha sido planificado correctamente.",
-      });
-    } catch (error) {
-      console.error("Error al agregar la orden:", error);
-      toast({
-        variant: "destructive",
-        title: "Error al Guardar",
-        description: "No se pudo agregar el nuevo pedido.",
-      });
-    } finally {
-      setLoading(false);
+      toast({ title: "Plan Creado", description: "El nuevo plan de entrega ha sido guardado." });
+    } catch (e) {
+      console.error("Error creando plan:", e);
     }
-  };
-
-  // Función para actualizar el estado de una orden
-  const updateOrderStatus = async (orderId: string, newStatus: 'pending' | 'delivered') => {
+  }, [toast]);
+  
+  const updatePlan = useCallback(async (id: string, planData: Partial<Omit<PlannedOrder, 'id'>>) => {
     if (!db) return;
-    const orderRef = doc(db, "plannedOrders", orderId);
-    try {
-      await updateDoc(orderRef, {
-        status: newStatus
-      });
-      toast({
-        title: "Estado Actualizado",
-        description: `El pedido ahora está como '${newStatus === 'delivered' ? 'Entregado' : 'Pendiente'}'.`,
-      });
-    } catch (error) {
-      console.error("Error al actualizar el estado:", error);
-      toast({
-        variant: "destructive",
-        title: "Error al Actualizar",
-        description: "No se pudo cambiar el estado del pedido.",
-      });
+    
+    const dataToUpdate: Partial<PlannedOrder> = { ...planData };
+    if (planData.items) {
+      dataToUpdate.totalKilos = (planData.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+      dataToUpdate.totalAmount = (planData.items || []).reduce((sum, item) => sum + ((item.quantity || 0) * (item.price || 0)), 0);
     }
-  };
 
-  // 3. Exportación de funcionalidades
+    try {
+      await updateDoc(doc(db, "plannedOrders", id), dataToUpdate);
+      toast({ title: "Plan Actualizado" });
+    } catch (e) {
+      console.error("Error actualizando plan:", e);
+    }
+  }, [toast]);
+
+  const deletePlan = useCallback(async (id: string) => {
+    if (!db) return;
+    try {
+      await deleteDoc(doc(db, "plannedOrders", id));
+      toast({ variant: 'destructive', title: "Plan Eliminado" });
+    } catch (e) {
+      console.error("Error eliminando plan:", e);
+    }
+  }, [toast]);
+
+  const promoteToSale = useCallback(async (plan: PlannedOrder) => {
+    if (!db) return;
+    
+    const batch = writeBatch(db);
+    
+    const salesOrderRef = doc(collection(db, 'salesOrders'));
+    const planRef = doc(db, 'plannedOrders', plan.id);
+    
+    const salesOrderData: Omit<SalesOrder, 'id'> = {
+      clientId: plan.clientId,
+      date: new Date().toISOString().split('T')[0],
+      deliveryDate: plan.deliveryDate,
+      items: plan.items,
+      totalAmount: plan.totalAmount,
+      totalKilos: plan.totalKilos,
+      notes: plan.notes,
+      status: 'pending',
+      paymentMethod: 'Contado',
+      saleType: 'Venta en Firme',
+      includeVat: true,
+      warehouse: 'Bodega Central', 
+    };
+
+    batch.set(salesOrderRef, salesOrderData);
+    batch.update(planRef, { status: 'entregado' });
+
+    try {
+      await batch.commit();
+      toast({ title: "¡Éxito!", description: `Plan ${plan.id} convertido a Orden de Venta.` });
+    } catch (e) {
+      console.error("Error al promover a venta:", e);
+      toast({ variant: 'destructive', title: "Error", description: "No se pudo convertir el plan a venta." });
+    }
+  }, [toast]);
+
   return {
-    orders,
-    loading,
-    addOrder,
-    updateOrderStatus
+    plannedOrders,
+    isLoading: loading,
+    createPlan,
+    updatePlan,
+    deletePlan,
+    promoteToSale,
   };
 }
