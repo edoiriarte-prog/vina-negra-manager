@@ -114,8 +114,6 @@ const StatusCell = ({ row }: { row: any }) => {
       saveStatus(modalData.newStatus, modalData.date, modalData.invoiceNumber);
   }
 
-  // **LA CORRECCIÓN CLAVE**
-  // Memorizamos la función que maneja la selección de fecha para estabilizar el componente Calendar.
   const handleDateSelect = useCallback((date: Date | undefined) => {
     if (date) {
       setModalData(prev => prev ? { ...prev, date } : null);
