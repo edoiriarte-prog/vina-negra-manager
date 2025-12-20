@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMasterData } from "@/hooks/use-master-data";
 import QuickContactDialog from "@/components/contacts/quick-contact-dialog";
 import { cn } from "@/lib/utils";
+import { LotSelectionDialog } from "./lot-selection-dialog";
 
 // --- Zod Schema for Validation ---
 const orderItemSchema = z.object({
@@ -37,6 +38,10 @@ const orderItemSchema = z.object({
     caliber: z.string().min(1, "Seleccione un calibre"),
     quantity: z.number().positive("La cantidad debe ser mayor a 0"),
     price: z.number().nonnegative("El precio no puede ser negativo"),
+    // Campos opcionales que no necesitan validación estricta aquí
+    lotNumber: z.string().optional(),
+    packagingQuantity: z.number().optional(),
+    unit: z.string().optional(),
 });
 
 const salesOrderSchema = z.object({
@@ -44,7 +49,6 @@ const salesOrderSchema = z.object({
   date: z.date(),
   warehouse: z.string().min(1, "Seleccione una bodega"),
   items: z.array(orderItemSchema).min(1, "Debe agregar al menos un producto."),
-  // Optional fields
   number: z.string().optional(),
   status: z.string().optional(),
   includeVat: z.boolean().default(true),
@@ -69,6 +73,11 @@ interface NewSalesOrderSheetProps {
   order: SalesOrder | null;
   clients: Contact[];
   salesOrders?: SalesOrder[];
+  // NUEVOS PROPS NECESARIOS PARA EL DIALOG DE LOTE
+  purchaseOrders: PurchaseOrder[];
+  inventoryAdjustments: InventoryAdjustment[];
+  contacts: Contact[];
+  sheetType: 'sale' | 'dispatch';
 }
 
 export function NewSalesOrderSheet({
@@ -77,12 +86,17 @@ export function NewSalesOrderSheet({
   onSave,
   order,
   clients,
-  salesOrders = []
+  salesOrders = [],
+  purchaseOrders,
+  inventoryAdjustments,
+  contacts,
+  sheetType,
 }: NewSalesOrderSheetProps) {
 
   const { toast } = useToast();
   const { warehouses, bankAccounts, products, calibers, productCaliberAssociations } = useMasterData();
   const [isQuickContactOpen, setIsQuickContactOpen] = useState(false);
+  const [isLotSelectionOpen, setIsLotSelectionOpen] = useState(false);
   
   const form = useForm<SalesOrderFormData>({
     resolver: zodResolver(salesOrderSchema),
@@ -116,17 +130,23 @@ export function NewSalesOrderSheet({
             caliber: item.caliber,
             quantity: Number(item.quantity || 0),
             price: Number(item.price || 0),
+            lotNumber: item.lotNumber,
+            packagingQuantity: item.packagingQuantity,
+            unit: item.unit
           })),
         });
       } else {
         // Creating new order
-        const existingIds = salesOrders
-          .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
+        const idPrefix = sheetType === 'dispatch' ? 'TR-' : 'OV-';
+        const relevantOrders = salesOrders.filter(o => o.number?.startsWith(idPrefix));
+        const existingIds = relevantOrders
+          .map(o => o.number ? parseInt(o.number.replace(idPrefix, ''), 10) : 0)
           .filter(n => !isNaN(n) && n > 0);
         
-        const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 2100;
-        const nextNum = maxId < 2100 ? 2101 : maxId + 1;
-        const newId = `OV-${nextNum}`;
+        const baseId = sheetType === 'dispatch' ? 3000 : 2100;
+        const maxId = existingIds.length > 0 ? Math.max(...existingIds) : baseId;
+        const nextNum = maxId < baseId ? baseId + 1 : maxId + 1;
+        const newId = `${idPrefix}${nextNum}`;
 
         form.reset({
           number: newId,
@@ -135,11 +155,11 @@ export function NewSalesOrderSheet({
           includeVat: true,
           warehouse: "Bodega Central",
           paymentMethod: "Contado",
-          saleType: "Venta en Firme",
+          saleType: sheetType === 'dispatch' ? "Traslado Bodega Interna" : "Venta en Firme",
         });
       }
     }
-  }, [order, isOpen, salesOrders, form]);
+  }, [order, isOpen, salesOrders, form, sheetType]);
   
   // -- Real-time Calculations --
   const watchedItems = watch("items");
@@ -156,13 +176,20 @@ export function NewSalesOrderSheet({
   const handleFormSubmit = async (data: SalesOrderFormData) => {
     const totalKilos = data.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
     
-    // Construct the final object for saving, ensuring no undefined values are sent to Firestore
     const finalOrderData: Omit<SalesOrder, 'id'> = {
       number: data.number || '',
       clientId: data.clientId,
       date: format(data.date, 'yyyy-MM-dd'),
       status: (order?.status || 'pending') as SalesOrder['status'],
-      items: data.items,
+      items: data.items.map(item => ({
+          product: item.product,
+          caliber: item.caliber,
+          quantity: item.quantity,
+          price: item.price,
+          lotNumber: item.lotNumber,
+          packagingQuantity: item.packagingQuantity,
+          unit: 'Kilos'
+      })),
       totalAmount: netTotal,
       totalKilos: totalKilos,
       warehouse: data.warehouse,
@@ -185,9 +212,23 @@ export function NewSalesOrderSheet({
       console.error("Error al guardar desde el sheet:", error);
     }
   };
+  
+  const handleAddLotItem = (item: OrderItem) => {
+    append({
+        product: item.product,
+        caliber: item.caliber,
+        quantity: item.quantity,
+        price: item.price,
+        lotNumber: item.lotNumber,
+        packagingQuantity: item.packagingQuantity,
+        unit: 'Kilos'
+    });
+  };
 
   // --- UI Constants ---
-  const title = order ? `Editar OV ${order.number}` : `Nueva Orden de Venta`;
+  const title = order 
+    ? (sheetType === 'dispatch' ? `Editar Traspaso ${order.number}` : `Editar OV ${order.number}`)
+    : (sheetType === 'dispatch' ? 'Nuevo Traspaso de Bodega' : 'Nueva Orden de Venta');
   const darkInputClass = "bg-slate-950 border-slate-800 text-slate-100 focus:border-blue-500 placeholder:text-slate-600";
   const darkCardClass = "bg-slate-900 border-slate-800 shadow-sm";
   const labelClass = "text-xs font-medium text-slate-400 uppercase tracking-wide";
@@ -261,16 +302,20 @@ export function NewSalesOrderSheet({
               
               {/* --- PRODUCT ITEMS --- */}
               <div className={cn("rounded-xl border", darkCardClass)}>
-                <CardHeader className="border-b border-slate-800 py-4 px-6">
+                <CardHeader className="border-b border-slate-800 py-4 px-6 flex justify-between items-center">
                   <h3 className="font-semibold text-slate-200 flex items-center gap-2"><Info className="h-4 w-4 text-blue-400" /> Detalle de Productos</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setIsLotSelectionOpen(true)} className="border-blue-500/30 bg-blue-950/20 text-blue-300 hover:bg-blue-900/50 hover:text-blue-200">
+                    <PackageCheck className="mr-2 h-4 w-4" /> Agregar desde Lote
+                  </Button>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-slate-800 hover:bg-transparent">
-                        <TableHead className="w-[30%] text-slate-400">Producto</TableHead>
-                        <TableHead className="w-[20%] text-slate-400">Calibre</TableHead>
-                        <TableHead className="w-[15%] text-center text-slate-400">Kilos</TableHead>
+                        <TableHead className="w-[25%] text-slate-400">Producto</TableHead>
+                        <TableHead className="w-[15%] text-slate-400">Calibre</TableHead>
+                        <TableHead className="w-[15%] text-slate-400">Lote</TableHead>
+                        <TableHead className="w-[10%] text-center text-slate-400">Kilos</TableHead>
                         <TableHead className="w-[15%] text-right text-slate-400">Precio Neto</TableHead>
                         <TableHead className="w-[15%] text-right text-slate-400">Subtotal</TableHead>
                         <TableHead className="w-[5%]"></TableHead>
@@ -290,6 +335,7 @@ export function NewSalesOrderSheet({
                                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{products.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                   </Select>
                                 )}/>
+                                {errors.items?.[index]?.product && <p className="text-red-500 text-xs mt-1">{errors.items[index]?.product?.message}</p>}
                               </TableCell>
                               <TableCell className="p-2">
                                  <Controller name={`items.${index}.caliber`} control={control} render={({ field }) => (
@@ -298,16 +344,22 @@ export function NewSalesOrderSheet({
                                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">{associatedCalibers.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                                   </Select>
                                 )}/>
+                                {errors.items?.[index]?.caliber && <p className="text-red-500 text-xs mt-1">{errors.items[index]?.caliber?.message}</p>}
+                              </TableCell>
+                              <TableCell className="p-2">
+                                <Input {...register(`items.${index}.lotNumber`)} className={cn(darkInputClass, "h-9")} placeholder="Lote (opcional)" />
                               </TableCell>
                               <TableCell className="p-2">
                                 <Controller name={`items.${index}.quantity`} control={control} render={({ field }) => (
                                   <Input type="number" placeholder="0" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} className={cn(darkInputClass, "text-center h-9")} />
                                 )} />
+                                {errors.items?.[index]?.quantity && <p className="text-red-500 text-xs mt-1">{errors.items[index]?.quantity?.message}</p>}
                               </TableCell>
                               <TableCell className="p-2">
                                  <Controller name={`items.${index}.price`} control={control} render={({ field }) => (
                                   <Input type="number" placeholder="0" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} className={cn(darkInputClass, "text-right font-mono h-9")} />
                                 )} />
+                                {errors.items?.[index]?.price && <p className="text-red-500 text-xs mt-1">{errors.items[index]?.price?.message}</p>}
                               </TableCell>
                               <TableCell className="p-2 text-right font-mono text-slate-300 align-middle pt-4">
                                 {formatCurrency((watch(`items.${index}.quantity`) || 0) * (watch(`items.${index}.price`) || 0))}
@@ -333,7 +385,6 @@ export function NewSalesOrderSheet({
                     <Card className={darkCardClass}>
                         <CardContent className="p-5 space-y-4">
                              <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2"><CreditCard className="h-4 w-4 text-indigo-400" /> Condiciones Comerciales</h4>
-                            {/* ... (resto de los campos financieros que ya tenías) ... */}
                             <div className="space-y-2 pt-2">
                                 <Label className={labelClass}>Notas / Observaciones</Label>
                                 <Textarea {...register("notes")} className="min-h-[80px] resize-none bg-slate-950 border-slate-800 text-slate-300 focus:border-slate-600" placeholder="Instrucciones especiales para el despacho..." />
@@ -386,7 +437,17 @@ export function NewSalesOrderSheet({
       </Sheet>
       
       <QuickContactDialog isOpen={isQuickContactOpen} onOpenChange={setIsQuickContactOpen} type="client" onSuccess={(newId) => setValue('clientId', newId, { shouldValidate: true })} />
+
+      <LotSelectionDialog 
+        isOpen={isLotSelectionOpen}
+        onOpenChange={setIsLotSelectionOpen}
+        onSave={handleAddLotItem}
+        purchaseOrders={purchaseOrders}
+        salesOrders={salesOrders}
+        inventoryAdjustments={inventoryAdjustments}
+        contacts={contacts}
+        warehouse={watch('warehouse')}
+      />
     </>
   );
 }
-

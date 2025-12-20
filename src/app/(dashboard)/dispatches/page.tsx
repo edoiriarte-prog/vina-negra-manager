@@ -53,7 +53,7 @@ export default function DispatchesPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  const { salesOrders, purchaseOrders, isLoading: loadingOps } = useOperations();
+  const { salesOrders, purchaseOrders, inventoryAdjustments, isLoading: loadingOps } = useOperations();
   const { contacts, inventory, isLoading: loadingMaster } = useMasterData();
   const { createSalesOrder, updateSalesOrder, deleteSalesOrder } = useSalesOrdersCRUD();
 
@@ -73,7 +73,7 @@ export default function DispatchesPage() {
   
   // Filtramos órdenes activas
   const dispatchOrders = useMemo(() => {
-      return salesOrders.filter(o => o.status !== 'cancelled'); 
+      return salesOrders.filter(o => o.orderType === 'dispatch' && o.status !== 'cancelled'); 
   }, [salesOrders]);
 
   const groupedOrders = useMemo(() => {
@@ -110,71 +110,13 @@ export default function DispatchesPage() {
       );
   }, [groupedOrders, filter]);
 
-  const handleSaveOrder = (orderData: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>, newItems: OrderItem[] = []) => {
-    if (!firestore) return;
-    let orderToSave: SalesOrder | Omit<SalesOrder, 'id' | 'totalPackages'>;
-
-    const allItems = [...orderData.items, ...newItems];
-    
+  const handleSaveOrder = async (orderData: Omit<SalesOrder, 'id'>) => {
     if ('id' in orderData) {
-        orderToSave = { ...orderData, items: allItems };
+        await updateSalesOrder((orderData as any).id, orderData as SalesOrder);
     } else {
-        // @ts-ignore
-        orderToSave = { ...orderData, items: allItems, orderType: 'dispatch' };
-    }
-
-    // Validación Stock
-    for (const item of orderToSave.items) {
-        const inventoryItem = inventory.find(i => 
-            i.name === item.product && 
-            i.caliber === item.caliber && 
-            i.warehouse === (orderData.warehouse || 'Principal')
-        );
-        
-        const currentStock = inventoryItem ? inventoryItem.stock : 0;
-        let quantityInOrder = 0;
-        if('id' in orderToSave && editingOrder) {
-             const oldItem = editingOrder.items.find(old => old.product === item.product && old.caliber === item.caliber);
-             quantityInOrder = oldItem ? oldItem.quantity : 0;
-        }
-
-        if (item.quantity > (currentStock + quantityInOrder)) {
-            toast({
-                variant: "destructive",
-                title: "Error de Stock",
-                description: `No hay suficiente stock para ${item.product} - ${item.caliber}. Stock disponible: ${currentStock} kg.`,
-            });
-            return;
-        }
+        await createSalesOrder(orderData);
     }
     
-    const subtotal = allItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.price || 0)), 0);
-    const totalAmount = orderToSave.includeVat ? subtotal * 1.19 : subtotal;
-    const totalKilos = allItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-    const totalPackages = allItems.reduce((sum, item) => sum + (Number(item.packagingQuantity || 0)), 0);
-
-    let finalOrderData: Omit<SalesOrder, 'id'> = {
-        ...(orderToSave as Omit<SalesOrder, 'id'>), 
-        totalAmount, 
-        totalKilos, 
-        totalPackages,
-        paymentStatus: 'Pendiente',
-        status: orderToSave.status || 'completed'
-    };
-
-    if ('id' in orderToSave) {
-        updateSalesOrder(orderToSave.id, finalOrderData as SalesOrder);
-        toast({ title: 'Orden Actualizada', description: `La orden ${orderToSave.id} ha sido actualizada.` });
-        setPreviewingOrder({ ...finalOrderData, id: orderToSave.id } as SalesOrder);
-    } else {
-        createSalesOrder(finalOrderData as SalesOrder).then(docRef => {
-            if (docRef) {
-                toast({ title: 'Orden Creada', description: `La orden ${docRef.id} ha sido creada.` });
-                setPreviewingOrder({ ...finalOrderData, id: docRef.id } as SalesOrder);
-            }
-        });
-    }
-
     setIsSheetOpen(false);
     setEditingOrder(null);
   };
@@ -230,7 +172,7 @@ export default function DispatchesPage() {
         'Cant. Envase': item.packagingQuantity,
         'Cantidad (kg)': item.quantity,
         'Precio Unitario': item.price,
-        'Subtotal': item.quantity * item.price,
+        'Subtotal': (item.quantity || 0) * (item.price || 0),
         'Lote': item.lotNumber || '',
     }));
 
@@ -264,7 +206,7 @@ export default function DispatchesPage() {
                 'Cant. Envase': item.packagingQuantity,
                 'Cantidad (kg)': item.quantity,
                 'Precio Unitario': item.price,
-                'Subtotal': item.quantity * item.price,
+                'Subtotal': (item.quantity || 0) * (item.price || 0),
                 'Lote': item.lotNumber,
             });
         });
@@ -304,7 +246,7 @@ export default function DispatchesPage() {
                       const groupKey = group.clientName; 
                       return (
                           <React.Fragment key={groupKey}>
-                              <TableRow className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggleCollapsible(groupKey)}>
+                              <TableRow className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggleCollapsibles(groupKey)}>
                                   <TableCell className='font-bold'>
                                         <div className="flex items-center gap-2">
                                           <ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsibles[groupKey] && "rotate-180")} />
@@ -333,7 +275,7 @@ export default function DispatchesPage() {
                                                               <TableCell className="font-medium">{order.number || order.id}</TableCell>
                                                               <TableCell>{format(parseISO(order.date), 'dd-MM-yyyy', { locale: es })}</TableCell>
                                                               <TableCell className="text-right">
-                                                                {order.items.reduce((s, i) => s + i.quantity, 0).toLocaleString('es-CL')} kg
+                                                                {(order.totalKilos || 0).toLocaleString('es-CL')} kg
                                                               </TableCell>
                                                               <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
                                                               <TableCell>
@@ -429,13 +371,9 @@ export default function DispatchesPage() {
             onSave={handleSaveOrder}
             order={editingOrder}
             clients={clients}
-            // @ts-ignore
-            carriers={carriers}
-            inventory={inventory} 
-            nextOrderId="" 
             purchaseOrders={purchaseOrders || []}
             salesOrders={salesOrders || []}
-            inventoryAdjustments={[]}
+            inventoryAdjustments={inventoryAdjustments || []}
             contacts={contacts || []}
             sheetType="dispatch"
         />
@@ -476,7 +414,6 @@ export default function DispatchesPage() {
           <SalesOrderPreview
             order={previewingOrder}
             isOpen={!!previewingOrder}
-            // CORRECCIÓN DEL ERROR DE TIPOS AQUÍ
             onOpenChange={(open) => !open && setPreviewingOrder(null)}
             onExportRequest={() => handleExport(previewingOrder)}
         />

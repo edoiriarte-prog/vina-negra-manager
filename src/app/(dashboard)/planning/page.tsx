@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
 import { usePlanning } from "@/hooks/use-planning";
 import { useMasterData } from "@/hooks/use-master-data";
-import { PlannedOrder } from "@/lib/types";
+import { PlannedOrder, SalesOrder } from "@/lib/types"; // Asegúrate que SalesOrder esté importado
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -58,26 +59,12 @@ export default function PlanningPage() {
     return { thisWeek, nextWeek };
   }, [plannedOrders]);
 
-  const handleSavePlan = useCallback(async (data: any) => {
-    const items = data.items || [];
-    const calculatedTotal = items.reduce((acc: number, item: any) => acc + ((item.price || 0) * item.quantity), 0);
-    const calculatedKilos = items.reduce((acc: number, item: any) => acc + item.quantity, 0);
-
-    const planData: any = {
-        ...data,
-        deliveryDate: data.deliveryDate, 
-        status: editingPlan ? editingPlan.status : 'borrador', 
-        totalKilos: calculatedKilos,
-        totalAmount: calculatedTotal
-    };
-    
-    delete planData.date;
-
+  const handleSavePlan = useCallback(async (data: Partial<Omit<PlannedOrder, 'id'>>) => {
     try {
         if (editingPlan) {
-            await updatePlan(editingPlan.id, planData);
+            await updatePlan(editingPlan.id, data);
         } else {
-            await createPlan(planData);
+            await createPlan(data);
         }
         setIsSheetOpen(false);
         setEditingPlan(null);
@@ -239,7 +226,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: any) {
                         <DropdownMenuSeparator className="bg-slate-800"/>
                         
                         <DropdownMenuItem 
-                            onSelect={(e) => {
+                             onSelect={(e) => {
                                 e.preventDefault();
                                 setTimeout(() => onEdit(), 100);
                             }}
@@ -249,10 +236,10 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: any) {
                         </DropdownMenuItem>
                         
                         <DropdownMenuItem 
-                            onSelect={(e) => {
+                             onSelect={(e) => {
                                 e.preventDefault();
                                 setTimeout(() => onDelete(), 100);
-                            }} 
+                            }}
                             className="cursor-pointer text-red-500 focus:text-red-400 focus:bg-red-950/20"
                         >
                             <Trash2 className="mr-2 h-4 w-4" /> Eliminar
