@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -102,22 +103,22 @@ export function NewSalesOrderSheet({
 
   useEffect(() => {
     if (isOpen) {
-      const initialData = getInitialFormData(order);
-      if (!order) {
-          const existingIds = (salesOrders || [])
-              .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
-              .filter(n => !isNaN(n) && n > 0);
-          
-          const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 2100;
-          const nextNum = maxId < 2100 ? 2101 : maxId + 1;
-          const newId = `OV-${nextNum}`;
-          initialData.number = newId;
-      }
-      setFormData(initialData);
-      setItems(initialData.items || []);
-      setIsSubmitting(false);
+        const initialData = getInitialFormData(order);
+        if (!order) {
+            const existingIds = (salesOrders || [])
+                .map(o => o.number ? parseInt(o.number.replace(/OV-|\D/g, ''), 10) : 0)
+                .filter(n => !isNaN(n) && n > 0);
+            
+            const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 2100;
+            const nextNum = maxId < 2100 ? 2101 : maxId + 1;
+            const newId = `OV-${nextNum}`;
+            initialData.number = newId;
+        }
+        setFormData(initialData);
+        setItems(initialData.items || []);
+        setIsSubmitting(false);
     }
-  }, [order, isOpen, salesOrders]);
+  }, [order, isOpen]);
 
   useEffect(() => {
       if (formData.paymentMethod === 'Crédito' && formData.creditDays && formData.creditDays > 0 && formData.date) {

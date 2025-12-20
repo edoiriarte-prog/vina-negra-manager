@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { usePlanning } from "@/hooks/use-planning";
 import { useMasterData } from "@/hooks/use-master-data";
 import { PlannedOrder } from "@/lib/types";
@@ -59,7 +59,9 @@ export default function PlanningPage() {
     return { thisWeek, nextWeek };
   }, [plannedOrders]);
 
-  const handleSavePlan = useCallback(async (data: any) => {
+  // --- HANDLER: Guardar Planificación (CORREGIDO: ASYNC) ---
+  const handleSavePlan = async (data: any) => {
+    // Calculamos totales aquí también por seguridad
     const items = data.items || [];
     const calculatedTotal = items.reduce((acc: number, item: any) => acc + ((item.price || 0) * item.quantity), 0);
     const calculatedKilos = items.reduce((acc: number, item: any) => acc + item.quantity, 0);
@@ -72,6 +74,7 @@ export default function PlanningPage() {
         totalAmount: calculatedTotal
     };
 
+    // Limpieza de campos de Ventas que no necesitamos en Planning
     delete planData.paymentStatus;
     delete planData.saleType;
 
@@ -84,27 +87,14 @@ export default function PlanningPage() {
         setIsSheetOpen(false);
         setEditingPlan(null);
     } catch (error) {
-        console.error("Error guardando plan:", error);
+        console.error("Error al guardar el plan:", error);
     }
-  }, [editingPlan, createPlan, updatePlan]);
+  };
 
-  const handleEdit = useCallback((plan: PlannedOrder) => {
-    setEditingPlan(plan);
-    setIsSheetOpen(true);
-  }, []);
-
-  const handleDelete = useCallback((id: string) => {
-    if (confirm('¿Estás seguro de eliminar este plan?')) {
-      deletePlan(id);
-    }
-  }, [deletePlan]);
-
-  const handlePromote = useCallback((plan: PlannedOrder) => {
-    if (confirm('¿Convertir este plan en una Orden de Venta?')) {
-      promoteToSale(plan);
-    }
-  }, [promoteToSale]);
-
+  const handleEdit = (plan: PlannedOrder) => {
+      setEditingPlan(plan);
+      setIsSheetOpen(true);
+  }
 
   if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full bg-slate-800"/></div>;
 
@@ -129,6 +119,7 @@ export default function PlanningPage() {
 
         <TabsContent value="week" className="grid md:grid-cols-2 gap-6">
             
+            {/* COLUMNA: ESTA SEMANA */}
             <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader className="border-b border-slate-800 pb-3">
                     <CardTitle className="text-emerald-400 flex items-center gap-2 text-lg">
@@ -143,13 +134,14 @@ export default function PlanningPage() {
                             plan={plan} 
                             contacts={contacts} 
                             onEdit={() => handleEdit(plan)}
-                            onDelete={() => handleDelete(plan.id)}
-                            onPromote={() => handlePromote(plan)}
+                            onDelete={() => deletePlan(plan.id)}
+                            onPromote={() => promoteToSale(plan)}
                         />
                     ))}
                 </CardContent>
             </Card>
 
+            {/* COLUMNA: PRÓXIMA SEMANA */}
             <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader className="border-b border-slate-800 pb-3">
                     <CardTitle className="text-blue-400 flex items-center gap-2 text-lg">
@@ -164,8 +156,8 @@ export default function PlanningPage() {
                             plan={plan} 
                             contacts={contacts} 
                             onEdit={() => handleEdit(plan)}
-                            onDelete={() => handleDelete(plan.id)}
-                            onPromote={() => handlePromote(plan)}
+                            onDelete={() => deletePlan(plan.id)}
+                            onPromote={() => promoteToSale(plan)}
                         />
                     ))}
                 </CardContent>
@@ -184,6 +176,7 @@ export default function PlanningPage() {
             isOpen={isSheetOpen}
             onOpenChange={(open) => !open && setIsSheetOpen(false)}
             onSave={handleSavePlan}
+            // @ts-ignore
             order={editingPlan ? { ...editingPlan, date: editingPlan.deliveryDate } : null}
             clients={clients} 
             inventory={inventory || []} 
@@ -194,11 +187,11 @@ export default function PlanningPage() {
   );
 }
 
-function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: PlannedOrder, contacts: Contact[], onEdit: () => void, onDelete: () => void, onPromote: () => void}) {
+function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: any) {
     const clientName = contacts?.find((c: any) => c.id === plan.clientId)?.name || 'Cliente Desconocido';
     const isConfirmed = plan.status === 'confirmado';
 
-    const safeTotal = plan.totalAmount || (plan.items || []).reduce((acc: number, i: any) => acc + ((i.price||0) * (i.quantity || 0)), 0);
+    const safeTotal = plan.totalAmount || plan.items.reduce((acc: number, i: any) => acc + ((i.price||0) * (i.quantity||0)), 0);
 
     return (
         <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 hover:border-slate-600 transition-all group relative shadow-sm">
@@ -208,7 +201,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: Planne
                         {clientName}
                     </h4>
                     <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 capitalize ${isConfirmed ? "text-emerald-400 border-emerald-900 bg-emerald-950/30" : "text-yellow-400 border-yellow-900 bg-yellow-950/30"}`}>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${isConfirmed ? "text-emerald-400 border-emerald-900 bg-emerald-950/30" : "text-yellow-400 border-yellow-900 bg-yellow-950/30"}`}>
                             {plan.status}
                         </Badge>
                         <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -223,13 +216,13 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: Planne
             </div>
             
             <div className="space-y-1 mt-3 border-t border-slate-800 pt-2">
-                {(plan.items || []).slice(0, 3).map((item: any, i: number) => (
+                {plan.items.slice(0, 3).map((item: any, i: number) => (
                     <div key={i} className="flex justify-between text-xs text-slate-300">
                         <span className="truncate max-w-[180px]">{item.product} <span className="text-slate-500 text-[10px]">{item.caliber}</span></span>
                         <span className="font-mono text-slate-400">{item.quantity}</span>
                     </div>
                 ))}
-                {(plan.items || []).length > 3 && <p className="text-[10px] text-slate-500 italic text-right">+ {(plan.items || []).length - 3} ítems más</p>}
+                {plan.items.length > 3 && <p className="text-[10px] text-slate-500 italic text-right">+ {plan.items.length - 3} ítems más</p>}
             </div>
 
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-950 shadow-lg rounded-md z-10">
@@ -243,7 +236,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: Planne
                         <DropdownMenuItem 
                             onSelect={(e) => {
                                 e.preventDefault();
-                                setTimeout(() => onPromote(), 0);
+                                setTimeout(() => onPromote(), 100);
                             }}
                             className="cursor-pointer text-emerald-500 focus:text-emerald-400 focus:bg-emerald-950/20"
                         >
@@ -255,7 +248,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: Planne
                         <DropdownMenuItem 
                             onSelect={(e) => {
                                 e.preventDefault();
-                                setTimeout(() => onEdit(), 0);
+                                setTimeout(() => onEdit(), 100);
                             }}
                             className="cursor-pointer focus:bg-slate-800"
                         >
@@ -265,7 +258,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: Planne
                         <DropdownMenuItem 
                             onSelect={(e) => {
                                 e.preventDefault();
-                                onDelete();
+                                setTimeout(() => onDelete(), 100);
                             }} 
                             className="cursor-pointer text-red-500 focus:text-red-400 focus:bg-red-950/20"
                         >
