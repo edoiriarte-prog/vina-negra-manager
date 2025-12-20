@@ -235,5 +235,3 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus 
         </div>
     )
 }
-
-    
