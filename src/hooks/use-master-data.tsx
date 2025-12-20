@@ -63,7 +63,7 @@ export type MasterDataContextType = {
 export const MasterDataContext = createContext<MasterDataContextType | undefined>(undefined);
 
 
-// --- PROVIDER (AQUÍ ESTABA EL ERROR, FALTABA EL EXPORT) ---
+// --- PROVIDER ---
 export function MasterDataProvider({ children }: { children: ReactNode }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -121,9 +121,10 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
   
   const addProduct = (name: string) => {
     if(products.includes(name)) return;
-    addToArray('products', name);
+    const upperName = name.toUpperCase();
+    addToArray('products', upperName);
     // Al agregar un producto, creamos su asociación de calibres vacía
-    const newAssoc = { id: name, calibers: [] };
+    const newAssoc = { id: upperName, calibers: [] };
     addToArray('productCaliberAssociations', newAssoc);
   };
   
