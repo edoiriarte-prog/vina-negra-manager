@@ -77,7 +77,9 @@ export default function PlanningPage() {
   }, [updatePlan]);
   
   const handleDeletePlan = useCallback((id: string) => {
-    deletePlan(id);
+    if(confirm(`¿Estás seguro de eliminar el plan ${id}?`)) {
+      deletePlan(id);
+    }
   }, [deletePlan]);
 
   const handlePromoteToSale = useCallback((plan: PlannedOrder) => {
@@ -110,7 +112,7 @@ export default function PlanningPage() {
                 <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
                     {weeklyView.thisWeek.length === 0 && <p className="text-slate-500 text-sm italic py-8 text-center">No hay entregas para esta semana.</p>}
                     {weeklyView.thisWeek.map(plan => (
-                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={handleEdit} onDelete={handleDeletePlan} onPromote={handlePromoteToSale} onToggleStatus={handleToggleStatus} />
+                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={() => handleEdit(plan)} onDelete={() => handleDeletePlan(plan.id)} onPromote={() => handlePromoteToSale(plan)} onToggleStatus={() => handleToggleStatus(plan)} />
                     ))}
                 </CardContent>
             </Card>
@@ -123,7 +125,7 @@ export default function PlanningPage() {
                 <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
                       {weeklyView.nextWeek.length === 0 && <p className="text-slate-500 text-sm italic py-8 text-center">Nada planificado aún.</p>}
                       {weeklyView.nextWeek.map(plan => (
-                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={handleEdit} onDelete={handleDeletePlan} onPromote={handlePromoteToSale} onToggleStatus={handleToggleStatus} />
+                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={() => handleEdit(plan)} onDelete={() => handleDeletePlan(plan.id)} onPromote={() => handlePromoteToSale(plan)} onToggleStatus={() => handleToggleStatus(plan)} />
                     ))}
                 </CardContent>
             </Card>
@@ -136,7 +138,7 @@ export default function PlanningPage() {
                 <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
                       {weeklyView.later.length === 0 && <p className="text-slate-500 text-sm italic py-8 text-center">Nada planificado aún.</p>}
                       {weeklyView.later.map(plan => (
-                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={handleEdit} onDelete={handleDeletePlan} onPromote={handlePromoteToSale} onToggleStatus={handleToggleStatus} />
+                        <PlanCard key={plan.id} plan={plan} contacts={contacts} onEdit={() => handleEdit(plan)} onDelete={() => handleDeletePlan(plan.id)} onPromote={() => handlePromoteToSale(plan)} onToggleStatus={() => handleToggleStatus(plan)} />
                     ))}
                 </CardContent>
             </Card>
@@ -157,7 +159,7 @@ export default function PlanningPage() {
   );
 }
 
-function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus }: { plan: PlannedOrder, contacts: Contact[], onEdit: (p: PlannedOrder) => void, onDelete: (id: string) => void, onPromote: (p: PlannedOrder) => void, onToggleStatus: (p: PlannedOrder) => void }) {
+function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus }: { plan: PlannedOrder, contacts: Contact[], onEdit: () => void, onDelete: () => void, onPromote: () => void, onToggleStatus: () => void }) {
     const clientName = contacts?.find((c: any) => c.id === plan.clientId)?.name || 'Desconocido';
     const deliveryDate = parseISO(plan.deliveryDate);
     const isOverdue = isPast(deliveryDate) && !isToday(deliveryDate);
@@ -182,13 +184,31 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus 
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 group-hover:opacity-100 opacity-20"><MoreVertical className="h-4 w-4"/></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200">
-                        <DropdownMenuItem onClick={() => onPromote(plan)} className="text-emerald-400 focus:bg-slate-800 focus:text-emerald-300">
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setTimeout(() => { onPromote(); }, 0);
+                          }}
+                          className="text-emerald-400 focus:bg-slate-800 focus:text-emerald-300 cursor-pointer"
+                        >
                             <Send className="mr-2 h-4 w-4"/> Convertir a Venta
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onEdit(plan)} className="focus:bg-slate-800">
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setTimeout(() => { onEdit(); }, 0);
+                          }}
+                          className="focus:bg-slate-800 cursor-pointer"
+                        >
                             <Edit className="mr-2 h-4 w-4"/> Editar Plan
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDelete(plan.id)} className="text-red-500 focus:bg-slate-800 focus:text-red-400">
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setTimeout(() => { onDelete(); }, 0);
+                          }}
+                          className="text-red-500 focus:bg-slate-800 focus:text-red-400 cursor-pointer"
+                        >
                             <Trash2 className="mr-2 h-4 w-4"/> Eliminar
                         </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -219,7 +239,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus 
                 {plan.items.slice(0, 3).map((item: any, i: number) => (
                     <div key={i} className="flex justify-between text-xs text-slate-300">
                         <span>• {item.product} {item.caliber}</span>
-                        <span className="font-mono">{item.quantity || 0} kg a {formatCurrency(item.price || 0)}</span>
+                        <span className="font-mono">{item.quantity || 0} kg a {formatCurrency((item.price || 0))}</span>
                     </div>
                 ))}
                 {plan.items.length > 3 && <p className="text-[10px] text-slate-500 italic text-right">+ {plan.items.length - 3} más...</p>}
@@ -227,7 +247,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus 
 
              <div className="mt-4 flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                 {plan.status !== 'entregado' && (
-                    <Button size="sm" onClick={() => onToggleStatus(plan)} className={`h-7 text-xs ${isConfirmed ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-blue-600 hover:bg-blue-500'} text-white`}>
+                    <Button size="sm" onClick={() => onToggleStatus()} className={`h-7 text-xs ${isConfirmed ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-blue-600 hover:bg-blue-500'} text-white`}>
                         <CheckCircle2 className="h-3 w-3 mr-1"/> Marcar como {isConfirmed ? 'Entregado' : "Confirmado"}
                     </Button>
                 )}
@@ -235,3 +255,5 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote, onToggleStatus 
         </div>
     )
 }
+
+    
