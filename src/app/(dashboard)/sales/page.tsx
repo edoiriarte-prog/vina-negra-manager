@@ -7,10 +7,9 @@ import { SalesOrder } from "@/lib/types";
 import { getColumns } from "./components/columns"; 
 import { DataTable } from "./components/data-table"; 
 import { useMasterData } from "@/hooks/use-master-data"; 
-import { useOperations } from "@/hooks/use-operations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, FileSpreadsheet, Users, Calendar, Search, FileText, RefreshCw } from "lucide-react";
+import { Plus, FileSpreadsheet, Users, Calendar, Search, FileText, RefreshCw, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -34,7 +33,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFirebase } from "@/firebase";
 import { writeBatch, doc } from "firebase/firestore";
-import { useRouter } from 'next/navigation';
 
 // --- LAZY LOADING DE COMPONENTES PESADOS ---
 const NewSalesOrderSheet = dynamic(() => import('./components/new-sales-order-sheet').then(mod => mod.NewSalesOrderSheet), {
@@ -61,14 +59,20 @@ const formatDate = (dateString?: string) => {
 export default function SalesPage() {
   const { toast } = useToast();
   const { firestore } = useFirebase();
-  const router = useRouter(); 
 
   // Hooks de Datos (Providers)
-  const { salesOrders, purchaseOrders, inventoryAdjustments, isLoading: opsLoading } = useOperations();
+  const { 
+    salesOrders,
+    isLoading: opsLoading,
+    isLoadingMore,
+    hasMore,
+    loadMore,
+    createSalesOrder, 
+    updateSalesOrder, 
+    deleteSalesOrder 
+  } = useSalesOrdersCRUD();
+  const { purchaseOrders, inventoryAdjustments } = useOperations(); // From other hook
   const { contacts, inventory, isLoading: masterLoading } = useMasterData();
-  
-  // Hook de Acciones (CRUD)
-  const { createSalesOrder, updateSalesOrder, deleteSalesOrder } = useSalesOrdersCRUD();
   
   const clients = useMemo(() => contacts?.filter(c => Array.isArray(c.type) ? c.type.includes('client') : c.type === 'client') || [], [contacts]);
   const salesList = useMemo(() => (salesOrders || []).filter(o => o.orderType !== 'dispatch' && o.status !== 'cancelled'), [salesOrders]);
@@ -114,7 +118,6 @@ export default function SalesPage() {
     }
   };
   
-  // --- FUNCIÓN PARA ACTUALIZACIÓN MASIVA ---
   const handleMassiveDispatch = async () => {
     if (!firestore || !salesOrders || salesOrders.length === 0) {
         toast({ variant: "destructive", title: "Error", description: "No hay datos para procesar."});
@@ -164,15 +167,16 @@ export default function SalesPage() {
     if (filteredOrders.length === 0) return toast({ variant: "destructive", title: "No hay datos", description: "No hay órdenes para exportar." });
     
     const formatSafeDate = (val: any) => {
-      if (!val || val === "null" || val === "undefined") return ""; 
-      const date = new Date(val);
-      if (isNaN(date.getTime()) || date.getFullYear() <= 1970) return "";
-      return format(date, "dd/MM/yyyy");
+        if (!val || val === "null" || val === "undefined") return ""; 
+        const date = new Date(val);
+        if (isNaN(date.getTime()) || date.getFullYear() <= 1970) return "";
+        return format(date, "dd/MM/yyyy");
     };
-    const formatSafeNumber = (val: any) => {
-      if (val === null || val === undefined || val === "") return "";
-      const num = parseFloat(val);
-      return isNaN(num) ? "" : num; 
+    
+    const formatSafeNumber = (val: any) => { 
+        if (val === null || val === undefined || val === "") return "";
+        const num = parseFloat(val);
+        return isNaN(num) ? "" : num; 
     };
 
     const data = filteredOrders.map(o => {
@@ -347,6 +351,13 @@ export default function SalesPage() {
                     <div className="rounded-md border border-slate-800 overflow-hidden">
                         <DataTable columns={columns} data={filteredOrders} />
                     </div>
+                     {hasMore && (
+                        <div className="flex justify-center mt-4">
+                            <Button onClick={loadMore} disabled={isLoadingMore} variant="outline" className="w-full md:w-1/2">
+                                {isLoadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Cargar ventas anteriores'}
+                            </Button>
+                        </div>
+                    )}
                 </TabsContent>
                 
                 <TabsContent value="byClient">

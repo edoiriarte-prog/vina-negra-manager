@@ -13,7 +13,7 @@ import {
 
 export type OperationsContextType = {
   purchaseOrders: PurchaseOrder[];
-  salesOrders: SalesOrder[];
+  // salesOrders is now handled by useSalesOrdersCRUD
   financialMovements: FinancialMovement[];
   serviceOrders: ServiceOrder[];
   inventoryAdjustments: InventoryAdjustment[];
@@ -24,14 +24,13 @@ export const OperationsContext = createContext<OperationsContextType | undefined
 
 export function OperationsProvider({ children }: { children: ReactNode }) {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
-  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [financialMovements, setFinancialMovements] = useState<FinancialMovement[]>([]);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [inventoryAdjustments, setInventoryAdjustments] = useState<InventoryAdjustment[]>([]);
   
   const [loadingStates, setLoadingStates] = useState({
     purchases: true,
-    sales: true,
+    // sales is removed
     financials: true,
     services: true,
     adjustments: true,
@@ -58,12 +57,10 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
       }
     };
     
-    // Cargar colecciones grandes una sola vez para mejorar performance
     fetchDataOnce('purchaseOrders', setPurchaseOrders, 'purchases');
-    fetchDataOnce('salesOrders', setSalesOrders, 'sales');
+    // We don't fetch salesOrders here anymore
     fetchDataOnce('financialMovements', setFinancialMovements, 'financials');
     
-    // Podemos mantener onSnapshot para colecciones más pequeñas o que necesiten real-time
     const unsubServices = onSnapshot(query(collection(db, 'serviceOrders'), orderBy('date', 'desc')), (snapshot) => {
       setServiceOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ServiceOrder)));
       setLoadingStates(prev => ({...prev, services: false}));
@@ -89,14 +86,14 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
 
   const value = {
     purchaseOrders,
-    salesOrders,
     financialMovements,
     serviceOrders,
     inventoryAdjustments,
     isLoading
   };
-
-  return <OperationsContext.Provider value={value}>{children}</OperationsContext.Provider>;
+  
+  // salesOrders is removed from the provider value
+  return <OperationsContext.Provider value={value as any}>{children}</OperationsContext.Provider>;
 }
 
 export function useOperations() {
