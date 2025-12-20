@@ -1,243 +1,201 @@
 
 "use client";
 
-import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useFirebase } from '@/firebase';
 import { 
-  collection, 
-  doc, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  setDoc,
-  query, 
-  orderBy 
+  doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove 
 } from 'firebase/firestore';
-import { db } from '@/firebase/init'; // Usamos la conexión limpia directa
-import { BankAccount, Contact, InventoryItem } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
 // --- TIPOS ---
+export type BankAccount = {
+  id: string; name: string; bankName: string; accountNumber: string;
+  accountType: string; initialBalance: number; status: 'Activa' | 'Inactiva';
+  owner?: string; ownerRUT?: string; ownerEmail?: string;
+  // Legacy
+  bank?: string; type?: string; currency?: string;
+};
+
+export type Caliber = {
+  name: string;
+  code: string;
+};
+
 export type ProductCaliberAssociation = {
-  id: string; // Nombre del producto
-  calibers: string[]; // Nombres de calibres
+  id: string; // Corresponde al nombre/ID del producto
+  calibers: string[]; // Array de NOMBRES de calibres
 };
 
-type MasterSettings = {
+type MasterDataDoc = {
   products: string[]; 
-  calibers: { name: string; code: string }[];
   warehouses: string[];
-  units: string[];
   packagingTypes: string[];
-  productCaliberAssociations: ProductCaliberAssociation[];
-};
-
-type MasterDataContextType = {
-  // Datos
-  products: string[];
-  calibers: { name: string; code: string }[];
-  warehouses: string[];
-  units: string[];
-  packagingTypes: string[];
-  productCaliberAssociations: ProductCaliberAssociation[];
-  inventory: InventoryItem[];
-  contacts: Contact[];
   bankAccounts: BankAccount[];
-  
-  isLoading: boolean;
-  
-  // Funciones CRUD Configuración
-  addProduct: (p: string) => void;
-  removeProduct: (p: string) => void;
-  addCaliber: (c: { name: string; code: string }) => void;
-  removeCaliber: (name: string) => void;
-  addWarehouse: (w: string) => void;
-  removeWarehouse: (w: string) => void;
-  addUnit: (u: string) => void;
-  removeUnit: (u: string) => void;
-  addPackagingType: (p: string) => void;
-  removePackagingType: (p: string) => void;
-  updateProductCalibers: (productId: string, caliberIds: string[]) => void;
-  
-  // Funciones CRUD Cuentas
-  addBankAccount: (account: Omit<BankAccount, 'id'>) => Promise<void>;
-  updateBankAccount: (account: BankAccount) => Promise<void>;
-  removeBankAccount: (id: string) => Promise<void>;
-  
-  // Estáticos
-  internalConcepts: { name: string }[];
-  costCenters: { name: string }[];
+  productCaliberAssociations: ProductCaliberAssociation[]; // Nuevo nombre consistente
+  calibers: Caliber[];
 };
 
-const MasterDataContext = createContext<MasterDataContextType | undefined>(undefined);
+export type MasterDataContextType = {
+  products: string[];
+  warehouses: string[];
+  packagingTypes: string[];
+  calibers: Caliber[];
+  bankAccounts: BankAccount[];
+  productCaliberAssociations: ProductCaliberAssociation[];
+  isLoading: boolean;
+  addProduct: (name: string) => void;
+  removeProduct: (name: string) => void;
+  addWarehouse: (name: string) => void;
+  removeWarehouse: (name: string) => void;
+  addPackagingType: (name: string) => void;
+  removePackagingType: (name: string) => void;
+  addCaliber: (caliber: Caliber) => void;
+  removeCaliber: (name: string) => void;
+  addBankAccount: (account: Omit<BankAccount, 'id'>) => void;
+  removeBankAccount: (id: string) => void;
+  updateProductCalibers: (productId: string, calibers: string[]) => void;
+  getCalibersForProduct: (productId: string) => string[];
+};
 
+
+// --- CONTEXTO ---
+export const MasterDataContext = createContext<MasterDataContextType | undefined>(undefined);
+
+
+// --- PROVIDER (AQUÍ ESTABA EL ERROR, FALTABA EL EXPORT) ---
 export function MasterDataProvider({ children }: { children: ReactNode }) {
+  const { firestore } = useFirebase();
   const { toast } = useToast();
-
-  const [settings, setSettings] = useState<MasterSettings>({
-    products: [],
-    calibers: [],
-    warehouses: [],
-    units: ['Kilos', 'Cajas'],
-    packagingTypes: [],
-    productCaliberAssociations: []
-  });
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  const [loadingStates, setLoadingStates] = useState({
-    settings: true,
-    banks: true,
-    contacts: true,
-    inventory: true,
-  });
+  const [products, setProducts] = useState<string[]>([]);
+  const [warehouses, setWarehouses] = useState<string[]>([]);
+  const [packagingTypes, setPackagingTypes] = useState<string[]>([]);
+  const [calibers, setCalibers] = useState<Caliber[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [productCaliberAssociations, setProductCaliberAssociations] = useState<ProductCaliberAssociation[]>([]);
 
-  const isLoading = Object.values(loadingStates).some(state => state);
+  const docRef = firestore ? doc(firestore, 'settings', 'master_data') : null;
 
   useEffect(() => {
-    if (!db) {
-      console.error("MasterDataProvider: Firestore (db) no está inicializado.");
-      Object.keys(loadingStates).forEach(key => setLoadingStates(prev => ({...prev, [key]: false})));
+    if (!docRef) {
+      setIsLoading(false);
       return;
-    };
-
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setSettings({
-            products: data.products || [],
-            calibers: data.calibers || [],
-            warehouses: data.warehouses || [],
-            units: data.units || ['Kilos', 'Cajas'],
-            packagingTypes: data.packagingTypes || [],
-            productCaliberAssociations: data.productCaliberAssociations || [],
+    }
+    const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data() as MasterDataDoc;
+        setProducts(data.products || []);
+        setWarehouses(data.warehouses || []);
+        setPackagingTypes(data.packagingTypes || []);
+        setCalibers(data.calibers || []);
+        setBankAccounts(data.bankAccounts || []);
+        setProductCaliberAssociations(data.productCaliberAssociations || []);
+      } else {
+        // Si el documento no existe, lo creamos vacío
+        setDoc(docRef, { 
+            products: [], warehouses: [], packagingTypes: [], calibers: [], 
+            bankAccounts: [], productCaliberAssociations: [] 
         });
       }
-      setLoadingStates(prev => ({...prev, settings: false}));
+      setIsLoading(false);
     }, (error) => {
-        console.error("Error cargando settings: ", error);
-        setLoadingStates(prev => ({...prev, settings: false}));
+        console.error("Error al cargar Master Data:", error);
+        setIsLoading(false);
+        toast({ variant: 'destructive', title: 'Error de Conexión', description: 'No se pudo cargar la configuración maestra.' });
     });
+    return () => unsubscribe();
+  }, [docRef, toast]);
 
-    const unsubBanks = onSnapshot(query(collection(db, 'bankAccounts'), orderBy('name', 'asc')), (snapshot) => {
-      setBankAccounts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BankAccount)));
-      setLoadingStates(prev => ({...prev, banks: false}));
-    }, (error) => {
-        console.error("Error cargando bankAccounts: ", error);
-        setLoadingStates(prev => ({...prev, banks: false}));
-    });
 
-    const unsubContacts = onSnapshot(query(collection(db, 'contacts'), orderBy('name', 'asc')), (snapshot) => {
-      setContacts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contact)));
-      setLoadingStates(prev => ({...prev, contacts: false}));
-    }, (error) => {
-        console.error("Error cargando contacts: ", error);
-        setLoadingStates(prev => ({...prev, contacts: false}));
-    });
+  // --- ACCIONES CRUD ---
 
-    const unsubInventory = onSnapshot(query(collection(db, 'inventory')), (snapshot) => {
-      setInventory(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
-       setLoadingStates(prev => ({...prev, inventory: false}));
-    }, (error) => {
-        console.error("Error cargando inventory: ", error);
-        setLoadingStates(prev => ({...prev, inventory: false}));
-    });
-
-    return () => {
-      unsubSettings();
-      unsubBanks();
-      unsubContacts();
-      unsubInventory();
-    };
-  }, []);
-
-  const updateSettingList = async (field: keyof MasterSettings, newList: any[]) => {
-    if (!db) return;
-    try {
-        await setDoc(doc(db, 'settings', 'general'), { [field]: newList }, { merge: true });
-        toast({ title: "Configuración Actualizada", description: `Se actualizó el campo '${field}'.` });
-    } catch (e) {
-        console.error("Error updating settings:", e);
-        toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar la configuración." });
-    }
+  const addToArray = (field: keyof MasterDataDoc, value: any) => {
+    if (docRef) updateDoc(docRef, { [field]: arrayUnion(value) });
   };
 
-  const addProduct = (p: string) => { if (!settings.products.includes(p)) updateSettingList('products', [...settings.products, p]); };
-  const removeProduct = (p: string) => updateSettingList('products', settings.products.filter(item => item !== p));
-  
-  const addCaliber = (c: { name: string; code: string }) => { if (!settings.calibers.find(cal => cal.name === c.name)) updateSettingList('calibers', [...settings.calibers, c]); };
-  const removeCaliber = (name: string) => updateSettingList('calibers', settings.calibers.filter(item => item.name !== name));
-  
-  const addWarehouse = (w: string) => { if (!settings.warehouses.includes(w)) updateSettingList('warehouses', [...settings.warehouses, w]); };
-  const removeWarehouse = (w: string) => updateSettingList('warehouses', settings.warehouses.filter(item => item !== w));
-
-  const addUnit = (u: string) => { if (!settings.units.includes(u)) updateSettingList('units', [...settings.units, u]); };
-  const removeUnit = (u: string) => updateSettingList('units', settings.units.filter(item => item !== u));
-
-  const addPackagingType = (p: string) => { if (!settings.packagingTypes.includes(p)) updateSettingList('packagingTypes', [...settings.packagingTypes, p]); };
-  const removePackagingType = (p: string) => updateSettingList('packagingTypes', settings.packagingTypes.filter(item => item !== p));
-
-  const updateProductCalibers = (productName: string, caliberNames: string[]) => {
-    const index = settings.productCaliberAssociations.findIndex(a => a.id === productName);
-    let newAssociations = [...settings.productCaliberAssociations];
-    if (index >= 0) {
-        newAssociations[index] = { id: productName, calibers: caliberNames };
-    } else {
-        newAssociations.push({ id: productName, calibers: caliberNames });
-    }
-    updateSettingList('productCaliberAssociations', newAssociations);
-  };
-
-  const addBankAccount = async (account: Omit<BankAccount, 'id'>) => {
-    if (!db) return;
-    try {
-        await addDoc(collection(db, 'bankAccounts'), account);
-        toast({ title: "Cuenta Agregada" });
-    } catch (e) {
-        console.error("Error adding bank account:", e);
-        toast({ variant: 'destructive', title: "Error", description: "No se pudo agregar la cuenta." });
-    }
+  const removeFromArray = (field: keyof MasterDataDoc, value: any) => {
+    if (docRef) updateDoc(docRef, { [field]: arrayRemove(value) });
   };
   
-  const updateBankAccount = async (account: BankAccount) => {
-     if (!db) return;
-     const { id, ...data } = account;
-     try {
-        await updateDoc(doc(db, 'bankAccounts', id), data);
-        toast({ title: "Cuenta Actualizada" });
-     } catch (e) {
-        console.error("Error updating bank account:", e);
-        toast({ variant: 'destructive', title: "Error", description: "No se pudo actualizar la cuenta." });
-     }
+  const addProduct = (name: string) => {
+    if(products.includes(name)) return;
+    addToArray('products', name);
+    // Al agregar un producto, creamos su asociación de calibres vacía
+    const newAssoc = { id: name, calibers: [] };
+    addToArray('productCaliberAssociations', newAssoc);
+  };
+  
+  const removeProduct = async (name: string) => {
+    if(!docRef) return;
+    // También eliminamos su asociación
+    const assocToRemove = productCaliberAssociations.find(a => a.id === name);
+    await updateDoc(docRef, {
+        products: arrayRemove(name),
+        ...(assocToRemove && { productCaliberAssociations: arrayRemove(assocToRemove) })
+    });
   };
 
+  const updateProductCalibers = async (productId: string, newCaliberNames: string[]) => {
+      if (!docRef) return;
+      const allAssociations = [...productCaliberAssociations];
+      const index = allAssociations.findIndex(a => a.id === productId);
+
+      if (index > -1) {
+          allAssociations[index].calibers = newCaliberNames;
+      } else {
+          allAssociations.push({ id: productId, calibers: newCaliberNames });
+      }
+      await updateDoc(docRef, { productCaliberAssociations: allAssociations });
+  };
+
+  const getCalibersForProduct = (productId: string) => {
+      return productCaliberAssociations.find(a => a.id === productId)?.calibers || [];
+  };
+
+  const addCaliber = (caliber: Caliber) => {
+    if(calibers.some(c => c.name === caliber.name || c.code === caliber.code)) return;
+    addToArray('calibers', caliber);
+  };
+
+  const removeCaliber = async (name: string) => {
+    const caliberToRemove = calibers.find(c => c.name === name);
+    if (caliberToRemove) removeFromArray('calibers', caliberToRemove);
+  };
+  
+  const addBankAccount = (account: Omit<BankAccount, 'id'>) => {
+      const newAccount: BankAccount = { ...account, id: `BA-${Date.now()}` };
+      addToArray('bankAccounts', newAccount);
+  };
+  
   const removeBankAccount = async (id: string) => {
-     if (!db) return;
-     try {
-        await deleteDoc(doc(db, 'bankAccounts', id));
-        toast({ title: "Cuenta Eliminada", variant: 'destructive' });
-     } catch(e) {
-        console.error("Error removing bank account:", e);
-        toast({ variant: 'destructive', title: "Error", description: "No se pudo eliminar la cuenta." });
-     }
+      const accountToRemove = bankAccounts.find(a => a.id === id);
+      if(accountToRemove) removeFromArray('bankAccounts', accountToRemove);
   };
-
-  const internalConcepts = [{ name: 'Retiro de Socios' }, { name: 'Pago de Impuestos' }, { name: 'Comisión Bancaria' }, { name: 'Préstamo Interno' }, { name: 'Gastos Generales' }, { name: 'Mantención' }, { name: 'Combustible' }, { name: 'Remuneraciones' }, { name: 'Leyes Sociales' }];
-  const costCenters = [{ name: 'Administración' }, { name: 'Campo' }, { name: 'Packing' }, { name: 'Comercial' }, { name: 'Logística' }, { name: 'Gestión Empresarial' }, { name: 'Gestión Comercial' }];
 
   const value: MasterDataContextType = {
-    ...settings, inventory, contacts, bankAccounts, addProduct, removeProduct,
-    addCaliber, removeCaliber, addWarehouse, removeWarehouse, addUnit, removeUnit,
-    addPackagingType, removePackagingType, updateProductCalibers, addBankAccount,
-    updateBankAccount, removeBankAccount, internalConcepts, costCenters, isLoading
+    products, addProduct, removeProduct,
+    warehouses, addWarehouse: (w) => addToArray('warehouses', w), removeWarehouse: (w) => removeFromArray('warehouses', w),
+    packagingTypes, addPackagingType: (p) => addToArray('packagingTypes', p), removePackagingType: (p) => removeFromArray('packagingTypes', p),
+    calibers, addCaliber, removeCaliber,
+    bankAccounts, addBankAccount, removeBankAccount,
+    productCaliberAssociations, updateProductCalibers, getCalibersForProduct,
+    isLoading
   };
-
-  return <MasterDataContext.Provider value={value}>{children}</MasterDataContext.Provider>;
+  
+  return (
+    <MasterDataContext.Provider value={value}>
+      {children}
+    </MasterDataContext.Provider>
+  );
 }
 
+// --- HOOK ---
 export function useMasterData() {
   const context = useContext(MasterDataContext);
-  if (context === undefined) throw new Error('useMasterData must be used within a MasterDataProvider');
+  if (context === undefined) {
+    throw new Error('useMasterData must be used within a MasterDataProvider');
+  }
   return context;
 }
