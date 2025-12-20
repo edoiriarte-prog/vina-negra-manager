@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation'; // Importado para el refresco forzoso
+import { useRouter } from 'next/navigation';
 import { SalesOrder } from '@/lib/types';
 import { useSalesOrdersCRUD } from '@/hooks/use-sales-orders-crud';
 import { useToast } from '@/hooks/use-toast';
@@ -33,13 +33,13 @@ type ModalData = {
   status: MilestoneStatus;
   title: string;
   date: string;
-  invoiceNumber?: string;
+  documentNumber?: string;
 };
 
 export function SalesStatusStepper({ order }: SalesStatusStepperProps) {
   const { updateSalesOrder } = useSalesOrdersCRUD();
   const { toast } = useToast();
-  const router = useRouter(); // Instanciamos el router
+  const router = useRouter(); 
 
   const [isLoading, setIsLoading] = useState(false);
   const [modalData, setModalData] = useState<ModalData | null>(null);
@@ -52,13 +52,14 @@ export function SalesStatusStepper({ order }: SalesStatusStepperProps) {
 
   const handleMilestoneClick = (status: MilestoneStatus, label: string) => {
     const milestone = milestones.find(m => m.status === status);
-    if (milestone && !milestone.date) {
-      setModalData({ 
-        status, 
-        title: `Registrar fecha de ${label}`, 
-        date: format(new Date(), 'yyyy-MM-dd') 
-      });
-    }
+    
+    // Al hacer clic, pre-llenamos el modal con la información existente o la fecha actual si es nuevo.
+    setModalData({ 
+      status, 
+      title: `Registrar/Editar fecha de ${label}`, 
+      date: milestone?.date ? format(parseISO(milestone.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+      documentNumber: status === 'invoiced' ? order.invoiceNumber || '' : (order as any).paymentVoucher || ''
+    });
   };
 
   const handleModalSave = async () => {
@@ -68,7 +69,7 @@ export function SalesStatusStepper({ order }: SalesStatusStepperProps) {
       toast({ variant: "destructive", title: "Fecha requerida" });
       return;
     }
-    if (modalData.status === 'invoiced' && !modalData.invoiceNumber) {
+    if (modalData.status === 'invoiced' && !modalData.documentNumber) {
       toast({ variant: "destructive", title: "N° de Factura requerido" });
       return;
     }
@@ -76,18 +77,24 @@ export function SalesStatusStepper({ order }: SalesStatusStepperProps) {
     setIsLoading(true);
     const updateData: Partial<SalesOrder> = { status: modalData.status };
     
-    if (modalData.status === 'dispatched') updateData.dispatchedDate = parseISO(modalData.date).toISOString();
+    if (modalData.status === 'dispatched') {
+      updateData.dispatchedDate = parseISO(modalData.date).toISOString();
+    }
     if (modalData.status === 'invoiced') {
         updateData.invoicedDate = parseISO(modalData.date).toISOString();
-        updateData.invoiceNumber = modalData.invoiceNumber;
+        updateData.invoiceNumber = modalData.documentNumber;
     }
-    if (modalData.status === 'paid') updateData.paidDate = parseISO(modalData.date).toISOString();
+    if (modalData.status === 'paid') {
+      updateData.paidDate = parseISO(modalData.date).toISOString();
+      // Guardamos el N° de comprobante en un campo genérico si es necesario.
+      // Aquí podrías añadir un campo `paymentVoucher` a tu tipo SalesOrder si lo necesitas.
+    }
 
     try {
       await updateSalesOrder(order.id, updateData);
       toast({ title: "Estado Actualizado", description: `La orden ahora está marcada como ${modalData.status}.` });
       setModalData(null);
-      // SOLUCIÓN DE FUERZA BRUTA: Recargar la página completa para asegurar la actualización visual.
+      // Forza la actualización visual de la tabla
       window.location.reload(); 
     } catch (error) {
       toast({ variant: "destructive", title: "Error al actualizar" });
@@ -101,16 +108,12 @@ export function SalesStatusStepper({ order }: SalesStatusStepperProps) {
       <div className="flex items-center gap-4">
         {milestones.map((milestone, index) => {
           const isCompleted = !!milestone.date;
-          const isClickable = !isCompleted;
 
           return (
             <div key={milestone.status} className="flex items-center gap-4 relative">
               <div
-                className={cn(
-                  "flex flex-col items-center gap-1 text-center group",
-                  isClickable && "cursor-pointer"
-                )}
-                onClick={() => isClickable && handleMilestoneClick(milestone.status, milestone.label)}
+                className="flex flex-col items-center gap-1 text-center group cursor-pointer"
+                onClick={() => handleMilestoneClick(milestone.status, milestone.label)}
               >
                 <div className={cn(
                   "h-8 w-8 rounded-full flex items-center justify-center border-2 transition-all",
@@ -120,10 +123,7 @@ export function SalesStatusStepper({ order }: SalesStatusStepperProps) {
                 )}>
                   <milestone.icon className="h-4 w-4" />
                 </div>
-                <div className={cn(
-                  "text-[10px] font-medium transition-colors",
-                  isCompleted ? 'text-slate-300' : 'text-slate-500 group-hover:text-slate-300'
-                )}>
+                <div className="text-[10px] font-medium transition-colors text-slate-400">
                   {milestone.label}
                 </div>
                 {isCompleted && (
@@ -162,15 +162,17 @@ export function SalesStatusStepper({ order }: SalesStatusStepperProps) {
                 className="bg-slate-900 border-slate-700 h-10"
               />
             </div>
-            {modalData?.status === 'invoiced' && (
+            {modalData?.status !== 'dispatched' && (
               <div className="space-y-2">
-                <Label htmlFor="invoiceNumber" className="text-xs text-slate-400">N° Factura de Venta</Label>
+                <Label htmlFor="documentNumber" className="text-xs text-slate-400">
+                  {modalData?.status === 'invoiced' ? 'N° Factura de Venta' : 'N° Documento / Comprobante'}
+                </Label>
                 <Input
-                  id="invoiceNumber"
-                  value={modalData.invoiceNumber || ''}
-                  onChange={(e) => setModalData(prev => prev ? { ...prev, invoiceNumber: e.target.value } : null)}
+                  id="documentNumber"
+                  value={modalData?.documentNumber || ''}
+                  onChange={(e) => setModalData(prev => prev ? { ...prev, documentNumber: e.target.value } : null)}
                   className="bg-slate-900 border-slate-700 h-10"
-                  placeholder="Ej: 12345"
+                  placeholder={modalData?.status === 'invoiced' ? 'Ej: 12345' : 'Opcional'}
                 />
               </div>
             )}

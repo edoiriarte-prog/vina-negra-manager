@@ -31,6 +31,7 @@ import { useMasterData } from "@/hooks/use-master-data";
 import QuickContactDialog from "@/components/contacts/quick-contact-dialog";
 import { cn } from "@/lib/utils";
 import { LotSelectionDialog } from "./lot-selection-dialog";
+import { useState } from 'react';
 
 // --- Zod Schema for Validation ---
 const orderItemSchema = z.object({
@@ -38,7 +39,6 @@ const orderItemSchema = z.object({
     caliber: z.string().min(1, "Seleccione un calibre"),
     quantity: z.number().positive("La cantidad debe ser mayor a 0"),
     price: z.number().nonnegative("El precio no puede ser negativo"),
-    // Campos opcionales que no necesitan validación estricta aquí
     lotNumber: z.string().optional(),
     packagingQuantity: z.number().optional(),
     unit: z.string().optional(),
@@ -61,6 +61,8 @@ const salesOrderSchema = z.object({
   bankAccountId: z.string().optional(),
   driver: z.string().optional(),
   plate: z.string().optional(),
+  // Nuevos campos para manejar el estado de despacho
+  dispatchedDate: z.string().optional(),
 });
 
 type SalesOrderFormData = z.infer<typeof salesOrderSchema>;
@@ -73,7 +75,6 @@ interface NewSalesOrderSheetProps {
   order: SalesOrder | null;
   clients: Contact[];
   salesOrders?: SalesOrder[];
-  // NUEVOS PROPS NECESARIOS PARA EL DIALOG DE LOTE
   purchaseOrders: PurchaseOrder[];
   inventoryAdjustments: InventoryAdjustment[];
   contacts: Contact[];
@@ -107,6 +108,7 @@ export function NewSalesOrderSheet({
       warehouse: "Bodega Central",
       paymentMethod: "Contado",
       saleType: "Venta en Firme",
+      status: 'pending',
     },
   });
 
@@ -121,7 +123,6 @@ export function NewSalesOrderSheet({
   useEffect(() => {
     if (isOpen) {
       if (order) {
-        // Editing existing order
         form.reset({
           ...order,
           date: order.date ? parseISO(order.date) : new Date(),
@@ -136,7 +137,6 @@ export function NewSalesOrderSheet({
           })),
         });
       } else {
-        // Creating new order
         const idPrefix = sheetType === 'dispatch' ? 'TR-' : 'OV-';
         const relevantOrders = salesOrders.filter(o => o.number?.startsWith(idPrefix));
         const existingIds = relevantOrders
@@ -156,6 +156,9 @@ export function NewSalesOrderSheet({
           warehouse: "Bodega Central",
           paymentMethod: "Contado",
           saleType: sheetType === 'dispatch' ? "Traslado Bodega Interna" : "Venta en Firme",
+          // REQUERIMIENTO 1: Estado inicial despachado con fecha de hoy
+          status: 'dispatched',
+          dispatchedDate: new Date().toISOString(),
         });
       }
     }
@@ -180,7 +183,9 @@ export function NewSalesOrderSheet({
       number: data.number || '',
       clientId: data.clientId,
       date: format(data.date, 'yyyy-MM-dd'),
-      status: (order?.status || 'pending') as SalesOrder['status'],
+      // Si es una orden nueva, su estado ya viene como 'despachada' desde el `reset`.
+      // Si es una edición, mantenemos el estado que ya tiene.
+      status: (order?.status || data.status) as SalesOrder['status'],
       items: data.items.map(item => ({
           product: item.product,
           caliber: item.caliber,
@@ -203,6 +208,7 @@ export function NewSalesOrderSheet({
       driver: data.driver || '',
       plate: data.plate || '',
       notes: data.notes || '',
+      dispatchedDate: order?.dispatchedDate || data.dispatchedDate, // Aseguramos que se mantenga o se asigne
     };
 
     try {
@@ -225,7 +231,6 @@ export function NewSalesOrderSheet({
     });
   };
 
-  // --- UI Constants ---
   const title = order 
     ? (sheetType === 'dispatch' ? `Editar Traspaso ${order.number}` : `Editar OV ${order.number}`)
     : (sheetType === 'dispatch' ? 'Nuevo Traspaso de Bodega' : 'Nueva Orden de Venta');
@@ -256,7 +261,6 @@ export function NewSalesOrderSheet({
 
           <form onSubmit={handleSubmit(handleFormSubmit)} className="flex-1 overflow-y-auto">
             <div className="p-6 space-y-8">
-              {/* --- GENERAL INFO --- */}
               <div className="grid md:grid-cols-3 gap-5">
                 <Card className={darkCardClass}>
                   <CardContent className="p-4 space-y-3">
@@ -300,7 +304,6 @@ export function NewSalesOrderSheet({
                 </Card>
               </div>
               
-              {/* --- PRODUCT ITEMS --- */}
               <div className={cn("rounded-xl border", darkCardClass)}>
                 <CardHeader className="border-b border-slate-800 py-4 px-6 flex justify-between items-center">
                   <h3 className="font-semibold text-slate-200 flex items-center gap-2"><Info className="h-4 w-4 text-blue-400" /> Detalle de Productos</h3>
@@ -379,7 +382,6 @@ export function NewSalesOrderSheet({
                 </CardContent>
               </div>
               
-              {/* --- FINANCIALS & NOTES --- */}
               <div className="grid md:grid-cols-12 gap-6 items-start">
                  <div className="md:col-span-7 space-y-4">
                     <Card className={darkCardClass}>
