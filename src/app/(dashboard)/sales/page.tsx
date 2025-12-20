@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -47,16 +46,6 @@ const formatDate = (dateString?: string) => {
         return dateString;
     } catch (e) {
         return dateString;
-    }
-};
-
-const excelDate = (dateString?: string): Date | null => {
-    if (!dateString || !/^\d{4}-\d{2}-\d{2}/.test(dateString)) return null;
-    try {
-        const date = parseISO(dateString);
-        return isValid(date) ? date : null;
-    } catch {
-        return null;
     }
 };
 
@@ -117,50 +106,66 @@ export default function SalesPage() {
   const handleExportPackingList = () => {
     if (filteredOrders.length === 0) return toast({ variant: "destructive", title: "No hay datos", description: "No hay órdenes para exportar." });
     
+    // --- HELPERS OBLIGATORIOS ---
+    const safeDate = (value: any) => {
+        if (!value) return ""; // Si es null, undefined o string vacío -> RETORNA CADENA VACÍA
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return ""; // Si la fecha es inválida -> RETORNA CADENA VACÍA
+        return d; // Retorna el objeto Date para que xlsx lo formatee
+    };
+    
+    const safeNumber = (value: any) => {
+        if (value === null || value === undefined || value === "") return "";
+        return Number(value);
+    };
+
     const data = filteredOrders.map(o => {
         const clientName = clients.find(c => c.id === o.clientId)?.name || 'Desconocido';
         const net = o.totalAmount || 0;
         const total = o.includeVat !== false ? net * 1.19 : net;
         return {
             'N° Venta': o.number || '',
-            'Fecha Emisión': excelDate(o.date),
+            'Fecha Emisión': safeDate(o.date),
             'Cliente': clientName,
             'Estado': o.status || '',
-            'Kilos Totales': o.totalKilos || 0,
-            'Monto Neto': net,
-            'Monto Total c/IVA': total,
+            'Kilos Totales': safeNumber(o.totalKilos),
+            'Monto Neto': safeNumber(net),
+            'Monto Total c/IVA': safeNumber(total),
             'Tipo de Venta': o.saleType || '',
             'Forma de Pago': o.paymentMethod || '',
-            'Días Crédito': o.creditDays || 0,
-            'Fecha Vencimiento': excelDate(o.paymentDueDate),
+            'Días Crédito': safeNumber(o.creditDays),
+            'Fecha Vencimiento': safeDate(o.paymentDueDate),
             'Bodega Origen': o.warehouse || '',
             'Chofer': o.driver || '',
             'Patente': o.plate || '',
-            'Fecha Despacho': excelDate(o.dispatchedDate),
-            'Fecha Facturación': excelDate(o.invoicedDate),
-            'N° Factura': o.invoiceNumber || '-',
-            'Fecha Pago': excelDate(o.paidDate),
+            'Fecha Despacho': safeDate(o.dispatchedDate),
+            'Fecha Facturación': safeDate(o.invoicedDate),
+            'N° Factura': safeNumber(o.invoiceNumber),
+            'Fecha Pago': safeDate(o.paidDate),
         };
     });
 
     const ws = XLSX.utils.json_to_sheet(data);
     
+    // Aplicar formatos a las celdas
     const range = XLSX.utils.decode_range(ws['!ref']!);
-    for (let R = range.s.r + 1; R <= range.e.r; ++R) { 
-        const numCols = ['E', 'F', 'G', 'J']; 
-        numCols.forEach(col => {
-            const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
-            if (!ws[cell_address]) return;
-            ws[cell_address].t = 'n';
-        });
-        
-        const dateCols = ['B', 'K', 'O', 'P', 'Q'];
-        dateCols.forEach(col => {
-             const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
-             if (!ws[cell_address] || !ws[cell_address].v) return;
-             ws[cell_address].t = 'd';
-             ws[cell_address].z = 'dd-mm-yyyy';
-        });
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      const dateCols = ['B', 'K', 'O', 'P', 'R'];
+      dateCols.forEach(col => {
+        const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
+        if (ws[cell_address] && ws[cell_address].v) {
+          ws[cell_address].t = 'd';
+          ws[cell_address].z = 'dd-mm-yyyy';
+        }
+      });
+      
+      const numCols = ['E', 'F', 'G', 'J', 'Q'];
+       numCols.forEach(col => {
+        const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
+        if (ws[cell_address] && (ws[cell_address].v !== null || ws[cell_address].v !== undefined)) {
+          ws[cell_address].t = 'n';
+        }
+      });
     }
 
     const wb = XLSX.utils.book_new();
