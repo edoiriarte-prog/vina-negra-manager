@@ -124,7 +124,6 @@ export default function SalesPage() {
     let updatedCount = 0;
 
     salesOrders.forEach(order => {
-        // Solo actualizamos las que no tengan fecha de despacho
         if (!order.dispatchedDate) {
             const orderRef = doc(firestore, "salesOrders", order.id);
             batch.update(orderRef, {
@@ -144,6 +143,7 @@ export default function SalesPage() {
     try {
         await batch.commit();
         toast({ title: "¡Sincronización Completa!", description: `${updatedCount} órdenes han sido marcadas como despachadas.`});
+        window.location.reload(); // Hard refresh to ensure UI update
     } catch (error) {
         console.error("Error en la actualización masiva:", error);
         toast({ variant: "destructive", title: "Error", description: "Ocurrió un error durante la sincronización."});
@@ -152,11 +152,9 @@ export default function SalesPage() {
     }
   };
 
-  // Exportar Excel (SOLUCIÓN DEFENSIVA)
   const handleExportPackingList = () => {
     if (filteredOrders.length === 0) return toast({ variant: "destructive", title: "No hay datos", description: "No hay órdenes para exportar." });
     
-    // HELPERS DEFENSIVOS
     const formatSafeDate = (val: any) => {
       if (!val || val === "null" || val === "undefined") return ""; 
       const date = new Date(val);
@@ -164,9 +162,9 @@ export default function SalesPage() {
       return format(date, "dd/MM/yyyy");
     };
     const formatSafeNumber = (val: any) => {
-        if (val === null || val === undefined || val === "") return "";
-        const num = parseFloat(val);
-        return isNaN(num) ? "" : num; 
+      if (val === null || val === undefined || val === "") return "";
+      const num = parseFloat(val);
+      return isNaN(num) ? "" : num; 
     };
 
     const data = filteredOrders.map(o => {
@@ -442,3 +440,5 @@ export default function SalesPage() {
     </div>
   );
 }
+
+    
