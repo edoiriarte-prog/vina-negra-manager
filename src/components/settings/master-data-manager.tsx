@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -16,7 +15,6 @@ export function MasterDataManager() {
     bankAccounts, addBankAccount, removeBankAccount
   } = useMasterData();
 
-  // Estado para formulario de Cuenta Bancaria
   const [newAccount, setNewAccount] = useState<Omit<BankAccount, 'id'>>({
     name: '',
     bankName: '',
@@ -39,99 +37,78 @@ export function MasterDataManager() {
     }
   };
 
-  return (
-    <div className="space-y-8">
-        <Card className="md:col-span-2">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Landmark className="h-5 w-5" /> Cuentas Bancarias</CardTitle>
-                <CardDescription>Cuentas para registrar ingresos y egresos de tesorería.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="grid md:grid-cols-2 gap-8">
-                    {/* Formulario */}
-                    <div className="space-y-4 border p-4 rounded-md bg-muted/10">
-                        <h4 className="font-semibold text-sm">Nueva Cuenta</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label>Alias / Nombre</Label>
-                                <Input placeholder="Ej: Banco Estado Principal" value={newAccount.name} onChange={e => setNewAccount({...newAccount, name: e.target.value})} />
-                            </div>
-                            <div>
-                                <Label>Banco</Label>
-                                <Input placeholder="Ej: Banco Estado" value={newAccount.bankName} onChange={e => setNewAccount({...newAccount, bankName: e.target.value})} />
-                            </div>
-                            <div>
-                                <Label>Tipo Cuenta</Label>
-                                <Select value={newAccount.accountType} onValueChange={(val: any) => setNewAccount({...newAccount, accountType: val})}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Cuenta Corriente">Cuenta Corriente</SelectItem>
-                                        <SelectItem value="Cuenta Vista">Cuenta Vista</SelectItem>
-                                        <SelectItem value="Línea de Crédito">Línea de Crédito</SelectItem>
-                                        <SelectItem value="Efectivo">Efectivo / Caja Chica</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label>Número Cuenta</Label>
-                                <Input placeholder="12345678" value={newAccount.accountNumber} onChange={e => setNewAccount({...newAccount, accountNumber: e.target.value})} />
-                            </div>
-                            <div>
-                                <Label>Saldo Inicial ($)</Label>
-                                <Input type="number" placeholder="0" value={newAccount.initialBalance || ''} onChange={e => setNewAccount({...newAccount, initialBalance: Number(e.target.value)})} />
-                            </div>
-                            <div className="col-span-2">
-                                <Label>Titular (Opcional)</Label>
-                                <div className="grid grid-cols-3 gap-2 mt-1">
-                                    <Input placeholder="Nombre Titular" value={newAccount.owner} onChange={e => setNewAccount({...newAccount, owner: e.target.value})} />
-                                    <Input placeholder="RUT Titular" value={newAccount.ownerRUT} onChange={e => setNewAccount({...newAccount, ownerRUT: e.target.value})} />
-                                    <Input placeholder="Email Notificaciones" value={newAccount.ownerEmail} onChange={e => setNewAccount({...newAccount, ownerEmail: e.target.value})} />
-                                </div>
-                            </div>
-                        </div>
-                        <Button className="w-full" onClick={handleAddAccount} disabled={!newAccount.name || !newAccount.bankName}>
-                            <Plus className="mr-2 h-4 w-4" /> Agregar Cuenta
-                        </Button>
-                    </div>
+  const cardClass = "bg-slate-900 border-slate-800";
+  const inputClass = "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-blue-600";
 
-                    {/* Lista */}
-                    <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                        <h4 className="font-semibold text-sm mb-2">Cuentas Registradas</h4>
-                        {bankAccounts.length === 0 && <p className="text-sm text-muted-foreground">No hay cuentas registradas.</p>}
-                        {bankAccounts.map(acc => (
-                            <div key={acc.id} className="flex flex-col p-3 border rounded hover:bg-muted/30 transition-colors relative group">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-bold">{acc.name}</p>
-                                        <p className="text-sm text-muted-foreground">{acc.bankName} - {acc.accountType}</p>
-                                        <p className="text-xs font-mono mt-1">{acc.accountNumber}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-semibold text-green-600">
-                                            {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(acc.initialBalance)}
-                                        </p>
-                                        <p className="text-[10px] text-muted-foreground">Saldo Inicial</p>
-                                    </div>
-                                </div>
-                                {acc.owner && (
-                                    <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                                        Titular: {acc.owner} ({acc.ownerRUT})
-                                    </div>
-                                )}
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => removeBankAccount(acc.id)}
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        ))}
+  return (
+    <Card className={cardClass}>
+        <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-slate-200"><Landmark className="h-5 w-5 text-slate-500" /> Cuentas Bancarias</CardTitle>
+        <CardDescription className="text-slate-400">Cuentas para registrar ingresos y egresos de tesorería.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid md:grid-cols-12 gap-6">
+        <div className="md:col-span-5 space-y-4 border-r border-slate-800 pr-6">
+            <h4 className="font-medium text-white mb-2">Nueva Cuenta</h4>
+            <div className="space-y-3">
+                <div className="space-y-1">
+                    <Label className="text-xs text-slate-500">Alias / Nombre</Label>
+                    <Input placeholder="Ej: Banco Estado Principal" value={newAccount.name} onChange={e => setNewAccount({...newAccount, name: e.target.value})} className={inputClass} />
+                </div>
+                <div className="space-y-1">
+                    <Label className="text-xs text-slate-500">Banco</Label>
+                    <Input placeholder="Ej: Banco Estado" value={newAccount.bankName} onChange={e => setNewAccount({...newAccount, bankName: e.target.value})} className={inputClass} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Tipo Cuenta</Label>
+                        <Select value={newAccount.accountType} onValueChange={(val: any) => setNewAccount({...newAccount, accountType: val})}>
+                            <SelectTrigger className={inputClass}><SelectValue/></SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                <SelectItem value="Cuenta Corriente">Cta. Corriente</SelectItem>
+                                <SelectItem value="Cuenta Vista">Cta. Vista</SelectItem>
+                                <SelectItem value="Línea de Crédito">Línea de Crédito</SelectItem>
+                                <SelectItem value="Efectivo">Efectivo / Caja Chica</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">N° Cuenta</Label>
+                        <Input placeholder="12345678" value={newAccount.accountNumber} onChange={e => setNewAccount({...newAccount, accountNumber: e.target.value})} className={inputClass} />
                     </div>
                 </div>
-            </CardContent>
-        </Card>
-    </div>
+                 <div className="space-y-1">
+                    <Label className="text-xs text-slate-500">Saldo Inicial ($)</Label>
+                    <Input type="number" placeholder="0" value={newAccount.initialBalance || ''} onChange={e => setNewAccount({...newAccount, initialBalance: Number(e.target.value)})} className={inputClass} />
+                </div>
+                <Button 
+                    onClick={handleAddAccount} 
+                    disabled={!newAccount.name || !newAccount.bankName}
+                    className="w-full bg-slate-100 text-slate-900 hover:bg-slate-200 font-bold mt-2"
+                >
+                    <Plus className="mr-2 h-4 w-4" /> Guardar Cuenta
+                </Button>
+            </div>
+        </div>
+        
+        <div className="md:col-span-7 space-y-3">
+            <h4 className="font-medium text-white mb-2">Cuentas Registradas</h4>
+            {bankAccounts.length === 0 && <div className="text-slate-500 text-sm italic">No hay cuentas registradas.</div>}
+            {bankAccounts.map(acc => (
+                <div key={acc.id} className="bg-slate-950 border border-slate-800 p-4 rounded-lg flex justify-between items-center group">
+                    <div>
+                        <div className="font-bold text-slate-200">{acc.name}</div>
+                        <div className="text-xs text-slate-500 uppercase tracking-wide">{acc.bankName} - {acc.accountType}</div>
+                        <div className="text-xs text-slate-600 font-mono mt-1">{acc.accountNumber}</div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-emerald-500 font-bold text-lg">{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(acc.initialBalance)}</div>
+                        <div className="text-[10px] text-slate-600">Saldo Inicial</div>
+                        <button onClick={() => removeBankAccount(acc.id)} className="text-red-500 text-xs hover:underline mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Eliminar</button>
+                    </div>
+                </div>
+            ))}
+        </div>
+        </CardContent>
+    </Card>
   );
 }

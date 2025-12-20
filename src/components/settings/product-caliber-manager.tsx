@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Save, RotateCcw, Eraser, CheckSquare } from 'lucide-react';
+import { Save, RotateCcw, Eraser, CheckSquare, Link as LinkIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils'; 
 
@@ -26,7 +26,7 @@ export function ProductCaliberManager() {
   useEffect(() => {
     if (products.length > 0) {
        const initialMap = products.map(pName => {
-         const pId = pName; // Assuming name is the id for now
+         const pId = pName; 
          const existing = productCaliberAssociations.find(a => a.id === pId);
          return existing ? { ...existing, calibers: [...existing.calibers] } : { id: pId, calibers: [] };
        });
@@ -64,7 +64,7 @@ export function ProductCaliberManager() {
       const localData = localAssociations.find(a => a.id === productId);
       if (localData) {
           updateProductCalibers(productId, localData.calibers);
-          toast({ title: "Configuración Guardada", description: `Calibres actualizados para el producto.`, variant: "default" });
+          toast({ title: "Configuración Guardada", description: `Calibres actualizados para ${productId}.`, variant: "default" });
       }
   };
 
@@ -76,7 +76,7 @@ export function ProductCaliberManager() {
         item.id === productId ? { ...item, calibers: globalCalibers } : item
       ));
       
-      toast({ title: "Restaurado", description: `Se han descartado los cambios.` });
+      toast({ title: "Restaurado", description: `Se han descartado los cambios para ${productId}.` });
   };
 
   const isCaliberSelectedLocal = (productId: string, caliberName: string) => {
@@ -101,20 +101,20 @@ export function ProductCaliberManager() {
   };
 
   return (
-    <Card className="shadow-md">
+    <Card className="shadow-md bg-slate-900 border-slate-800">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-            Asociación de Productos y Calibres
+        <CardTitle className="flex items-center gap-2 text-indigo-400">
+            <LinkIcon className="h-5 w-5"/>
+            Asociación de Calibres
         </CardTitle>
-        <CardDescription>
-          Configura qué calibres están disponibles para cada variedad de fruta.
+        <CardDescription className="text-slate-400">
+          Activa los calibres correspondientes para cada producto. Los cambios deben guardarse individualmente.
         </CardDescription>
       </CardHeader>
       <CardContent>
         {products.length === 0 ? (
-          <div className="text-center py-10 border-2 border-dashed rounded-lg">
-             <p className="text-muted-foreground mb-2">No hay productos registrados.</p>
-             <Button variant="outline" size="sm">Ir a Maestros de Productos</Button>
+          <div className="text-center py-10 border-2 border-dashed border-slate-800 rounded-lg">
+             <p className="text-slate-500 mb-2">No hay productos registrados.</p>
           </div>
         ) : (
           <Accordion type="single" collapsible className="w-full space-y-2">
@@ -124,17 +124,17 @@ export function ProductCaliberManager() {
               const count = getCountLocal(productId);
               
               return (
-                <AccordionItem key={productId} value={productId} className="border rounded-lg bg-card px-2">
+                <AccordionItem key={productId} value={productId} className="border border-slate-800 rounded-lg bg-slate-950/50 px-2 data-[state=open]:bg-slate-900">
                   <AccordionTrigger className="hover:no-underline py-3 px-2">
                     <div className="flex items-center gap-4 w-full">
-                      <span className="font-semibold text-lg">{productName}</span>
+                      <span className="font-semibold text-lg text-slate-100">{productName}</span>
                       <div className="flex items-center gap-2 ml-auto mr-4">
                         {changed && (
-                            <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 animate-in fade-in">
+                            <Badge variant="outline" className="text-amber-400 border-amber-500/40 bg-amber-950/30">
                                 Sin guardar
                             </Badge>
                         )}
-                        <Badge variant={count > 0 ? "secondary" : "outline"}>
+                        <Badge variant={count > 0 ? "secondary" : "outline"} className="border-slate-700 bg-slate-800 text-slate-300">
                             {count} calibres
                         </Badge>
                       </div>
@@ -142,12 +142,12 @@ export function ProductCaliberManager() {
                   </AccordionTrigger>
                   <AccordionContent className="pb-4 px-2">
                     
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-2 bg-muted/30 rounded-md border">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-2 bg-slate-950/50 rounded-md border border-slate-800">
                         <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => handleSelectAll(productId)} title="Seleccionar Todos">
+                            <Button size="sm" variant="ghost" onClick={() => handleSelectAll(productId)} title="Seleccionar Todos" className="text-slate-300 hover:bg-slate-800">
                                 <CheckSquare className="mr-2 h-3.5 w-3.5" /> Todos
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => handleClearProduct(productId)} title="Limpiar Selección">
+                            <Button size="sm" variant="ghost" onClick={() => handleClearProduct(productId)} title="Limpiar Selección" className="text-slate-300 hover:bg-slate-800">
                                 <Eraser className="mr-2 h-3.5 w-3.5" /> Ninguno
                             </Button>
                         </div>
@@ -156,7 +156,7 @@ export function ProductCaliberManager() {
                                 size="sm" variant="ghost" 
                                 onClick={() => handleRestoreProduct(productId)} 
                                 disabled={!changed}
-                                className="text-muted-foreground"
+                                className="text-slate-400 hover:bg-slate-800"
                             >
                                 <RotateCcw className="mr-2 h-3.5 w-3.5" /> Deshacer
                             </Button>
@@ -164,35 +164,36 @@ export function ProductCaliberManager() {
                                 size="sm" 
                                 onClick={() => handleSaveProduct(productId)} 
                                 disabled={!changed}
-                                className={cn(changed && "bg-amber-600 hover:bg-amber-700 text-white")}
+                                className={cn("bg-slate-700 hover:bg-slate-600", changed && "bg-amber-600 hover:bg-amber-700 text-white")}
                             >
                                 <Save className="mr-2 h-3.5 w-3.5" /> Guardar Cambios
                             </Button>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-3">
                       {calibers.map((caliber) => (
                         <div 
                           key={`${productId}-${caliber.name}`} 
                           className={cn(
-                              "flex items-start space-x-2 p-2 rounded-md border transition-all",
+                              "flex items-start space-x-2 p-3 rounded-md border transition-all cursor-pointer",
                               isCaliberSelectedLocal(productId, caliber.name) 
-                                ? "bg-primary/5 border-primary/20" 
-                                : "bg-background hover:bg-muted/50 border-transparent"
+                                ? "bg-indigo-950/50 border-indigo-500/40" 
+                                : "bg-slate-900 border-slate-800 hover:bg-slate-800/50"
                           )}
+                          onClick={() => handleToggleCaliber(productId, caliber.name, !isCaliberSelectedLocal(productId, caliber.name))}
                         >
                           <Checkbox 
                             id={`${productId}-${caliber.name}`} 
                             checked={isCaliberSelectedLocal(productId, caliber.name)}
-                            onCheckedChange={(checked) => handleToggleCaliber(productId, caliber.name, checked as boolean)}
+                            className="mt-0.5"
                           />
                           <Label 
                             htmlFor={`${productId}-${caliber.name}`}
                             className="text-sm cursor-pointer w-full"
                           >
-                            <div className="font-medium">{caliber.name}</div>
-                            {caliber.code && <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{caliber.code}</div>}
+                            <div className="font-medium text-slate-100">{caliber.name}</div>
+                            {caliber.code && <div className="text-[10px] text-indigo-400 font-mono mt-0.5">{caliber.code}</div>}
                           </Label>
                         </div>
                       ))}
