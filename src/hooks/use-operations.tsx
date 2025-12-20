@@ -45,11 +45,14 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
         return;
     };
 
+    // SOLUCIÓN DE PERFORMANCE: Usar getDocs para cargar los datos una sola vez
+    // en lugar de mantener una conexión en tiempo real con onSnapshot para colecciones grandes.
     const fetchDataOnce = async (collectionName: string, setter: Function, loadingKey: keyof typeof loadingStates) => {
       try {
         const q = query(collection(db, collectionName), orderBy('date', 'desc'));
         const querySnapshot = await getDocs(q);
-        setter(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setter(data);
       } catch (error) {
          console.error(`Error fetching ${collectionName}:`, error);
       } finally {
