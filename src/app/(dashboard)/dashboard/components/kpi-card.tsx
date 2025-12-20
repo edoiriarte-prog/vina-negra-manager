@@ -1,4 +1,3 @@
-
 import {
   Card,
   CardContent,
@@ -13,7 +12,7 @@ type KpiCardProps = {
   value: string;
   icon: React.ReactNode;
   description: string;
-  subValue?: string; // Nuevo para el desglose
+  subValue?: string;
   isLoading?: boolean;
 };
 
