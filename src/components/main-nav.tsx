@@ -34,7 +34,7 @@ const menuItems = [
   { href: "/services", label: "Servicios (O/S)", icon: Truck },
   { href: "/inventory", label: "Inventario", icon: Boxes },
   { href: "/inventory-adjustments", label: "Ajustes de Stock", icon: FileSliders },
-  { href: "/mercantile-account", label: "Cuenta Corriente", icon: Landmark },
+  { href: "/current-account", label: "Cuenta Corriente", icon: Landmark },
   { href: "/financials", label: "Tesorería", icon: Wallet },
   { href: "/settings", label: "Configuración", icon: Settings },
   { href: "/help", label: "Ayuda", icon: HelpCircle },
