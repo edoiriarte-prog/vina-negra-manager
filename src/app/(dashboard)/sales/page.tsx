@@ -9,7 +9,7 @@ import { useMasterData } from "@/hooks/use-master-data";
 import { useOperations } from "@/hooks/use-operations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, FileSpreadsheet, Users, Calendar, Search, FileText } from "lucide-react";
+import { Plus, FileSpreadsheet, Users, Calendar, Search, FileText, RefreshCw } from "lucide-react";
 import { NewSalesOrderSheet } from "./components/new-sales-order-sheet";
 import { SalesOrderPreview } from "./components/sales-order-preview"; 
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +33,8 @@ import { format, parseISO, isValid } from "date-fns";
 import { es } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFirebase } from "@/firebase";
+import { writeBatch, doc } from "firebase/firestore";
 
 // Helpers
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
@@ -51,6 +53,7 @@ const formatDate = (dateString?: string) => {
 
 export default function SalesPage() {
   const { toast } = useToast();
+  const { firestore } = useFirebase();
 
   // Hooks de Datos (Providers)
   const { salesOrders, purchaseOrders, inventoryAdjustments, isLoading: opsLoading } = useOperations();
@@ -67,6 +70,7 @@ export default function SalesPage() {
   const [previewOrder, setPreviewOrder] = useState<SalesOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Guardar (Crear o Editar)
   const handleSave = async (orderData: SalesOrder | Omit<SalesOrder, "id">) => {
@@ -101,24 +105,68 @@ export default function SalesPage() {
         console.error("Error al eliminar:", e);
     }
   };
+  
+  // --- FUNCIÓN PARA ACTUALIZACIÓN MASIVA ---
+  const handleMassiveDispatch = async () => {
+    if (!firestore || !salesOrders || salesOrders.length === 0) {
+        toast({ variant: "destructive", title: "Error", description: "No hay datos para procesar."});
+        return;
+    }
+
+    if (!confirm("¿Estás seguro de que quieres marcar todas las órdenes de venta no despachadas como 'Despachadas'? Esta acción usará la fecha de creación de cada orden.")) {
+        return;
+    }
+
+    setIsSyncing(true);
+    toast({ title: "Iniciando Sincronización...", description: "Actualizando órdenes, por favor espera." });
+
+    const batch = writeBatch(firestore);
+    let updatedCount = 0;
+
+    salesOrders.forEach(order => {
+        // Solo actualizamos las que no tengan fecha de despacho
+        if (!order.dispatchedDate) {
+            const orderRef = doc(firestore, "salesOrders", order.id);
+            batch.update(orderRef, {
+                status: 'dispatched',
+                dispatchedDate: order.date 
+            });
+            updatedCount++;
+        }
+    });
+
+    if (updatedCount === 0) {
+        setIsSyncing(false);
+        toast({ title: "Todo al día", description: "No se encontraron órdenes que necesitaran actualización." });
+        return;
+    }
+
+    try {
+        await batch.commit();
+        toast({ title: "¡Sincronización Completa!", description: `${updatedCount} órdenes han sido marcadas como despachadas.`});
+    } catch (error) {
+        console.error("Error en la actualización masiva:", error);
+        toast({ variant: "destructive", title: "Error", description: "Ocurrió un error durante la sincronización."});
+    } finally {
+        setIsSyncing(false);
+    }
+  };
 
   // Exportar Excel (SOLUCIÓN DEFENSIVA)
   const handleExportPackingList = () => {
     if (filteredOrders.length === 0) return toast({ variant: "destructive", title: "No hay datos", description: "No hay órdenes para exportar." });
     
-    // --- HELPERS OBLIGATORIOS ---
+    // HELPERS DEFENSIVOS
     const formatSafeDate = (val: any) => {
-      if (!val || val === "null" || val === "undefined") return ""; // Si no hay dato, CELDA VACÍA.
+      if (!val || val === "null" || val === "undefined") return ""; 
       const date = new Date(val);
-      // Si la fecha es inválida o es epoch (año 1969/1970), devolver vacío
       if (isNaN(date.getTime()) || date.getFullYear() <= 1970) return "";
       return format(date, "dd/MM/yyyy");
     };
-
     const formatSafeNumber = (val: any) => {
         if (val === null || val === undefined || val === "") return "";
         const num = parseFloat(val);
-        return isNaN(num) ? "" : num; // Si no es número, CELDA VACÍA.
+        return isNaN(num) ? "" : num; 
     };
 
     const data = filteredOrders.map(o => {
@@ -251,6 +299,9 @@ export default function SalesPage() {
           <p className="text-slate-400 mt-1">Control de despachos y facturación comercial.</p>
         </div>
         <div className="flex gap-2">
+            <Button onClick={handleMassiveDispatch} variant="outline" className="border-amber-500/30 bg-amber-950/20 text-amber-300 hover:bg-amber-900/50 hover:text-amber-200" disabled={isSyncing}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} /> Sincronizar Despachos
+            </Button>
             <Button onClick={handleExportPackingList} variant="outline" className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800">
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar
             </Button>
@@ -355,7 +406,6 @@ export default function SalesPage() {
             onSave={handleSave}
             order={editingOrder}
             clients={clients}
-            inventory={inventory}
             sheetType="sale"
             salesOrders={salesOrders}
             purchaseOrders={purchaseOrders}
