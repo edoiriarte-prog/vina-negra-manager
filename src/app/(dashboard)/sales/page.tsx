@@ -51,13 +51,10 @@ const formatDate = (dateString?: string) => {
 };
 
 const excelDate = (dateString?: string): Date | null => {
-    if (!dateString || !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(dateString)) return null;
+    if (!dateString || !/^\d{4}-\d{2}-\d{2}/.test(dateString)) return null;
     try {
         const date = parseISO(dateString);
-        if (isValid(date)) {
-          return date;
-        }
-        return null;
+        return isValid(date) ? date : null;
     } catch {
         return null;
     }
@@ -125,20 +122,20 @@ export default function SalesPage() {
         const net = o.totalAmount || 0;
         const total = o.includeVat !== false ? net * 1.19 : net;
         return {
-            'N° Venta': o.number,
+            'N° Venta': o.number || '',
             'Fecha Emisión': excelDate(o.date),
             'Cliente': clientName,
-            'Estado': o.status,
+            'Estado': o.status || '',
             'Kilos Totales': o.totalKilos || 0,
             'Monto Neto': net,
             'Monto Total c/IVA': total,
-            'Tipo de Venta': o.saleType,
-            'Forma de Pago': o.paymentMethod,
+            'Tipo de Venta': o.saleType || '',
+            'Forma de Pago': o.paymentMethod || '',
             'Días Crédito': o.creditDays || 0,
             'Fecha Vencimiento': excelDate(o.paymentDueDate),
-            'Bodega Origen': o.warehouse,
-            'Chofer': o.driver,
-            'Patente': o.plate,
+            'Bodega Origen': o.warehouse || '',
+            'Chofer': o.driver || '',
+            'Patente': o.plate || '',
             'Fecha Despacho': excelDate(o.dispatchedDate),
             'Fecha Facturación': excelDate(o.invoicedDate),
             'N° Factura': o.invoiceNumber || '-',
