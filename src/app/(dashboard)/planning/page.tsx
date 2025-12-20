@@ -59,9 +59,7 @@ export default function PlanningPage() {
     return { thisWeek, nextWeek };
   }, [plannedOrders]);
 
-  // --- HANDLER: Guardar Planificación (CORREGIDO con ASYNC) ---
   const handleSavePlan = useCallback(async (data: any) => {
-    // Calculamos totales aquí también por seguridad
     const items = data.items || [];
     const calculatedTotal = items.reduce((acc: number, item: any) => acc + ((item.price || 0) * item.quantity), 0);
     const calculatedKilos = items.reduce((acc: number, item: any) => acc + item.quantity, 0);
@@ -74,7 +72,6 @@ export default function PlanningPage() {
         totalAmount: calculatedTotal
     };
 
-    // Limpieza de campos de Ventas que no necesitamos en Planning
     delete planData.paymentStatus;
     delete planData.saleType;
 
@@ -95,6 +92,19 @@ export default function PlanningPage() {
     setEditingPlan(plan);
     setIsSheetOpen(true);
   }, []);
+
+  const handleDelete = useCallback((id: string) => {
+    if (confirm('¿Estás seguro de eliminar este plan?')) {
+      deletePlan(id);
+    }
+  }, [deletePlan]);
+
+  const handlePromote = useCallback((plan: PlannedOrder) => {
+    if (confirm('¿Convertir este plan en una Orden de Venta?')) {
+      promoteToSale(plan);
+    }
+  }, [promoteToSale]);
+
 
   if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full bg-slate-800"/></div>;
 
@@ -119,7 +129,6 @@ export default function PlanningPage() {
 
         <TabsContent value="week" className="grid md:grid-cols-2 gap-6">
             
-            {/* COLUMNA: ESTA SEMANA */}
             <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader className="border-b border-slate-800 pb-3">
                     <CardTitle className="text-emerald-400 flex items-center gap-2 text-lg">
@@ -134,14 +143,13 @@ export default function PlanningPage() {
                             plan={plan} 
                             contacts={contacts} 
                             onEdit={() => handleEdit(plan)}
-                            onDelete={() => deletePlan(plan.id)}
-                            onPromote={() => promoteToSale(plan)}
+                            onDelete={() => handleDelete(plan.id)}
+                            onPromote={() => handlePromote(plan)}
                         />
                     ))}
                 </CardContent>
             </Card>
 
-            {/* COLUMNA: PRÓXIMA SEMANA */}
             <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader className="border-b border-slate-800 pb-3">
                     <CardTitle className="text-blue-400 flex items-center gap-2 text-lg">
@@ -156,8 +164,8 @@ export default function PlanningPage() {
                             plan={plan} 
                             contacts={contacts} 
                             onEdit={() => handleEdit(plan)}
-                            onDelete={() => deletePlan(plan.id)}
-                            onPromote={() => promoteToSale(plan)}
+                            onDelete={() => handleDelete(plan.id)}
+                            onPromote={() => handlePromote(plan)}
                         />
                     ))}
                 </CardContent>
@@ -186,12 +194,10 @@ export default function PlanningPage() {
   );
 }
 
-// --- COMPONENTE DE TARJETA MEJORADO (CON FIX DE BUCLE INFINITO) ---
 function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: PlannedOrder, contacts: Contact[], onEdit: () => void, onDelete: () => void, onPromote: () => void}) {
     const clientName = contacts?.find((c: any) => c.id === plan.clientId)?.name || 'Cliente Desconocido';
     const isConfirmed = plan.status === 'confirmado';
 
-    // Cálculo seguro del total si viene corrupto de BD antigua
     const safeTotal = plan.totalAmount || (plan.items || []).reduce((acc: number, i: any) => acc + ((i.price||0) * (i.quantity || 0)), 0);
 
     return (
@@ -202,7 +208,7 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: Planne
                         {clientName}
                     </h4>
                     <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${isConfirmed ? "text-emerald-400 border-emerald-900 bg-emerald-950/30" : "text-yellow-400 border-yellow-900 bg-yellow-950/30"}`}>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 capitalize ${isConfirmed ? "text-emerald-400 border-emerald-900 bg-emerald-950/30" : "text-yellow-400 border-yellow-900 bg-yellow-950/30"}`}>
                             {plan.status}
                         </Badge>
                         <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -226,7 +232,6 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: Planne
                 {(plan.items || []).length > 3 && <p className="text-[10px] text-slate-500 italic text-right">+ {(plan.items || []).length - 3} ítems más</p>}
             </div>
 
-            {/* ACCIONES - CORREGIDO PARA EVITAR ERROR DE BUCLE INFINITO */}
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-950 shadow-lg rounded-md z-10">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -272,5 +277,3 @@ function PlanCard({ plan, contacts, onEdit, onDelete, onPromote }: {plan: Planne
         </div>
     )
 }
-
-    
