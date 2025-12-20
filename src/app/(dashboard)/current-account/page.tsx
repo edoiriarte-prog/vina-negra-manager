@@ -3,24 +3,31 @@
 import React, { useState, useMemo } from 'react';
 import { useMasterData } from '@/hooks/use-master-data';
 import { useOperations } from '@/hooks/use-operations';
-import { Contact, SalesOrder, FinancialMovement, OrderItem } from '@/lib/types';
+import { Contact, SalesOrder, PurchaseOrder, FinancialMovement, OrderItem } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipProvider, TooltipContent } from "@/components/ui/tooltip";
 import { 
   Search, Wallet, FileText, ChevronRight, User, ArrowUpRight, ArrowDownLeft,
-  Truck, Briefcase, Download, Printer, Package, Scale
+  Truck, Briefcase, Download, Printer, Package, Scale, Calendar as CalendarIcon, X
 } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { StatementDocument } from '@/components/pdf/StatementDocument';
+import { DateRange } from 'react-day-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+
 
 // --- FORMATO MONEDA ---
 const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
@@ -42,12 +49,13 @@ type AccountSummary = {
 type DetailedMovement = {
     date: string;
     type: 'Cargo' | 'Abono';
-    documentType: 'O/V' | 'Pago';
+    documentType: 'O/V' | 'O/C' | 'Pago';
     reference: string;
     details: string | OrderItem[]; // String para pagos, OrderItem[] para ventas
     charge: number;
     payment: number;
     balance: number;
+    paymentDueDate?: string; // Nuevo campo para vencimiento
 };
 
 export default function CurrentAccountPage() {
@@ -255,7 +263,7 @@ function AccountCard({ account, type, onClick }: { account: AccountSummary, type
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center mb-4">
-                    <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Operado</p><p className="font-bold text-slate-200 text-sm">{formatCurrency(account.totalBilled)}</p></div>
+                    <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Facturado</p><p className="font-bold text-slate-200 text-sm">{formatCurrency(account.totalBilled)}</p></div>
                     <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Pagado</p><p className="font-bold text-emerald-400 text-sm">{formatCurrency(account.totalPaid)}</p></div>
                     <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Saldo</p><p className={`font-bold ${balanceColor} text-sm`}>{formatCurrency(account.balance)}</p></div>
                 </div>
@@ -288,49 +296,83 @@ function AccountCard({ account, type, onClick }: { account: AccountSummary, type
 
 function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financialMovements, purchaseOrders }: { account: AccountSummary, isOpen: boolean, onOpenChange: () => void, salesOrders: SalesOrder[], financialMovements: FinancialMovement[], purchaseOrders: PurchaseOrder[] }) {
     
-    const detailedMovements: DetailedMovement[] = useMemo(() => {
-        if (!account) return [];
-        const movements: Omit<DetailedMovement, 'balance'>[] = [];
+    const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+      from: startOfMonth(new Date()),
+      to: endOfMonth(new Date()),
+    });
 
+    const { filteredMovements, initialBalance, finalBalance } = useMemo(() => {
+        if (!account) return { filteredMovements: [], initialBalance: 0, finalBalance: 0 };
+
+        const allMovements: Omit<DetailedMovement, 'balance'>[] = [];
         const isClient = (account.contact.type || []).includes('client');
         const relevantOrders = isClient ? salesOrders : purchaseOrders;
         const relevantPayments = financialMovements.filter(f => f.contactId === account.contact.id && (isClient ? f.type === 'income' : f.type === 'expense'));
-        
-        // Cargos (Ventas o Compras)
-        relevantOrders.filter(o => (isClient ? (o as SalesOrder).clientId : (o as PurchaseOrder).supplierId) === account.contact.id && o.status !== 'cancelled' && o.status !== 'draft').forEach(o => {
-            const grossAmount = o.includeVat !== false ? Math.round((o.totalAmount || 0) * 1.19) : (o.totalAmount || 0);
-            movements.push({
-                date: o.date,
-                type: 'Cargo',
-                documentType: isClient ? 'O/V' : 'O/C',
-                reference: o.number || o.id,
-                details: o.items,
-                charge: grossAmount,
-                payment: 0
-            });
-        });
 
-        // Abonos (Pagos)
+        relevantOrders
+            .filter(o => ((isClient ? (o as SalesOrder).clientId : (o as PurchaseOrder).supplierId) === account.contact.id) && o.status !== 'cancelled' && o.status !== 'draft')
+            .forEach(o => {
+                const grossAmount = o.includeVat !== false ? Math.round((o.totalAmount || 0) * 1.19) : (o.totalAmount || 0);
+                let dueDate = (o as SalesOrder).paymentDueDate;
+                if (!dueDate && (o as SalesOrder).creditDays) {
+                    dueDate = format(addDays(parseISO(o.date), (o as SalesOrder).creditDays!), 'yyyy-MM-dd');
+                }
+                
+                allMovements.push({
+                    date: o.date,
+                    type: 'Cargo',
+                    documentType: isClient ? 'O/V' : 'O/C',
+                    reference: isClient ? `OV-${o.number}` : `OC-${o.number}`,
+                    details: o.items,
+                    charge: grossAmount,
+                    payment: 0,
+                    paymentDueDate: dueDate,
+                });
+            });
+
         relevantPayments.forEach(f => {
-            movements.push({
+            let description = f.description || "Abono general";
+            if (f.relatedDocument) {
+              const docType = f.relatedDocument.type;
+              const docId = f.relatedDocument.id;
+              const order = [...salesOrders, ...purchaseOrders].find(o => o.id === docId);
+              description = `Pago ${docType}-${order?.number || docId}`;
+            }
+            allMovements.push({
                 date: f.date,
                 type: 'Abono',
                 documentType: 'Pago',
                 reference: f.voucherNumber || f.id,
-                details: f.description,
+                details: description,
                 charge: 0,
                 payment: f.amount || 0
             });
         });
 
-        movements.sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+        const sortedMovements = allMovements.sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+        const fromDate = dateRange?.from ? startOfDay(dateRange.from) : null;
+        
+        const bal = sortedMovements.reduce((acc, mov) => acc + (mov.charge - mov.payment), 0);
+        
+        const initialBal = fromDate ? sortedMovements
+            .filter(m => isBefore(parseISO(m.date), fromDate))
+            .reduce((balance, mov) => balance + mov.charge - mov.payment, 0) : 0;
 
-        let balance = 0;
-        return movements.map(m => {
-            balance += m.charge - m.payment;
-            return { ...m, balance };
-        });
-    }, [account, salesOrders, purchaseOrders, financialMovements]);
+        let runningBalance = initialBal;
+        const filtered = sortedMovements
+            .filter(m => {
+                if (!fromDate) return true;
+                const toDate = dateRange?.to ? endOfDay(dateRange.to) : endOfDay(fromDate);
+                return isWithinInterval(parseISO(m.date), { start: fromDate, end: toDate });
+            })
+            .map(m => {
+                runningBalance += m.charge - m.payment;
+                return { ...m, balance: runningBalance };
+            });
+
+        return { filteredMovements: filtered, initialBalance: initialBal, finalBalance: runningBalance };
+    }, [account, salesOrders, purchaseOrders, financialMovements, dateRange]);
+
 
     return (
         <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -345,39 +387,106 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <Button variant="outline" className="border-slate-700"><Download className="h-4 w-4 mr-2"/> PDF</Button>
+                             <PDFDownloadLink
+                                document={
+                                <StatementDocument
+                                    account={account}
+                                    movements={filteredMovements}
+                                    dateRange={dateRange}
+                                    initialBalance={initialBalance}
+                                />
+                                }
+                                fileName={`Estado_Cuenta_${account.contact.name.replace(/ /g, '_')}.pdf`}
+                            >
+                                {({ loading }) => (
+                                <Button variant="outline" className="border-slate-700" disabled={loading}>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    {loading ? 'Generando...' : 'PDF'}
+                                </Button>
+                                )}
+                            </PDFDownloadLink>
                             <Button variant="outline" className="border-slate-700"><Printer className="h-4 w-4 mr-2"/> Imprimir</Button>
                         </div>
                     </div>
                     <div className="mt-4 grid grid-cols-3 gap-4 text-center">
-                        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800"><p className="text-xs text-slate-500 uppercase">Total Operado</p><p className="text-lg font-bold">{formatCurrency(account.totalBilled)}</p></div>
+                        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800"><p className="text-xs text-slate-500 uppercase">Total Facturado</p><p className="text-lg font-bold">{formatCurrency(account.totalBilled)}</p></div>
                         <div className="bg-slate-950 p-3 rounded-lg border border-slate-800"><p className="text-xs text-slate-500 uppercase">Total Pagado</p><p className="text-lg font-bold text-emerald-400">{formatCurrency(account.totalPaid)}</p></div>
                          <div className="bg-slate-950 p-3 rounded-lg border border-slate-800"><p className="text-xs text-slate-500 uppercase">Saldo Actual</p><p className="text-lg font-bold text-amber-400">{formatCurrency(account.balance)}</p></div>
                     </div>
                 </SheetHeader>
 
-                <div className="flex-1 overflow-y-auto p-6">
-                    <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><FileText className="h-4 w-4" /> Cartola Histórica de Movimientos</h4>
-                    <ScrollArea className="h-[calc(100vh-300px)]">
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2"><FileText className="h-4 w-4" /> Cartola Histórica de Movimientos</h4>
+                        <div className="flex items-center gap-2">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  id="date"
+                                  variant={"outline"}
+                                  className={cn(
+                                    "w-[260px] justify-start text-left font-normal bg-slate-900 border-slate-700 hover:bg-slate-800 hover:text-slate-100",
+                                    !dateRange && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {dateRange?.from ? (
+                                    dateRange.to ? (
+                                      <>
+                                        {format(dateRange.from, "LLL dd, y")} -{" "}
+                                        {format(dateRange.to, "LLL dd, y")}
+                                      </>
+                                    ) : (
+                                      format(dateRange.from, "LLL dd, y")
+                                    )
+                                  ) : (
+                                    <span>Seleccionar rango</span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="end">
+                                <Calendar
+                                  initialFocus
+                                  mode="range"
+                                  defaultMonth={dateRange?.from}
+                                  selected={dateRange}
+                                  onSelect={setDateRange}
+                                  numberOfMonths={2}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                             <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-white" onClick={() => setDateRange(undefined)}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                    <ScrollArea className="h-[calc(100vh-350px)]">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Cargo</TableHead><TableHead className="text-right">Abono</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
+                            <TableHeader className="sticky top-0 bg-slate-900/80 backdrop-blur-sm z-10"><TableRow className="border-slate-800 hover:bg-slate-900"><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead className="text-right">Crédito</TableHead><TableHead className="text-right">Abono</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {detailedMovements.length === 0 ? (
-                                    <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">No hay movimientos para este contacto.</TableCell></TableRow>
+                                <TableRow className="border-slate-800/50 bg-slate-900 font-bold">
+                                    <TableCell colSpan={6} className="text-slate-400">Saldo Anterior (Transporte)</TableCell>
+                                    <TableCell className="text-right text-slate-400 font-mono">{formatCurrency(initialBalance)}</TableCell>
+                                </TableRow>
+
+                                {filteredMovements.length === 0 ? (
+                                    <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">No hay movimientos para este contacto en el período seleccionado.</TableCell></TableRow>
                                 ) : (
-                                    detailedMovements.map((mov, i) => (
+                                    filteredMovements.map((mov, i) => (
                                         <TableRow key={i} className={`border-slate-800/50 ${mov.type === 'Abono' ? 'bg-emerald-950/20' : ''}`}>
                                             <TableCell className="text-slate-400 text-xs">{format(parseISO(mov.date), 'dd-MM-yy')}</TableCell>
                                             <TableCell><Badge variant={mov.type === 'Cargo' ? 'outline' : 'default'} className={mov.type === 'Abono' ? 'bg-emerald-500/80 border-emerald-700' : 'border-slate-700'}>{mov.documentType}</Badge></TableCell>
                                             <TableCell className="font-mono text-xs">{mov.reference}</TableCell>
                                             <TableCell className="text-xs max-w-xs">
-                                                {typeof mov.details === 'string' ? mov.details : (
+                                                {typeof mov.details === 'string' ? (
+                                                    mov.details
+                                                ) : (
                                                     <TooltipProvider>
                                                         <Tooltip>
                                                             <TooltipTrigger asChild><span className="cursor-help underline decoration-dotted">{mov.details.length} ítem(s) de producto</span></TooltipTrigger>
                                                             <TooltipContent className="bg-slate-900 border-slate-800 text-slate-200">
-                                                                <div className="space-y-1">
-                                                                    {mov.details.map((item, idx) => <p key={idx}>{item.quantity} kg de {item.product} ({item.caliber})</p>)}
+                                                                <div className="space-y-1 p-2">
+                                                                    {mov.details.map((item, idx) => <p key={idx} className="text-xs">• {item.product} ({item.caliber}): {item.quantity}kg a {formatCurrency(item.price * 1.19)}</p>)}
                                                                 </div>
                                                             </TooltipContent>
                                                         </Tooltip>
@@ -390,6 +499,12 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                         </TableRow>
                                     ))
                                 )}
+                            </TableBody>
+                             <TableBody>
+                                <TableRow className="border-t-2 border-slate-700 bg-slate-900 font-bold">
+                                    <TableCell colSpan={6} className="text-right text-lg text-white">SALDO FINAL</TableCell>
+                                    <TableCell className="text-right text-lg font-mono text-amber-400">{formatCurrency(finalBalance)}</TableCell>
+                                </TableRow>
                             </TableBody>
                         </Table>
                     </ScrollArea>
