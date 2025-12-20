@@ -44,7 +44,7 @@ const navMain = [
   { title: "Despachos", url: "/dispatches", icon: ClipboardList },
   { title: "Inventario", url: "/inventory", icon: Package },
   { title: "Tesorería", url: "/financials", icon: Wallet },
-  { title: "Cta. Corriente", url: "/mercantile-account", icon: Briefcase },
+  { title: "Cta. Corriente", url: "/current-account", icon: Briefcase },
   { title: "Contactos", url: "/contacts", icon: Users },
   { title: "Reportes", url: "/reports", icon: FileText },
   { title: "Configuración", url: "/settings", icon: Settings },
