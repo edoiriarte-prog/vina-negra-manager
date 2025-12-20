@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { SalesOrder } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,6 @@ const StatusCell = ({ row }: { row: any }) => {
   const handleStatusChange = (newStatus: string) => {
     if (newStatus === order.status) return;
 
-    // Si el nuevo estado requiere fecha o factura, abre el modal.
     if (newStatus === 'dispatched' || newStatus === 'invoiced') {
         const initialDate = 
             newStatus === 'invoiced' && order.invoicedDate ? parseISO(order.invoicedDate) :
@@ -75,7 +74,6 @@ const StatusCell = ({ row }: { row: any }) => {
         });
         setIsModalOpen(true);
     } else {
-        // Para estados simples, actualiza directamente.
         saveStatus(newStatus);
     }
   };
@@ -115,6 +113,14 @@ const StatusCell = ({ row }: { row: any }) => {
       }
       saveStatus(modalData.newStatus, modalData.date, modalData.invoiceNumber);
   }
+
+  // **LA CORRECCIÓN CLAVE**
+  // Memorizamos la función que maneja la selección de fecha para estabilizar el componente Calendar.
+  const handleDateSelect = useCallback((date: Date | undefined) => {
+    if (date) {
+      setModalData(prev => prev ? { ...prev, date } : null);
+    }
+  }, []);
 
   const displayDate = order.status === 'invoiced' && order.invoicedDate 
     ? order.invoicedDate 
@@ -164,7 +170,7 @@ const StatusCell = ({ row }: { row: any }) => {
                     <Calendar
                         mode="single"
                         selected={modalData?.date}
-                        onSelect={(d) => d && setModalData(prev => prev ? {...prev, date: d} : null)}
+                        onSelect={handleDateSelect}
                         locale={es}
                         className="rounded-md border border-slate-800 bg-slate-900 p-2"
                     />
