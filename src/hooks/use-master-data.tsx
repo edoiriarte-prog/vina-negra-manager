@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
@@ -96,29 +97,52 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!db) {
+      console.error("MasterDataProvider: Firestore (db) no está inicializado.");
       Object.keys(loadingStates).forEach(key => setLoadingStates(prev => ({...prev, [key]: false})));
       return;
     };
 
     const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
-      if (docSnap.exists()) setSettings(prev => ({ ...prev, ...(docSnap.data() as Partial<MasterSettings>) }));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSettings({
+            products: data.products || [],
+            calibers: data.calibers || [],
+            warehouses: data.warehouses || [],
+            units: data.units || ['Kilos', 'Cajas'],
+            packagingTypes: data.packagingTypes || [],
+            productCaliberAssociations: data.productCaliberAssociations || [],
+        });
+      }
       setLoadingStates(prev => ({...prev, settings: false}));
-    }, () => setLoadingStates(prev => ({...prev, settings: false})));
+    }, (error) => {
+        console.error("Error cargando settings: ", error);
+        setLoadingStates(prev => ({...prev, settings: false}));
+    });
 
-    const unsubBanks = onSnapshot(collection(db, 'bankAccounts'), (snapshot) => {
+    const unsubBanks = onSnapshot(query(collection(db, 'bankAccounts'), orderBy('name', 'asc')), (snapshot) => {
       setBankAccounts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BankAccount)));
       setLoadingStates(prev => ({...prev, banks: false}));
-    }, () => setLoadingStates(prev => ({...prev, banks: false})));
+    }, (error) => {
+        console.error("Error cargando bankAccounts: ", error);
+        setLoadingStates(prev => ({...prev, banks: false}));
+    });
 
-    const unsubContacts = onSnapshot(collection(db, 'contacts'), (snapshot) => {
+    const unsubContacts = onSnapshot(query(collection(db, 'contacts'), orderBy('name', 'asc')), (snapshot) => {
       setContacts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contact)));
       setLoadingStates(prev => ({...prev, contacts: false}));
-    }, () => setLoadingStates(prev => ({...prev, contacts: false})));
+    }, (error) => {
+        console.error("Error cargando contacts: ", error);
+        setLoadingStates(prev => ({...prev, contacts: false}));
+    });
 
-    const unsubInventory = onSnapshot(collection(db, 'inventory'), (snapshot) => {
+    const unsubInventory = onSnapshot(query(collection(db, 'inventory')), (snapshot) => {
       setInventory(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
        setLoadingStates(prev => ({...prev, inventory: false}));
-    }, () => setLoadingStates(prev => ({...prev, inventory: false})));
+    }, (error) => {
+        console.error("Error cargando inventory: ", error);
+        setLoadingStates(prev => ({...prev, inventory: false}));
+    });
 
     return () => {
       unsubSettings();
@@ -132,6 +156,7 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
     if (!db) return;
     try {
         await setDoc(doc(db, 'settings', 'general'), { [field]: newList }, { merge: true });
+        toast({ title: "Configuración Actualizada", description: `Se actualizó el campo '${field}'.` });
     } catch (e) {
         console.error("Error updating settings:", e);
         toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar la configuración." });
@@ -140,37 +165,62 @@ export function MasterDataProvider({ children }: { children: ReactNode }) {
 
   const addProduct = (p: string) => { if (!settings.products.includes(p)) updateSettingList('products', [...settings.products, p]); };
   const removeProduct = (p: string) => updateSettingList('products', settings.products.filter(item => item !== p));
+  
   const addCaliber = (c: { name: string; code: string }) => { if (!settings.calibers.find(cal => cal.name === c.name)) updateSettingList('calibers', [...settings.calibers, c]); };
   const removeCaliber = (name: string) => updateSettingList('calibers', settings.calibers.filter(item => item.name !== name));
+  
   const addWarehouse = (w: string) => { if (!settings.warehouses.includes(w)) updateSettingList('warehouses', [...settings.warehouses, w]); };
   const removeWarehouse = (w: string) => updateSettingList('warehouses', settings.warehouses.filter(item => item !== w));
+
   const addUnit = (u: string) => { if (!settings.units.includes(u)) updateSettingList('units', [...settings.units, u]); };
   const removeUnit = (u: string) => updateSettingList('units', settings.units.filter(item => item !== u));
+
   const addPackagingType = (p: string) => { if (!settings.packagingTypes.includes(p)) updateSettingList('packagingTypes', [...settings.packagingTypes, p]); };
   const removePackagingType = (p: string) => updateSettingList('packagingTypes', settings.packagingTypes.filter(item => item !== p));
 
   const updateProductCalibers = (productName: string, caliberNames: string[]) => {
     const index = settings.productCaliberAssociations.findIndex(a => a.id === productName);
     let newAssociations = [...settings.productCaliberAssociations];
-    if (index >= 0) newAssociations[index] = { id: productName, calibers: caliberNames };
-    else newAssociations.push({ id: productName, calibers: caliberNames });
+    if (index >= 0) {
+        newAssociations[index] = { id: productName, calibers: caliberNames };
+    } else {
+        newAssociations.push({ id: productName, calibers: caliberNames });
+    }
     updateSettingList('productCaliberAssociations', newAssociations);
   };
 
   const addBankAccount = async (account: Omit<BankAccount, 'id'>) => {
-    await addDoc(collection(db, 'bankAccounts'), account);
-    toast({ title: "Cuenta Agregada" });
+    if (!db) return;
+    try {
+        await addDoc(collection(db, 'bankAccounts'), account);
+        toast({ title: "Cuenta Agregada" });
+    } catch (e) {
+        console.error("Error adding bank account:", e);
+        toast({ variant: 'destructive', title: "Error", description: "No se pudo agregar la cuenta." });
+    }
   };
   
   const updateBankAccount = async (account: BankAccount) => {
+     if (!db) return;
      const { id, ...data } = account;
-     await updateDoc(doc(db, 'bankAccounts', id), data);
-     toast({ title: "Cuenta Actualizada" });
+     try {
+        await updateDoc(doc(db, 'bankAccounts', id), data);
+        toast({ title: "Cuenta Actualizada" });
+     } catch (e) {
+        console.error("Error updating bank account:", e);
+        toast({ variant: 'destructive', title: "Error", description: "No se pudo actualizar la cuenta." });
+     }
   };
 
   const removeBankAccount = async (id: string) => {
-     await deleteDoc(doc(db, 'bankAccounts', id));
-     toast({ title: "Cuenta Eliminada" });
+     if (!db) return;
+     try {
+        await deleteDoc(doc(db, 'bankAccounts', id));
+        toast({ title: "Cuenta Eliminada", variant: 'destructive' });
+     } catch(e) {
+        console.error("Error removing bank account:", e);
+        toast({ variant: 'destructive', title: "Error", description: "No se pudo eliminar la cuenta." });
+     }
   };
 
   const internalConcepts = [{ name: 'Retiro de Socios' }, { name: 'Pago de Impuestos' }, { name: 'Comisión Bancaria' }, { name: 'Préstamo Interno' }, { name: 'Gastos Generales' }, { name: 'Mantención' }, { name: 'Combustible' }, { name: 'Remuneraciones' }, { name: 'Leyes Sociales' }];
