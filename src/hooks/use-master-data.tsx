@@ -1,241 +1,217 @@
-
 "use client";
 
-import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
-import { collection, doc, onSnapshot, updateDoc, arrayUnion, arrayRemove, writeBatch, addDoc, deleteDoc, getDocs } from 'firebase/firestore';
-import { db } from '@/firebase/init';
-import { Contact, BankAccount, ProductCaliberAssociation, Caliber } from '@/lib/types';
-import { useToast } from './use-toast';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useFirebase, setDocumentNonBlocking } from '@/firebase'; // Importar la función de escritura
+import { 
+  doc, collection, onSnapshot, updateDoc, arrayUnion, arrayRemove 
+} from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+
+// --- DEFINICIÓN DE TIPOS LOCALES (Para evitar errores de importación) ---
+export type BankAccount = {
+  id: string; 
+  name: string; 
+  bankName: string; 
+  accountNumber: string;
+  accountType: string; 
+  initialBalance: number; 
+  status: 'Activa' | 'Inactiva';
+  // Campos opcionales para compatibilidad
+  bank?: string; 
+  type?: string; 
+  currency?: 'CLP' | 'USD';
+};
+
+export type Caliber = {
+  name: string;
+  code: string;
+};
+
+export type ProductCaliberAssociation = {
+  id: string; 
+  calibers: string[]; 
+};
+
+type MasterDataDoc = {
+  products: string[]; 
+  warehouses: string[];
+  packagingTypes: string[];
+  bankAccounts: BankAccount[];
+  productCaliberAssociations: ProductCaliberAssociation[];
+  calibers: Caliber[];
+};
 
 export type MasterDataContextType = {
   products: string[];
-  calibers: Caliber[];
   warehouses: string[];
   packagingTypes: string[];
-  costCenters: { name: string }[];
-  contacts: Contact[];
+  calibers: Caliber[];
   bankAccounts: BankAccount[];
   productCaliberAssociations: ProductCaliberAssociation[];
-  inventory: any[]; // Consider creating a specific type for inventory items
+  contacts: any[]; // Recuperado para ventas
   isLoading: boolean;
-  addProduct: (productName: string) => void;
-  removeProduct: (productName: string) => void;
-  addCaliber: (caliber: Omit<Caliber, 'id'>) => void;
-  removeCaliber: (caliberName: string) => void;
-  addWarehouse: (warehouseName: string) => void;
-  removeWarehouse: (warehouseName: string) => void;
-  addPackagingType: (typeName: string) => void;
-  removePackagingType: (typeName: string) => void;
-  addBankAccount: (account: Omit<BankAccount, 'id'>) => void;
-  removeBankAccount: (accountId: string) => void;
+  
+  addProduct: (name: string) => void;
+  removeProduct: (name: string) => void;
+  addWarehouse: (name: string) => void;
+  removeWarehouse: (name: string) => void;
+  addPackagingType: (name: string) => void;
+  removePackagingType: (name: string) => void;
+  addCaliber: (caliber: Caliber) => void;
+  removeCaliber: (name: string) => void;
+  addBankAccount: (account: BankAccount) => void; // Acepta el objeto completo con ID
+  removeBankAccount: (id: string) => void;
   updateProductCalibers: (productId: string, calibers: string[]) => void;
-  getCalibersForProduct: (productId: string) => Caliber[];
+  getCalibersForProduct: (productId: string) => string[];
 };
 
+// --- CONTEXTO ---
 export const MasterDataContext = createContext<MasterDataContextType | undefined>(undefined);
 
+// --- PROVIDER ---
 export function MasterDataProvider({ children }: { children: ReactNode }) {
+  const { firestore } = useFirebase();
   const { toast } = useToast();
-
+  
+  const [loadingStates, setLoadingStates] = useState({
+      master: true,
+      contacts: true,
+  });
+  const isLoading = Object.values(loadingStates).some(s => s);
+  
   const [products, setProducts] = useState<string[]>([]);
-  const [calibers, setCalibers] = useState<Caliber[]>([]);
   const [warehouses, setWarehouses] = useState<string[]>([]);
   const [packagingTypes, setPackagingTypes] = useState<string[]>([]);
-  const [costCenters, setCostCenters] = useState<{ name: string }[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [calibers, setCalibers] = useState<Caliber[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [productCaliberAssociations, setProductCaliberAssociations] = useState<ProductCaliberAssociation[]>([]);
-  const [inventory, setInventory] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
 
-  const [loadingStates, setLoadingStates] = useState({
-    general: true,
-    contacts: true,
-    bankAccounts: true,
-    associations: true,
-    inventory: true,
-  });
+  const docRef = firestore ? doc(firestore, 'settings', 'master_data') : null;
 
-  const isLoading = Object.values(loadingStates).some(state => state);
-
-  // Listener para datos maestros generales
+  // 1. Cargar Configuración Maestra
   useEffect(() => {
-    if (!db) {
-      setLoadingStates(prev => ({ ...prev, general: false }));
-      return;
-    }
-    const unsub = onSnapshot(doc(db, 'settings', 'master_data'), (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
+    if (!docRef) { setLoadingStates(p => ({ ...p, master: false })); return; }
+    const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data() as MasterDataDoc;
         setProducts(data.products || []);
-        setCalibers(data.calibers || []);
         setWarehouses(data.warehouses || []);
         setPackagingTypes(data.packagingTypes || []);
-        setCostCenters(data.costCenters || []);
+        setCalibers(data.calibers || []);
+        setBankAccounts(data.bankAccounts || []);
+        setProductCaliberAssociations(data.productCaliberAssociations || []);
+      } else {
+        // Si no existe, lo creamos con valores por defecto
+        const initialData = { 
+            products: [], warehouses: [], packagingTypes: [], calibers: [], 
+            bankAccounts: [], productCaliberAssociations: [] 
+        };
+        setDocumentNonBlocking(docRef, initialData, { merge: false });
       }
-      setLoadingStates(prev => ({ ...prev, general: false }));
-    }, (error) => {
-      console.error("Error fetching general master data:", error);
-      setLoadingStates(prev => ({ ...prev, general: false }));
+      setLoadingStates(p => ({ ...p, master: false }));
+    }, (err) => {
+      console.error("Error al cargar master_data:", err);
+      setLoadingStates(p => ({ ...p, master: false }));
     });
-    return () => unsub();
-  }, []);
-  
-  // Listener para contactos
+    return () => unsubscribe();
+  }, [docRef]);
+
+  // 2. Cargar Contactos
   useEffect(() => {
-    if (!db) {
-      setLoadingStates(prev => ({ ...prev, contacts: false }));
-      return;
-    }
-    const unsub = onSnapshot(collection(db, 'contacts'), (snapshot) => {
-      const contactsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contact));
-      setContacts(contactsData);
-      setLoadingStates(prev => ({ ...prev, contacts: false }));
-    }, (error) => {
-      console.error("Error fetching contacts:", error);
-      setLoadingStates(prev => ({ ...prev, contacts: false }));
+    if (!firestore) { setLoadingStates(p => ({ ...p, contacts: false })); return; }
+    const contactsRef = collection(firestore, 'contacts');
+    const unsubscribe = onSnapshot(contactsRef, (snap) => {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setContacts(list);
+        setLoadingStates(p => ({ ...p, contacts: false }));
+    }, (err) => {
+      console.error("Error al cargar contacts:", err);
+      setLoadingStates(p => ({ ...p, contacts: false }));
     });
-    return () => unsub();
-  }, []);
+    return () => unsubscribe();
+  }, [firestore]);
 
-  // Listener para cuentas bancarias
-  useEffect(() => {
-    if (!db) {
-      setLoadingStates(prev => ({ ...prev, bankAccounts: false }));
-      return;
-    }
-    const unsub = onSnapshot(collection(db, 'bankAccounts'), (snapshot) => {
-      const accountsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
-      setBankAccounts(accountsData);
-      setLoadingStates(prev => ({ ...prev, bankAccounts: false }));
-    }, (error) => {
-      console.error("Error fetching bank accounts:", error);
-      setLoadingStates(prev => ({ ...prev, bankAccounts: false }));
-    });
-    return () => unsub();
-  }, []);
-
-  // Listener para asociaciones
-  useEffect(() => {
-    if (!db) {
-      setLoadingStates(prev => ({ ...prev, associations: false }));
-      return;
-    }
-    const unsub = onSnapshot(collection(db, 'productCaliberAssociations'), (snapshot) => {
-        const associationsData = snapshot.docs.map(doc => ({ id: doc.id, calibers: doc.data().calibers || [] }));
-        setProductCaliberAssociations(associationsData);
-        setLoadingStates(prev => ({ ...prev, associations: false }));
-    }, (error) => {
-        console.error("Error fetching product-caliber associations:", error);
-        setLoadingStates(prev => ({ ...prev, associations: false }));
-    });
-    return () => unsub();
-  }, []);
-  
-  // Listener para inventario
-  useEffect(() => {
-    if (!db) {
-        setLoadingStates(prev => ({...prev, inventory: false}));
-        return;
-    }
-    const unsub = onSnapshot(collection(db, "inventory"), (snapshot) => {
-      const inventoryData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setInventory(inventoryData);
-      setLoadingStates(prev => ({...prev, inventory: false}));
-    }, (error) => {
-      console.error("Error fetching inventory:", error);
-      setLoadingStates(prev => ({...prev, inventory: false}));
-    });
-    return () => unsub();
-  }, []);
-
-  // --- Funciones CRUD ---
-  const masterDocRef = db ? doc(db, 'settings', 'master_data') : null;
-
-  const updateMasterArray = async (field: string, value: any, action: 'add' | 'remove') => {
-    if (!masterDocRef) return;
-    try {
-      await updateDoc(masterDocRef, {
-        [field]: action === 'add' ? arrayUnion(value) : arrayRemove(value)
-      });
-      toast({ title: "Actualización Exitosa", description: `Se ha ${action === 'add' ? 'agregado' : 'eliminado'} el ítem.` });
-    } catch (e) {
-      console.error(e);
-      toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar la lista maestra." });
+  // --- ACCIONES ---
+  const updateField = (field: keyof MasterDataDoc, value: any) => {
+    if (docRef) {
+      updateDoc(docRef, { [field]: value }).catch(e => console.error(`Error updating ${field}`, e));
     }
   };
 
-  const addProduct = (productName: string) => updateMasterArray('products', productName, 'add');
-  const removeProduct = (productName: string) => updateMasterArray('products', productName, 'remove');
-  
-  const addCaliber = async (caliber: Omit<Caliber, 'id'>) => {
-      // Since calibers are now complex objects, we handle them carefully.
-      // We read the existing array, add the new one, and write back.
-      if (!masterDocRef) return;
-      const currentCalibers = calibers || [];
-      const newCalibers = [...currentCalibers, caliber];
-      try {
-        await updateDoc(masterDocRef, { calibers: newCalibers });
-        toast({ title: "Calibre Agregado" });
-      } catch(e) { console.error(e); }
+  const addToArray = (field: keyof MasterDataDoc, value: any) => {
+    if (docRef) updateDoc(docRef, { [field]: arrayUnion(value) });
+  };
+  const removeFromArray = (field: keyof MasterDataDoc, value: any) => {
+    if (docRef) updateDoc(docRef, { [field]: arrayRemove(value) });
   };
   
-  const removeCaliber = async (caliberName: string) => {
-       if (!masterDocRef) return;
-       const newCalibers = (calibers || []).filter(c => c.name !== caliberName);
-       try {
-        await updateDoc(masterDocRef, { calibers: newCalibers });
-        toast({ variant: 'destructive', title: "Calibre Eliminado" });
-      } catch(e) { console.error(e); }
+  const addProduct = (name: string) => {
+    const upperName = name.trim().toUpperCase();
+    if(products.includes(upperName)) return;
+    addToArray('products', upperName);
+    addToArray('productCaliberAssociations', { id: upperName, calibers: [] });
+  };
+  
+  const removeProduct = (name: string) => {
+    const newAssoc = productCaliberAssociations.filter(a => a.id !== name);
+    updateField('products', arrayRemove(name));
+    updateField('productCaliberAssociations', newAssoc);
   };
 
-  const addWarehouse = (warehouseName: string) => updateMasterArray('warehouses', warehouseName, 'add');
-  const removeWarehouse = (warehouseName: string) => updateMasterArray('warehouses', warehouseName, 'remove');
-  
-  const addPackagingType = (typeName: string) => updateMasterArray('packagingTypes', typeName, 'add');
-  const removePackagingType = (typeName: string) => updateMasterArray('packagingTypes', typeName, 'remove');
-  
-  const addBankAccount = async (account: Omit<BankAccount, 'id'>) => {
-      if (!db) return;
-      await addDoc(collection(db, 'bankAccounts'), account);
-  };
-
-  const removeBankAccount = async (accountId: string) => {
-      if (!db) return;
-      await deleteDoc(doc(db, 'bankAccounts', accountId));
-  };
-  
-  const updateProductCalibers = async (productId: string, newCalibers: string[]) => {
-      if(!db) return;
-      const docRef = doc(db, "productCaliberAssociations", productId);
-      try {
-        // Usamos setDoc con merge:true. Crea el doc si no existe, o lo actualiza si existe.
-        await updateDoc(docRef, { calibers: newCalibers });
-      } catch (e) {
-          // Si updateDoc falla porque el doc no existe, lo creamos con setDoc.
-          if ((e as any).code === 'not-found') {
-              await setDoc(docRef, { calibers: newCalibers });
-          } else {
-              console.error("Error al asociar calibres:", e);
-              toast({ variant: 'destructive', title: "Error de Asociación", description: "No se pudieron guardar los cambios."});
-          }
+  const updateProductCalibers = (productId: string, newCaliberNames: string[]) => {
+      if (!docRef) return;
+      const allAssociations = [...productCaliberAssociations];
+      const index = allAssociations.findIndex(a => a.id === productId);
+      if (index > -1) {
+          allAssociations[index].calibers = newCaliberNames;
+      } else {
+          allAssociations.push({ id: productId, calibers: newCaliberNames });
       }
+      updateField('productCaliberAssociations', allAssociations);
   };
 
-  const getCalibersForProduct = (productId: string): Caliber[] => {
-      const association = productCaliberAssociations.find(a => a.id === productId);
-      if (!association) return [];
-      return calibers.filter(c => association.calibers.includes(c.name));
+  const getCalibersForProduct = (productId: string) => {
+      return productCaliberAssociations.find(a => a.id === productId)?.calibers || [];
   };
 
-  const value = {
-    products, calibers, warehouses, packagingTypes, costCenters, contacts, bankAccounts, productCaliberAssociations, inventory,
-    isLoading,
-    addProduct, removeProduct, addCaliber, removeCaliber, addWarehouse, removeWarehouse,
-    addPackagingType, removePackagingType, addBankAccount, removeBankAccount,
-    updateProductCalibers, getCalibersForProduct
+  const addCaliber = (caliber: Caliber) => {
+    if(calibers.some(c => c.name.toUpperCase() === caliber.name.trim().toUpperCase())) return;
+    addToArray('calibers', { ...caliber, name: caliber.name.trim().toUpperCase() });
+  };
+  
+  const removeCaliber = (name: string) => {
+    const caliberToRemove = calibers.find(c => c.name === name);
+    if (caliberToRemove) removeFromArray('calibers', caliberToRemove);
+  };
+  
+  const addBankAccount = (account: BankAccount) => {
+      // Ahora acepta el objeto completo, incluido el ID predefinido
+      if(bankAccounts.some(b => b.id === account.id)) return;
+      addToArray('bankAccounts', account);
+  };
+  
+  const removeBankAccount = (id: string) => {
+      const acc = bankAccounts.find(a => a.id === id);
+      if(acc) removeFromArray('bankAccounts', acc);
   };
 
-  return <MasterDataContext.Provider value={value}>{children}</MasterDataContext.Provider>;
+  const value: MasterDataContextType = {
+    products, addProduct, removeProduct,
+    warehouses, addWarehouse: (w) => addToArray('warehouses', w), removeWarehouse: (w) => removeFromArray('warehouses', w),
+    packagingTypes, addPackagingType: (p) => addToArray('packagingTypes', p), removePackagingType: (p) => removeFromArray('packagingTypes', p),
+    calibers, addCaliber, removeCaliber,
+    bankAccounts, addBankAccount, removeBankAccount,
+    productCaliberAssociations, updateProductCalibers, getCalibersForProduct,
+    contacts, 
+    isLoading
+  };
+  
+  return (
+    <MasterDataContext.Provider value={value}>
+      {children}
+    </MasterDataContext.Provider>
+  );
 }
 
 export function useMasterData() {

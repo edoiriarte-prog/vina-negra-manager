@@ -5,6 +5,8 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  collection,
+  writeBatch,
   CollectionReference,
   DocumentReference,
   SetOptions,
