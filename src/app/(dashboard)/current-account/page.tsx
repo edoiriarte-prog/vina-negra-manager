@@ -1,9 +1,9 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
 import { useMasterData } from '@/hooks/use-master-data';
 import { useOperations } from '@/hooks/use-operations';
+import { useSalesOrdersCRUD } from '@/hooks/use-sales-orders-crud';
 import { Contact, SalesOrder, FinancialMovement, OrderItem } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,8 +60,9 @@ type DetailedMovement = {
 
 export default function CurrentAccountPage() {
   const { contacts, isLoading: l1 } = useMasterData();
-  const { salesOrders, financialMovements, isLoading: l2 } = useOperations();
-  const isLoading = l1 || l2;
+  const { salesOrders, isLoading: loadingSales } = useSalesOrdersCRUD();
+  const { financialMovements, isLoading: l2 } = useOperations();
+  const isLoading = l1 || l2 || loadingSales;
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<AccountSummary | null>(null);
@@ -198,7 +199,7 @@ function AccountCard({ account, onClick }: { account: AccountSummary, onClick: (
                 <div className="grid grid-cols-3 gap-2 text-center mb-4">
                     <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Vendido</p><p className="font-bold text-slate-200 text-sm">{formatCurrency(account.totalBilled)}</p></div>
                     <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Cobrado</p><p className="font-bold text-emerald-400 text-sm">{formatCurrency(account.totalPaid)}</p></div>
-                    <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Saldo</p><p className={'font-bold ${balanceColor} text-sm'}>{formatCurrency(account.balance)}</p></div>
+                    <div className="bg-slate-950 p-2 rounded-md border border-slate-800"><p className="text-xs text-slate-500 uppercase">Saldo</p><p className={`font-bold ${balanceColor} text-sm`}>{formatCurrency(account.balance)}</p></div>
                 </div>
                 
                 <Separator className="bg-slate-800 my-3"/>
@@ -399,7 +400,7 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
                                     <TableRow><TableCell colSpan={7} className="h-24 text-center text-slate-500">No hay movimientos en el período seleccionado.</TableCell></TableRow>
                                 ) : (
                                     filteredMovements.map((mov, i) => (
-                                        <TableRow key={i} className={'border-slate-800/50 ${mov.type === "Abono" ? "bg-emerald-950/20" : ""}'}>
+                                        <TableRow key={i} className={`border-slate-800/50 ${mov.type === "Abono" ? "bg-emerald-950/20" : ""}`}>
                                             <TableCell className="text-slate-400 text-xs">{format(parseISO(mov.date), 'dd-MM-yy', { locale: es })}</TableCell>
                                             <TableCell><Badge variant={mov.type === 'Cargo' ? 'outline' : 'default'} className={mov.type === 'Abono' ? 'bg-emerald-500/80 border-emerald-700' : 'border-slate-700'}>{mov.documentType}</Badge></TableCell>
                                             <TableCell className="font-mono text-xs">{mov.reference.replace('OV-OV-', 'OV-')}</TableCell>
@@ -439,5 +440,3 @@ function AccountDetailSheet({ account, isOpen, onOpenChange, salesOrders, financ
         </Sheet>
     )
 }
-
-    
