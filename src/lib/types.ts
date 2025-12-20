@@ -3,7 +3,7 @@
 // --- 0. TIPOS PRIMITIVOS Y GLOBALES ---
 export type ContactType = 'client' | 'supplier' | 'carrier' | 'other_income' | 'other_expense';
 export type InteractionType = 'Llamada' | 'Reunión' | 'Email' | 'Acuerdo' | 'Cotizacion';
-export type OrderStatus = 'pending' | 'completed' | 'cancelled' | 'received' | 'dispatched' | 'invoiced' | 'draft';
+export type OrderStatus = 'pending' | 'completed' | 'cancelled' | 'received' | 'dispatched' | 'invoiced' | 'draft' | 'paid';
 export type MovementType = 'income' | 'expense' | 'traspaso';
 export type Category = 'fruit' | 'supply' | 'service';
 export type Unit = 'Kilos' | 'Cajas' | 'Unidades' | 'Litros' | string;
@@ -209,6 +209,7 @@ export interface SalesOrder {
   dispatchedDate?: string; // Fecha ISO
   invoicedDate?: string;   // Fecha ISO
   invoiceNumber?: string;  // N° Documento
+  paidDate?: string; // Fecha ISO
 
   // Campos opcionales para visualización en PDF/Vistas (Expandidos)
   customer?: Contact;

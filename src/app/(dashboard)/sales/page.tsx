@@ -51,12 +51,9 @@ const formatDate = (dateString?: string) => {
 };
 
 const excelDate = (dateString?: string): Date | null => {
-    if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return null;
+    if (!dateString || !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(dateString)) return null;
     try {
-        const [year, month, day] = dateString.split('-').map(Number);
-        // Crear la fecha usando componentes numéricos para evitar problemas de zona horaria.
-        // new Date(year, month - 1, day) la interpreta en la zona horaria local del navegador.
-        const date = new Date(year, month - 1, day);
+        const date = parseISO(dateString);
         if (isValid(date)) {
           return date;
         }
@@ -145,6 +142,7 @@ export default function SalesPage() {
             'Fecha Despacho': excelDate(o.dispatchedDate),
             'Fecha Facturación': excelDate(o.invoicedDate),
             'N° Factura': o.invoiceNumber || '-',
+            'Fecha Pago': excelDate(o.paidDate),
         };
     });
 
@@ -159,7 +157,7 @@ export default function SalesPage() {
             ws[cell_address].t = 'n';
         });
         
-        const dateCols = ['B', 'K', 'O', 'P']; 
+        const dateCols = ['B', 'K', 'O', 'P', 'Q'];
         dateCols.forEach(col => {
              const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
              if (!ws[cell_address] || !ws[cell_address].v) return;

@@ -5,7 +5,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { SalesOrder } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { 
-  MoreHorizontal, ArrowUpDown, Eye, Edit, Trash, Check, Truck, FileText, Ban, ChevronDown, Calendar as CalendarIcon, Save
+  MoreHorizontal, ArrowUpDown, Eye, Edit, Trash, Check, Truck, FileText, Ban, DollarSign, Save, Calendar as CalendarIcon
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,158 +28,137 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { useSalesOrdersCRUD } from "@/hooks/use-sales-orders-crud";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 
-
-const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-    pending: { label: 'Pendiente', color: 'border-yellow-500/50 bg-yellow-950/50 text-yellow-400', icon: Check },
-    dispatched: { label: 'Despachada', color: 'border-blue-500/50 bg-blue-950/50 text-blue-400', icon: Truck },
-    invoiced: { label: 'Facturada', color: 'border-emerald-500/50 bg-emerald-950/50 text-emerald-400', icon: FileText },
-    cancelled: { label: 'Cancelada', color: 'border-red-500/50 bg-red-950/50 text-red-500', icon: Ban },
-};
-
-
-// --- COMPONENTE INTELIGENTE DE ESTADO (CON DIALOG/MODAL) ---
-const StatusCell = ({ row }: { row: any }) => {
+// --- NUEVO COMPONENTE STEPPER DE ESTADO ---
+const StatusStepper = ({ row }: { row: any }) => {
   const order = row.original as SalesOrder;
   const { updateSalesOrder } = useSalesOrdersCRUD();
   const { toast } = useToast();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalData, setModalData] = useState<{ newStatus: string; date?: Date; invoiceNumber?: string } | null>(null);
+  const [modalContent, setModalContent] = useState<{
+    status: 'dispatched' | 'invoiced' | 'paid';
+    title: string;
+    date?: Date;
+    invoiceNumber?: string;
+  } | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
 
-  const currentStatusConfig = statusConfig[order.status] || statusConfig.pending;
+  const milestones = [
+    { status: 'dispatched', icon: Truck, label: 'Despachada', date: order.dispatchedDate },
+    { status: 'invoiced', icon: FileText, label: 'Facturada', date: order.invoicedDate },
+    { status: 'paid', icon: DollarSign, label: 'Pagada', date: order.paidDate },
+  ];
 
-  const handleStatusChange = (newStatus: string) => {
-    if (newStatus === order.status) return;
-
-    if (newStatus === 'dispatched' || newStatus === 'invoiced') {
-        const initialDate = 
-            newStatus === 'invoiced' && order.invoicedDate ? parseISO(order.invoicedDate) :
-            newStatus === 'dispatched' && order.dispatchedDate ? parseISO(order.dispatchedDate) :
-            new Date();
-
-        setModalData({
-            newStatus,
-            date: initialDate,
-            invoiceNumber: order.invoiceNumber || ''
-        });
-        setIsModalOpen(true);
-    } else {
-        saveStatus(newStatus);
+  const handleMilestoneClick = (status: 'dispatched' | 'invoiced' | 'paid', label: string) => {
+    // Solo abre el modal si el paso no se ha completado
+    const milestone = milestones.find(m => m.status === status);
+    if (milestone && !milestone.date) {
+      setModalContent({ status, title: `Marcar como ${label}`, date: new Date() });
+      setIsModalOpen(true);
     }
   };
 
-  const saveStatus = async (statusToSave: string, date?: Date, invoiceNumber?: string) => {
-    setIsLoading(true);
-    const updateData: Partial<SalesOrder> = { status: statusToSave as any };
-
-    if (statusToSave === 'dispatched' && date) {
-        updateData.dispatchedDate = date.toISOString();
-    } else if (statusToSave === 'invoiced' && date) {
-        updateData.invoicedDate = date.toISOString();
-        updateData.invoiceNumber = invoiceNumber;
+  const handleModalSave = async () => {
+    if (!modalContent || !modalContent.date) {
+      toast({ variant: "destructive", title: "Fecha requerida" });
+      return;
     }
+    if (modalContent.status === 'invoiced' && !modalContent.invoiceNumber) {
+      toast({ variant: "destructive", title: "N° de Factura requerido" });
+      return;
+    }
+
+    setIsLoading(true);
+    const updateData: Partial<SalesOrder> = { status: modalContent.status };
+    
+    if (modalContent.status === 'dispatched') updateData.dispatchedDate = modalContent.date.toISOString();
+    if (modalContent.status === 'invoiced') {
+        updateData.invoicedDate = modalContent.date.toISOString();
+        updateData.invoiceNumber = modalContent.invoiceNumber;
+    }
+    if (modalContent.status === 'paid') updateData.paidDate = modalContent.date.toISOString();
 
     try {
-        await updateSalesOrder(order.id, updateData);
-        toast({ title: "Estado Actualizado", description: `La orden ahora está ${statusConfig[statusToSave].label}.` });
-        setIsModalOpen(false);
-        setModalData(null);
+      await updateSalesOrder(order.id, updateData);
+      toast({ title: "Estado Actualizado", description: `La orden ahora está ${modalContent.title.toLowerCase()}.` });
+      setIsModalOpen(false);
+      setModalContent(null);
     } catch (error) {
-        toast({ variant: "destructive", title: "Error al actualizar" });
+      toast({ variant: "destructive", title: "Error al actualizar" });
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
-  
-  const handleModalSave = () => {
-      if (!modalData) return;
-      if (!modalData.date) {
-          toast({ variant: "destructive", title: "Fecha requerida" });
-          return;
-      }
-      if (modalData.newStatus === 'invoiced' && !modalData.invoiceNumber) {
-          toast({ variant: "destructive", title: "N° de Factura requerido" });
-          return;
-      }
-      saveStatus(modalData.newStatus, modalData.date, modalData.invoiceNumber);
-  }
-
-  const handleDateSelect = useCallback((date: Date | undefined) => {
-    if (date) {
-      setModalData(prev => prev ? { ...prev, date } : null);
-    }
-  }, []);
-
-  const displayDate = order.status === 'invoiced' && order.invoicedDate 
-    ? order.invoicedDate 
-    : (order.status === 'dispatched' && order.dispatchedDate ? order.dispatchedDate : null);
 
   return (
     <>
-      <Select value={order.status} onValueChange={handleStatusChange}>
-        <SelectTrigger 
-            className={`h-auto min-w-[150px] justify-between text-xs font-semibold px-3 py-1.5 transition-all ${currentStatusConfig.color}`}
-            disabled={isLoading}
-        >
-            <SelectValue>
-                <div className="flex flex-col items-start">
-                    <span className="flex items-center gap-1.5">
-                        <currentStatusConfig.icon className="h-3.5 w-3.5" />
-                        {currentStatusConfig.label}
-                    </span>
-                    {displayDate && (
-                        <span className="text-[10px] font-normal text-slate-500 pl-5">
-                            {format(parseISO(displayDate), 'dd/MM/yy')}
-                        </span>
-                    )}
+      <div className="flex items-center gap-4">
+        {milestones.map((milestone, index) => {
+          const isCompleted = !!milestone.date;
+          const isClickable = !isCompleted;
+          
+          return (
+            <div key={milestone.status} className="flex items-center gap-4 relative">
+              <div 
+                className={`flex flex-col items-center gap-1 text-center cursor-${isClickable ? 'pointer' : 'default'} group`}
+                onClick={() => isClickable && handleMilestoneClick(milestone.status as any, milestone.label)}
+              >
+                <div className={`
+                  h-8 w-8 rounded-full flex items-center justify-center border-2 transition-all
+                  ${isCompleted 
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' 
+                    : 'bg-slate-800 border-slate-700 text-slate-500 group-hover:border-blue-500 group-hover:text-blue-400'
+                  }`}
+                >
+                  <milestone.icon className="h-4 w-4" />
                 </div>
-            </SelectValue>
-        </SelectTrigger>
-        <SelectContent className="bg-slate-900 border-slate-700 text-slate-100">
-             {Object.entries(statusConfig).map(([key, { label }]) => (
-                <SelectItem key={key} value={key} className="focus:bg-slate-800">{label}</SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
+                <div className={`text-[10px] font-medium transition-colors ${isCompleted ? 'text-slate-300' : 'text-slate-500 group-hover:text-slate-300'}`}>{milestone.label}</div>
+                 {isCompleted && (
+                    <div className="text-[9px] text-slate-500 -mt-1">
+                        {format(parseISO(milestone.date!), 'dd-MM-yy')}
+                    </div>
+                )}
+              </div>
+
+              {index < milestones.length - 1 && (
+                <div className={`w-6 border-t-2 ${isCompleted ? 'border-emerald-500' : 'border-slate-700 border-dashed'}`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       <AlertDialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <AlertDialogContent className="bg-slate-950 border-slate-800 text-slate-100">
             <AlertDialogHeader>
-                <AlertDialogTitle>Confirmar Estado: {statusConfig[modalData?.newStatus || '']?.label}</AlertDialogTitle>
+                <AlertDialogTitle>{modalContent?.title || 'Confirmar Estado'}</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Por favor, proporcione la información adicional requerida.
+                    Seleccione la fecha en que ocurrió este evento.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-4 py-4">
-                 <div className="space-y-2">
-                    <Label className="text-xs text-slate-400">
-                        Fecha de {modalData?.newStatus === 'dispatched' ? 'Despacho' : 'Facturación'}
-                    </Label>
+                 <div className="flex justify-center">
                     <Calendar
                         mode="single"
-                        selected={modalData?.date}
-                        onSelect={handleDateSelect}
+                        selected={modalContent?.date}
+                        onSelect={(date) => date && setModalContent(prev => prev ? { ...prev, date } : null)}
                         locale={es}
                         className="rounded-md border border-slate-800 bg-slate-900 p-2"
                     />
                 </div>
-                {modalData?.newStatus === 'invoiced' && (
+                {modalContent?.status === 'invoiced' && (
                     <div className="space-y-2">
                         <Label htmlFor="invoiceNumber" className="text-xs text-slate-400">N° Factura</Label>
                         <Input
                             id="invoiceNumber"
-                            value={modalData.invoiceNumber}
-                            onChange={(e) => setModalData(prev => prev ? {...prev, invoiceNumber: e.target.value} : null)}
+                            value={modalContent.invoiceNumber || ''}
+                            onChange={(e) => setModalContent(prev => prev ? {...prev, invoiceNumber: e.target.value} : null)}
                             className="bg-slate-900 border-slate-700 h-9"
                             placeholder="Ej: 12345"
                         />
@@ -262,7 +241,7 @@ export const getColumns = ({ onEdit, onDelete, onPreview, clients }: GetColumnsP
   {
     accessorKey: "status",
     header: "Estado",
-    cell: ({ row }) => <StatusCell row={row} />,
+    cell: ({ row }) => <StatusStepper row={row} />,
   },
   {
     accessorKey: "totalAmount",
