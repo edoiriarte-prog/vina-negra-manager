@@ -102,21 +102,23 @@ export default function SalesPage() {
     }
   };
 
-  // Exportar Excel
+  // Exportar Excel (SOLUCIÓN DEFENSIVA)
   const handleExportPackingList = () => {
     if (filteredOrders.length === 0) return toast({ variant: "destructive", title: "No hay datos", description: "No hay órdenes para exportar." });
     
     // --- HELPERS OBLIGATORIOS ---
-    const safeDate = (value: any) => {
-        if (!value) return ""; // Si es null, undefined o string vacío -> RETORNA CADENA VACÍA
-        const d = new Date(value);
-        if (isNaN(d.getTime())) return ""; // Si la fecha es inválida -> RETORNA CADENA VACÍA
-        return d; // Retorna el objeto Date para que xlsx lo formatee
+    const formatSafeDate = (val: any) => {
+      if (!val || val === "null" || val === "undefined") return ""; // Si no hay dato, CELDA VACÍA.
+      const date = new Date(val);
+      // Si la fecha es inválida o es epoch (año 1969/1970), devolver vacío
+      if (isNaN(date.getTime()) || date.getFullYear() <= 1970) return "";
+      return format(date, "dd/MM/yyyy");
     };
-    
-    const safeNumber = (value: any) => {
-        if (value === null || value === undefined || value === "") return "";
-        return Number(value);
+
+    const formatSafeNumber = (val: any) => {
+        if (val === null || val === undefined || val === "") return "";
+        const num = parseFloat(val);
+        return isNaN(num) ? "" : num; // Si no es número, CELDA VACÍA.
     };
 
     const data = filteredOrders.map(o => {
@@ -125,49 +127,27 @@ export default function SalesPage() {
         const total = o.includeVat !== false ? net * 1.19 : net;
         return {
             'N° Venta': o.number || '',
-            'Fecha Emisión': safeDate(o.date),
+            'Fecha Emisión': formatSafeDate(o.date),
             'Cliente': clientName,
             'Estado': o.status || '',
-            'Kilos Totales': safeNumber(o.totalKilos),
-            'Monto Neto': safeNumber(net),
-            'Monto Total c/IVA': safeNumber(total),
+            'Kilos Totales': formatSafeNumber(o.totalKilos),
+            'Monto Neto': formatSafeNumber(net),
+            'Monto Total c/IVA': formatSafeNumber(total),
             'Tipo de Venta': o.saleType || '',
             'Forma de Pago': o.paymentMethod || '',
-            'Días Crédito': safeNumber(o.creditDays),
-            'Fecha Vencimiento': safeDate(o.paymentDueDate),
+            'Días Crédito': formatSafeNumber(o.creditDays),
+            'Fecha Vencimiento': formatSafeDate(o.paymentDueDate),
             'Bodega Origen': o.warehouse || '',
             'Chofer': o.driver || '',
             'Patente': o.plate || '',
-            'Fecha Despacho': safeDate(o.dispatchedDate),
-            'Fecha Facturación': safeDate(o.invoicedDate),
-            'N° Factura': safeNumber(o.invoiceNumber),
-            'Fecha Pago': safeDate(o.paidDate),
+            'Fecha Despacho': formatSafeDate(o.dispatchedDate),
+            'Fecha Facturación': formatSafeDate(o.invoicedDate),
+            'N° Factura': formatSafeNumber(o.invoiceNumber),
+            'Fecha Pago': formatSafeDate(o.paidDate),
         };
     });
 
     const ws = XLSX.utils.json_to_sheet(data);
-    
-    // Aplicar formatos a las celdas
-    const range = XLSX.utils.decode_range(ws['!ref']!);
-    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      const dateCols = ['B', 'K', 'O', 'P', 'R'];
-      dateCols.forEach(col => {
-        const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
-        if (ws[cell_address] && ws[cell_address].v) {
-          ws[cell_address].t = 'd';
-          ws[cell_address].z = 'dd-mm-yyyy';
-        }
-      });
-      
-      const numCols = ['E', 'F', 'G', 'J', 'Q'];
-       numCols.forEach(col => {
-        const cell_address = XLSX.utils.encode_cell({c: XLSX.utils.decode_col(col), r: R});
-        if (ws[cell_address] && (ws[cell_address].v !== null || ws[cell_address].v !== undefined)) {
-          ws[cell_address].t = 'n';
-        }
-      });
-    }
-
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ventas");
     XLSX.writeFile(wb, `Reporte_Ventas_${format(new Date(), 'ddMMyyyy')}.xlsx`);
@@ -241,7 +221,7 @@ export default function SalesPage() {
                     <TableRow key={order.id} className="border-slate-800 hover:bg-slate-800/50">
                         <TableCell className="font-medium text-slate-200 text-xs">{order.number}</TableCell>
                         <TableCell className="text-slate-400 text-xs">{formatDate(order.date)}</TableCell>
-                        <TableCell className="text-right text-emerald-400 font-mono text-xs font-bold">{formatCurrency(order.totalAmount * (order.includeVat !== false ? 1.19 : 1))}</TableCell>
+                        <TableCell className="text-right text-emerald-400 font-mono text-xs font-bold">{formatCurrency((order.totalAmount || 0) * (order.includeVat !== false ? 1.19 : 1))}</TableCell>
                         <TableCell><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPreviewOrder(order)}><FileText className="h-3 w-3 text-blue-400"/></Button></TableCell>
                     </TableRow>
                 ))}

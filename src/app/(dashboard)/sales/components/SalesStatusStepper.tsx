@@ -1,7 +1,7 @@
-
 "use client";
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation'; // Importado para el refresco forzoso
 import { SalesOrder } from '@/lib/types';
 import { useSalesOrdersCRUD } from '@/hooks/use-sales-orders-crud';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +39,7 @@ type ModalData = {
 export function SalesStatusStepper({ order }: SalesStatusStepperProps) {
   const { updateSalesOrder } = useSalesOrdersCRUD();
   const { toast } = useToast();
+  const router = useRouter(); // Instanciamos el router
 
   const [isLoading, setIsLoading] = useState(false);
   const [modalData, setModalData] = useState<ModalData | null>(null);
@@ -86,6 +87,8 @@ export function SalesStatusStepper({ order }: SalesStatusStepperProps) {
       await updateSalesOrder(order.id, updateData);
       toast({ title: "Estado Actualizado", description: `La orden ahora está marcada como ${modalData.status}.` });
       setModalData(null);
+      // SOLUCIÓN DE FUERZA BRUTA: Recargar la página completa para asegurar la actualización visual.
+      window.location.reload(); 
     } catch (error) {
       toast({ variant: "destructive", title: "Error al actualizar" });
     } finally {
