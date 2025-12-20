@@ -53,12 +53,12 @@ export default function DispatchesPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  const { salesOrders, purchaseOrders, inventoryAdjustments, isLoading: loadingOps } = useOperations();
+  const { purchaseOrders, inventoryAdjustments, isLoading: loadingOps } = useOperations();
   const { contacts, inventory, isLoading: loadingMaster } = useMasterData();
-  const { createSalesOrder, updateSalesOrder, deleteSalesOrder } = useSalesOrdersCRUD();
+  const { salesOrders, createSalesOrder, updateSalesOrder, deleteSalesOrder, isLoading: loadingSales } = useSalesOrdersCRUD();
 
 
-  const isLoading = loadingOps || loadingMaster;
+  const isLoading = loadingOps || loadingMaster || loadingSales;
 
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [confirmingEditOrder, setConfirmingEditOrder] = useState<SalesOrder | null>(null);
@@ -73,7 +73,7 @@ export default function DispatchesPage() {
   
   // Filtramos órdenes activas
   const dispatchOrders = useMemo(() => {
-      return salesOrders.filter(o => o.orderType === 'dispatch' && o.status !== 'cancelled'); 
+      return (salesOrders || []).filter(o => o.orderType === 'dispatch' && o.status !== 'cancelled'); 
   }, [salesOrders]);
 
   const groupedOrders = useMemo(() => {

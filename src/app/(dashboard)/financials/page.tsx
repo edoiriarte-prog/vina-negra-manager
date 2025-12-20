@@ -1,11 +1,12 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
 import { useOperations } from '@/hooks/use-operations';
 import { useMasterData } from '@/hooks/use-master-data';
-import { useFinancialsCRUD } from '@/hooks/use-financials-crud';
-import { useSalesOrdersCRUD } from '@/hooks/use-sales-orders-crud'; // IMPORTADO
+// 👇 AQUI ESTA EL CAMBIO: Usamos CRUD (Mayúsculas) como pide tu sistema
+import { useFinancialsCRUD } from '@/hooks/use-financials-crud'; 
+import { useSalesOrdersCRUD } from '@/hooks/use-sales-orders-crud'; 
+
 import { FinancialMovement, BankAccount } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,9 @@ const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 
 export default function FinancialsPage() {
   const { bankAccounts, contacts } = useMasterData();
   const { financialMovements, purchaseOrders, serviceOrders } = useOperations();
-  const { salesOrders } = useSalesOrdersCRUD(); // OBTENIDO DEL HOOK CORRECTO
+  
+  // 👇 Usamos los nombres en mayúscula
+  const { salesOrders } = useSalesOrdersCRUD(); 
   const { createFinancialMovement, updateFinancialMovement, deleteFinancialMovement } = useFinancialsCRUD();
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -90,7 +93,7 @@ export default function FinancialsPage() {
       onEdit: handleEdit, 
       onDelete: setDeletingMovement, 
       bankAccounts: bankAccounts || [] 
-  }), [bankAccounts, handleEdit]);
+  }), [bankAccounts]); 
 
   return (
     <>
@@ -218,5 +221,3 @@ export default function FinancialsPage() {
     </>
   );
 }
-
-    
