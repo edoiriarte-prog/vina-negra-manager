@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -95,6 +96,27 @@ export default function FinancialsPage() {
       bankAccounts: bankAccounts || [] 
   }), [bankAccounts]); 
 
+  const accountBalances = useMemo(() => {
+    if (!bankAccounts || !financialMovements) return {};
+    const balances: Record<string, { income: number; expense: number }> = {};
+    
+    bankAccounts.forEach(acc => {
+      balances[acc.id] = { income: 0, expense: 0 };
+    });
+
+    financialMovements.forEach(mov => {
+      const amount = Number(mov.amount) || 0;
+      if (mov.destinationAccountId && balances[mov.destinationAccountId]) {
+        balances[mov.destinationAccountId].income += amount;
+      }
+      if (mov.sourceAccountId && balances[mov.sourceAccountId]) {
+        balances[mov.sourceAccountId].expense += amount;
+      }
+    });
+
+    return balances;
+  }, [bankAccounts, financialMovements]);
+
   return (
     <>
     <div className="flex-1 space-y-6 p-8 pt-6 bg-slate-950 min-h-screen text-slate-100">
@@ -134,10 +156,9 @@ export default function FinancialsPage() {
               <Landmark className="h-5 w-5 text-slate-500" /> Mis Cuentas
           </h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {bankAccounts?.map(acc => {
-                  const accIncome = financialMovements?.filter(m => m.destinationAccountId === acc.id).reduce((sum, m) => sum + Number(m.amount), 0) || 0;
-                  const accExpense = financialMovements?.filter(m => m.sourceAccountId === acc.id).reduce((sum, m) => sum + Number(m.amount), 0) || 0;
-                  const currentBalance = (acc.initialBalance || 0) + accIncome - accExpense;
+              {(bankAccounts || []).map(acc => {
+                  const balances = accountBalances[acc.id] || { income: 0, expense: 0 };
+                  const currentBalance = (acc.initialBalance || 0) + balances.income - balances.expense;
 
                   return (
                     <Card key={acc.id} onClick={() => setSelectedAccount(acc)} className="bg-gradient-to-br from-slate-900 to-slate-800 border-slate-800 hover:border-slate-700 transition-all shadow-md group cursor-pointer">
@@ -156,11 +177,11 @@ export default function FinancialsPage() {
                            <div className="text-xs space-y-1 text-slate-400 border-t border-slate-800/50 pt-2">
                                <div className="flex justify-between items-center">
                                    <span className='flex items-center gap-1'><ArrowDownLeft className='h-3 w-3 text-emerald-500'/> Ingresos</span>
-                                   <span className='font-mono'>{formatCurrency(accIncome)}</span>
+                                   <span className='font-mono'>{formatCurrency(balances.income)}</span>
                                </div>
                                 <div className="flex justify-between items-center">
                                    <span className='flex items-center gap-1'><ArrowUpRight className='h-3 w-3 text-rose-500'/> Egresos</span>
-                                   <span className='font-mono'>{formatCurrency(accExpense)}</span>
+                                   <span className='font-mono'>{formatCurrency(balances.expense)}</span>
                                </div>
                            </div>
                         </CardContent>
@@ -221,3 +242,4 @@ export default function FinancialsPage() {
     </>
   );
 }
+
