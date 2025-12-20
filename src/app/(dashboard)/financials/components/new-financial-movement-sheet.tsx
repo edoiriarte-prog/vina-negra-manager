@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -177,13 +178,15 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
 
   const pendingDocuments = useMemo(() => {
     if (!contactId) return [];
-    if (movementType === 'income') return salesOrders.filter(o => o.clientId === contactId && (o.status === 'dispatched' || o.status === 'invoiced'));
-    if (movementType === 'expense') return purchaseOrders.filter(o => o.supplierId === contactId && (o.status === 'completed' || o.status === 'received'));
+    if (movementType === 'income') return (salesOrders || []).filter(o => o.clientId === contactId && (o.status === 'dispatched' || o.status === 'invoiced'));
+    if (movementType === 'expense') return (purchaseOrders || []).filter(o => o.supplierId === contactId && (o.status === 'completed' || o.status === 'received'));
     return [];
   }, [contactId, movementType, salesOrders, purchaseOrders]);
 
   const documentBalance = useMemo(() => {
-    const doc = [...salesOrders, ...purchaseOrders].find(d => d.id === pendingDocId);
+    const safeSalesOrders = salesOrders || [];
+    const safePurchaseOrders = purchaseOrders || [];
+    const doc = [...safeSalesOrders, ...safePurchaseOrders].find(d => d.id === pendingDocId);
     if (!doc) return { total: 0, paid: 0, pending: 0, vat: 0, net: 0, isComplete: false };
     
     const netAmount = doc.totalAmount || 0;
@@ -223,12 +226,12 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
 
   const handleViewDocument = () => {
     if (!pendingDocId) return;
-    const isSale = salesOrders.some(order => order.id === pendingDocId);
+    const isSale = (salesOrders || []).some(order => order.id === pendingDocId);
     if (isSale) {
         window.open('/sales', '_blank');
         return;
     }
-    const isPurchase = purchaseOrders.some(order => order.id === pendingDocId);
+    const isPurchase = (purchaseOrders || []).some(order => order.id === pendingDocId);
     if (isPurchase) {
         window.open('/purchases', '_blank');
     }
@@ -265,7 +268,7 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
       manualDteFolio: data.manualDteFolio || undefined,
       relatedDocument: data.pendingDocumentId ? {
         id: data.pendingDocumentId,
-        type: salesOrders.some(s => s.id === data.pendingDocumentId) ? 'OV' : 'OC',
+        type: (salesOrders || []).some(s => s.id === data.pendingDocumentId) ? 'OV' : 'OC',
       } : undefined,
       items: data.items,
     };
@@ -673,3 +676,5 @@ export function NewFinancialMovementSheet({ isOpen, onOpenChange, onSave, moveme
     </>
   );
 }
+
+    

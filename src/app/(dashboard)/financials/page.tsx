@@ -1,9 +1,11 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
 import { useOperations } from '@/hooks/use-operations';
 import { useMasterData } from '@/hooks/use-master-data';
-import { useFinancialsCRUD } from '@/hooks/use-financials-crud'; 
+import { useFinancialsCRUD } from '@/hooks/use-financials-crud';
+import { useSalesOrdersCRUD } from '@/hooks/use-sales-orders-crud'; // IMPORTADO
 import { FinancialMovement, BankAccount } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,8 @@ const formatCurrency = (val: number) => new Intl.NumberFormat('es-CL', { style: 
 
 export default function FinancialsPage() {
   const { bankAccounts, contacts } = useMasterData();
-  const { financialMovements, purchaseOrders, salesOrders, serviceOrders } = useOperations();
+  const { financialMovements, purchaseOrders, serviceOrders } = useOperations();
+  const { salesOrders } = useSalesOrdersCRUD(); // OBTENIDO DEL HOOK CORRECTO
   const { createFinancialMovement, updateFinancialMovement, deleteFinancialMovement } = useFinancialsCRUD();
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -215,3 +218,5 @@ export default function FinancialsPage() {
     </>
   );
 }
+
+    
