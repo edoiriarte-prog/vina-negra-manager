@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trash2, Plus, Users, Truck, Info, PackageCheck, DollarSign, CreditCard, CalendarIcon, Warehouse, Landmark, Loader2 } from "lucide-react";
 import {
@@ -452,3 +452,5 @@ export function NewSalesOrderSheet({
     </>
   );
 }
+
+    
