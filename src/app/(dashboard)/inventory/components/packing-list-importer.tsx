@@ -225,7 +225,8 @@ export function PackingListImporter({ isOpen, onOpenChange, onImported }: Packin
         id:               row.no_tarja,
       }));
 
-      const fechaBase = rows[0]?.fechaEmbal || new Date().toISOString().split('T')[0];
+      // Usamos fecha de HOY para que aparezca como entrada del periodo actual
+      const fechaBase = new Date().toISOString().split('T')[0];
 
       const oc: Omit<PurchaseOrder, 'id'> = {
         date:        fechaBase,
