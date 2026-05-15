@@ -55,6 +55,32 @@ const normalizeDate = (dateString: string) => {
 const formatKilos = (val: number) => new Intl.NumberFormat('es-CL').format(Math.round(val)) + ' kg';
 const normalize = (str?: string) => (str || '').trim().toUpperCase();
 
+// Mapeo de calibres ZC Logistics → nombres estándar Viña Negra
+const CALIBRE_MAP: Record<string, string> = {
+  'MAND_CHICA': 'CHICA',
+  'MAND_MED': 'MEDIANA',
+  'MAND_GRANDE': 'GRANDE',
+  'MAND_SEGUNDA': 'SEGUNDA',
+  'MAND_PRIMERA': 'PRIMERA',
+  'MAND_EXTRA': 'EXTRA-PRIMERA',
+  'MEDIAN': 'MEDIANA',
+  'CHICO': 'CHICA',
+  'GRANDE': 'GRANDE',
+  'MEDIANA': 'MEDIANA',
+  'CHICA': 'CHICA',
+  'SEGUNDA': 'SEGUNDA',
+  'TERCERA': 'TERCERA',
+  'CUARTA': 'CUARTA',
+  'EXTRA-PRIMERA': 'EXTRA-PRIMERA',
+  'EXTRA PRIMERA': 'EXTRA-PRIMERA',
+  'PRE CALIBRE': 'PRE CALIBRE',
+  'PREC.': 'PRE CALIBRE',
+};
+const normalizeCalibre = (str?: string): string => {
+  const upper = (str || '').trim().toUpperCase();
+  return CALIBRE_MAP[upper] || upper;
+};
+
 export default function InventoryPage() {
   const { toast } = useToast();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -114,7 +140,9 @@ export default function InventoryPage() {
             oc.items.forEach(linea => {
                 allMovements.push({
                     date: normalizeDate(oc.date),
-                    product: linea.product, caliber: linea.caliber, warehouse: oc.warehouse,
+                    product: linea.product,
+                    caliber: normalizeCalibre(linea.caliber),
+                    warehouse: oc.warehouse,
                     quantity: Number(linea.quantity), type: 'ENTRADA'
                 });
             });
@@ -123,15 +151,15 @@ export default function InventoryPage() {
 
     // --- PROCESAR VENTAS ---
     salesOrders.forEach(ov => {
-        if (ov.status === 'dispatched' || ov.status === 'completed' || ov.status === 'invoiced') {
+        if (ov.status === 'dispatched' || ov.status === 'completed' || ov.status === 'invoiced' || ov.status === 'paid') {
             if (ov.saleType === 'Traslado Bodega Interna') {
                  ov.items.forEach(linea => {
-                    allMovements.push({ date: normalizeDate(ov.date), product: linea.product, caliber: linea.caliber, warehouse: ov.warehouse!, quantity: Number(linea.quantity), type: 'SALIDA' });
-                    allMovements.push({ date: normalizeDate(ov.date), product: linea.product, caliber: linea.caliber, warehouse: ov.destinationWarehouse!, quantity: Number(linea.quantity), type: 'ENTRADA' });
+                    allMovements.push({ date: normalizeDate(ov.date), product: linea.product, caliber: normalizeCalibre(linea.caliber), warehouse: ov.warehouse!, quantity: Number(linea.quantity), type: 'SALIDA' });
+                    allMovements.push({ date: normalizeDate(ov.date), product: linea.product, caliber: normalizeCalibre(linea.caliber), warehouse: ov.destinationWarehouse!, quantity: Number(linea.quantity), type: 'ENTRADA' });
                  });
             } else {
                 ov.items.forEach(linea => {
-                    allMovements.push({ date: normalizeDate(ov.date), product: linea.product, caliber: linea.caliber, warehouse: ov.warehouse!, quantity: Number(linea.quantity), type: 'SALIDA' });
+                    allMovements.push({ date: normalizeDate(ov.date), product: linea.product, caliber: normalizeCalibre(linea.caliber), warehouse: ov.warehouse!, quantity: Number(linea.quantity), type: 'SALIDA' });
                 });
             }
         }
@@ -140,7 +168,10 @@ export default function InventoryPage() {
     // --- PROCESAR AJUSTES ---
     inventoryAdjustments.forEach(adj => {
         allMovements.push({
-            date: normalizeDate(adj.date), product: adj.product, caliber: adj.caliber, warehouse: adj.warehouse,
+            date: normalizeDate(adj.date),
+            product: adj.product,
+            caliber: normalizeCalibre(adj.caliber),
+            warehouse: adj.warehouse,
             quantity: Number(adj.quantity), type: adj.type === 'increase' ? 'ENTRADA' : 'SALIDA'
         });
     });
