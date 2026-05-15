@@ -16,7 +16,7 @@ import { format, startOfMonth, endOfMonth, isBefore, parseISO, startOfDay, endOf
 import { es } from 'date-fns/locale';
 import { 
   Search, Package, Download, History,
-  Calendar as CalendarIcon, TrendingUp, TrendingDown, Boxes
+  Calendar as CalendarIcon, TrendingUp, TrendingDown, Boxes, FileUp
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { InventoryHistoryDialog } from './components/inventory-history-dialog';
+import { PackingListImporter } from './components/packing-list-importer';
 import { useFirebase } from '@/firebase';
 import { Calendar } from '@/components/ui/calendar';
 
@@ -55,27 +56,40 @@ const normalizeDate = (dateString: string) => {
 const formatKilos = (val: number) => new Intl.NumberFormat('es-CL').format(Math.round(val)) + ' kg';
 const normalize = (str?: string) => (str || '').trim().toUpperCase();
 
-// Mapeo de calibres ZC Logistics → nombres estándar Viña Negra
+// ─────────────────────────────────────────────────────────────────────────────
+// Mapeo de calibres ZC Logistics / Frigorifico Zepeda → nombres estándar Viña Negra
+// ─────────────────────────────────────────────────────────────────────────────
 const CALIBRE_MAP: Record<string, string> = {
-  'MAND_CHICA': 'CHICA',
-  'MAND_MED': 'MEDIANA',
-  'MAND_GRANDE': 'GRANDE',
-  'MAND_SEGUNDA': 'SEGUNDA',
-  'MAND_PRIMERA': 'PRIMERA',
-  'MAND_EXTRA': 'EXTRA-PRIMERA',
-  'MEDIAN': 'MEDIANA',
-  'CHICO': 'CHICA',
-  'GRANDE': 'GRANDE',
-  'MEDIANA': 'MEDIANA',
-  'CHICA': 'CHICA',
-  'SEGUNDA': 'SEGUNDA',
-  'TERCERA': 'TERCERA',
-  'CUARTA': 'CUARTA',
+  'MAND_CHICA':    'CHICA',
+  'MAND_MED':      'MEDIANA',
+  'MAND_GRANDE':   'GRANDE',
+  'MAND_SEGUNDA':  'SEGUNDA',
+  'MAND_PRIMERA':  'PRIMERA',
+  'MAND_EXTRA':    'EXTRA-PRIMERA',
+  'MEDIAN':        'MEDIANA',
+  'MEDIANA':       'MEDIANA',
+  'CHICO':         'CHICA',
+  'CHICA':         'CHICA',
+  'GRANDE':        'GRANDE',
+  'PREC.':         'PRE CALIBRE',
+  'PREC':          'PRE CALIBRE',
+  'PRE CALIBRE':   'PRE CALIBRE',
+  'TC':            'TODO CALIBRE',
+  'TODO CALIBRE':  'TODO CALIBRE',
+  'QUINTA':        'QUINTA',
+  'SEGUNDA':       'SEGUNDA',
+  'TERCERA':       'TERCERA',
+  'CUARTA':        'CUARTA',
   'EXTRA-PRIMERA': 'EXTRA-PRIMERA',
   'EXTRA PRIMERA': 'EXTRA-PRIMERA',
-  'PRE CALIBRE': 'PRE CALIBRE',
-  'PREC.': 'PRE CALIBRE',
+  '3':  'CAL-3',
+  '4':  'CAL-4',
+  '4B': 'CAL-4B',
+  '5':  'CAL-5',
+  '5A': 'CAL-5A',
+  '6':  'CAL-6',
 };
+
 const normalizeCalibre = (str?: string): string => {
   const upper = (str || '').trim().toUpperCase();
   return CALIBRE_MAP[upper] || upper;
@@ -87,11 +101,8 @@ export default function InventoryPage() {
   const { firestore } = useFirebase();
   
   // 👇 2. SEPARAMOS LAS FUENTES DE DATOS
-  // useOperations ya NO trae salesOrders
   const { purchaseOrders, inventoryAdjustments } = useOperations();
-  // Traemos salesOrders desde su propio hook
   const { salesOrders } = useSalesOrdersCRUD(); 
-  
   const { warehouses, products, contacts } = useMasterData();
   
   const [filterMode, setFilterMode] = useState<FilterMode>("day");
@@ -103,9 +114,10 @@ export default function InventoryPage() {
   const [filtroProducto, setFiltroProducto] = useState<string>("All");
   const [busqueda, setBusqueda] = useState("");
   const [itemSeleccionado, setItemSeleccionado] = useState<InventoryReportItem | null>(null);
+  // 👇 NUEVO: estado para abrir/cerrar el importador
+  const [importerOpen, setImporterOpen] = useState(false);
 
   const kardexData = useMemo(() => {
-    // Validamos que existan los arrays (salesOrders puede venir vacío al principio)
     if (!purchaseOrders || !salesOrders || !inventoryAdjustments) return [];
     
     let fechaInicioRaw: Date, fechaFinRaw: Date;
@@ -134,7 +146,6 @@ export default function InventoryPage() {
     const reportMap = new Map<string, InventoryReportItem>();
     const allMovements: { date: Date, product: string, caliber: string, warehouse: string, quantity: number, type: 'ENTRADA' | 'SALIDA' }[] = [];
 
-    // --- PROCESAR COMPRAS ---
     purchaseOrders.forEach(oc => {
         if (oc.status === 'received' || oc.status === 'completed') {
             oc.items.forEach(linea => {
@@ -149,7 +160,6 @@ export default function InventoryPage() {
         }
     });
 
-    // --- PROCESAR VENTAS ---
     salesOrders.forEach(ov => {
         if (ov.status === 'dispatched' || ov.status === 'completed' || ov.status === 'invoiced' || ov.status === 'paid') {
             if (ov.saleType === 'Traslado Bodega Interna') {
@@ -165,7 +175,6 @@ export default function InventoryPage() {
         }
     });
 
-    // --- PROCESAR AJUSTES ---
     inventoryAdjustments.forEach(adj => {
         allMovements.push({
             date: normalizeDate(adj.date),
@@ -176,7 +185,6 @@ export default function InventoryPage() {
         });
     });
 
-    // --- CALCULAR KARDEX ---
     allMovements.forEach(mov => {
         if (!mov.product || !mov.caliber || !mov.warehouse) return;
         
@@ -211,7 +219,6 @@ export default function InventoryPage() {
     return reporte.sort((a, b) => a.product.localeCompare(b.product) || a.caliber.localeCompare(b.caliber));
   }, [purchaseOrders, salesOrders, inventoryAdjustments, date, dateRange, month, filterMode]);
   
-  // Cálculos de Totales y Filtros UI
   const { datosFiltrados, resumenPorProducto, totalEntradas, totalSalidas, stockFinalTotal } = useMemo(() => {
     let data = kardexData;
 
@@ -279,9 +286,18 @@ export default function InventoryPage() {
             <h2 className="text-3xl font-bold tracking-tight text-white">Auditoría de Stock (Kardex)</h2>
             <p className="text-slate-400 mt-1">Análisis de movimientos de inventario por periodo.</p>
         </div>
-        <Button onClick={handleExport} variant="outline" className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800">
+        {/* 👇 BOTONES DE ACCIÓN */}
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setImporterOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
+          >
+            <FileUp className="mr-2 h-4 w-4" /> Importar Packing List
+          </Button>
+          <Button onClick={handleExport} variant="outline" className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800">
             <Download className="mr-2 h-4 w-4" /> Exportar a Excel
-        </Button>
+          </Button>
+        </div>
       </div>
       
       <div className="grid gap-4 md:grid-cols-3">
@@ -388,6 +404,16 @@ export default function InventoryPage() {
         </div>
       </Card>
     </div>
+
+    {/* 👇 IMPORTADOR DE PACKING LIST */}
+    <PackingListImporter
+      isOpen={importerOpen}
+      onOpenChange={setImporterOpen}
+      onImported={() => {
+        setImporterOpen(false);
+        toast({ title: "Inventario actualizado", description: "El packing list fue importado correctamente." });
+      }}
+    />
 
     {itemSeleccionado && (
       <InventoryHistoryDialog 
